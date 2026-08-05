@@ -76,6 +76,14 @@ platform gate.
   simultaneous-timestamp batching, common-case Brier, coverage, and explicit
   end-to-end utility semantics. It is methodology evidence only and does not
   establish live provider performance.
+- A local Planning Desk intake surface with privacy-minimal fields, stable
+  hashed request IDs, an idempotent SQLite queue, and explicit no-Telegraph/no-
+  payment status. It prepares legitimate pilot demand without claiming usage.
+- A file-backed observation ingestion boundary with raw-export hashing,
+  duplicate-event rejection, exact observation contracts, and an explicit
+  operator-verification requirement for source independence.
+- A pilot runbook, evidence-led X drafts, and a track/submission checklist
+  that distinguish completed local preparation from live protocol gates.
 
 ## Actionable next, not platform-blocked
 

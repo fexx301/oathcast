@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -7,6 +8,7 @@ from oathcast.application import ApplicationDecision, MinerReply
 from oathcast.cases import CaseConflict, CaseStateError, SqliteCaseStore
 from oathcast.forecast import ForecastQuestion
 from oathcast.ground_truth import (
+    FileObservationSource,
     GroundTruthResult,
     PrecipitationObservation,
     resolve_precipitation,
@@ -105,6 +107,33 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(invalid.status, "invalid")
         self.assertEqual(invalid.issue, "observation_predates_event_end")
         self.assertIsNone(invalid.outcome)
+
+    def test_file_observation_source_hashes_and_rejects_duplicates(self):
+        observation = self.observation(0.4)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "observations.json"
+            path.write_text(
+                json.dumps({"observations": [observation.to_dict()]}),
+                encoding="utf-8",
+            )
+            source = FileObservationSource(path)
+            self.assertEqual(source.observation_count, 1)
+            self.assertEqual(len(source.source_sha256), 64)
+            self.assertEqual(
+                source.observe(self.question).observation_id,
+                observation.observation_id,
+            )
+            self.assertEqual(
+                source.manifest()["independence_status"],
+                "must_be_verified_by_operator",
+            )
+
+            path.write_text(
+                json.dumps([observation.to_dict(), observation.to_dict()]),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError):
+                FileObservationSource(path)
 
     def test_case_lifecycle_is_idempotent_and_survives_restart(self):
         with tempfile.TemporaryDirectory() as directory:

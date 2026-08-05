@@ -25,7 +25,7 @@
 - **Recommended action:** `plan_for_no_event`
 - **External Miner used:** yes
 - **External influence detected:** yes
-- **Application request ID:** `app-b5db3c20020c43539f3ba48212445395`
+- **Application request ID:** `app-40858f23d6a44768b1f2606519abfe92`
 
 ## Later resolution
 
@@ -38,8 +38,8 @@
 ## Durable evidence
 
 - **Question SHA-256:** `c69272144fb4cfec7d6b5f95ad35e3892da2e22498b526cdc28a5f12ec4f62be`
-- **Decision SHA-256:** `c40df940220e874e2483995dca4a617bd6f384a695bf5925cbd7d1627fad0151`
-- **Resolution SHA-256:** `923ee483cf8f1d22d0f7787a6bf8088fb2d38a901d794f5569af9801a37a84fa`
+- **Decision SHA-256:** `6ae324bb640b2963d8c1f70c9a361a6f49c1699639fd4b644cf7bd98d9decc6d`
+- **Resolution SHA-256:** `7fb769559962e2eb629b8b5f886f11f103f10f2aa869140c37c96c26d5da664e`
 - **Protocol/payment receipts:** not present in this fixture run
 
 ## Owned-Miner-disabled ablation

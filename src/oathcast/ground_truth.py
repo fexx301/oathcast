@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import math
+from pathlib import Path
 from typing import Any, Protocol
 
 from oathcast.forecast import ForecastQuestion, ensure_utc, format_timestamp, parse_timestamp
@@ -259,3 +262,51 @@ class MappingObservationSource:
 
     def observe(self, question: ForecastQuestion) -> PrecipitationObservation | None:
         return self.observations.get(question.event_id)
+
+
+class FileObservationSource:
+    """Load exact-window observations from a hashed JSON export.
+
+    This is an ingestion boundary, not an assertion that any particular file
+    or upstream provider is independent enough for the hackathon.  The file
+    must contain a JSON list of observation objects, or an object with an
+    ``observations`` list.  Duplicate event IDs are rejected rather than
+    silently choosing one observation.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = str(path)
+        raw = Path(path).read_bytes()
+        self.source_sha256 = hashlib.sha256(raw).hexdigest()
+        data = json.loads(raw.decode("utf-8"))
+        if isinstance(data, list):
+            records = data
+        elif isinstance(data, dict) and isinstance(data.get("observations"), list):
+            records = data["observations"]
+        else:
+            raise ValueError("observation file must be a JSON list or {observations: [...]} object")
+
+        observations: dict[str, PrecipitationObservation] = {}
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                raise ValueError(f"observation record {index} must be an object")
+            observation = PrecipitationObservation.from_dict(record)
+            if observation.event_id in observations:
+                raise ValueError(f"duplicate observation event_id: {observation.event_id}")
+            observations[observation.event_id] = observation
+        self.observations = observations
+
+    @property
+    def observation_count(self) -> int:
+        return len(self.observations)
+
+    def observe(self, question: ForecastQuestion) -> PrecipitationObservation | None:
+        return self.observations.get(question.event_id)
+
+    def manifest(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "source_sha256": self.source_sha256,
+            "observation_count": self.observation_count,
+            "independence_status": "must_be_verified_by_operator",
+        }

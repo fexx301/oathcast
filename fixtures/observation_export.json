@@ -1,0 +1,16 @@
+{
+  "export_status": "development_fixture_only",
+  "observations": [
+    {
+      "event_id": "dev-lagos-2026-08-17-1500z",
+      "latitude": 6.5244,
+      "longitude": 3.3792,
+      "window_start": "2026-08-17T15:00:00Z",
+      "window_end": "2026-08-17T16:00:00Z",
+      "precipitation_mm": 0.25,
+      "source": "development-fixture-observation",
+      "observation_id": "fixture-observation-1",
+      "observed_at": "2026-08-17T16:00:00Z"
+    }
+  ]
+}

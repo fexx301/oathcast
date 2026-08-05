@@ -63,6 +63,10 @@ From the OathCast directory:
     PYTHONPATH=src python3 scripts/demo_application.py \
       --compare-owned-fallback --format markdown \
       --output artifacts/application-demo/oathcast-application-demo.md
+    PYTHONPATH=src python3 scripts/application_pilot.py \
+      --host 127.0.0.1 --port 8787 --database state/pilot.sqlite3
+    PYTHONPATH=src python3 scripts/validate_observations.py \
+      fixtures/observation_export.json
     PYTHONPATH=src python3 scripts/create_registration_draft.py
     PYTHONPATH=src python3 scripts/public_canary.py --skip-authenticated
     PYTHONPATH=src python3 scripts/backup_receipts.py \
@@ -104,6 +108,14 @@ setup. `backup_receipts.py` uses SQLite's online backup API, runs integrity
 checks on both copies, and verifies that the row count survives restoration.
 The `--compare-owned-fallback` demo mode proves the Application can make a
 decision from external Miners when the owned OathCast Miner is disabled.
+
+`application_pilot.py` serves the local Planning Desk intake surface. It queues
+privacy-minimal planning questions in SQLite and makes no Miner, Telegraph, or
+payment call. See `docs/application-pilot.md` before sharing it with pilot
+users. `FileObservationSource` and `validate_observations.py` provide the
+provider-neutral ingestion boundary for a later independent observation
+export; the bundled observation file is a development fixture and its
+independence is not asserted.
 
 `discover_live_miners.py` makes a read-only request to Telegraph's public
 `/miner-dispatcher/integrations` endpoint and prints active external weather

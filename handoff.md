@@ -8,7 +8,7 @@
 - **Former descriptive name:** Forecast Court
 - **Workspace:** `/Users/femi/Documents/My-Projects/oathcast`
 - **Last updated:** 2026-08-05
-- **Current state:** Project folder created. Registration form completed. Discord access obtained. Local vertical-slice scaffolding, deployment package, hardened x402 boundary, external response normalization, read-only live Miner discovery with optional evidence snapshots, strict provider-native event validation, cutoff enforcement, immutable SQLite forecast receipts, durable Application case evidence, exact-window ground-truth resolution, request correlation, release provenance, readiness/auth/rate-limit controls, local Miner draft validation, a fixture-excluding append-only demand provenance ledger, a thin case workflow, SQLite backup/restore checks, an independent canary entry point, an owned-Miner fallback ablation, typed registration declarations, protocol result/receipt envelopes, a human-readable Application evidence shell, a canonical registration dry-run artifact, Explorer evidence templates, repository/canary setup documentation, a local adversarial Script Author benchmark, and a leakage-safe chronological provider backtest are implemented locally and pass 88 tests. The authorized AWS EC2 staging host still runs the exact v3.2 Docker release behind verified public HTTPS at `https://oathcastcourt.duckdns.org`; the v3.2 release was verified at 64 tests, while the follow-on recovery/canary/ablation/provenance/presentation/benchmark/backtest changes are local and not yet deployed. The old v3.1 container is retained stopped for rollback and the temporary EC2 Instance Connect rule has been removed. No Miner registration, paid external request, or WASM registration exists. The project has not yet been pushed to a hosted Git remote; the local GitHub CLI session is unauthenticated.
+- **Current state:** Project folder created. Registration form completed. Discord access obtained. Local vertical-slice scaffolding, deployment package, hardened x402 boundary, external response normalization, read-only live Miner discovery with optional evidence snapshots, strict provider-native event validation, cutoff enforcement, immutable SQLite forecast receipts, durable Application case evidence, exact-window ground-truth resolution, request correlation, release provenance, readiness/auth/rate-limit controls, local Miner draft validation, a fixture-excluding append-only demand provenance ledger, a thin case workflow, SQLite backup/restore checks, an independent canary entry point, an owned-Miner fallback ablation, typed registration declarations, protocol result/receipt envelopes, a human-readable Application evidence shell, a canonical registration dry-run artifact, Explorer evidence templates, repository/canary setup documentation, a local adversarial Script Author benchmark, a leakage-safe chronological provider backtest, a local Planning Desk intake pilot, and a hashed file-observation ingestion boundary are implemented locally and pass 94 tests. The authorized AWS EC2 staging host still runs the exact v3.2 Docker release behind verified public HTTPS at `https://oathcastcourt.duckdns.org`; the v3.2 release was verified at 64 tests, while the follow-on recovery/canary/ablation/provenance/presentation/benchmark/backtest/pilot changes are local and not yet deployed. The old v3.1 container is retained stopped for rollback and the temporary EC2 Instance Connect rule has been removed. No Miner registration, paid external request, or WASM registration exists. The project has not yet been pushed to a hosted Git remote; the local GitHub CLI session is unauthenticated.
 - **Primary positioning:** A public calibration court for machine forecasts.
 - **One-line pitch:** OathCast time-locks short-horizon machine forecasts, settles them against independent observations, and makes Miner quality visible through transparent scoring.
 
@@ -37,7 +37,7 @@ Commit to the full three-track narrative only after the vertical-slice gates pas
 
 ## 4. Advisor decision record
 
-An independent advisor was consulted three times using `gpt-5.6-sol` at maximum reasoning effort.
+An independent advisor was consulted multiple times using `gpt-5.6-sol`; the latest review covered the chronological backtest contract.
 
 ### Advisor verdict
 
@@ -312,15 +312,18 @@ Implemented under `/Users/femi/Documents/My-Projects/oathcast`:
 - `src/oathcast/reference_evaluator.py`: development-only proxy for the future three-input Script Author contract; not the official scorer.
 - `src/oathcast/script_benchmark.py`: deterministic development comparison between the baseline proxy and a stricter anti-gaming candidate; not the official Canonical Script.
 - `src/oathcast/backtest.py`: timestamped warmup/holdout provider benchmark with resolution-aware, prior-only selection; not live provider evidence.
+- `src/oathcast/pilot.py`: local Planning Desk intake UI/server and idempotent SQLite queue; intake-only, with no Telegraph or payment calls.
+- `src/oathcast/ground_truth.py`: `FileObservationSource` validates and hashes an observation export while leaving source independence for operator verification.
 - `src/oathcast/scoring.py`: Brier loss, Brier quality, unclipped Brier skill, coverage, and zero-scored non-valid attempts.
 - `fixtures/`: development provider payloads, registry snapshot, evaluator cases, one common question, ten timestamped synthetic Brier cases, and the fixed Script Author adversarial corpus.
 - `artifacts/benchmarks/script-author-adversarial-report.json`: reproducible local benchmark evidence with fixture hash, baseline/candidate comparison, issue counts, and an explicit non-official status.
 - `artifacts/benchmarks/chronological-provider-backtest.json`: reproducible local provider report with warmup/holdout metrics, common-case comparisons, resolution-aware selection trace, and explicit non-live status.
+- `docs/application-pilot.md`, `docs/x-update-drafts.md`, and `docs/submission-checklist.md`: local pilot runbook, evidence-led public-update drafts, and track/submission gate checklist.
 - `miners/`: one canonical OathCast Miner registration draft plus three provider-adapter YAML experiments; only the canonical draft is a registration candidate.
 - `scripts/discover_live_miners.py`: read-only live registry discovery; it does not pay, sign, or write a snapshot.
 - `scripts/preflight_miner.py`: one unpaid challenge inspection for a selected Miner; it never attaches a signer.
 - `Dockerfile`, `.dockerignore`, `.env.example`, `Caddyfile`, and `DEPLOYMENT.md`: public-service packaging and operational handoff.
-- `tests/`: 77 standard-library contract tests; all pass.
+- `tests/`: 94 standard-library contract tests; all pass.
 
 Read-only live registry observation on 2026-08-03 (volatile; query again before routing):
 
@@ -484,6 +487,8 @@ Current phase, before August 17, 2026.
 - Build and test the development reference evaluator against structured, chat, empty, and overlong responses; replace its proxy scoring once the official harness arrives.
 - Run the local Script Author adversarial benchmark after evaluator changes; keep its fixture hash and report separate from live-usage evidence.
 - Run the chronological provider backtest after fixture or adapter changes; preserve the timestamped fixture hash, warmup/holdout boundary, resolution-aware selection trace, and explicit synthetic-only label.
+- Run the local Planning Desk intake pilot to collect concrete, privacy-minimal planning questions without making protocol calls; review queued requests before any future live routing.
+- Validate independent observation exports with `FileObservationSource`; retain the export hash and source manifest, but do not label a source independent until its provenance is verified.
 - Base Sepolia USDC and the minimum Miner price of 0.01 USDC are confirmed; exact wallet/faucet flow remains open.
 - Prepare a minimal Application shell.
 
@@ -680,6 +685,7 @@ Avoid building:
 - **2026-08-05:** User supplied the complete judging breakdown from the official track panels: Track 1 is 75% normalized performance + 25% X; Track 2 is 50% improvement over baseline + 30% robustness/code quality + 10% X + 10% community engagement/adoption; Track 3 is 45% real usage/adoption + 25% usefulness/creativity/depth + 25% X + 5% technical execution/integration. Reframed the strategy: Application is the primary product lane if real demand can be secured, Script Author is the controllable technical secondary lane, and Miner is the lifecycle/support lane where performance—not social activity—dominates.
 - **2026-08-05:** Added the local Script Author adversarial benchmark: ten fixed development cases, baseline-versus-candidate behavior comparison, explicit rejection of wrong outcomes and anti-gaming patterns, fixture hashing, and a reproducible JSON report. The candidate achieved 1.0 behavior accuracy, 1.0 good-case pass rate, and 1.0 adversarial rejection on this corpus versus 0.5 baseline behavior accuracy. These are local diagnostics only—not Telegraph's Canonical Script, WASM score, or qualifying traffic. Full regression now passes 82 tests; AWS remains on v3.2 and was not redeployed.
 - **2026-08-05:** Added a leakage-safe chronological provider backtest. The Brier fixture now carries issued, cutoff, horizon, and resolution timestamps; the runner freezes a four-case warmup and six-case holdout, gates history on `resolved_at <= issued_at`, batches simultaneous issue times, reports conditional/common-case Brier plus coverage and end-to-end utility, and excludes unresolved cases. On this synthetic fixture, holdout Brier is Open-Meteo `0.061060`, OpenWeather `0.081780`, and WeatherAPI `0.093125`; the prior-only selector chose Open-Meteo for all six decisions. These are methodology checks only, not live provider evidence. Full regression now passes 88 tests; AWS remains on v3.2 and was not redeployed.
+- **2026-08-05:** Added the local Planning Desk pilot and `FileObservationSource`. The pilot serves an intake-only UI backed by an idempotent, hashed SQLite queue and explicitly makes no Miner, Telegraph, or payment call. The observation boundary loads a JSON export, rejects duplicate event IDs, fingerprints the raw file, and leaves source independence as an operator verification step. Added pilot runbook, X update drafts, and a track/submission checklist. Full regression now passes 94 tests; AWS remains on v3.2 and was not redeployed. Repository push remains pending because the local GitHub CLI credential is invalid.
 
 ## 19. Handoff maintenance protocol
 

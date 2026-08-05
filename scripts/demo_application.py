@@ -159,7 +159,10 @@ def main() -> None:
         print(output)
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(output + "\n", encoding="utf-8")
+        args.output.write_text(
+            output if output.endswith("\n") else output + "\n",
+            encoding="utf-8",
+        )
         print(f"wrote {args.output}")
 
 
