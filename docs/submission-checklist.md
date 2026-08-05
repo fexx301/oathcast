@@ -42,9 +42,9 @@ source is independently verifiable.
 
 ## Submission integrity
 
-- [ ] Hosted repository is public or otherwise accessible to judges.
-- [ ] Secrets, private keys, wallet files, local databases, and credentials are absent.
-- [ ] README explains what is live, synthetic, pending, and platform-dependent.
+- [x] Hosted repository is public or otherwise accessible to judges.
+- [x] Secrets, private keys, wallet files, local databases, and credentials are absent.
+- [x] README explains what is live, synthetic, pending, and platform-dependent.
 - [ ] Demo video shows the Application consuming independent Miners.
 - [ ] Every traffic/usage number links to Explorer or payment evidence.
 - [ ] No fixture or automated traffic is presented as adoption.
