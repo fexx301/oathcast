@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "future_live_telegraph_request",
+  "status": "unverified_template",
+  "official_demand_claimed": false,
+  "captured_at": null,
+  "application": {
+    "release_id": null,
+    "source_sha256": null,
+    "request_id": null,
+    "event_id": null,
+    "intent": null,
+    "question": null,
+    "forecast_window_utc": {
+      "start": null,
+      "end": null,
+      "cutoff": null
+    },
+    "registry_snapshot_sha256": null
+  },
+  "telegraph": {
+    "route_mode": "telegraph",
+    "miner_id": null,
+    "miner_slug": null,
+    "request_or_signal_id": null,
+    "response_status": null,
+    "response_sha256": null,
+    "signal_receipt_sha256": null
+  },
+  "payment": {
+    "method": null,
+    "asset": "USDC",
+    "network": "Base Sepolia",
+    "declared_price_usdc": "0.01",
+    "paid_amount_usdc": null,
+    "payment_attempt_id": null,
+    "challenge_sha256": null,
+    "settlement_artifact_sha256": null,
+    "settlement_verification": "unverified"
+  },
+  "explorer": {
+    "url": null,
+    "checked_at": null,
+    "request_or_signal_id": null,
+    "payment_identifier": null,
+    "visible": null,
+    "screenshot_or_export": null
+  },
+  "reconciliation": {
+    "served_request_visible": null,
+    "payment_attached": null,
+    "matched_local_correlation": null,
+    "local_candidate": false,
+    "official_telegraph_demand": false,
+    "reason": null
+  },
+  "notes": []
+}

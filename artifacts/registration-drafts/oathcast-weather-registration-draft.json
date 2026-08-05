@@ -1,0 +1,65 @@
+{
+  "artifact_type": "oathcast_miner_registration_dry_run",
+  "artifact_version": 1,
+  "claims": {
+    "official_request_count": null,
+    "paid_telegraph_traffic": false,
+    "telegraph_registered": false
+  },
+  "generated_at": "2026-08-05T07:43:33.661625Z",
+  "official_registration": {
+    "blocked_on": [
+      "Hackathon 1 integration-interface YAML freeze",
+      "official portal validation",
+      "official Base Sepolia registration flow and contract details"
+    ],
+    "registered": false,
+    "submitted": false,
+    "transaction_hash": null
+  },
+  "output_mapping": {
+    "fields": {
+      "integers": [
+        {
+          "index": 0,
+          "multiplier": 10000,
+          "name": "probability_x10000",
+          "source_path": "probability"
+        }
+      ],
+      "strings": [
+        {
+          "index": 0,
+          "name": "content",
+          "source_path": "content"
+        }
+      ]
+    },
+    "transform": "direct"
+  },
+  "registration": {
+    "chain": "eip155:84532",
+    "confirmation_status": "draft",
+    "evidence_uri": null,
+    "fee_address": null,
+    "generation": 1,
+    "min_price_micro_usdc": 10000,
+    "min_price_usdc": "0.010000",
+    "miner_id": null,
+    "miner_slug": "oathcast-weather",
+    "output_mapping_sha256": "a6302fbb533a17957abc2b57c8aaf4bfb59b12af24d6e08c72091877d0f8d08c",
+    "schema_profile": "unconfirmed_hackathon_1",
+    "source_authority": "local_draft",
+    "supported_intents": [
+      "WEATHER_FORECAST",
+      "WEATHER_CHECK"
+    ],
+    "yaml_sha256": "233cebbd0287e2dfd71a9856175724551c409292dc928b956e2b8e00610397e1",
+    "yaml_uri": null
+  },
+  "source": {
+    "local_validator": "scripts/validate_miner_drafts.py",
+    "path": "miners/oathcast-weather.yaml",
+    "yaml_sha256": "233cebbd0287e2dfd71a9856175724551c409292dc928b956e2b8e00610397e1"
+  }
+}

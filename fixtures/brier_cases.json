@@ -1,0 +1,102 @@
+[
+  {
+    "case_id": "dev-001",
+    "outcome": 1,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.70, "status": "valid"},
+      "weatherapi": {"probability": 0.66, "status": "valid"},
+      "openweather_onecall": {"probability": 0.72, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-002",
+    "outcome": 0,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.20, "status": "valid"},
+      "weatherapi": {"probability": 0.28, "status": "valid"},
+      "openweather_onecall": {"probability": 0.24, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-003",
+    "outcome": 1,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.55, "status": "valid"},
+      "weatherapi": {"probability": 0.49, "status": "valid"},
+      "openweather_onecall": {"probability": 0.60, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-004",
+    "outcome": 0,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.35, "status": "valid"},
+      "weatherapi": {"probability": 0.30, "status": "valid"},
+      "openweather_onecall": {"probability": 0.40, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-005",
+    "outcome": 1,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.80, "status": "valid"},
+      "weatherapi": {"probability": 0.74, "status": "valid"},
+      "openweather_onecall": {"probability": 0.68, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-006",
+    "outcome": 0,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.10, "status": "valid"},
+      "weatherapi": {"probability": 0.18, "status": "valid"},
+      "openweather_onecall": {"probability": 0.12, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-007",
+    "outcome": 1,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.62, "status": "valid"},
+      "weatherapi": {"probability": 0.58, "status": "valid"},
+      "openweather_onecall": {"probability": 0.56, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-008",
+    "outcome": 0,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.22, "status": "valid"},
+      "weatherapi": {"probability": 0.31, "status": "valid"},
+      "openweather_onecall": {"probability": 0.27, "status": "valid"}
+    }
+  },
+  {
+    "case_id": "dev-009",
+    "outcome": 1,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": 0.75, "status": "valid"},
+      "weatherapi": {"probability": 0.63, "status": "late"},
+      "openweather_onecall": {"probability": 1.2, "status": "invalid"}
+    }
+  },
+  {
+    "case_id": "dev-010",
+    "outcome": 0,
+    "climatology_probability": 0.35,
+    "forecasts": {
+      "open_meteo": {"probability": null, "status": "missing"},
+      "weatherapi": {"probability": null, "status": "abstained"},
+      "openweather_onecall": {"probability": 0.16, "status": "valid"}
+    }
+  }
+]

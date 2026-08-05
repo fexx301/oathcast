@@ -1,0 +1,47 @@
+[
+  {
+    "id": 9001,
+    "slug": "oathcast-weather",
+    "name": "OathCast Weather Forecast Miner",
+    "base_url": "http://127.0.0.1:8080",
+    "supported_intents": ["WEATHER_FORECAST"],
+    "active": true,
+    "owner": "oathcast"
+  },
+  {
+    "id": 9101,
+    "slug": "independent-weather-alpha",
+    "name": "Independent Weather Alpha",
+    "base_url": "https://external-alpha.example",
+    "supported_intents": ["WEATHER_FORECAST"],
+    "active": true,
+    "owner": "external-fixture"
+  },
+  {
+    "id": 9102,
+    "slug": "independent-weather-beta",
+    "name": "Independent Weather Beta",
+    "base_url": "https://external-beta.example",
+    "supported_intents": ["WEATHER_CHECK"],
+    "active": true,
+    "owner": "external-fixture"
+  },
+  {
+    "id": 9103,
+    "slug": "offline-weather",
+    "name": "Offline Weather",
+    "base_url": "https://offline.example",
+    "supported_intents": ["WEATHER_FORECAST"],
+    "active": false,
+    "owner": "external-fixture"
+  },
+  {
+    "id": 9104,
+    "slug": "generic-chat",
+    "name": "Generic Chat",
+    "base_url": "https://chat.example",
+    "supported_intents": ["CHAT_COMPLETION"],
+    "active": true,
+    "owner": "external-fixture"
+  }
+]

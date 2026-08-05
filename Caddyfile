@@ -1,0 +1,12 @@
+# Public HTTPS edge. Caddy obtains and renews the certificate automatically.
+oathcastcourt.duckdns.org {
+    encode gzip
+
+    reverse_proxy 127.0.0.1:8080 {
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 20s
+        }
+        header_up X-Real-IP {remote_host}
+    }
+}

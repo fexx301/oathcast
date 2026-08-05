@@ -1,0 +1,32 @@
+name: OathCast public canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oathcast-public-canary
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify public Miner
+        env:
+          OATHCAST_PUBLIC_URL: https://oathcastcourt.duckdns.org
+          OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
+        run: |
+          PYTHONPATH=src python3 scripts/public_canary.py \
+            --expected-release-id oathcast-2026-08-04-hardened-v3-2 \
+            --expected-source-sha256 df62b88dbb4a4e6661e944a910269058f910d9f1201c27b5ac1833f19496d976 \
+            --expected-image-digest sha256:34183579a239fdfd3048519c8c5551a428a7ed2665b2df6b312b86e36bd1d71

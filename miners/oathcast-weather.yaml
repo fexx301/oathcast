@@ -1,0 +1,55 @@
+# CANONICAL REGISTRATION DRAFT — replace id/base_url and validate before use.
+# The three provider-specific YAMLs are adapter experiments, not separate
+# ecosystem Miners. This single service is the candidate OathCast Miner.
+version: "1"
+kind: miner
+id: 0
+slug: oathcast-weather
+protocol: generic
+name: OathCast Weather Forecast Miner
+description: One-hour UTC measurable-precipitation forecasts with provider provenance and deterministic text output.
+base_url: https://oathcastcourt.duckdns.org
+
+auth:
+  type: bearer
+  header_name: Authorization
+  value_prefix: "Bearer "
+  env_var: OATHCAST_MINER_API_KEY
+
+endpoints:
+  - path: /predict
+    external_path: /v1/forecast/point
+    method: GET
+    description: Forecast one UTC hour and return a short semantic response.
+    param_map:
+      lat: latitude
+      lon: longitude
+      start: horizon_start
+      end: horizon_end
+
+semantics:
+  signal_mapping:
+    confidence_field: probability
+    reason_field: content
+  supported_intents:
+    - WEATHER_FORECAST
+    - WEATHER_CHECK
+
+on_chain:
+  transform: direct
+  min_price_usdc: 0.01
+  fields:
+    strings:
+      - index: 0
+        name: content
+        source_path: content
+    integers:
+      - index: 0
+        name: probability_x10000
+        source_path: probability
+        multiplier: 10000
+
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30

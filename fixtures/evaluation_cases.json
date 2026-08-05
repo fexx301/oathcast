@@ -1,0 +1,38 @@
+[
+  {
+    "case_id": "structured_public_response",
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "Yes. Measurable precipitation greater than or equal to 0.1 mm occurred in Lagos from 15:00 to 16:00 UTC.",
+    "raw_response": {
+      "content": "At Lagos, the probability of measurable precipitation > 0.1 mm from 2026-08-17T15:00:00Z to 2026-08-17T16:00:00Z is 70%.",
+      "probability": 0.7
+    }
+  },
+  {
+    "case_id": "chat_completion_response",
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "No. Measurable precipitation greater than or equal to 0.1 mm did not occur in Lagos from 15:00 to 16:00 UTC.",
+    "raw_response": {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "There is a 20% probability of measurable precipitation in Lagos during the requested UTC hour."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "empty_response",
+    "question": "Will measurable precipitation occur?",
+    "ground_truth": "No measurable precipitation occurred.",
+    "raw_response": ""
+  },
+  {
+    "case_id": "ordinary_plain_response",
+    "question": "Will measurable precipitation occur?",
+    "ground_truth": "Measurable precipitation occurred.",
+    "raw_response": "This response is deliberately too long for the development contract."
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "release_id": "oathcast-2026-08-04-hardened-v3-2",
+  "verified_at": "2026-08-04",
+  "source_sha256": "df62b88dbb4a4e6661e944a910269058f910d9f1201c27b5ac1833f19496d976",
+  "source_bundle": {
+    "path": "/tmp/oathcast-v3-2-source.tgz",
+    "bytes": 80929,
+    "sha256": "66c8b2b455db48d0a11e9ca5c820ba3e8723b9e4a96cb346b9fd966ef322438b"
+  },
+  "runtime": {
+    "host": "AWS EC2 eu-north-1",
+    "container": "oathcast",
+    "image": "oathcast:v3-2-correct",
+    "image_id": "sha256:34183579a239fdfd3048519c8c5551a428a7ed2665b2df6b312b86e36bd1d71",
+    "restart_policy": "unless-stopped",
+    "port_binding": "127.0.0.1:8080->8080/tcp",
+    "durable_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "rollback_container": "oathcast-old-20260804-v3-1"
+  },
+  "public_smoke": {
+    "artifact": "oathcast-2026-08-04-hardened-v3-2-public-smoke.json",
+    "base_url": "https://oathcastcourt.duckdns.org",
+    "healthz": 200,
+    "readyz": 200,
+    "unauthorized_forecast": 401,
+    "authenticated_forecast": 200,
+    "restart_replay": 200,
+    "restart_replay_receipt_sha256": "20510d4ed9944d6b14be4108942588bbabc78ae42668f44c555cff2647dfeff9"
+  },
+  "local_validation": {
+    "unit_tests": 64,
+    "compileall": "passed",
+    "miner_draft_validation": "4 drafts valid",
+    "disposable_container_smoke": "passed"
+  },
+  "network": {
+    "security_group": "sg-086d2585c6a32fa07",
+    "inbound_rules": [
+      "TCP 80 from 0.0.0.0/0",
+      "TCP 443 from 0.0.0.0/0"
+    ],
+    "ssh_22": "not exposed",
+    "miner_8080": "not exposed; loopback-only"
+  },
+  "payment_and_telegraph": {
+    "paid_request_created": false,
+    "miner_registered": false,
+    "official_telegraph_count": null,
+    "note": "This evidence proves service readiness only; it is not hackathon demand or Miner-registration evidence."
+  }
+}

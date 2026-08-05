@@ -1,0 +1,18 @@
+{
+  "artifact": "application-owned-miner-ablation",
+  "fixture_set": "development-only",
+  "qualifying_telegraph_traffic": false,
+  "normal_path": {
+    "owned_miner_disabled": false,
+    "used_external_miner": true,
+    "external_influence": true
+  },
+  "owned_miner_disabled_path": {
+    "owned_miner_disabled": true,
+    "valid_external_replies": 2,
+    "used_external_miner": true,
+    "external_influence": true,
+    "ok": true
+  },
+  "interpretation": "Development evidence only: the Application remains decision-capable with the owned Miner removed; this does not represent paid demand or an official Telegraph request count."
+}

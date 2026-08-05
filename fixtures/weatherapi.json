@@ -1,0 +1,25 @@
+{
+  "location": {
+    "name": "Lagos",
+    "tz_id": "Africa/Lagos"
+  },
+  "forecast": {
+    "forecastday": [
+      {
+        "date": "2026-08-17",
+        "hour": [
+          {
+            "time": "2026-08-17 15:00",
+            "time_epoch": 1786978800,
+            "chance_of_rain": 66
+          },
+          {
+            "time": "2026-08-17 16:00",
+            "time_epoch": 1786982400,
+            "chance_of_rain": 61
+          }
+        ]
+      }
+    ]
+  }
+}

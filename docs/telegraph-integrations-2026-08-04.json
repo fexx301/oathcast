@@ -1,0 +1,37 @@
+{
+  "observed_at": "2026-08-04T12:35:19.434865Z",
+  "payload_sha256": "6fbb0ba8da2caaa0c54e515a9b94a7f22eae5465e976b613a4135940925f6cd3",
+  "qualifying_traffic": false,
+  "source": "telegraph_integrations_read_only",
+  "weather_capabilities": [
+    {
+      "endpoint": "forecast",
+      "id": "211",
+      "intents": ["WEATHER_CHECK", "WEATHER_FORECAST"],
+      "minimum_price_micro_usdc": 10000,
+      "name": "OpenWeatherMap",
+      "slug": "openweathermap"
+    },
+    {
+      "endpoint": "forecast",
+      "id": "212",
+      "intents": ["WEATHER_CHECK", "WEATHER_FORECAST"],
+      "minimum_price_micro_usdc": 10000,
+      "name": "WeatherAPI",
+      "slug": "weatherapi"
+    },
+    {
+      "endpoint": "predict",
+      "id": "18",
+      "intents": [
+        "STORM_ALERT",
+        "WEATHER_CHECK",
+        "WEATHER_FORECAST",
+        "WEATHER_RISK_ASSESSMENT"
+      ],
+      "minimum_price_micro_usdc": 10000,
+      "name": "Zeus Weather Forecasting (Bittensor SN18)",
+      "slug": "bittensor-sn18-zeus"
+    }
+  ]
+}

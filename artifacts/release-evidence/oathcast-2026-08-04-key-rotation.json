@@ -1,0 +1,22 @@
+{
+  "artifact": "staging-api-key-rotation",
+  "release_id": "oathcast-2026-08-04-hardened-v3-2",
+  "public_base_url": "https://oathcastcourt.duckdns.org",
+  "overlap": {
+    "retired_key_http_status": 200,
+    "active_key_http_status": 200
+  },
+  "post_rotation": {
+    "retired_key_http_status": 401,
+    "active_key_http_status": 200,
+    "health_http_status": 200,
+    "readiness_http_status": 200
+  },
+  "container_recreated_to_reload_env_file": true,
+  "security_group_after": [
+    "tcp/80 public",
+    "tcp/443 public"
+  ],
+  "secret_material_recorded": false,
+  "note": "HTTP statuses were collected through public HTTPS; no credential value or reversible secret material is stored in this artifact."
+}

@@ -1,0 +1,23 @@
+{
+  "base_url": "https://oathcastcourt.duckdns.org",
+  "checks": [
+    {
+      "name": "healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "readyz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "unauthorized_rejected",
+      "ok": true,
+      "status": 401
+    }
+  ],
+  "ok": true,
+  "release_id": "oathcast-2026-08-04-hardened-v3-2",
+  "note": "External no-state canary run from the development host; the scheduled workflow remains inactive until the repository is hosted with its secret configured."
+}
