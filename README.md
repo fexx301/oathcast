@@ -1,5 +1,7 @@
 # OathCast preparation spike
 
+[![CI](https://github.com/fexx301/oathcast/actions/workflows/ci.yml/badge.svg)](https://github.com/fexx301/oathcast/actions/workflows/ci.yml)
+
 This folder contains the first implementation spike for OathCast: three
 provider adapters, one shared forecast contract, deterministic public text
 rendering, local development fixtures, and a leakage-safe Brier benchmark.
