@@ -6,8 +6,9 @@ every 15 minutes, verifies the expected v3.2 release identity, rejects
 unauthenticated forecasting, and uses the API key only through the repository
 secret `OATHCAST_MINER_API_KEY`.
 
-The workflow is intentionally fail-closed. It cannot become active until the
-project is pushed to a hosted repository and that secret is configured.
+The workflow is intentionally fail-closed. It skips cleanly until the project
+is pushed to a hosted repository and that secret is configured; once the secret
+exists, scheduled and manual runs perform the authenticated checks.
 
 ## Local repository
 
@@ -30,8 +31,9 @@ git status --short
 
 ## Hosted repository
 
-Create an empty private or public repository using the final repository name,
-then add its remote and push the reviewed commit:
+The public repository is now available at
+`https://github.com/fexx301/oathcast`, with the reviewed `main` branch pushed.
+For a future clone or mirror, the equivalent remote setup is:
 
 ```sh
 git remote add origin <repository-ssh-or-https-url>
@@ -61,8 +63,8 @@ Telegraph traffic, Explorer demand, or Track 3 qualification.
 
 ## Current blocker
 
-The local project previously had no Git remote, and the available local GitHub
-CLI session is not authenticated. Therefore the code and workflow can be
-prepared locally, but remote creation, push, and secret configuration still
-require the repository owner to authenticate and choose the final repository
-name.
+The repository is now public at `https://github.com/fexx301/oathcast` and the
+reviewed `main` branch is pushed. The remaining canary step is to add the active
+staging Bearer token as the `OATHCAST_MINER_API_KEY` Actions secret. Until then,
+scheduled and manual canary runs skip the authenticated check without exposing
+or inventing a credential.

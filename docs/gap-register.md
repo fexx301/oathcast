@@ -87,10 +87,12 @@ platform gate.
 
 ## Actionable next, not platform-blocked
 
-- Host the repository and configure the external canary secret. The workflow
-  is implemented and needs only repository owner authentication, a final
-  remote name, and the active staging API key; no paid AWS monitoring
-  component is required for the preparation baseline.
+- The public repository is hosted at `https://github.com/fexx301/oathcast` and
+  the reviewed `main` branch is pushed. Configure the external canary secret
+  `OATHCAST_MINER_API_KEY` when the active staging credential is intentionally
+  shared with GitHub Actions; until then, the workflow skips authenticated
+  checks safely. No paid AWS monitoring component is required for the
+  preparation baseline.
 
 ## Blocked on Telegraph or external participants
 

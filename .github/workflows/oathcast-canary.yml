@@ -21,7 +21,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Check canary secret
+        id: secret
+        env:
+          OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
+        run: |
+          if [ -z "$OATHCAST_MINER_API_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OATHCAST_MINER_API_KEY is not configured; canary skipped safely."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Verify public Miner
+        if: steps.secret.outputs.configured == 'true'
         env:
           OATHCAST_PUBLIC_URL: https://oathcastcourt.duckdns.org
           OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
