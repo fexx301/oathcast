@@ -490,6 +490,30 @@ Telegraph emphasizes the complete cycle from Miner to Application to demand. The
 - Public progress updates.
 - Evidence that the Application consumes and compares external Miners, not only participant-owned services.
 
+### Current judging-weight interpretation
+
+The Hackathon judging page currently shows engagement and X updates as:
+
+- **Track 1 — Miner:** 25% engagement/X updates; the other 75% is performance
+  within the Intent.
+- **Track 2 — Script Author:** 10% engagement/X updates; the priority remains
+  automated evaluation quality, ranking accuracy, and resistance to gaming.
+- **Track 3 — Application:** 25% engagement/X updates; the remaining weight is
+  the application's real usage, usefulness, creativity, and Telegraph-Miner
+  consumption requirements.
+
+This means our public updates should be evidence-led rather than high-volume:
+
+- Miner updates should show availability, forecast quality, response validity,
+  and meaningful progress toward live demand.
+- Script Author updates should explain evaluator design, anti-gaming tests,
+  harness compatibility, and ranking behavior.
+- Application updates should show real user-facing utility, live Miner usage,
+  Explorer/payment evidence when available, and resolved outcomes.
+
+Do not use fixture runs or artificial traffic as engagement proof. Keep all
+development screenshots and local demos explicitly labeled as preparation.
+
 Avoid building:
 
 - Generic weather chatbot
@@ -587,6 +611,7 @@ Avoid building:
 - **2026-08-04:** The whitepaper integration slice passed the full 77-test suite, compile checks, all four Miner-draft validations, and the owned-Miner-disabled Application demo. The new code is local only; the deployed v3.2 staging image has not been rebuilt or replaced.
 - **2026-08-05:** Ahmed clarified that Hackathon 1 removes the Machina bond, the integration-interface YAML overrides the whitepaper and is still being frozen, released hashes/schema URI requirements apply with pre-submission validation, and served request/payment records are public on-chain/Explorer evidence. He confirmed the Explorer is the current checking path and API docs will follow. Updated the authority matrix and remaining gates; no code or AWS deployment change was needed.
 - **2026-08-05:** Implemented the immediate local preparation slice: `scripts/demo_application.py --format markdown` now presents the cross-Miner decision, external influence, durable case hashes, raw responses, later resolution, and owned-Miner-disabled ablation; `scripts/create_registration_draft.py` generated `artifacts/registration-drafts/oathcast-weather-registration-draft.json` with explicit draft/non-submission claims; added human and JSON Explorer evidence templates; added repository/canary setup guidance, secret/database ignore rules, and least-privilege/concurrency protections to the GitHub workflow. Full local regression now passes 78 tests and compile/draft validation passes. The project is not yet pushed to a hosted Git remote because the available GitHub CLI session is unauthenticated; AWS remains on v3.2 and was not redeployed.
+- **2026-08-05:** User reviewed the Hackathon judging page and recorded the current engagement/X weights: 25% for Track 1, 10% for Track 2, and 25% for Track 3. Updated judge strategy: evidence-led public updates are a major workstream for Miner and Application, while Script Author effort remains concentrated on evaluator quality, ranking accuracy, anti-gaming, and harness compatibility.
 
 ## 19. Handoff maintenance protocol
 
