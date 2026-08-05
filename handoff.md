@@ -490,29 +490,54 @@ Telegraph emphasizes the complete cycle from Miner to Application to demand. The
 - Public progress updates.
 - Evidence that the Application consumes and compares external Miners, not only participant-owned services.
 
-### Current judging-weight interpretation
+### Current judging criteria
 
-The Hackathon judging page currently shows engagement and X updates as:
+The official judging page, as captured on 2026-08-05, gives the tracks these
+weights:
 
-- **Track 1 — Miner:** 25% engagement/X updates; the other 75% is performance
-  within the Intent.
-- **Track 2 — Script Author:** 10% engagement/X updates; the priority remains
-  automated evaluation quality, ranking accuracy, and resistance to gaming.
-- **Track 3 — Application:** 25% engagement/X updates; the remaining weight is
-  the application's real usage, usefulness, creativity, and Telegraph-Miner
-  consumption requirements.
+| Track | Criterion | Weight |
+| --- | --- | ---: |
+| Miner | Normalized Performance within Intent | 75% |
+| Miner | Engagement & Updates on X | 25% |
+| Script Author | Improvement over Baseline | 50% |
+| Script Author | Robustness & Code Quality | 30% |
+| Script Author | Engagement & Updates on X | 10% |
+| Script Author | Community Engagement & Adoption | 10% |
+| Application | Real Usage & Adoption | 45% |
+| Application | Usefulness, Creativity & Depth of Integration | 25% |
+| Application | Engagement & Updates on X | 25% |
+| Application | Technical Execution & Integration Quality | 5% |
 
-This means our public updates should be evidence-led rather than high-volume:
+The page also defines the Script Author's Canonical Script as the current
+benchmark and says improved scripts are evaluated against it. This means our
+local semantic proxy and Brier harness are preparation tools only; the final
+submission must target the official Canonical Script once it is released.
 
-- Miner updates should show availability, forecast quality, response validity,
-  and meaningful progress toward live demand.
-- Script Author updates should explain evaluator design, anti-gaming tests,
-  harness compatibility, and ranking behavior.
-- Application updates should show real user-facing utility, live Miner usage,
-  Explorer/payment evidence when available, and resolved outcomes.
+### Strategic consequences
 
-Do not use fixture runs or artificial traffic as engagement proof. Keep all
-development screenshots and local demos explicitly labeled as preparation.
+- **Primary application lane:** Track 3 is the strongest fit for OathCast's
+  product idea, but only if we secure genuine users and real Telegraph calls.
+  Usage/adoption is 45%, so a beautiful demo without real demand is weak.
+- **Technical secondary lane:** Track 2 is the most controllable secondary
+  opportunity. We should optimize for measurable improvement over the
+  Canonical Script, robustness, edge-case handling, sandbox compliance, and
+  evidence that other people can use the script.
+- **Miner support lane:** Track 1 is valuable for the full lifecycle and the
+  cash-prize guardrail, but 75% depends on normalized performance against the
+  best Miner in the Intent. X activity cannot compensate for weak forecast
+  quality.
+
+Public updates should therefore be evidence-led rather than high-volume:
+
+- Miner posts: availability, forecast quality, response validity, and ranking.
+- Script posts: baseline improvement, robustness tests, code quality, and
+  community adoption.
+- Application posts: real users, Telegraph call volume, usefulness, depth of
+  integration, and resolved outcomes.
+
+Do not use fixture runs or artificial traffic as engagement, adoption, or usage
+proof. Keep all development screenshots and local demos explicitly labeled as
+preparation.
 
 Avoid building:
 
@@ -612,6 +637,7 @@ Avoid building:
 - **2026-08-05:** Ahmed clarified that Hackathon 1 removes the Machina bond, the integration-interface YAML overrides the whitepaper and is still being frozen, released hashes/schema URI requirements apply with pre-submission validation, and served request/payment records are public on-chain/Explorer evidence. He confirmed the Explorer is the current checking path and API docs will follow. Updated the authority matrix and remaining gates; no code or AWS deployment change was needed.
 - **2026-08-05:** Implemented the immediate local preparation slice: `scripts/demo_application.py --format markdown` now presents the cross-Miner decision, external influence, durable case hashes, raw responses, later resolution, and owned-Miner-disabled ablation; `scripts/create_registration_draft.py` generated `artifacts/registration-drafts/oathcast-weather-registration-draft.json` with explicit draft/non-submission claims; added human and JSON Explorer evidence templates; added repository/canary setup guidance, secret/database ignore rules, and least-privilege/concurrency protections to the GitHub workflow. Full local regression now passes 78 tests and compile/draft validation passes. The project is not yet pushed to a hosted Git remote because the available GitHub CLI session is unauthenticated; AWS remains on v3.2 and was not redeployed.
 - **2026-08-05:** User reviewed the Hackathon judging page and recorded the current engagement/X weights: 25% for Track 1, 10% for Track 2, and 25% for Track 3. Updated judge strategy: evidence-led public updates are a major workstream for Miner and Application, while Script Author effort remains concentrated on evaluator quality, ranking accuracy, anti-gaming, and harness compatibility.
+- **2026-08-05:** User supplied the complete judging breakdown from the official track panels: Track 1 is 75% normalized performance + 25% X; Track 2 is 50% improvement over baseline + 30% robustness/code quality + 10% X + 10% community engagement/adoption; Track 3 is 45% real usage/adoption + 25% usefulness/creativity/depth + 25% X + 5% technical execution/integration. Reframed the strategy: Application is the primary product lane if real demand can be secured, Script Author is the controllable technical secondary lane, and Miner is the lifecycle/support lane where performance—not social activity—dominates.
 
 ## 19. Handoff maintenance protocol
 
