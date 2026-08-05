@@ -1,6 +1,11 @@
 [
   {
     "case_id": "dev-001",
+    "issued_at": "2026-08-01T12:00:00Z",
+    "forecast_cutoff": "2026-08-01T12:00:00Z",
+    "horizon_start": "2026-08-01T15:00:00Z",
+    "horizon_end": "2026-08-01T16:00:00Z",
+    "resolved_at": "2026-08-01T18:00:00Z",
     "outcome": 1,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -11,6 +16,11 @@
   },
   {
     "case_id": "dev-002",
+    "issued_at": "2026-08-02T12:00:00Z",
+    "forecast_cutoff": "2026-08-02T12:00:00Z",
+    "horizon_start": "2026-08-02T15:00:00Z",
+    "horizon_end": "2026-08-02T16:00:00Z",
+    "resolved_at": "2026-08-02T18:00:00Z",
     "outcome": 0,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -21,6 +31,11 @@
   },
   {
     "case_id": "dev-003",
+    "issued_at": "2026-08-03T12:00:00Z",
+    "forecast_cutoff": "2026-08-03T12:00:00Z",
+    "horizon_start": "2026-08-03T15:00:00Z",
+    "horizon_end": "2026-08-03T16:00:00Z",
+    "resolved_at": "2026-08-05T18:00:00Z",
     "outcome": 1,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -31,6 +46,11 @@
   },
   {
     "case_id": "dev-004",
+    "issued_at": "2026-08-04T12:00:00Z",
+    "forecast_cutoff": "2026-08-04T12:00:00Z",
+    "horizon_start": "2026-08-04T15:00:00Z",
+    "horizon_end": "2026-08-04T16:00:00Z",
+    "resolved_at": "2026-08-04T18:00:00Z",
     "outcome": 0,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -41,6 +61,11 @@
   },
   {
     "case_id": "dev-005",
+    "issued_at": "2026-08-05T12:00:00Z",
+    "forecast_cutoff": "2026-08-05T12:00:00Z",
+    "horizon_start": "2026-08-05T15:00:00Z",
+    "horizon_end": "2026-08-05T16:00:00Z",
+    "resolved_at": "2026-08-05T18:00:00Z",
     "outcome": 1,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -51,6 +76,11 @@
   },
   {
     "case_id": "dev-006",
+    "issued_at": "2026-08-06T12:00:00Z",
+    "forecast_cutoff": "2026-08-06T12:00:00Z",
+    "horizon_start": "2026-08-06T15:00:00Z",
+    "horizon_end": "2026-08-06T16:00:00Z",
+    "resolved_at": "2026-08-06T18:00:00Z",
     "outcome": 0,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -61,6 +91,11 @@
   },
   {
     "case_id": "dev-007",
+    "issued_at": "2026-08-07T12:00:00Z",
+    "forecast_cutoff": "2026-08-07T12:00:00Z",
+    "horizon_start": "2026-08-07T15:00:00Z",
+    "horizon_end": "2026-08-07T16:00:00Z",
+    "resolved_at": "2026-08-07T18:00:00Z",
     "outcome": 1,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -71,6 +106,11 @@
   },
   {
     "case_id": "dev-008",
+    "issued_at": "2026-08-08T12:00:00Z",
+    "forecast_cutoff": "2026-08-08T12:00:00Z",
+    "horizon_start": "2026-08-08T15:00:00Z",
+    "horizon_end": "2026-08-08T16:00:00Z",
+    "resolved_at": "2026-08-08T18:00:00Z",
     "outcome": 0,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -81,6 +121,11 @@
   },
   {
     "case_id": "dev-009",
+    "issued_at": "2026-08-09T12:00:00Z",
+    "forecast_cutoff": "2026-08-09T12:00:00Z",
+    "horizon_start": "2026-08-09T15:00:00Z",
+    "horizon_end": "2026-08-09T16:00:00Z",
+    "resolved_at": "2026-08-09T18:00:00Z",
     "outcome": 1,
     "climatology_probability": 0.35,
     "forecasts": {
@@ -91,6 +136,11 @@
   },
   {
     "case_id": "dev-010",
+    "issued_at": "2026-08-10T12:00:00Z",
+    "forecast_cutoff": "2026-08-10T12:00:00Z",
+    "horizon_start": "2026-08-10T15:00:00Z",
+    "horizon_end": "2026-08-10T16:00:00Z",
+    "resolved_at": "2026-08-10T18:00:00Z",
     "outcome": 0,
     "climatology_probability": 0.35,
     "forecasts": {

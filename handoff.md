@@ -8,7 +8,7 @@
 - **Former descriptive name:** Forecast Court
 - **Workspace:** `/Users/femi/Documents/My-Projects/oathcast`
 - **Last updated:** 2026-08-05
-- **Current state:** Project folder created. Registration form completed. Discord access obtained. Local vertical-slice scaffolding, deployment package, hardened x402 boundary, external response normalization, read-only live Miner discovery with optional evidence snapshots, strict provider-native event validation, cutoff enforcement, immutable SQLite forecast receipts, durable Application case evidence, exact-window ground-truth resolution, request correlation, release provenance, readiness/auth/rate-limit controls, local Miner draft validation, a fixture-excluding append-only demand provenance ledger, a thin case workflow, SQLite backup/restore checks, an independent canary entry point, an owned-Miner fallback ablation, typed registration declarations, protocol result/receipt envelopes, a human-readable Application evidence shell, a canonical registration dry-run artifact, Explorer evidence templates, repository/canary setup documentation, and a local adversarial Script Author benchmark are implemented locally and pass 82 tests. The authorized AWS EC2 staging host still runs the exact v3.2 Docker release behind verified public HTTPS at `https://oathcastcourt.duckdns.org`; the v3.2 release was verified at 64 tests, while the follow-on recovery/canary/ablation/provenance/presentation/benchmark changes are local and not yet deployed. The old v3.1 container is retained stopped for rollback and the temporary EC2 Instance Connect rule has been removed. No Miner registration, paid external request, or WASM registration exists. The project has not yet been pushed to a hosted Git remote; the local GitHub CLI session is unauthenticated.
+- **Current state:** Project folder created. Registration form completed. Discord access obtained. Local vertical-slice scaffolding, deployment package, hardened x402 boundary, external response normalization, read-only live Miner discovery with optional evidence snapshots, strict provider-native event validation, cutoff enforcement, immutable SQLite forecast receipts, durable Application case evidence, exact-window ground-truth resolution, request correlation, release provenance, readiness/auth/rate-limit controls, local Miner draft validation, a fixture-excluding append-only demand provenance ledger, a thin case workflow, SQLite backup/restore checks, an independent canary entry point, an owned-Miner fallback ablation, typed registration declarations, protocol result/receipt envelopes, a human-readable Application evidence shell, a canonical registration dry-run artifact, Explorer evidence templates, repository/canary setup documentation, a local adversarial Script Author benchmark, and a leakage-safe chronological provider backtest are implemented locally and pass 88 tests. The authorized AWS EC2 staging host still runs the exact v3.2 Docker release behind verified public HTTPS at `https://oathcastcourt.duckdns.org`; the v3.2 release was verified at 64 tests, while the follow-on recovery/canary/ablation/provenance/presentation/benchmark/backtest changes are local and not yet deployed. The old v3.1 container is retained stopped for rollback and the temporary EC2 Instance Connect rule has been removed. No Miner registration, paid external request, or WASM registration exists. The project has not yet been pushed to a hosted Git remote; the local GitHub CLI session is unauthenticated.
 - **Primary positioning:** A public calibration court for machine forecasts.
 - **One-line pitch:** OathCast time-locks short-horizon machine forecasts, settles them against independent observations, and makes Miner quality visible through transparent scoring.
 
@@ -56,6 +56,16 @@ An independent advisor was consulted three times using `gpt-5.6-sol` at maximum 
 - Require an ablation path where the Application still works with the OathCast Miner disabled.
 - Do not rely on synthetic, automated, or self-generated traffic to satisfy request requirements.
 - Treat weather forecasting as non-binding planning support, not emergency, medical, financial, aviation, or safety-critical advice.
+
+### Advisor review — chronological backtest (2026-08-05)
+
+The advisor returned **REVISE** for the initial issued-time-only design. The
+backtest now gates prior history on `resolved_at <= current issued_at`, batches
+equal issue times, freezes the warmup/holdout policy and tie-breaks, rejects
+mixed horizons and duplicate IDs, separates conditional Brier from coverage
+and end-to-end utility, reports common-case Brier, and excludes unresolved
+events from scoring and future history. Missing, late, invalid, and abstained
+attempts contribute zero utility rather than zero Brier loss.
 
 ## 5. Verified information from Discord
 
@@ -249,6 +259,26 @@ Local domain benchmark:
 - Invalid, late, missing, and abstained results must score `0` and be excluded from later routing for the relevant epoch according to the Discord clarification.
 - Do not let a local benchmark silently become an unsupported claim about Telegraph's current evaluator.
 
+### Chronological provider backtest (2026-08-05)
+
+The timestamped development fixture uses four warmup cases and a six-case
+holdout. One warmup outcome resolves after a later forecast is issued, so the
+selector cannot use it until its `resolved_at` timestamp. Equal-issued-time
+cases are batched; unresolved cases are excluded from scoring and future
+history. The report defines conditional Brier, coverage, common-case Brier,
+and end-to-end utility separately.
+
+| Provider | Holdout Brier | Coverage | End-to-end utility |
+| --- | ---: | ---: | ---: |
+| Open-Meteo | 0.061060 | 0.833333 | 0.782450 |
+| OpenWeather One Call | 0.081780 | 0.833333 | 0.765183 |
+| WeatherAPI | 0.093125 | 0.666667 | 0.604583 |
+
+The prior-only selector chose Open-Meteo for all six holdout decisions and
+achieved `0.782450` end-to-end utility. These are synthetic methodology
+checks only; they do not establish provider superiority, live usage, or
+qualifying Telegraph traffic.
+
 The evaluator must be deterministic, testable, resistant to time leakage, and explicit about:
 
 - Outcome timestamp
@@ -281,9 +311,11 @@ Implemented under `/Users/femi/Documents/My-Projects/oathcast`:
 - `src/oathcast/render.py`: deterministic text presentation with a small `content` + `probability` envelope.
 - `src/oathcast/reference_evaluator.py`: development-only proxy for the future three-input Script Author contract; not the official scorer.
 - `src/oathcast/script_benchmark.py`: deterministic development comparison between the baseline proxy and a stricter anti-gaming candidate; not the official Canonical Script.
+- `src/oathcast/backtest.py`: timestamped warmup/holdout provider benchmark with resolution-aware, prior-only selection; not live provider evidence.
 - `src/oathcast/scoring.py`: Brier loss, Brier quality, unclipped Brier skill, coverage, and zero-scored non-valid attempts.
-- `fixtures/`: development provider payloads, registry snapshot, evaluator cases, one common question, ten synthetic Brier cases, and the fixed Script Author adversarial corpus.
+- `fixtures/`: development provider payloads, registry snapshot, evaluator cases, one common question, ten timestamped synthetic Brier cases, and the fixed Script Author adversarial corpus.
 - `artifacts/benchmarks/script-author-adversarial-report.json`: reproducible local benchmark evidence with fixture hash, baseline/candidate comparison, issue counts, and an explicit non-official status.
+- `artifacts/benchmarks/chronological-provider-backtest.json`: reproducible local provider report with warmup/holdout metrics, common-case comparisons, resolution-aware selection trace, and explicit non-live status.
 - `miners/`: one canonical OathCast Miner registration draft plus three provider-adapter YAML experiments; only the canonical draft is a registration candidate.
 - `scripts/discover_live_miners.py`: read-only live registry discovery; it does not pay, sign, or write a snapshot.
 - `scripts/preflight_miner.py`: one unpaid challenge inspection for a selected Miner; it never attaches a signer.
@@ -451,6 +483,7 @@ Current phase, before August 17, 2026.
 - Configure `OATHCAST_MINER_API_KEY` in the host secret store so the public Miner enforces the Bearer token declared in its YAML; keep the payment wallet off-host.
 - Build and test the development reference evaluator against structured, chat, empty, and overlong responses; replace its proxy scoring once the official harness arrives.
 - Run the local Script Author adversarial benchmark after evaluator changes; keep its fixture hash and report separate from live-usage evidence.
+- Run the chronological provider backtest after fixture or adapter changes; preserve the timestamped fixture hash, warmup/holdout boundary, resolution-aware selection trace, and explicit synthetic-only label.
 - Base Sepolia USDC and the minimum Miner price of 0.01 USDC are confirmed; exact wallet/faucet flow remains open.
 - Prepare a minimal Application shell.
 
@@ -646,6 +679,7 @@ Avoid building:
 - **2026-08-05:** User reviewed the Hackathon judging page and recorded the current engagement/X weights: 25% for Track 1, 10% for Track 2, and 25% for Track 3. Updated judge strategy: evidence-led public updates are a major workstream for Miner and Application, while Script Author effort remains concentrated on evaluator quality, ranking accuracy, anti-gaming, and harness compatibility.
 - **2026-08-05:** User supplied the complete judging breakdown from the official track panels: Track 1 is 75% normalized performance + 25% X; Track 2 is 50% improvement over baseline + 30% robustness/code quality + 10% X + 10% community engagement/adoption; Track 3 is 45% real usage/adoption + 25% usefulness/creativity/depth + 25% X + 5% technical execution/integration. Reframed the strategy: Application is the primary product lane if real demand can be secured, Script Author is the controllable technical secondary lane, and Miner is the lifecycle/support lane where performance—not social activity—dominates.
 - **2026-08-05:** Added the local Script Author adversarial benchmark: ten fixed development cases, baseline-versus-candidate behavior comparison, explicit rejection of wrong outcomes and anti-gaming patterns, fixture hashing, and a reproducible JSON report. The candidate achieved 1.0 behavior accuracy, 1.0 good-case pass rate, and 1.0 adversarial rejection on this corpus versus 0.5 baseline behavior accuracy. These are local diagnostics only—not Telegraph's Canonical Script, WASM score, or qualifying traffic. Full regression now passes 82 tests; AWS remains on v3.2 and was not redeployed.
+- **2026-08-05:** Added a leakage-safe chronological provider backtest. The Brier fixture now carries issued, cutoff, horizon, and resolution timestamps; the runner freezes a four-case warmup and six-case holdout, gates history on `resolved_at <= issued_at`, batches simultaneous issue times, reports conditional/common-case Brier plus coverage and end-to-end utility, and excludes unresolved cases. On this synthetic fixture, holdout Brier is Open-Meteo `0.061060`, OpenWeather `0.081780`, and WeatherAPI `0.093125`; the prior-only selector chose Open-Meteo for all six decisions. These are methodology checks only, not live provider evidence. Full regression now passes 88 tests; AWS remains on v3.2 and was not redeployed.
 
 ## 19. Handoff maintenance protocol
 

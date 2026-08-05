@@ -51,6 +51,8 @@ From the OathCast directory:
 
     PYTHONPATH=src python3 -m unittest discover -s tests -v
     PYTHONPATH=src python3 scripts/score_fixtures.py
+    PYTHONPATH=src python3 scripts/backtest_providers.py \
+      --output artifacts/benchmarks/chronological-provider-backtest.json
     PYTHONPATH=src python3 scripts/evaluate_fixtures.py
     PYTHONPATH=src python3 scripts/benchmark_script_author.py \
       --output artifacts/benchmarks/script-author-adversarial-report.json
@@ -132,6 +134,15 @@ wrong-window, contradictory, and keyword-stuffed responses. Its fixed corpus
 and JSON report are regression evidence for local robustness only; neither the
 candidate score nor the report is Telegraph's Canonical Script, a WASM result,
 or qualifying hackathon traffic. The Brier benchmark remains a separate lane.
+
+`backtest_providers.py` runs the Brier fixture in chronological order with a
+frozen warmup/holdout split. Provider history is available to the prequential
+selector only when `resolved_at <= issued_at`; equal-issued-time cases are
+batched, unresolved events are excluded, and missing/late/invalid/abstained
+attempts contribute zero end-to-end utility rather than zero Brier loss. The
+report includes conditional Brier, coverage, common-case Brier, and the
+prior-only selection trace. The timestamped fixture is synthetic development
+evidence, not real provider performance or Telegraph traffic.
 
 The paid boundary is in `src/oathcast/payment.py`. It understands Base Sepolia
 USDC x402 challenge/retry semantics but requires a real injected signer; it

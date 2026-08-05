@@ -71,6 +71,11 @@ platform gate.
   report that rejects wrong outcomes, malformed/overlong responses,
   wrong-window answers, contradictions, and keyword stuffing. It is explicitly
   labeled development-only and does not claim Telegraph's Canonical Script.
+- A leakage-safe chronological provider backtest with timestamped synthetic
+  cases, a frozen warmup/holdout split, resolution-aware prior-only selection,
+  simultaneous-timestamp batching, common-case Brier, coverage, and explicit
+  end-to-end utility semantics. It is methodology evidence only and does not
+  establish live provider performance.
 
 ## Actionable next, not platform-blocked
 

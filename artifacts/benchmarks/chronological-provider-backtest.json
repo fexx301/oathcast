@@ -1,0 +1,603 @@
+{
+  "backtest_version": "chronological_provider_backtest_v1",
+  "dataset": {
+    "first_issued_at": "2026-08-01T12:00:00Z",
+    "holdout_cases": 6,
+    "holdout_first_issued_at": "2026-08-05T12:00:00Z",
+    "horizon_duration_hours": 1.0,
+    "last_issued_at": "2026-08-10T12:00:00Z",
+    "providers": [
+      "open_meteo",
+      "openweather_onecall",
+      "weatherapi"
+    ],
+    "resolved_cases": 10,
+    "resolved_holdout_cases": 6,
+    "total_cases": 10,
+    "unresolved_cases": 0,
+    "warmup_cases": 4
+  },
+  "fixture_source": {
+    "path": "fixtures/brier_cases.json",
+    "sha256": "83fd5c7d5b1b607061e29238558c7f29b259c1e05a0af8a0a6a0d2717bee49ca"
+  },
+  "metric_definitions": {
+    "common_case_brier": "conditional Brier over the same cases where every provider has a valid forecast",
+    "conditional_brier": "mean((probability - outcome)^2) over valid attempts only; lower is better",
+    "coverage": "valid attempts divided by resolved eligible cases",
+    "end_to_end_score": "sum(valid * (1 - brier_loss)) divided by all resolved eligible cases; invalid, late, missing, and abstained attempts contribute zero utility"
+  },
+  "no_leakage_checks": {
+    "current_outcome_used_for_current_selection": false,
+    "holdout_scored_separately": true,
+    "mixed_horizons_rejected": true,
+    "nondecreasing_input_chronology": true,
+    "provider_selection_uses_prior_resolved_cases_only": true,
+    "resolution_timestamps_enforced": true,
+    "simultaneous_issued_at_batched": true,
+    "unique_case_ids": true,
+    "unresolved_events_excluded_from_scoring_and_history": true
+  },
+  "official_status": "development_only_synthetic_not_live_provider_performance",
+  "prequential_selection": {
+    "holdout_cases": 6,
+    "resolved_holdout_cases": 6,
+    "selected_decisions": 6,
+    "selected_holdout_summary": {
+      "baseline_brier_score": 0.3025,
+      "brier_quality": 0.93894,
+      "brier_score": 0.06106,
+      "brier_skill_score": 0.798149,
+      "coverage": 0.833333,
+      "end_to_end_score": 0.78245,
+      "invalid_cases_by_status": {
+        "missing": 1
+      },
+      "total_cases": 6,
+      "valid_cases": 5
+    },
+    "selected_provider_counts": {
+      "open_meteo": 6
+    },
+    "selected_resolved_cases": 6
+  },
+  "provider_summaries": {
+    "open_meteo": {
+      "all_cases_reference_only": {
+        "baseline_brier_score": 0.289167,
+        "brier_quality": 0.915522,
+        "brier_score": 0.084478,
+        "brier_skill_score": 0.707858,
+        "common_case_brier": 0.087225,
+        "common_case_count": 8,
+        "coverage": 0.9,
+        "end_to_end_score": 0.82397,
+        "invalid_cases_by_status": {
+          "missing": 1
+        },
+        "total_cases": 10,
+        "valid_cases": 9
+      },
+      "holdout": {
+        "baseline_brier_score": 0.3025,
+        "brier_quality": 0.93894,
+        "brier_score": 0.06106,
+        "brier_skill_score": 0.798149,
+        "common_case_brier": 0.0607,
+        "common_case_count": 4,
+        "coverage": 0.833333,
+        "end_to_end_score": 0.78245,
+        "invalid_cases_by_status": {
+          "missing": 1
+        },
+        "total_cases": 6,
+        "valid_cases": 5
+      },
+      "warmup": {
+        "baseline_brier_score": 0.2725,
+        "brier_quality": 0.88625,
+        "brier_score": 0.11375,
+        "brier_skill_score": 0.582569,
+        "common_case_brier": 0.11375,
+        "common_case_count": 4,
+        "coverage": 1.0,
+        "end_to_end_score": 0.88625,
+        "invalid_cases_by_status": {},
+        "total_cases": 4,
+        "valid_cases": 4
+      }
+    },
+    "openweather_onecall": {
+      "all_cases_reference_only": {
+        "baseline_brier_score": 0.255833,
+        "brier_quality": 0.9039,
+        "brier_score": 0.0961,
+        "brier_skill_score": 0.624365,
+        "common_case_brier": 0.104913,
+        "common_case_count": 8,
+        "coverage": 0.9,
+        "end_to_end_score": 0.81351,
+        "invalid_cases_by_status": {
+          "invalid": 1
+        },
+        "total_cases": 10,
+        "valid_cases": 9
+      },
+      "holdout": {
+        "baseline_brier_score": 0.2425,
+        "brier_quality": 0.91822,
+        "brier_score": 0.08178,
+        "brier_skill_score": 0.662763,
+        "common_case_brier": 0.095825,
+        "common_case_count": 4,
+        "coverage": 0.833333,
+        "end_to_end_score": 0.765183,
+        "invalid_cases_by_status": {
+          "invalid": 1
+        },
+        "total_cases": 6,
+        "valid_cases": 5
+      },
+      "warmup": {
+        "baseline_brier_score": 0.2725,
+        "brier_quality": 0.886,
+        "brier_score": 0.114,
+        "brier_skill_score": 0.581651,
+        "common_case_brier": 0.114,
+        "common_case_count": 4,
+        "coverage": 1.0,
+        "end_to_end_score": 0.886,
+        "invalid_cases_by_status": {},
+        "total_cases": 4,
+        "valid_cases": 4
+      }
+    },
+    "weatherapi": {
+      "all_cases_reference_only": {
+        "baseline_brier_score": 0.2725,
+        "brier_quality": 0.885425,
+        "brier_score": 0.114575,
+        "brier_skill_score": 0.579541,
+        "common_case_brier": 0.114575,
+        "common_case_count": 8,
+        "coverage": 0.8,
+        "end_to_end_score": 0.70834,
+        "invalid_cases_by_status": {
+          "abstained": 1,
+          "late": 1
+        },
+        "total_cases": 10,
+        "valid_cases": 8
+      },
+      "holdout": {
+        "baseline_brier_score": 0.2725,
+        "brier_quality": 0.906875,
+        "brier_score": 0.093125,
+        "brier_skill_score": 0.658257,
+        "common_case_brier": 0.093125,
+        "common_case_count": 4,
+        "coverage": 0.666667,
+        "end_to_end_score": 0.604583,
+        "invalid_cases_by_status": {
+          "abstained": 1,
+          "late": 1
+        },
+        "total_cases": 6,
+        "valid_cases": 4
+      },
+      "warmup": {
+        "baseline_brier_score": 0.2725,
+        "brier_quality": 0.863975,
+        "brier_score": 0.136025,
+        "brier_skill_score": 0.500826,
+        "common_case_brier": 0.136025,
+        "common_case_count": 4,
+        "coverage": 1.0,
+        "end_to_end_score": 0.863975,
+        "invalid_cases_by_status": {},
+        "total_cases": 4,
+        "valid_cases": 4
+      }
+    }
+  },
+  "selection_policy": {
+    "current_outcome_used_for_current_selection": false,
+    "history_rule": "resolved_at <= current issued_at",
+    "min_history_valid_cases": 2,
+    "policy_frozen_before_holdout": true,
+    "primary_metric": "prior_end_to_end_score",
+    "simultaneous_timestamp_batching": true,
+    "tie_breakers": [
+      "lower_prior_brier_score",
+      "provider_name_ascending"
+    ],
+    "unresolved_case_policy": "exclude from scoring and future history until resolved",
+    "warmup_cases": 4
+  },
+  "selection_trace": [
+    {
+      "available_history_through_resolved_at": null,
+      "case_id": "dev-001",
+      "eligible_providers": [],
+      "history_cases_before_decision": 0,
+      "issued_at": "2026-08-01T12:00:00Z",
+      "phase": "warmup",
+      "prior_profiles": {},
+      "selected_attempt_after_resolution": null,
+      "selected_provider": null,
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-01T18:00:00Z",
+      "case_id": "dev-002",
+      "eligible_providers": [],
+      "history_cases_before_decision": 1,
+      "issued_at": "2026-08-02T12:00:00Z",
+      "phase": "warmup",
+      "prior_profiles": {},
+      "selected_attempt_after_resolution": null,
+      "selected_provider": null,
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-02T18:00:00Z",
+      "case_id": "dev-003",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 2,
+      "issued_at": "2026-08-03T12:00:00Z",
+      "phase": "warmup",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.065,
+          "coverage": 1.0,
+          "end_to_end_score": 0.935,
+          "total_cases": 2,
+          "valid_cases": 2
+        },
+        "openweather_onecall": {
+          "brier_score": 0.068,
+          "coverage": 1.0,
+          "end_to_end_score": 0.932,
+          "total_cases": 2,
+          "valid_cases": 2
+        },
+        "weatherapi": {
+          "brier_score": 0.097,
+          "coverage": 1.0,
+          "end_to_end_score": 0.903,
+          "total_cases": 2,
+          "valid_cases": 2
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-003",
+        "outcome": 1,
+        "probability": 0.55,
+        "score": 0.7975,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-02T18:00:00Z",
+      "case_id": "dev-004",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 2,
+      "issued_at": "2026-08-04T12:00:00Z",
+      "phase": "warmup",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.065,
+          "coverage": 1.0,
+          "end_to_end_score": 0.935,
+          "total_cases": 2,
+          "valid_cases": 2
+        },
+        "openweather_onecall": {
+          "brier_score": 0.068,
+          "coverage": 1.0,
+          "end_to_end_score": 0.932,
+          "total_cases": 2,
+          "valid_cases": 2
+        },
+        "weatherapi": {
+          "brier_score": 0.097,
+          "coverage": 1.0,
+          "end_to_end_score": 0.903,
+          "total_cases": 2,
+          "valid_cases": 2
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-004",
+        "outcome": 0,
+        "probability": 0.35,
+        "score": 0.8775,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-04T18:00:00Z",
+      "case_id": "dev-005",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 3,
+      "issued_at": "2026-08-05T12:00:00Z",
+      "phase": "holdout",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.084167,
+          "coverage": 1.0,
+          "end_to_end_score": 0.915833,
+          "total_cases": 3,
+          "valid_cases": 3
+        },
+        "openweather_onecall": {
+          "brier_score": 0.098667,
+          "coverage": 1.0,
+          "end_to_end_score": 0.901333,
+          "total_cases": 3,
+          "valid_cases": 3
+        },
+        "weatherapi": {
+          "brier_score": 0.094667,
+          "coverage": 1.0,
+          "end_to_end_score": 0.905333,
+          "total_cases": 3,
+          "valid_cases": 3
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-005",
+        "outcome": 1,
+        "probability": 0.8,
+        "score": 0.96,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-05T18:00:00Z",
+      "case_id": "dev-006",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 5,
+      "issued_at": "2026-08-06T12:00:00Z",
+      "phase": "holdout",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.099,
+          "coverage": 1.0,
+          "end_to_end_score": 0.901,
+          "total_cases": 5,
+          "valid_cases": 5
+        },
+        "openweather_onecall": {
+          "brier_score": 0.11168,
+          "coverage": 1.0,
+          "end_to_end_score": 0.88832,
+          "total_cases": 5,
+          "valid_cases": 5
+        },
+        "weatherapi": {
+          "brier_score": 0.12234,
+          "coverage": 1.0,
+          "end_to_end_score": 0.87766,
+          "total_cases": 5,
+          "valid_cases": 5
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-006",
+        "outcome": 0,
+        "probability": 0.1,
+        "score": 0.99,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-06T18:00:00Z",
+      "case_id": "dev-007",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 6,
+      "issued_at": "2026-08-07T12:00:00Z",
+      "phase": "holdout",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.084167,
+          "coverage": 1.0,
+          "end_to_end_score": 0.915833,
+          "total_cases": 6,
+          "valid_cases": 6
+        },
+        "openweather_onecall": {
+          "brier_score": 0.095467,
+          "coverage": 1.0,
+          "end_to_end_score": 0.904533,
+          "total_cases": 6,
+          "valid_cases": 6
+        },
+        "weatherapi": {
+          "brier_score": 0.10735,
+          "coverage": 1.0,
+          "end_to_end_score": 0.89265,
+          "total_cases": 6,
+          "valid_cases": 6
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-007",
+        "outcome": 1,
+        "probability": 0.62,
+        "score": 0.8556,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-07T18:00:00Z",
+      "case_id": "dev-008",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 7,
+      "issued_at": "2026-08-08T12:00:00Z",
+      "phase": "holdout",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.092771,
+          "coverage": 1.0,
+          "end_to_end_score": 0.907229,
+          "total_cases": 7,
+          "valid_cases": 7
+        },
+        "openweather_onecall": {
+          "brier_score": 0.109486,
+          "coverage": 1.0,
+          "end_to_end_score": 0.890514,
+          "total_cases": 7,
+          "valid_cases": 7
+        },
+        "weatherapi": {
+          "brier_score": 0.117214,
+          "coverage": 1.0,
+          "end_to_end_score": 0.882786,
+          "total_cases": 7,
+          "valid_cases": 7
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-008",
+        "outcome": 0,
+        "probability": 0.22,
+        "score": 0.9516,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-08T18:00:00Z",
+      "case_id": "dev-009",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 8,
+      "issued_at": "2026-08-09T12:00:00Z",
+      "phase": "holdout",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.087225,
+          "coverage": 1.0,
+          "end_to_end_score": 0.912775,
+          "total_cases": 8,
+          "valid_cases": 8
+        },
+        "openweather_onecall": {
+          "brier_score": 0.104913,
+          "coverage": 1.0,
+          "end_to_end_score": 0.895088,
+          "total_cases": 8,
+          "valid_cases": 8
+        },
+        "weatherapi": {
+          "brier_score": 0.114575,
+          "coverage": 1.0,
+          "end_to_end_score": 0.885425,
+          "total_cases": 8,
+          "valid_cases": 8
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-009",
+        "outcome": 1,
+        "probability": 0.75,
+        "score": 0.9375,
+        "status": "valid",
+        "valid": true
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    },
+    {
+      "available_history_through_resolved_at": "2026-08-09T18:00:00Z",
+      "case_id": "dev-010",
+      "eligible_providers": [
+        "open_meteo",
+        "openweather_onecall",
+        "weatherapi"
+      ],
+      "history_cases_before_decision": 9,
+      "issued_at": "2026-08-10T12:00:00Z",
+      "phase": "holdout",
+      "prior_profiles": {
+        "open_meteo": {
+          "brier_score": 0.084478,
+          "coverage": 1.0,
+          "end_to_end_score": 0.915522,
+          "total_cases": 9,
+          "valid_cases": 9
+        },
+        "openweather_onecall": {
+          "brier_score": 0.104913,
+          "coverage": 0.888889,
+          "end_to_end_score": 0.795633,
+          "total_cases": 9,
+          "valid_cases": 8
+        },
+        "weatherapi": {
+          "brier_score": 0.114575,
+          "coverage": 0.888889,
+          "end_to_end_score": 0.787044,
+          "total_cases": 9,
+          "valid_cases": 8
+        }
+      },
+      "selected_attempt_after_resolution": {
+        "case_id": "dev-010",
+        "outcome": 0,
+        "probability": null,
+        "score": 0.0,
+        "status": "missing",
+        "valid": false
+      },
+      "selected_provider": "open_meteo",
+      "simultaneous_timestamp_batch_size": 1
+    }
+  ]
+}
