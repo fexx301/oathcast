@@ -66,6 +66,11 @@ platform gate.
   confirmation.
 - Repository/canary setup documentation, secret/database ignore rules, and
   least-privilege/concurrency protections on the scheduled GitHub workflow.
+- A deterministic local Script Author adversarial benchmark with ten fixed
+  cases, baseline-versus-candidate behavior metrics, fixture hashing, and a
+  report that rejects wrong outcomes, malformed/overlong responses,
+  wrong-window answers, contradictions, and keyword stuffing. It is explicitly
+  labeled development-only and does not claim Telegraph's Canonical Script.
 
 ## Actionable next, not platform-blocked
 

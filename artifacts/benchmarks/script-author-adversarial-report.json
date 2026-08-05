@@ -1,0 +1,272 @@
+{
+  "benchmark_version": "script_author_adversarial_benchmark_v1",
+  "cases": [
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour. Probability: 70%.",
+        "score": 1.0,
+        "valid": true
+      },
+      "baseline_expected_behavior": true,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [],
+        "response_text": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour. Probability: 70%.",
+        "score": 0.95,
+        "valid": true
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "good",
+      "case_id": "good_structured_positive",
+      "expected_good": true
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "No. The probability of measurable precipitation in Lagos during the requested UTC hour is 20%.",
+        "score": 0.815385,
+        "valid": true
+      },
+      "baseline_expected_behavior": true,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [],
+        "response_text": "No. The probability of measurable precipitation in Lagos during the requested UTC hour is 20%.",
+        "score": 0.908333,
+        "valid": true
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "good",
+      "case_id": "good_chat_negative",
+      "expected_good": true
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "Yes \u2014 there is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+        "score": 0.927273,
+        "valid": true
+      },
+      "baseline_expected_behavior": true,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [],
+        "response_text": "Yes \u2014 there is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+        "score": 0.908333,
+        "valid": true
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "good",
+      "case_id": "good_plain_probability",
+      "expected_good": true
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "Yes. There is a 90% probability of measurable precipitation in Lagos during the requested UTC hour.",
+        "score": 0.753846,
+        "valid": true
+      },
+      "baseline_expected_behavior": false,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "polarity_mismatch"
+        ],
+        "response_text": "Yes. There is a 90% probability of measurable precipitation in Lagos during the requested UTC hour.",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "bad",
+      "case_id": "bad_wrong_outcome",
+      "expected_good": false
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour. measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos.",
+        "score": 1.0,
+        "valid": true
+      },
+      "baseline_expected_behavior": false,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "keyword_stuffing"
+        ],
+        "response_text": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour. measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos.",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "adversarial",
+      "case_id": "adversarial_keyword_stuffing",
+      "expected_good": false
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "No. Measurable precipitation will not occur in Lagos during the requested UTC hour.",
+        "score": 0.854545,
+        "valid": true
+      },
+      "baseline_expected_behavior": false,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "contradictory_probability",
+          "polarity_mismatch"
+        ],
+        "response_text": "No. Measurable precipitation will not occur in Lagos during the requested UTC hour.",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "adversarial",
+      "case_id": "adversarial_contradictory_probability",
+      "expected_good": false
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "Yes. Measurable precipitation occurred in Lagos from 10:00 to 11:00 UTC. Probability: 80%.",
+        "score": 0.709091,
+        "valid": true
+      },
+      "baseline_expected_behavior": false,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "wrong_time_window"
+        ],
+        "response_text": "Yes. Measurable precipitation occurred in Lagos from 10:00 to 11:00 UTC. Probability: 80%.",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "adversarial",
+      "case_id": "adversarial_wrong_time_window",
+      "expected_good": false
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [
+          "empty_response"
+        ],
+        "response_text": "",
+        "score": 0.0,
+        "valid": false
+      },
+      "baseline_expected_behavior": true,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "empty_response"
+        ],
+        "response_text": "",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "invalid",
+      "case_id": "invalid_empty",
+      "expected_good": false
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [],
+        "response_text": "{\"content\": \"Yes. Measurable precipitation occurred.\"",
+        "score": 0.883333,
+        "valid": true
+      },
+      "baseline_expected_behavior": false,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "malformed_json_like_response"
+        ],
+        "response_text": "{\"content\": \"Yes. Measurable precipitation occurred.\"",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "invalid",
+      "case_id": "invalid_malformed_json_like_response",
+      "expected_good": false
+    },
+    {
+      "baseline": {
+        "algorithm": "development_proxy_not_telegraph_scorer",
+        "issues": [
+          "response_too_long"
+        ],
+        "response_text": "Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred.",
+        "score": 0.0,
+        "valid": false
+      },
+      "baseline_expected_behavior": true,
+      "candidate": {
+        "algorithm": "development_robust_semantic_proxy_v1",
+        "issues": [
+          "response_too_long",
+          "keyword_stuffing"
+        ],
+        "response_text": "Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred. Yes. Measurable precipitation occurred.",
+        "score": 0.0,
+        "valid": false
+      },
+      "candidate_expected_behavior": true,
+      "case_class": "invalid",
+      "case_id": "invalid_overlong",
+      "expected_good": false
+    }
+  ],
+  "fixture_source": {
+    "path": "fixtures/script_author_adversarial.json",
+    "sha256": "5366877d352a84e59a63d27dc948344eed5a98ed47489a297593af8af466878d"
+  },
+  "official_status": "development_only_not_telegraph_canonical_script",
+  "scoring_lanes": {
+    "baseline": "existing_development_reference_proxy",
+    "brier": "separate_domain_benchmark_not_included_here",
+    "candidate": "development_robust_semantic_proxy_v1"
+  },
+  "summary": {
+    "baseline_adversarial_accepts": 4,
+    "baseline_behavior_accuracy": 0.5,
+    "baseline_mean_score": 0.694347,
+    "behavior_accuracy_improvement": 0.5,
+    "candidate_adversarial_accepts": 0,
+    "candidate_adversarial_rejection_rate": 1.0,
+    "candidate_behavior_accuracy": 1.0,
+    "candidate_good_case_pass_rate": 1.0,
+    "candidate_mean_score": 0.276667,
+    "candidate_mean_score_delta": -0.417681,
+    "good_cases": 3,
+    "issues_by_type": {
+      "contradictory_probability": 1,
+      "empty_response": 1,
+      "keyword_stuffing": 2,
+      "malformed_json_like_response": 1,
+      "polarity_mismatch": 2,
+      "response_too_long": 1,
+      "wrong_time_window": 1
+    },
+    "score_bounds_ok": true,
+    "total_cases": 10
+  },
+  "thresholds": {
+    "good_score_threshold": 0.55
+  }
+}

@@ -8,7 +8,7 @@
 - **Former descriptive name:** Forecast Court
 - **Workspace:** `/Users/femi/Documents/My-Projects/oathcast`
 - **Last updated:** 2026-08-05
-- **Current state:** Project folder created. Registration form completed. Discord access obtained. Local vertical-slice scaffolding, deployment package, hardened x402 boundary, external response normalization, read-only live Miner discovery with optional evidence snapshots, strict provider-native event validation, cutoff enforcement, immutable SQLite forecast receipts, durable Application case evidence, exact-window ground-truth resolution, request correlation, release provenance, readiness/auth/rate-limit controls, local Miner draft validation, a fixture-excluding append-only demand provenance ledger, a thin case workflow, SQLite backup/restore checks, an independent canary entry point, an owned-Miner fallback ablation, typed registration declarations, protocol result/receipt envelopes, a human-readable Application evidence shell, a canonical registration dry-run artifact, Explorer evidence templates, and repository/canary setup documentation are implemented locally and pass 78 tests. The authorized AWS EC2 staging host still runs the exact v3.2 Docker release behind verified public HTTPS at `https://oathcastcourt.duckdns.org`; the v3.2 release was verified at 64 tests, while the follow-on recovery/canary/ablation/provenance/presentation changes are local and not yet deployed. The old v3.1 container is retained stopped for rollback and the temporary EC2 Instance Connect rule has been removed. No Miner registration, paid external request, or WASM registration exists. The project has not yet been pushed to a hosted Git remote; the local GitHub CLI session is unauthenticated.
+- **Current state:** Project folder created. Registration form completed. Discord access obtained. Local vertical-slice scaffolding, deployment package, hardened x402 boundary, external response normalization, read-only live Miner discovery with optional evidence snapshots, strict provider-native event validation, cutoff enforcement, immutable SQLite forecast receipts, durable Application case evidence, exact-window ground-truth resolution, request correlation, release provenance, readiness/auth/rate-limit controls, local Miner draft validation, a fixture-excluding append-only demand provenance ledger, a thin case workflow, SQLite backup/restore checks, an independent canary entry point, an owned-Miner fallback ablation, typed registration declarations, protocol result/receipt envelopes, a human-readable Application evidence shell, a canonical registration dry-run artifact, Explorer evidence templates, repository/canary setup documentation, and a local adversarial Script Author benchmark are implemented locally and pass 82 tests. The authorized AWS EC2 staging host still runs the exact v3.2 Docker release behind verified public HTTPS at `https://oathcastcourt.duckdns.org`; the v3.2 release was verified at 64 tests, while the follow-on recovery/canary/ablation/provenance/presentation/benchmark changes are local and not yet deployed. The old v3.1 container is retained stopped for rollback and the temporary EC2 Instance Connect rule has been removed. No Miner registration, paid external request, or WASM registration exists. The project has not yet been pushed to a hosted Git remote; the local GitHub CLI session is unauthenticated.
 - **Primary positioning:** A public calibration court for machine forecasts.
 - **One-line pitch:** OathCast time-locks short-horizon machine forecasts, settles them against independent observations, and makes Miner quality visible through transparent scoring.
 
@@ -237,6 +237,10 @@ Current protocol-facing metric (per Ahmed Ali's Discord answer):
 - The current scorer is a `0..1` composite of cosine similarity, BM25 word overlap, and length quality.
 - Structured JSON may be converted to readable text before scoring; the scorer itself works with plain text.
 - Brier is not currently part of the protocol scorer.
+- The local adversarial benchmark compares the existing proxy with a stricter
+  candidate that rejects empty, malformed, overlong, wrong-window,
+  contradictory, wrong-outcome, and keyword-stuffed responses. Its report is
+  a regression guard only; it does not predict the official Canonical Script.
 
 Local domain benchmark:
 
@@ -276,8 +280,10 @@ Implemented under `/Users/femi/Documents/My-Projects/oathcast`:
 - `src/oathcast/workflow.py`: thin Application façade that seals a current cross-Miner decision and resolves it later without exposing outcomes to the live router.
 - `src/oathcast/render.py`: deterministic text presentation with a small `content` + `probability` envelope.
 - `src/oathcast/reference_evaluator.py`: development-only proxy for the future three-input Script Author contract; not the official scorer.
+- `src/oathcast/script_benchmark.py`: deterministic development comparison between the baseline proxy and a stricter anti-gaming candidate; not the official Canonical Script.
 - `src/oathcast/scoring.py`: Brier loss, Brier quality, unclipped Brier skill, coverage, and zero-scored non-valid attempts.
-- `fixtures/`: development provider payloads, registry snapshot, evaluator cases, one common question, and ten synthetic Brier cases.
+- `fixtures/`: development provider payloads, registry snapshot, evaluator cases, one common question, ten synthetic Brier cases, and the fixed Script Author adversarial corpus.
+- `artifacts/benchmarks/script-author-adversarial-report.json`: reproducible local benchmark evidence with fixture hash, baseline/candidate comparison, issue counts, and an explicit non-official status.
 - `miners/`: one canonical OathCast Miner registration draft plus three provider-adapter YAML experiments; only the canonical draft is a registration candidate.
 - `scripts/discover_live_miners.py`: read-only live registry discovery; it does not pay, sign, or write a snapshot.
 - `scripts/preflight_miner.py`: one unpaid challenge inspection for a selected Miner; it never attaches a signer.
@@ -444,6 +450,7 @@ Current phase, before August 17, 2026.
 - Keep paid transport behind `TelegraphX402Client`; run its non-signing preflight first, never add a fake proof, and never claim live traffic until a real signer and funded Base Sepolia wallet are configured.
 - Configure `OATHCAST_MINER_API_KEY` in the host secret store so the public Miner enforces the Bearer token declared in its YAML; keep the payment wallet off-host.
 - Build and test the development reference evaluator against structured, chat, empty, and overlong responses; replace its proxy scoring once the official harness arrives.
+- Run the local Script Author adversarial benchmark after evaluator changes; keep its fixture hash and report separate from live-usage evidence.
 - Base Sepolia USDC and the minimum Miner price of 0.01 USDC are confirmed; exact wallet/faucet flow remains open.
 - Prepare a minimal Application shell.
 
@@ -638,6 +645,7 @@ Avoid building:
 - **2026-08-05:** Implemented the immediate local preparation slice: `scripts/demo_application.py --format markdown` now presents the cross-Miner decision, external influence, durable case hashes, raw responses, later resolution, and owned-Miner-disabled ablation; `scripts/create_registration_draft.py` generated `artifacts/registration-drafts/oathcast-weather-registration-draft.json` with explicit draft/non-submission claims; added human and JSON Explorer evidence templates; added repository/canary setup guidance, secret/database ignore rules, and least-privilege/concurrency protections to the GitHub workflow. Full local regression now passes 78 tests and compile/draft validation passes. The project is not yet pushed to a hosted Git remote because the available GitHub CLI session is unauthenticated; AWS remains on v3.2 and was not redeployed.
 - **2026-08-05:** User reviewed the Hackathon judging page and recorded the current engagement/X weights: 25% for Track 1, 10% for Track 2, and 25% for Track 3. Updated judge strategy: evidence-led public updates are a major workstream for Miner and Application, while Script Author effort remains concentrated on evaluator quality, ranking accuracy, anti-gaming, and harness compatibility.
 - **2026-08-05:** User supplied the complete judging breakdown from the official track panels: Track 1 is 75% normalized performance + 25% X; Track 2 is 50% improvement over baseline + 30% robustness/code quality + 10% X + 10% community engagement/adoption; Track 3 is 45% real usage/adoption + 25% usefulness/creativity/depth + 25% X + 5% technical execution/integration. Reframed the strategy: Application is the primary product lane if real demand can be secured, Script Author is the controllable technical secondary lane, and Miner is the lifecycle/support lane where performance—not social activity—dominates.
+- **2026-08-05:** Added the local Script Author adversarial benchmark: ten fixed development cases, baseline-versus-candidate behavior comparison, explicit rejection of wrong outcomes and anti-gaming patterns, fixture hashing, and a reproducible JSON report. The candidate achieved 1.0 behavior accuracy, 1.0 good-case pass rate, and 1.0 adversarial rejection on this corpus versus 0.5 baseline behavior accuracy. These are local diagnostics only—not Telegraph's Canonical Script, WASM score, or qualifying traffic. Full regression now passes 82 tests; AWS remains on v3.2 and was not redeployed.
 
 ## 19. Handoff maintenance protocol
 

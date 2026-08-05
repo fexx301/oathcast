@@ -52,6 +52,8 @@ From the OathCast directory:
     PYTHONPATH=src python3 -m unittest discover -s tests -v
     PYTHONPATH=src python3 scripts/score_fixtures.py
     PYTHONPATH=src python3 scripts/evaluate_fixtures.py
+    PYTHONPATH=src python3 scripts/benchmark_script_author.py \
+      --output artifacts/benchmarks/script-author-adversarial-report.json
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py --release-id local-check
     PYTHONPATH=src python3 scripts/demo_application.py
@@ -123,6 +125,13 @@ authorization.
 The reference evaluator is a contract/proxy test only. Ahmed confirmed that
 Telegraph has not released the public WASM boilerplates or harness yet; replace
 the proxy with the official module and rerun its tests when released.
+
+`benchmark_script_author.py` compares that baseline proxy with a transparent
+development candidate across good, wrong-outcome, malformed, overlong,
+wrong-window, contradictory, and keyword-stuffed responses. Its fixed corpus
+and JSON report are regression evidence for local robustness only; neither the
+candidate score nor the report is Telegraph's Canonical Script, a WASM result,
+or qualifying hackathon traffic. The Brier benchmark remains a separate lane.
 
 The paid boundary is in `src/oathcast/payment.py`. It understands Base Sepolia
 USDC x402 challenge/retry semantics but requires a real injected signer; it

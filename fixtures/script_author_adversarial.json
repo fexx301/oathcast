@@ -1,0 +1,102 @@
+[
+  {
+    "case_id": "good_structured_positive",
+    "case_class": "good",
+    "expected_good": true,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+    "raw_response": {
+      "content": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour. Probability: 70%.",
+      "probability": 0.7
+    }
+  },
+  {
+    "case_id": "good_chat_negative",
+    "case_class": "good",
+    "expected_good": true,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+    "raw_response": {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "No. The probability of measurable precipitation in Lagos during the requested UTC hour is 20%."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "good_plain_probability",
+    "case_class": "good",
+    "expected_good": true,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+    "raw_response": "Yes — there is a 65% probability of measurable precipitation in Lagos during the requested UTC hour."
+  },
+  {
+    "case_id": "bad_wrong_outcome",
+    "case_class": "bad",
+    "expected_good": false,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+    "raw_response": "Yes. There is a 90% probability of measurable precipitation in Lagos during the requested UTC hour."
+  },
+  {
+    "case_id": "adversarial_keyword_stuffing",
+    "case_class": "adversarial",
+    "expected_good": false,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+    "raw_response": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour. measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos."
+  },
+  {
+    "case_id": "adversarial_contradictory_probability",
+    "case_class": "adversarial",
+    "expected_good": false,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+    "raw_response": {
+      "content": "No. Measurable precipitation will not occur in Lagos during the requested UTC hour.",
+      "probability": 0.9
+    }
+  },
+  {
+    "case_id": "adversarial_wrong_time_window",
+    "case_class": "adversarial",
+    "expected_good": false,
+    "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+    "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+    "raw_response": "Yes. Measurable precipitation occurred in Lagos from 10:00 to 11:00 UTC. Probability: 80%."
+  },
+  {
+    "case_id": "invalid_empty",
+    "case_class": "invalid",
+    "expected_good": false,
+    "question": "Will measurable precipitation occur?",
+    "ground_truth": "No measurable precipitation occurred.",
+    "raw_response": ""
+  },
+  {
+    "case_id": "invalid_malformed_json_like_response",
+    "case_class": "invalid",
+    "expected_good": false,
+    "question": "Will measurable precipitation occur?",
+    "ground_truth": "Yes. Measurable precipitation occurred.",
+    "raw_response": "{\"content\": \"Yes. Measurable precipitation occurred.\""
+  },
+  {
+    "case_id": "invalid_overlong",
+    "case_class": "invalid",
+    "expected_good": false,
+    "question": "Will measurable precipitation occur?",
+    "ground_truth": "Yes. Measurable precipitation occurred.",
+    "raw_response": {
+      "_fixture_repeat": {
+        "value": "Yes. Measurable precipitation occurred. ",
+        "count": 160
+      }
+    }
+  }
+]
