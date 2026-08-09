@@ -706,6 +706,7 @@ Avoid building:
 - **2026-08-09:** The explicitly requested advisor consultation was attempted with gpt-5.6-sol at max effort but returned no review despite waits and an interrupt; no advisor verdict is claimed for this slice. Work proceeded conservatively with fail-closed defaults and primary-source/live-protocol verification.
 - **2026-08-09:** Audited the published Miner Registry portal/parser source at commit `3985e67` against the local canonical YAML. The draft is shape-compatible with the wizard's required basics, connection, endpoint, semantics, and on-chain sections; the placeholder Integration ID, final live validation, exact pinned bytes/hash, and wallet registration remain intentionally pending. Added `docs/official-portal-compatibility.md` as a non-submission runbook.
 - **2026-08-09:** Rechecked Telegraph's public Explorer at `2026-08-09T21:52:34Z`. Weather traffic for Miners 212 and 18 was visible, but neither the recent-signal feed nor the Miner leaderboard exposed a one-to-one match for the Solana canary transaction signature. Updated the sanitized canary artifact; the payment remains a verified devnet settlement check, not qualifying Telegraph demand.
+- **2026-08-09:** Committed and pushed the compatibility runbook, refreshed Explorer evidence, and handoff update as `6a8911e` (`Record Explorer recheck and portal compatibility`). The pre-existing untracked `improvements.md` remains intentionally untouched.
 
 ## 19. Handoff maintenance protocol
 
