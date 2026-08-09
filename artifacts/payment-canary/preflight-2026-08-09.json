@@ -1,0 +1,28 @@
+{
+  "evidence_version": "oathcast.payment-canary.v1",
+  "mode": "preflight",
+  "ok": true,
+  "operation_id": "preflight-live-2026-08-09-002",
+  "payment_attempted": false,
+  "source": {
+    "dispatcher_origin": "http://13.237.89.59:7044",
+    "endpoint_path": "/miner-dispatcher/v1/18/predict",
+    "miner_id": "18",
+    "observed_at_utc": "2026-08-08T23:40:51Z"
+  },
+  "challenge": {
+    "amount": "10000",
+    "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "challenge_sha256": "50928736e03c81b7fb29034f5ad6ccaf8a35f6875107a27ae87ac11de24bd32a",
+    "fee_payer": "2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4",
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "pay_to": "G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix",
+    "payment_required_header_sha256": "1349a0252cb9c78af402c2042436fad78da0616220806588f22771b78846ddec",
+    "validated": true
+  },
+  "limitations": [
+    "This unpaid preflight is not Telegraph demand.",
+    "No wallet was read and no transaction was signed.",
+    "The live dispatcher is HTTP; the canary accepts only its pinned devnet authority and disables redirects."
+  ]
+}

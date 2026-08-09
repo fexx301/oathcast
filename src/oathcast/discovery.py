@@ -58,9 +58,13 @@ def _endpoint_name(data: dict[str, Any], path: str) -> str:
 
 
 def _price_to_micro_usdc(value: Any) -> int | None:
-    """Convert an explicitly decimal ``min_price_usdc`` value to micro-USDC."""
+    """Convert a decimal USDC value from a YAML-style record to micro-USDC."""
 
     if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return None
+    if isinstance(value, str) and "." not in value and "e" not in value.lower():
         return None
     try:
         decimal_value = Decimal(str(value))
@@ -84,6 +88,41 @@ def _explicit_micro_usdc(value: Any) -> int | None:
     if isinstance(value, str) and value.strip().isdigit():
         return int(value.strip())
     return None
+
+
+def _min_price_micro_usdc(data: dict[str, Any]) -> int | None:
+    """Parse live integer prices and YAML decimal prices without guessing."""
+
+    price_data = data
+    if not any(key in data for key in ("min_price_micro_usdc", "min_price_usdc")):
+        on_chain = data.get("on_chain")
+        if isinstance(on_chain, dict):
+            price_data = on_chain
+
+    if "min_price_micro_usdc" in price_data:
+        return _explicit_micro_usdc(price_data.get("min_price_micro_usdc"))
+
+    value = price_data.get("min_price_usdc")
+    if isinstance(value, int) and not isinstance(value, bool):
+        # Telegraph's live integrations response uses this field name for
+        # integer micro-USDC amounts. YAML decimal values take the path below.
+        return _explicit_micro_usdc(value)
+    return _price_to_micro_usdc(value)
+
+
+def _protocol_reliability(data: dict[str, Any]) -> float:
+    """Use Telegraph's live average score, with legacy data as a fallback."""
+
+    value = data.get("avg_score")
+    if value is None:
+        value = data.get("historical_reliability", 0.5)
+    try:
+        reliability = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("historical_reliability must be between 0 and 1") from exc
+    if not 0 <= reliability <= 1:
+        raise ValueError("historical_reliability must be between 0 and 1")
+    return reliability
 
 
 @dataclass(frozen=True)
@@ -112,14 +151,9 @@ class MinerCapability:
             supported = [supported]
         if not isinstance(supported, list):
             supported = []
-        reliability = float(data.get("historical_reliability", 0.5))
-        if not 0 <= reliability <= 1:
-            raise ValueError("historical_reliability must be between 0 and 1")
+        reliability = _protocol_reliability(data)
         endpoint_path = _endpoint_path(data)
-        if "min_price_micro_usdc" in data:
-            min_price_micro_usdc = _explicit_micro_usdc(data.get("min_price_micro_usdc"))
-        else:
-            min_price_micro_usdc = _price_to_micro_usdc(data.get("min_price_usdc"))
+        min_price_micro_usdc = _min_price_micro_usdc(data)
         return cls(
             miner_id=str(data.get("id", data.get("miner_id", ""))),
             slug=str(data.get("slug", "")),

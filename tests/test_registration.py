@@ -8,9 +8,50 @@ from oathcast.registration import (
     MinerRegistrationDeclaration,
     decimal_usdc_to_micro,
 )
+from scripts.validate_miner_drafts import (
+    INTEGRATION_ID_PLACEHOLDER,
+    validate_draft,
+)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_MINER = ROOT / "miners" / "oathcast-weather.yaml"
 
 
 class RegistrationDeclarationTests(unittest.TestCase):
+    def test_canonical_yaml_matches_service_contract_and_is_not_portal_validated(self):
+        result = validate_draft(CANONICAL_MINER, canonical=True)
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertEqual(result["validation_scope"], "draft_local")
+        self.assertEqual(result["official_portal_validation"]["status"], "not_run")
+        self.assertFalse(result["official_portal_validation"]["validated"])
+        self.assertFalse(result["official_portal_validated"])
+        self.assertEqual(result["id"], INTEGRATION_ID_PLACEHOLDER)
+        self.assertTrue(any("placeholder" in warning for warning in result["warnings"]))
+
+        yaml_text = CANONICAL_MINER.read_text(encoding="utf-8")
+        for fragment in (
+            "input_schema:\n",
+            "output_schema:\n",
+            "required:\n    - lat\n    - lon\n    - start\n    - end\n",
+            "lat: { source: strings.2, type: float }",
+            "probability_x10000",
+            "multiplier: 10000",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, yaml_text)
+
+    def test_canonical_local_validation_rejects_missing_schema(self):
+        yaml_text = CANONICAL_MINER.read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "miner.yaml"
+            path.write_text(yaml_text.replace("input_schema:\n", "# input_schema:\n", 1), encoding="utf-8")
+            result = validate_draft(path, canonical=True)
+
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("input_schema" in error for error in result["errors"]))
+        self.assertEqual(result["official_portal_validation"]["status"], "not_run")
+
     def test_decimal_price_conversion_is_explicit(self):
         self.assertEqual(decimal_usdc_to_micro("0.01"), MINIMUM_PRICE_MICRO_USDC)
         with self.assertRaises(ValueError):

@@ -1,9 +1,11 @@
-# CANONICAL REGISTRATION DRAFT — replace id/base_url and validate before use.
+# CANONICAL REGISTRATION DRAFT — the Integration ID is intentionally unresolved.
+# Replace only the ID placeholder after uniqueness is verified in the official
+# portal; this file is still a local draft until that portal check succeeds.
 # The three provider-specific YAMLs are adapter experiments, not separate
 # ecosystem Miners. This single service is the candidate OathCast Miner.
 version: "1"
 kind: miner
-id: 0
+id: REPLACE_WITH_UNIQUE_INTEGRATION_ID
 slug: oathcast-weather
 protocol: generic
 name: OathCast Weather Forecast Miner
@@ -16,6 +18,11 @@ auth:
   value_prefix: "Bearer "
   env_var: OATHCAST_MINER_API_KEY
 
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
 endpoints:
   - path: /predict
     external_path: /v1/forecast/point
@@ -26,6 +33,72 @@ endpoints:
       lon: longitude
       start: horizon_start
       end: horizon_end
+      cutoff: forecast_cutoff
+
+input_schema:
+  type: object
+  properties:
+    event_id:
+      type: string
+      description: Stable event identifier; defaults to a request-derived identifier when omitted.
+    location_name:
+      type: string
+      description: Human-readable point name; defaults to requested location when omitted.
+    lat:
+      type: number
+      description: Point latitude in decimal degrees.
+      minimum: -90
+      maximum: 90
+    lon:
+      type: number
+      description: Point longitude in decimal degrees.
+      minimum: -180
+      maximum: 180
+    start:
+      type: string
+      description: Inclusive UTC start of the one-hour forecast window.
+      format: date-time
+    end:
+      type: string
+      description: Exclusive UTC end of the one-hour forecast window.
+      format: date-time
+    cutoff:
+      type: string
+      description: UTC deadline before which a new forecast must be issued; defaults to one hour before start.
+      format: date-time
+    threshold_mm:
+      type: number
+      description: Measurable precipitation threshold supported by this service.
+      enum:
+        - 0.1
+    operator:
+      type: string
+      description: Provider-native precipitation comparison supported by this service.
+      enum:
+        - ">"
+    provider:
+      type: string
+      description: Optional provider selector; the service still applies its configured provider allowlist.
+  required:
+    - lat
+    - lon
+    - start
+    - end
+
+output_schema:
+  type: object
+  properties:
+    content:
+      type: string
+      description: Deterministic human-readable forecast sentence.
+    probability:
+      type: number
+      description: Probability of the declared measurable-precipitation event.
+      minimum: 0
+      maximum: 1
+  required:
+    - content
+    - probability
 
 semantics:
   signal_mapping:
@@ -42,14 +115,25 @@ on_chain:
     strings:
       - index: 0
         name: content
+        description: Deterministic human-readable forecast sentence.
         source_path: content
     integers:
       - index: 0
         name: probability_x10000
+        description: Probability in the inclusive range 0 to 1 scaled by 10000.
         source_path: probability
         multiplier: 10000
-
-rate_limit_per_sec: 2
-cache_ttl_sec: 0
-circuit_threshold: 5
-circuit_cooldown_seconds: 30
+  request:
+    - endpoint: predict
+      method: GET
+      query_params:
+        event_id: { source: strings.0, optional: true }
+        location_name: { source: strings.1, optional: true }
+        lat: { source: strings.2, type: float }
+        lon: { source: strings.3, type: float }
+        start: { source: strings.4, format: date-time }
+        end: { source: strings.5, format: date-time }
+        cutoff: { source: strings.6, optional: true, format: date-time }
+        threshold_mm: { source: strings.7, optional: true, type: float }
+        operator: { source: strings.8, optional: true }
+        provider: { source: strings.9, optional: true }

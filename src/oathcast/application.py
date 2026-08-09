@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 
 from oathcast.discovery import MinerCapability
 from oathcast.forecast import ForecastQuestion, format_timestamp
+from oathcast.miner_adapters import AdaptedMinerResponse, adapter_for_miner
 from oathcast.protocol import ProtocolResultEnvelope
 
 
@@ -109,6 +110,7 @@ class MinerReply:
     content: str
     latency_ms: float | None
     transport: str
+    probability_comparable: bool = True
     error: str | None = None
     received_at: datetime | None = None
     parser_version: str = "probability_extractor_v1"
@@ -118,7 +120,17 @@ class MinerReply:
 
     @property
     def valid(self) -> bool:
-        return self.error is None and self.probability is not None
+        return (
+            self.error is None
+            and self.probability is not None
+            and self.probability_comparable
+        )
+
+    @property
+    def has_comparable_probability(self) -> bool:
+        """Whether this reply is eligible to influence probability consensus."""
+
+        return self.valid
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -127,6 +139,7 @@ class MinerReply:
             "owned": self.owned,
             "raw_response": self.raw_response,
             "probability": self.probability,
+            "probability_comparable": self.probability_comparable,
             "content": self.content,
             "latency_ms": self.latency_ms,
             "transport": self.transport,
@@ -173,10 +186,9 @@ class ApplicationDecision:
 class HttpMinerClient:
     """Small development client for a Miner HTTP endpoint.
 
-    Payment headers are deliberately not fabricated here. The Base Sepolia
-    USDC/x402 transport will be attached once the official Application flow is
-    available; a caller can inject headers through the constructor for local
-    integration tests.
+    Payment headers are deliberately not fabricated here. A caller can inject
+    headers through the constructor for local integration tests; live paid
+    Telegraph traffic belongs behind the reviewed Solana x402 boundary.
     """
 
     def __init__(
@@ -228,23 +240,15 @@ class TelegraphMinerClient:
     ) -> None:
         self.capability = capability
         self.payment_client = payment_client
-        self.endpoint = endpoint or capability.endpoint_name
+        self.adapter = adapter_for_miner(capability.miner_id)
+        self.endpoint = endpoint or self.adapter.endpoint_name or capability.endpoint_name
         self.demand_ledger = demand_ledger
 
     def __call__(self, question: ForecastQuestion) -> Any:
         return self.request_with_id(question, request_id=None)
 
     def request_with_id(self, question: ForecastQuestion, request_id: str | None) -> Any:
-        params = {
-            "event_id": question.event_id,
-            "location_name": question.location_name,
-            "lat": f"{question.latitude:.6f}",
-            "lon": f"{question.longitude:.6f}",
-            "horizon_start": format_timestamp(question.horizon_start),
-            "horizon_end": format_timestamp(question.horizon_end),
-            "forecast_cutoff": format_timestamp(question.forecast_cutoff),
-            "threshold_mm": f"{question.threshold_mm:g}",
-        }
+        params = self.adapter.build_params(question)
         request_headers = None
         if request_id:
             request_headers = {
@@ -322,8 +326,13 @@ class CrossMinerRouter:
         started = time.perf_counter()
         try:
             raw = self._call_client(self.clients[capability.slug], question, request_id)
-            probability = extract_probability(raw)
-            error = None if probability is not None else "response has no valid probability"
+            adapter = adapter_for_miner(capability.miner_id)
+            adapted: AdaptedMinerResponse = adapter.parse_response(raw, question)
+            probability = adapted.probability
+            comparable = adapted.has_comparable_probability
+            error = None if comparable else (
+                adapted.validity_reason or "response has no comparable probability"
+            )
             protocol_result = raw if isinstance(raw, ProtocolResultEnvelope) else None
             raw_body = protocol_result.body if protocol_result is not None else raw
             return MinerReply(
@@ -335,9 +344,11 @@ class CrossMinerRouter:
                 content=extract_content(raw),
                 latency_ms=(time.perf_counter() - started) * 1000,
                 transport="development_http_or_injected",
+                probability_comparable=comparable,
                 error=error,
                 received_at=self.clock().astimezone(UTC),
-                validity_reason=error,
+                parser_version=adapted.parser_version,
+                validity_reason=adapted.validity_reason or error,
                 request_id=request_id,
                 protocol_result=protocol_result,
             )
@@ -351,6 +362,7 @@ class CrossMinerRouter:
                 content="",
                 latency_ms=(time.perf_counter() - started) * 1000,
                 transport="development_http_or_injected",
+                probability_comparable=False,
                 error=str(exc),
                 received_at=self.clock().astimezone(UTC),
                 validity_reason=str(exc),

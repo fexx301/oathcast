@@ -158,19 +158,16 @@ report includes conditional Brier, coverage, common-case Brier, and the
 prior-only selection trace. The timestamped fixture is synthetic development
 evidence, not real provider performance or Telegraph traffic.
 
-The paid boundary is in `src/oathcast/payment.py`. It understands Base Sepolia
-USDC x402 challenge/retry semantics but requires a real injected signer; it
-never fabricates `PAYMENT-SIGNATURE` values. The signer receives an immutable
-validated authorization containing exactly one approved challenge option.
-Signed clients also require an Application-side SQLite payment journal with
-durable `RESERVED -> SUBMITTED -> SETTLED/UNKNOWN` state, spend caps, restart-
-persistent duplicate blocking, and no private keys or replayable proofs.
-`preflight_miner()` performs only the unpaid request and never reserves a
-journal entry. Live signing remains blocked until an official HTTPS dispatcher,
-real signer/SDK, funded Base Sepolia wallet, and settlement/reconciliation
-evidence are available. If a challenge supplies a resource URL, it must match
-the exact request URL; the current live challenge shape omits that field, so
-target and endpoint allowlists remain mandatory.
+The current paid boundary is `payment-canary/`. It uses the official x402 fetch
+and SVM clients, pins Solana Devnet, Circle's Devnet USDC mint, the 0.01-USDC
+cap, recipient, fee payer, Miner route, and endpoint, and independently checks
+the settlement transaction through Solana RPC. Preflight never reads a key.
+Execution requires both `--execute` and `SOLANA_PRIVATE_KEY`, sends at most one
+paid retry, and emits only sanitized evidence. Telegraph's temporary HTTP
+dispatcher and prefix-free canonical resource are accepted only by an explicit
+flag pinned to the current live authority; redirects and every other HTTP host
+remain blocked. `src/oathcast/payment.py` is retained as a legacy Base-Sepolia
+policy/journal regression harness and is not the current live signer.
 
 When deployed behind a host such as Railway, the service honors the host's
 `PORT` value. Set `OATHCAST_MINER_API_KEY` to enable the Bearer protection that
@@ -189,8 +186,10 @@ wraps those adapters behind one public Miner service. Before registration:
 - validate the canonical YAML against a running Telegraph node and the released Intent/harness;
 - define the canonical request price; the current Discord clarification sets the minimum at 0.01 USDC.
 
-The hackathon currently uses Base Sepolia USDC. Each Miner YAML must define a
-price, and the minimum allowed price is 0.01 USDC. The explorer is at
+Miner registration remains a separate Base-Sepolia portal/contract concern.
+The current live consumption challenge uses Solana Devnet USDC; these testnet
+tokens have no monetary value. Each Miner YAML must still define a price, and
+the minimum allowed price is 0.01 USDC. The explorer is at
 https://explorer.telegraphprotocol.com/.
 
 ## Official provider references

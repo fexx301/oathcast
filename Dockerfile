@@ -12,6 +12,7 @@ WORKDIR /app
 COPY pyproject.toml .
 COPY src ./src
 COPY miners ./miners
+COPY scripts ./scripts
 
 ENV PYTHONPATH=/app/src
 ENV OATHCAST_HOST=0.0.0.0
@@ -22,6 +23,6 @@ ENV OATHCAST_SOURCE_SHA256=${OATHCAST_SOURCE_SHA256}
 
 RUN mkdir -p /data/oathcast
 
-EXPOSE 8080
+EXPOSE 8080 8787
 
 CMD ["python", "-m", "oathcast.service"]

@@ -1,0 +1,68 @@
+{
+  "evidence_version": "oathcast.payment-canary.v1",
+  "mode": "execute",
+  "ok": true,
+  "operation_id": "canary-live-2026-08-09-002",
+  "observed_at_utc": "2026-08-09T19:44:06Z",
+  "target": {
+    "dispatcher_origin": "http://13.237.89.59:7044",
+    "path": "/miner-dispatcher/v1/18/predict",
+    "miner_id": "18",
+    "endpoint_path": "predict",
+    "request_url_sha256": "69da19c39c734792b44a6ef9038cf86ecd162fc080ff0d44bd039312ee17fd7a"
+  },
+  "challenge": {
+    "amount": "10000",
+    "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "challenge_sha256": "50928736e03c81b7fb29034f5ad6ccaf8a35f6875107a27ae87ac11de24bd32a",
+    "fee_payer": "2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4",
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "pay_to": "G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix",
+    "payment_required_header_sha256": "1349a0252cb9c78af402c2042436fad78da0616220806588f22771b78846ddec"
+  },
+  "settlement": {
+    "success": true,
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "header_sha256": "013e579ebd5617d58068705f5cd6310400920668dcc672da1e0231d050183b5f",
+    "transaction_signature": "5DeqVG5RV84uSi8Ae2XUKYNgYTWJyYhvS4GFPXNAZf2EhBayuUaQSsfkf4xpQe4GMNdQ48iCXKmFpVYdwFQMVECp"
+  },
+  "signer_address": "2BGoFrhXmt6sDR9N6CNfgKtepbvkjJB6TuV53Tpvv5yw",
+  "verification": {
+    "rpc_url_sha256": "3d423a3cdf16d45a050ac04bd1af892df2aba3be585a23462392774390919658",
+    "confirmed_transaction": true,
+    "confirmation_status": "confirmed",
+    "transaction_error": false,
+    "transaction_signature_matches": true,
+    "fee_payer_verified": true,
+    "token_movement": {
+      "status": "verified",
+      "expected_amount": "10000",
+      "payer_delta": "-10000",
+      "recipient_delta": "10000",
+      "payer": "2BGoFrhXmt6sDR9N6CNfgKtepbvkjJB6TuV53Tpvv5yw",
+      "recipient": "G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix"
+    }
+  },
+  "explorer_reconciliation": {
+    "status": "not_found_yet",
+    "url": "https://explorer.telegraphprotocol.com/",
+    "official_demand_claim": false,
+    "checked_at_utc": "2026-08-09T20:00:25Z",
+    "checks": [
+      {
+        "endpoint": "/api/daemon/api/questions?sort=recent&order=desc&since_hours=72&limit=100&offset=0",
+        "result": "no one-to-one transaction-signature or canary-record match"
+      },
+      {
+        "endpoint": "/api/leaderboard/miners",
+        "result": "existing bittensor-sn18-zeus epoch entry observed; no one-to-one canary record"
+      }
+    ],
+    "official_demand_claim": false
+  },
+  "limitations": [
+    "This is one manually authorized Solana-Devnet testnet payment; testnet tokens have no monetary value.",
+    "The canary verified settlement on Solana RPC, but Telegraph Explorer reconciliation is still required before counting demand.",
+    "The dispatcher was HTTP at execution time; the canary used the explicitly pinned devnet exception with redirects disabled."
+  ]
+}

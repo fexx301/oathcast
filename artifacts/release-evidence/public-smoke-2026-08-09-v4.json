@@ -1,0 +1,48 @@
+{
+  "evidence_version": "oathcast.release-smoke.v1",
+  "observed_at_utc": "2026-08-09T21:13:16Z",
+  "release_id": "oathcast-2026-08-09-readiness-v4",
+  "source_sha256": "d3069ec17f6fc7f24224b3ebc3803e665500f24f9e71fd948fbc98b9b20de233",
+  "image_digest": "sha256:6cd62e074ccd33aa1233e6e750d9163bcd09870981c05a92045ecd3938e6a66a",
+  "bundle_sha256": "147046dff2720f3a15ac50344036efa94d50d739431dc517206adf6d3f9bf254",
+  "caddyfile_sha256": "71447527c5195fab1ee164274e4583954f79324d8faebe9d58a470ec878233ef",
+  "public_origin": "https://oathcastcourt.duckdns.org",
+  "checks": {
+    "healthz": {
+      "status": 200,
+      "release_id_matches": true,
+      "source_sha256_matches": true,
+      "image_digest_matches": true
+    },
+    "readyz": {
+      "status": 200,
+      "ready": true
+    },
+    "decision_ui_root": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8"
+    },
+    "decision_ui_health": {
+      "status": 200
+    },
+    "decision_fail_closed": {
+      "status": 503,
+      "error": "decision_unavailable",
+      "message": "Live Telegraph routing and payment are not configured."
+    },
+    "unauthenticated_miner": {
+      "status": 401
+    },
+    "authenticated_near_term_forecast": {
+      "status": 200,
+      "provider": "open_meteo",
+      "probability": 0.48,
+      "event_id": "deploy-v4-smoke-2"
+    }
+  },
+  "notes": [
+    "The public development fixture targets a horizon beyond Open-Meteo's seven-day adapter window; the successful authenticated smoke used a separate near-term event.",
+    "The decision UI remains intentionally fail-closed until the reviewed Telegraph-backed Application runner and payment boundary are enabled.",
+    "Temporary SSH access was restricted to the current workstation IP during deployment and must be removed after this evidence is recorded."
+  ]
+}

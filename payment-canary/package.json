@@ -1,0 +1,28 @@
+{
+  "name": "oathcast-payment-canary",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "canary": "tsx src/cli.ts",
+    "wallet:create": "tsx src/create-wallet.ts",
+    "check": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@scure/base": "1.2.6",
+    "@solana/kit": "5.5.1",
+    "@x402/fetch": "2.11.0",
+    "@x402/svm": "2.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.4",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3",
+    "vitest": "3.0.5"
+  }
+}

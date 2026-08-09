@@ -92,6 +92,29 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(response["probability"], 0.4)
         self.assertEqual(calls[0][0:2], ("211", "forecast"))
 
+    def test_telegraph_client_uses_weatherapi_miner_schema_parameters(self):
+        from oathcast.application import TelegraphMinerClient
+
+        capability = MinerCapability(
+            "212",
+            "weatherapi",
+            "WeatherAPI",
+            "https://dispatcher.example",
+            frozenset({"WEATHER_FORECAST"}),
+        )
+        calls = []
+
+        class PaymentClient:
+            def request_miner(self, miner_id, endpoint, params):
+                calls.append((miner_id, endpoint, params))
+                return type("Response", (), {"body": {"probability": 0.4}})()
+
+        TelegraphMinerClient(capability, PaymentClient())(self.question)
+        self.assertEqual(
+            calls,
+            [("212", "forecast", {"q": "6.524400,3.379200", "days": "1"})],
+        )
+
     def test_telegraph_client_records_settled_application_provenance(self):
         from oathcast.application import TelegraphMinerClient
         from oathcast.demand import DemandLedger

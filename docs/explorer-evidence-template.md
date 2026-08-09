@@ -28,7 +28,7 @@ unknown fields blank and do not infer an Explorer API response.
 ## Payment and response
 
 - Payment method: `x402 | other-supported-method`
-- Asset/network: `Base Sepolia USDC`
+- Asset/network: `Solana Devnet USDC | Base Sepolia USDC | other supported`
 - Declared Miner price (USDC):
 - Paid amount (USDC):
 - Payment attempt ID:

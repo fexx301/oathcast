@@ -13,14 +13,16 @@ from datetime import datetime, timedelta, timezone
 from collections import OrderedDict, deque
 import hashlib
 import hmac
+import ipaddress
 import json
+import math
 import os
 import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Iterable
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 from oathcast.adapters import OpenMeteoAdapter, OpenWeatherAdapter, WeatherApiAdapter
@@ -38,6 +40,12 @@ from oathcast.release import ReleaseInfo, current_release
 
 UTC = timezone.utc
 JsonFetcher = Callable[[str], dict[str, Any]]
+MAX_REQUEST_TARGET_LENGTH = 8192
+MAX_QUERY_LENGTH = 4096
+MAX_QUERY_PARAMETERS = 32
+MAX_EVENT_ID_LENGTH = 128
+MAX_LOCATION_NAME_LENGTH = 256
+DEFAULT_TRUSTED_PROXY_NETWORKS = ("127.0.0.0/8", "::1/128")
 
 
 class ProviderUnavailable(RuntimeError):
@@ -218,6 +226,7 @@ class ForecastService:
         auth_tokens: Iterable[str] | None = None,
         rate_limit_per_minute: int | None = None,
         auth_failure_limit_per_minute: int | None = None,
+        trusted_proxy_networks: Iterable[str] | None = None,
         release: ReleaseInfo | None = None,
     ) -> None:
         self.fetcher = fetcher
@@ -261,13 +270,82 @@ class ForecastService:
             except ValueError as exc:
                 raise ValueError("OATHCAST_AUTH_FAILURE_LIMIT_PER_MINUTE must be an integer") from exc
         self.auth_failure_limiter = RequestRateLimiter(auth_failure_limit_per_minute)
+        if trusted_proxy_networks is None:
+            configured_proxies = [
+                item.strip()
+                for item in os.getenv("OATHCAST_TRUSTED_PROXIES", "").split(",")
+                if item.strip()
+            ]
+        elif isinstance(trusted_proxy_networks, str):
+            configured_proxies = [trusted_proxy_networks]
+        else:
+            configured_proxies = list(trusted_proxy_networks)
+        proxy_networks = [*DEFAULT_TRUSTED_PROXY_NETWORKS, *configured_proxies]
+        try:
+            self.trusted_proxy_networks = tuple(
+                ipaddress.ip_network(network, strict=False) for network in proxy_networks
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "trusted proxy networks must be valid IP addresses or CIDR ranges"
+            ) from exc
         self.release = release or current_release()
 
-    def rate_limit_key(self, *, remote_address: str) -> str:
-        """Return a non-sensitive limiter key derived only from client address."""
+    def _is_trusted_proxy(self, remote_address: str) -> bool:
+        if not isinstance(remote_address, str):
+            return False
+        try:
+            address = ipaddress.ip_address(remote_address)
+        except (TypeError, ValueError):
+            return False
+        return address.is_loopback or any(address in network for network in self.trusted_proxy_networks)
+
+    @staticmethod
+    def _validated_forwarded_address(forwarded_for: str | None) -> str | None:
+        """Return the first address from a syntactically valid X-Forwarded-For."""
+
+        if not isinstance(forwarded_for, str) or not forwarded_for or len(forwarded_for) > 1024:
+            return None
+        values = [value.strip() for value in forwarded_for.split(",")]
+        if not values or any(not value for value in values):
+            return None
+        try:
+            addresses = [ipaddress.ip_address(value) for value in values]
+        except ValueError:
+            return None
+        return str(addresses[0])
+
+    def rate_limit_identity(
+        self,
+        *,
+        remote_address: str,
+        forwarded_for: str | None = None,
+    ) -> str:
+        """Return the client address used for rate limiting.
+
+        Forwarded addresses are accepted only from a configured trusted proxy
+        (including loopback). Direct callers cannot select their bucket by
+        spoofing X-Forwarded-For.
+        """
 
         identity = remote_address or "unknown"
-        return hashlib.sha256(identity.encode()).hexdigest()
+        if self._is_trusted_proxy(identity):
+            identity = self._validated_forwarded_address(forwarded_for) or identity
+        return identity
+
+    def rate_limit_key(
+        self,
+        *,
+        remote_address: str,
+        forwarded_for: str | None = None,
+    ) -> str:
+        """Return a non-sensitive limiter key derived from the client address."""
+
+        identity = self.rate_limit_identity(
+            remote_address=remote_address,
+            forwarded_for=forwarded_for,
+        )
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
     @classmethod
     def _provider_order_from_env(cls) -> list[str]:
@@ -407,31 +485,169 @@ class ForecastService:
         return self._service_forecast_from_receipt(stored, result.question)
 
 
-def question_from_query(params: dict[str, list[str]]) -> ForecastQuestion:
-    def first(names: tuple[str, ...], default: str | None = None) -> str:
-        for name in names:
-            values = params.get(name)
-            if values and values[0] != "":
-                return values[0]
-        if default is not None:
-            return default
-        raise ValueError(f"missing query parameter: {' or '.join(names)}")
+_MISSING = object()
 
-    start = parse_timestamp(first(("horizon_start", "start")))
-    end = parse_timestamp(first(("horizon_end", "end")))
-    cutoff_value = params.get("forecast_cutoff", params.get("cutoff", [None]))[0]
-    cutoff = parse_timestamp(cutoff_value) if cutoff_value else start - timedelta(hours=1)
-    return ForecastQuestion(
-        event_id=first(("event_id",), f"request-{start.timestamp():.0f}"),
-        location_name=first(("location_name",), "requested location"),
-        latitude=float(first(("latitude", "lat"))),
-        longitude=float(first(("longitude", "lon"))),
+
+def _validate_query_params(params: dict[str, list[str]]) -> None:
+    for name, values in params.items():
+        if not isinstance(name, str) or not name:
+            raise ValueError("query parameter names must not be empty")
+        if any(ord(char) < 32 or ord(char) == 127 for char in name):
+            raise ValueError(f"query parameter {name!r} contains control characters")
+        if not isinstance(values, (list, tuple)) or len(values) != 1:
+            raise ValueError(f"query parameter {name!r} must appear exactly once")
+        value = values[0]
+        if not isinstance(value, str):
+            raise ValueError(f"query parameter {name!r} must be text")
+        if value == "":
+            raise ValueError(f"query parameter {name!r} must not be empty")
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError(f"query parameter {name!r} contains control characters")
+
+
+def _first_query_value(
+    params: dict[str, list[str]],
+    names: tuple[str, ...],
+    default: str | None | object = _MISSING,
+) -> str | None:
+    present = [name for name in names if name in params]
+    if len(present) > 1:
+        raise ValueError(f"provide only one of the query parameters: {', '.join(present)}")
+    if present:
+        return params[present[0]][0]
+    if default is not _MISSING:
+        return default  # type: ignore[return-value]
+    raise ValueError(f"missing query parameter: {' or '.join(names)}")
+
+
+def _parse_query_timestamp(name: str, value: str) -> datetime:
+    try:
+        return parse_timestamp(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a valid ISO-8601 timestamp") from exc
+
+
+def _parse_finite_number(name: str, value: str) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a finite number") from exc
+    if not math.isfinite(parsed):
+        raise ValueError(f"{name} must be a finite number")
+    return parsed
+
+
+def _parse_coordinate(name: str, value: str, minimum: float, maximum: float) -> float:
+    parsed = _parse_finite_number(name, value)
+    if not minimum <= parsed <= maximum:
+        raise ValueError(f"{name} must be a finite number between {minimum:g} and {maximum:g}")
+    return parsed
+
+
+def _bounded_query_text(name: str, value: str, maximum: int) -> str:
+    if not value.strip():
+        raise ValueError(f"{name} must not be empty")
+    if len(value) > maximum:
+        raise ValueError(f"{name} must be at most {maximum} characters")
+    return value
+
+
+def default_event_id(question: ForecastQuestion) -> str:
+    """Return a deterministic ID bound to every canonical question field.
+
+    The generated identity is the only field omitted from the digest; including
+    it would make deriving the identity circular.
+    """
+
+    canonical = question.to_dict()
+    canonical.pop("event_id", None)
+    encoded = json.dumps(
+        canonical,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"request-{hashlib.sha256(encoded).hexdigest()}"
+
+
+def question_from_query(params: dict[str, list[str]]) -> ForecastQuestion:
+    _validate_query_params(params)
+
+    start = _parse_query_timestamp(
+        "horizon_start",
+        _first_query_value(params, ("horizon_start", "start")),
+    )
+    end = _parse_query_timestamp(
+        "horizon_end",
+        _first_query_value(params, ("horizon_end", "end")),
+    )
+    cutoff_value = _first_query_value(
+        params,
+        ("forecast_cutoff", "cutoff"),
+        default=None,
+    )
+    cutoff = (
+        _parse_query_timestamp("forecast_cutoff", cutoff_value)
+        if cutoff_value is not None
+        else start - timedelta(hours=1)
+    )
+    event_id_value = _first_query_value(params, ("event_id",), default=None)
+    event_id = (
+        None
+        if event_id_value is None
+        else _bounded_query_text("event_id", event_id_value, MAX_EVENT_ID_LENGTH)
+    )
+    question = ForecastQuestion(
+        event_id=event_id or "__generated_event_id__",
+        location_name=_bounded_query_text(
+            "location_name",
+            _first_query_value(params, ("location_name",), default="requested location"),
+            MAX_LOCATION_NAME_LENGTH,
+        ),
+        latitude=_parse_coordinate(
+            "latitude",
+            _first_query_value(params, ("latitude", "lat")),
+            -90,
+            90,
+        ),
+        longitude=_parse_coordinate(
+            "longitude",
+            _first_query_value(params, ("longitude", "lon")),
+            -180,
+            180,
+        ),
         horizon_start=start,
         horizon_end=end,
         forecast_cutoff=cutoff,
-        threshold_mm=float(first(("threshold_mm",), "0.1")),
-        operator=first(("operator",), SUPPORTED_EVENT_OPERATOR),
+        threshold_mm=_parse_finite_number(
+            "threshold_mm",
+            _first_query_value(params, ("threshold_mm",), default="0.1"),
+        ),
+        operator=_first_query_value(
+            params,
+            ("operator",),
+            default=SUPPORTED_EVENT_OPERATOR,
+        ),
     )
+    return question if event_id is not None else replace(question, event_id=default_event_id(question))
+
+
+def _parse_request_query(query: str) -> dict[str, list[str]]:
+    if len(query) > MAX_QUERY_LENGTH:
+        raise ValueError(f"query string must be at most {MAX_QUERY_LENGTH} characters")
+    try:
+        return parse_qs(
+            query,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=MAX_QUERY_PARAMETERS,
+        )
+    except ValueError as exc:
+        if "Max number of fields" in str(exc):
+            raise ValueError(
+                f"query must contain at most {MAX_QUERY_PARAMETERS} parameters"
+            ) from exc
+        raise ValueError("query contains malformed parameters") from exc
 
 
 class ForecastRequestHandler(BaseHTTPRequestHandler):
@@ -455,6 +671,15 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(encoded)
+
+    def _forwarded_for_header(self) -> str | None:
+        get_all = getattr(self.headers, "get_all", None)
+        if callable(get_all):
+            values = get_all("X-Forwarded-For") or []
+            if len(values) != 1:
+                return None
+            return values[0]
+        return self.headers.get("X-Forwarded-For")
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         parsed = urlparse(self.path)
@@ -491,11 +716,11 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
         request_id = self.headers.get("X-Request-ID", "").strip()
         if not request_id or len(request_id) > 128 or any(ord(char) < 32 for char in request_id):
             request_id = f"http-{uuid.uuid4().hex}"
-        # Do not trust a client-supplied forwarding header here. Caddy keeps
-        # the Miner on loopback, so public callers share the proxy's bounded
-        # bucket; direct deployments still receive the socket peer address.
         remote_address = self.client_address[0]
-        rate_key = self.service.rate_limit_key(remote_address=remote_address)
+        rate_key = self.service.rate_limit_key(
+            remote_address=remote_address,
+            forwarded_for=self._forwarded_for_header(),
+        )
         authorized = authorization_valid(
             self.headers.get("Authorization"),
             self.service.auth_tokens,
@@ -534,7 +759,11 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
             )
             return
         try:
-            params = parse_qs(parsed.query, keep_blank_values=False)
+            if len(self.path) > MAX_REQUEST_TARGET_LENGTH:
+                raise ValueError(
+                    f"request target must be at most {MAX_REQUEST_TARGET_LENGTH} characters"
+                )
+            params = _parse_request_query(parsed.query)
             question = question_from_query(params)
             result = self.service.forecast(
                 question,

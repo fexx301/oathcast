@@ -2,11 +2,27 @@
 oathcastcourt.duckdns.org {
     encode gzip
 
-    reverse_proxy 127.0.0.1:8080 {
-        transport http {
-            dial_timeout 5s
-            response_header_timeout 20s
+    @miner path /healthz /readyz /v1/*
+
+    handle @miner {
+        reverse_proxy 127.0.0.1:8080 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 20s
+            }
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {remote_host}
         }
-        header_up X-Real-IP {remote_host}
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:8787 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 20s
+            }
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {remote_host}
+        }
     }
 }

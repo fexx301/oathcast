@@ -34,29 +34,26 @@ when deploying the corrected image.
 
 ## x402 boundary
 
-payment.py implements the safe HTTP shape:
+`payment-canary/` is the current live-compatible boundary. It uses the official
+x402 fetch/SVM client packages and permits one unpaid preflight followed by at
+most one explicitly enabled paid retry. Before loading a signer it validates
+x402 v2, Solana Devnet, Circle's Devnet USDC mint, the 0.01-USDC cap, recipient,
+fee payer, Miner ID, endpoint, and complete request URL. It never fabricates a
+signature and never emits signing material or a raw settlement header.
 
-1. Query /integrations without payment.
-2. Make a Miner request.
-3. Decode Payment-Required from a 402 response.
-4. Inject a signer-produced PAYMENT-SIGNATURE and retry.
-5. Retain the settlement header.
+The current Telegraph dispatcher is HTTP and its challenge removes the
+`/miner-dispatcher` gateway prefix from the canonical resource. The canary
+supports this only through `--allow-insecure-http-devnet`, pinned to
+`http://13.237.89.59:7044`; redirects, other HTTP authorities, changed paths,
+and changed queries fail closed. Remove this exception when Telegraph exposes
+HTTPS.
 
-It never fabricates a signature. A real signer or the official PayAI-compatible
-SDK must be injected before paid requests are attempted. Signed clients require
-an Application-side `SqlitePaymentJournal`; it records hashes, state, budgets,
-and settlement evidence but never private keys or replayable proofs. The
-current Base Sepolia USDC contract and dispatcher URL are documented in
-.env.example and must be rechecked before live use.
-
-Use `TelegraphX402Client.preflight_miner()` first. It performs the unpaid
-request only. Before any signer is allowed to run, the client requires HTTPS,
-an explicit approved Miner/endpoint set, an expected recipient, an amount cap,
-and an unused one-shot budget. If the challenge supplies a resource URL, it
-must match the exact request URL. The current live challenge omits that field,
-so the target and endpoint allowlists are mandatory. A missing settlement
-header or transport error is treated as an unknown outcome; the durable journal
-blocks retries and further spending until it is reconciled.
+After settlement, the canary queries Solana Devnet RPC and requires a confirmed,
+error-free transaction with the expected signature, fee payer, mint, and exact
+token movement. Telegraph Explorer reconciliation is still required before a
+request is counted as local evidence. `src/oathcast/payment.py` remains a legacy
+Base-Sepolia policy/journal regression harness and must not be used as the
+current signer.
 
 Set `OATHCAST_MINER_API_KEY` on the host to enforce the Bearer token declared in
 the canonical YAML. Keep the payment wallet local; never put its private key
@@ -97,9 +94,9 @@ The smoke test is non-destructive with respect to Telegraph and uses one
 ordinary authenticated request against the OathCast service only; it does not
 create paid demand. Record its JSON output with the release manifest.
 
-Live payment is currently blocked: the documented dispatcher value is HTTP,
-and no real signer, funded wallet, protocol-compatible SDK, or settlement
-reconciliation proof has been established. Keep the signer disabled.
+Live execution remains gated on a dedicated faucet-funded Solana-devnet wallet.
+The unpaid Miner-18 preflight passed on 2026-08-09 and is archived under
+`artifacts/payment-canary/`; it did not read a wallet or create demand.
 
 Before choosing external Miners, run:
 

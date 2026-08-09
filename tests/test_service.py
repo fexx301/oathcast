@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 import unittest
-from urllib.parse import urlparse
+from urllib.parse import urlencode
 
 from oathcast.forecast import ForecastQuestion
 from oathcast.receipts import ReceiptConflict, SqliteReceiptStore
@@ -11,6 +11,7 @@ from oathcast.service import (
     ForecastCutoffPassed,
     ForecastRequestHandler,
     ForecastService,
+    MAX_QUERY_LENGTH,
     ProviderUnavailable,
     RequestRateLimiter,
     authorization_valid,
@@ -25,6 +26,17 @@ FIXED_NOW = datetime(2026, 8, 17, 11, tzinfo=timezone.utc)
 
 def load_json(name: str):
     return json.loads((FIXTURES / name).read_text())
+
+
+def valid_query_params():
+    return {
+        "location_name": ["Lagos"],
+        "lat": ["6.5244"],
+        "lon": ["3.3792"],
+        "start": ["2026-08-17T15:00:00Z"],
+        "end": ["2026-08-17T16:00:00Z"],
+        "cutoff": ["2026-08-17T12:00:00Z"],
+    }
 
 
 class ServiceTests(unittest.TestCase):
@@ -79,6 +91,38 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(question.event_id, "q-1")
         self.assertEqual(question.forecast_cutoff.isoformat(), "2026-08-17T14:00:00+00:00")
 
+    def test_default_event_id_is_stable_and_bound_to_the_canonical_question(self):
+        first = question_from_query(valid_query_params())
+        repeated = question_from_query(valid_query_params())
+        changed = valid_query_params()
+        changed["location_name"] = ["Ibadan"]
+        changed_question = question_from_query(changed)
+
+        self.assertEqual(first.event_id, repeated.event_id)
+        self.assertTrue(first.event_id.startswith("request-"))
+        self.assertEqual(len(first.event_id), len("request-") + 64)
+        self.assertNotEqual(first.event_id, changed_question.event_id)
+
+    def test_generated_event_id_preserves_receipt_idempotency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calls = []
+            service = ForecastService(
+                fetcher=lambda url: calls.append(url) or load_json("open_meteo.json"),
+                provider_order=["open_meteo"],
+                receipt_store=SqliteReceiptStore(Path(directory) / "receipts.sqlite3"),
+                clock=lambda: FIXED_NOW,
+            )
+            first_question = question_from_query(valid_query_params())
+            first = service.forecast(first_question, request_id="first")
+            replay = service.forecast(
+                question_from_query(valid_query_params()),
+                request_id="retry",
+            )
+
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(replay.request_id, "first")
+            self.assertEqual(replay.to_public_response(), first.to_public_response())
+
     def test_bearer_auth_is_optional_locally_but_fail_closed_when_configured(self):
         self.assertTrue(authorization_valid(None, None))
         self.assertTrue(authorization_valid("Bearer secret", "secret"))
@@ -95,6 +139,73 @@ class ServiceTests(unittest.TestCase):
             require_auth=True,
         )
         self.assertEqual(service.auth_token, "secret")
+
+    def test_query_parser_rejects_nonfinite_and_out_of_range_coordinates(self):
+        for field, value, expected in (
+            ("lat", "nan", "latitude"),
+            ("lat", "91", "latitude"),
+            ("lon", "inf", "longitude"),
+            ("lon", "-181", "longitude"),
+        ):
+            params = valid_query_params()
+            params[field] = [value]
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(
+                ValueError,
+                expected,
+            ):
+                question_from_query(params)
+
+    def test_query_parser_rejects_duplicate_and_oversized_identity_parameters(self):
+        duplicate = valid_query_params()
+        duplicate["lat"] = ["6.5", "6.6"]
+        with self.assertRaisesRegex(ValueError, "lat.*exactly once"):
+            question_from_query(duplicate)
+
+        aliases = valid_query_params()
+        aliases["latitude"] = ["6.5244"]
+        with self.assertRaisesRegex(ValueError, "latitude.*lat"):
+            question_from_query(aliases)
+
+        oversized_event = valid_query_params()
+        oversized_event["event_id"] = ["e" * 129]
+        with self.assertRaisesRegex(ValueError, "event_id.*128"):
+            question_from_query(oversized_event)
+
+        oversized_location = valid_query_params()
+        oversized_location["location_name"] = ["L" * 257]
+        with self.assertRaisesRegex(ValueError, "location_name.*256"):
+            question_from_query(oversized_location)
+
+    def test_get_query_validation_returns_clear_400_errors(self):
+        service = ForecastService(provider_order=["open_meteo"])
+
+        class RecordingHandler(ForecastRequestHandler):
+            def _send_json(self, status, payload, *, headers=None):
+                self.responses.append((status, payload, headers or {}))
+
+        def request(path):
+            handler = object.__new__(RecordingHandler)
+            handler.service = service
+            handler.client_address = ("203.0.113.10", 0)
+            handler.path = path
+            handler.headers = {}
+            handler.responses = []
+            handler.do_GET()
+            return handler.responses[0]
+
+        invalid_coordinate = valid_query_params()
+        invalid_coordinate["lat"] = ["nan"]
+        status, payload, _ = request(
+            "/v1/forecast/point?" + urlencode(invalid_coordinate, doseq=True)
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("latitude", payload["error"])
+
+        status, payload, _ = request(
+            "/v1/forecast/point?" + "x" * (MAX_QUERY_LENGTH + 1)
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("query string", payload["error"])
 
     def test_rate_limiter_enforces_a_window_and_returns_retry_after(self):
         ticks = iter([0.0, 1.0, 2.0, 61.0])
@@ -122,6 +233,72 @@ class ServiceTests(unittest.TestCase):
             service.rate_limit_key(remote_address="127.0.0.1"),
             service.rate_limit_key(remote_address="127.0.0.1"),
         )
+
+    def test_forwarded_rate_limit_identity_requires_a_trusted_socket_peer(self):
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            trusted_proxy_networks=["10.0.0.0/8"],
+        )
+        self.assertEqual(
+            service.rate_limit_identity(
+                remote_address="198.51.100.10",
+                forwarded_for="203.0.113.10",
+            ),
+            "198.51.100.10",
+        )
+        self.assertEqual(
+            service.rate_limit_identity(
+                remote_address="10.1.2.3",
+                forwarded_for="203.0.113.10, 10.1.2.3",
+            ),
+            "203.0.113.10",
+        )
+        self.assertNotEqual(
+            service.rate_limit_key(
+                remote_address="127.0.0.1",
+                forwarded_for="203.0.113.10",
+            ),
+            service.rate_limit_key(
+                remote_address="127.0.0.1",
+                forwarded_for="203.0.113.11",
+            ),
+        )
+        self.assertEqual(
+            service.rate_limit_identity(
+                remote_address="127.0.0.1",
+                forwarded_for="not-an-ip",
+            ),
+            "127.0.0.1",
+        )
+
+    def test_forwarded_public_clients_do_not_share_auth_failure_buckets(self):
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            auth_token="correct-secret",
+            require_auth=True,
+            auth_failure_limit_per_minute=1,
+        )
+
+        class RecordingHandler(ForecastRequestHandler):
+            def _send_json(self, status, payload, *, headers=None):
+                self.responses.append((status, payload, headers or {}))
+
+        def request(forwarded_for):
+            handler = object.__new__(RecordingHandler)
+            handler.service = service
+            handler.client_address = ("127.0.0.1", 0)
+            handler.path = "/v1/forecast/point?event_id=auth-test"
+            handler.headers = {
+                "Authorization": "Bearer invalid",
+                "X-Forwarded-For": forwarded_for,
+            }
+            handler.responses = []
+            handler.do_GET()
+            return handler.responses[0][0]
+
+        self.assertEqual(request("203.0.113.10"), 401)
+        self.assertEqual(request("203.0.113.11"), 401)
+        self.assertEqual(request("203.0.113.10"), 429)
 
     def test_rotating_invalid_authorization_headers_share_one_failure_bucket(self):
         service = ForecastService(

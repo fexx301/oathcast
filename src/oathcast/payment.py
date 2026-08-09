@@ -1,8 +1,9 @@
-"""Small x402 transport boundary for Telegraph Miner requests.
+"""Legacy Base-Sepolia x402 transport boundary retained for regression tests.
 
-This module implements the HTTP challenge/retry flow but deliberately does not
-fake wallet signing. A real signer or the official PayAI-compatible SDK must be
-injected before any paid request is sent.
+Telegraph's live Hackathon API currently challenges for Solana-devnet USDC, so
+new canary and Application work must use ``payment-canary/``.  This module is
+not a live-compatible signer.  It remains useful for the older EVM policy and
+journal tests and deliberately cannot fake wallet signing.
 """
 
 from __future__ import annotations
