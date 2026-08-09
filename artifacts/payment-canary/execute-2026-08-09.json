@@ -47,18 +47,21 @@
     "status": "not_found_yet",
     "url": "https://explorer.telegraphprotocol.com/",
     "official_demand_claim": false,
-    "checked_at_utc": "2026-08-09T20:00:25Z",
+    "checked_at_utc": "2026-08-09T21:52:34Z",
     "checks": [
       {
         "endpoint": "/api/daemon/api/questions?sort=recent&order=desc&since_hours=72&limit=100&offset=0",
-        "result": "no one-to-one transaction-signature or canary-record match"
+        "result": "252 records returned; current weather traffic for Miner 212 and Miner 18 is visible, but no one-to-one canary transaction-signature or operation match was found"
       },
       {
         "endpoint": "/api/leaderboard/miners",
-        "result": "existing bittensor-sn18-zeus epoch entry observed; no one-to-one canary record"
+        "result": "bittensor-sn18-zeus is active with 3 total requests served; no one-to-one canary record is exposed"
+      },
+      {
+        "endpoint": "public-feed signature search",
+        "result": "0 records contained the settled transaction signature"
       }
-    ],
-    "official_demand_claim": false
+    ]
   },
   "limitations": [
     "This is one manually authorized Solana-Devnet testnet payment; testnet tokens have no monetary value.",
