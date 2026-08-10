@@ -1,0 +1,127 @@
+name: Collect provider pairs
+
+# P4 evidence collection. Neither Open-Meteo nor WeatherAPI sells a historical
+# *forecast* archive, so paired cases can only accumulate forward and a missed
+# hour is unrecoverable.
+#
+# Requested hourly, not 3-hourly, on purpose. GitHub delivers scheduled runs on
+# a best-effort basis: measured on this repository over 2026-08-06..10, the
+# */15 canary received 96 of 409 requested runs (23%), with gaps up to 360 min.
+# Over-requesting cannot create duplicates -- case_id floors issued_at to the
+# hour, so two runs in one hour converge on one case -- so asking for more than
+# we need is free coverage against a dropped run.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # :23 -- off the hour, because schedulers bunch at :00.
+    - cron: "23 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never cancel a run mid-collection: the dataset push is the point.
+  group: collect-provider-pairs
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Scoped to this job only. It writes exactly one path on one branch.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check collection secret
+        id: secret
+        env:
+          WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
+        run: |
+          if [ -z "$WEATHERAPI_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::WEATHERAPI_KEY is not configured; skipping, because a single-provider case cannot support a paired comparison."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect one paired case
+        if: steps.secret.outputs.configured == 'true'
+        env:
+          WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
+          DATA_BRANCH: data/provider-pairs
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Retry the whole fetch->collect->push cycle. Re-collecting within the
+          # same hour is a no-op (case_id dedupes), so a retry costs two API
+          # calls and never double-counts.
+          for attempt in 1 2 3; do
+            rm -rf databranch
+            # Not --depth=1: a shallow worktree can be refused on push with
+            # "shallow update not allowed", and the branch is one small file.
+            git fetch --force origin "$DATA_BRANCH"
+            git worktree prune
+            git worktree add --detach databranch FETCH_HEAD
+
+            set +e
+            PYTHONPATH=src python3 scripts/collect_provider_pairs.py \
+              --mode collect \
+              --dataset databranch/paired-forecasts.json \
+              > collect-summary.json 2> collect-stderr.txt
+            status=$?
+            set -e
+
+            # The collector scrubs the key from its own error output; stderr is
+            # surfaced so a failure is visible without opening the dataset.
+            if [ $status -ne 0 ]; then
+              echo "::error::collector exited $status"
+              cat collect-stderr.txt
+              exit $status
+            fi
+            # `[ -s f ] && cat f` would return 1 on an empty file and, under
+            # set -e, fail the step on a clean run.
+            if [ -s collect-stderr.txt ]; then cat collect-stderr.txt; fi
+
+            cat collect-summary.json
+            {
+              echo '### Collection run'
+              echo '```json'
+              cat collect-summary.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            valid=$(python3 -c "import json;print(json.load(open('collect-summary.json'))['valid_provider_attempts'])")
+            if [ "$valid" -lt 2 ]; then
+              # One provider answered. The case is still recorded (a failed
+              # provider is 'missing', not dropped) but flag it loudly: a run
+              # of these is a silently useless dataset.
+              echo "::warning::only $valid/2 providers answered this run"
+            fi
+
+            cd databranch
+            if git diff --quiet -- paired-forecasts.json; then
+              echo "no new case this hour (already collected); nothing to push"
+              cd ..
+              exit 0
+            fi
+            git add paired-forecasts.json
+            git commit -q -m "Collect provider pair $(date -u +%Y-%m-%dT%H:00Z)"
+            if git push -q origin HEAD:"$DATA_BRANCH"; then
+              echo "pushed $(git rev-parse --short HEAD) to $DATA_BRANCH"
+              cd ..
+              exit 0
+            fi
+            cd ..
+            echo "::warning::push rejected (attempt $attempt); refetching"
+          done
+
+          echo "::error::could not push the dataset after 3 attempts"
+          exit 1
