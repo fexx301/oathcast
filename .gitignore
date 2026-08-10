@@ -64,3 +64,6 @@ node_modules/
 handoff.md
 docs/x-update-drafts.md
 improvements.md
+
+# Second git dir holding the local-only notes — never publish
+.notes-git/
