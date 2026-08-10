@@ -210,10 +210,22 @@ wrong file reports a reassuring zero):
     failed / invalid-user    0
     first accept             17:04:57Z
     last accept              18:13:02Z
+    rule removed             ~20:45Z (operator)
 
 Zero failed attempts is the /32 scoping working: with the rule scoped to one
 address, scan traffic never reached `sshd` at all. A `0.0.0.0/0` rule would have
 collected background scanning within minutes.
+
+**Closure verified from outside the host, not assumed.** After the operator
+removed the rule: TCP 22 filtered, TCP 80 still reachable, HTTPS `/healthz` 200
+reporting `2026-08-10-hardened-v5`. The port-80 control is the point — it
+distinguishes "the SSH rule was removed" from "the host or the whole security
+group went dark," which look identical if you only test 22.
+
+One trap worth recording: the first check used `timeout 15 bash -c ...`, and
+**macOS has no `timeout`**, so the command exited 127 and the `||` branch printed
+"closed" — a *passing* security result produced entirely by a missing binary. Use
+`nc -z -G 5 -w 5 <host> 22` on macOS, and always test a control port alongside.
 
 ## Retrieving the data
 
