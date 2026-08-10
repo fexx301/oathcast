@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -13,6 +14,47 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def format_timestamp(moment: datetime) -> str:
+    return f"{moment:%Y-%m-%dT%H:%M:%SZ}"
+
+
+def rolling_horizon(now: datetime) -> tuple[datetime, datetime, datetime]:
+    """Pick a horizon that is inside every provider's window, at any run time.
+
+    A fixed calendar date cannot survive as a recurring canary, because it is
+    squeezed between two independent failure modes:
+
+    * too far out -- Open-Meteo publishes a rolling 7 days, and
+      ``select_exact_point`` correctly refuses to substitute a neighbouring
+      hour, so a horizon past the window surfaces as ``provider_unavailable``
+      and a 502;
+    * too far back -- ``service.py:435`` rejects a request issued at or after
+      its ``forecast_cutoff``.
+
+    ``fixtures/question.json`` asks for 2026-08-17T15:00Z, which is beyond the
+    window today and permanently past its own cutoff after 2026-08-17T12:00Z.
+    It therefore fails now, works for a few days, then fails forever.
+
+    This targets the gap between those bounds: 12:00-13:00 UTC on the *next*
+    UTC day -- never nearer than 11 hours, never further than 36, and it moves
+    forward on its own.
+
+    Anchoring to the next UTC *day* rather than ``now + N hours`` is the load
+    bearing part. The receipt hash is derived from the canonical question, so
+    an identical question replays one receipt instead of writing a new row. A
+    horizon that moved with every run would make each of the 96 daily canary
+    runs a distinct question and write 96 receipts a day of synthetic traffic
+    into the store that is meant to be evidence of real demand. Stable within
+    the day, this costs at most one receipt per day.
+    """
+
+    tomorrow = now.astimezone(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+    start = tomorrow.replace(hour=12)
+    return start, start + timedelta(hours=1), start - timedelta(hours=1)
 
 
 def header_value(headers: dict[str, str], name: str) -> str | None:
@@ -103,7 +145,15 @@ def main() -> None:
         default=10.0,
         help="fail the canary when receipt-store headroom drops below this percentage",
     )
-    parser.add_argument("--question-file", type=Path, default=ROOT / "fixtures" / "question.json")
+    parser.add_argument(
+        "--question-file",
+        type=Path,
+        default=None,
+        help=(
+            "question to smoke with. Defaults to a rolling horizon (12:00-13:00 UTC "
+            "tomorrow) so the check keeps working as dates pass; pass a file to pin one."
+        ),
+    )
     parser.add_argument("--skip-authenticated", action="store_true")
     args = parser.parse_args()
     base_url = args.base_url.rstrip("/")
@@ -142,15 +192,34 @@ def main() -> None:
         receipt_capacity_check(ready, min_headroom_percent=args.min_receipt_headroom_percent)
     )
 
-    question = json.loads(args.question_file.read_text(encoding="utf-8"))
+    if args.question_file is not None:
+        question = json.loads(args.question_file.read_text(encoding="utf-8"))
+        horizon_start = question["horizon_start"]
+        horizon_end = question["horizon_end"]
+        forecast_cutoff = question["forecast_cutoff"]
+    else:
+        question = json.loads(
+            (ROOT / "fixtures" / "question.json").read_text(encoding="utf-8")
+        )
+        start, end, cutoff = rolling_horizon(datetime.now(timezone.utc))
+        horizon_start = format_timestamp(start)
+        horizon_end = format_timestamp(end)
+        forecast_cutoff = format_timestamp(cutoff)
+        # The fixture's event_id names a fixed date. Left alone it would stamp
+        # "2026-08-17-1500z" onto receipts for a horizon that is no longer that
+        # hour. event_id is excluded from the request hash (service.py:603), so
+        # naming the real horizon costs no replay stability and keeps the stored
+        # receipt honest about what was asked.
+        question["event_id"] = f"canary-lagos-{start:%Y%m%dT%H%M}z"
+
     params = {
         "event_id": question["event_id"],
         "location_name": question["location_name"],
         "lat": f"{question['latitude']:.6f}",
         "lon": f"{question['longitude']:.6f}",
-        "horizon_start": question["horizon_start"],
-        "horizon_end": question["horizon_end"],
-        "forecast_cutoff": question["forecast_cutoff"],
+        "horizon_start": horizon_start,
+        "horizon_end": horizon_end,
+        "forecast_cutoff": forecast_cutoff,
         "threshold_mm": str(question["threshold_mm"]),
     }
     forecast_url = f"{base_url}/v1/forecast/point?{urlencode(params)}"

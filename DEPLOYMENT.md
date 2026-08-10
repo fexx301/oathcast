@@ -1,8 +1,9 @@
 # Deployment and payment boundary
 
 The repository is ready to package as one public HTTPS OathCast Miner. The
-hardened v3.2 release is running in Docker on AWS EC2 behind private host port
-8080, with Caddy terminating HTTPS at `https://oathcastcourt.duckdns.org`.
+`oathcast-2026-08-09-readiness-v4` release is running in Docker on AWS EC2
+behind private host port 8080, with Caddy terminating HTTPS at
+`https://oathcastcourt.duckdns.org`.
 Set the environment variables from `.env.example` and validate the canonical
 YAML before registration. The exact deployed release, public smoke output, and
 runtime details are archived under `artifacts/release-evidence/`.
@@ -125,10 +126,14 @@ amount, and target are all approved.
 
 ## Current AWS staging
 
-The staging host is an Amazon Linux 2023 `t3.micro` in `eu-north-1`. The
-`oathcast:staging` image runs as container `oathcast` with restart policy
-`unless-stopped`; `/healthz` and authenticated forecast smoke tests have
-passed. The Miner is bound to loopback port 8080 and the `oathcast-caddy`
+The staging host is an Amazon Linux 2023 `t3.micro` in `eu-north-1`
+(Stockholm) — instance `i-0c4948734b7a6326c`, security group `oathcast-web`,
+key pair `oathcast-ec2`. Region matters operationally: the security group,
+the instance, and the key pair are all regional objects, so the console must
+be switched to `eu-north-1` before any of them is visible. The
+`oathcast:oathcast-2026-08-09-readiness-v4` image runs as container `oathcast`
+with restart policy `unless-stopped`; `/healthz` and authenticated forecast
+smoke tests have passed. The Miner is bound to loopback port 8080 and the `oathcast-caddy`
 container uses host networking to terminate HTTPS and redirect HTTP to it. The
 security group exposes only ports 80 and 443. DuckDNS currently maps
 `oathcastcourt.duckdns.org` to `13.49.229.253`. An EC2-side DuckDNS updater is
@@ -171,19 +176,69 @@ Hardened release verified and deployed on 2026-08-04:
   `401` and active new `200`; public health/readiness remained `200`. The
   security group was restored to public ports 80/443 only.
 
-## Release 2026-08-10 — renderer v2 and security batch (NOT YET DEPLOYED)
+## Release 2026-08-10 — renderer v2 and security batch (DEPLOYED 2026-08-10)
 
-The repository is ahead of the running host. These changes are merged and covered
-by 193 local tests but the live service still runs the earlier release. Redeploy
-before treating any of it as live behaviour. Confirmed 2026-08-10: `/readyz` on
-`oathcastcourt.duckdns.org` returns ready but reports **no release ID**, i.e. the
-host is still serving the 2026-08-04 v3.2 image.
+**Deployed and verified live.** The running host is:
 
-**The canary is green and blind — fix this with the redeploy.** Every scheduled
-canary run since it was added has taken its *skip* path: `OATHCAST_MINER_API_KEY`
-is not configured as a repository secret, so "Verify public Miner" is skipped and
-the job succeeds having checked nothing. 96 consecutive green runs verified
-nothing. Set the secret as part of this redeploy, or the pins below are decoration.
+    release_id    2026-08-10-hardened-v5
+    source_sha256 8b1788cae3c43bcadc03a7e1d9c5b390553fd7798b587e7a3b989ed833a10d46
+    image_digest  sha256:22a7c7893e2339cae070de9b2676845684008a438133eb69a098e914c4f96b3f
+    runs as       uid=1000(oathcast)          <-- v4 ran as root
+
+Verified through public HTTPS with authentication rather than from inside the
+host: 200 with receipt
+`276ca07d0e5a64e9f64d5b1dbcd08a6e7177c68d22e6adbf845a3af13b5e281c` and renderer
+v2 text — *"Measurable precipitation > 0.1 mm is very unlikely to occur in Lagos
+in the hour from 20:00 to 21:00 UTC on 10 August 2026. Probability: 0%."*
+Renderer v2 is therefore the **scored surface** as of this release.
+
+Cutover facts worth keeping: the 5 pre-existing receipts survived (6 after the
+verification call), v4 is preserved stopped as `oathcast-v4-rollback-20260810`
+as the rollback target, a byte-verified backup sits at
+`/home/ec2-user/oathcast/receipts-preV5-backup.sqlite3`, and
+`oathcast-decision-ui` was deliberately left on v4 rather than cutting both at
+once. Replay determinism was checked after cutover: an identical question
+returned an identical hash and wrote no new row.
+
+**Corrected 2026-08-10.** An earlier version of this section claimed `/readyz`
+reported no release ID and that the host was still serving the 2026-08-04 v3.2
+image. Both claims were wrong, and the error was mine: `/readyz` nests release
+identity one level down, so reading `release_id` at the top level returned
+nothing and I read that absence as "no release." The host at that point ran
+
+    release_id    oathcast-2026-08-09-readiness-v4
+    source_sha256 d3069ec17f6fc7f24224b3ebc3803e665500f24f9e71fd948fbc98b9b20de233
+    image_digest  sha256:6cd62e074ccd33aa1233e6e750d9163bcd09870981c05a92045ecd3938e6a66a
+
+The gap was one release, not two. The v3.2 record at "Hardened release verified
+and deployed on 2026-08-04" above stays as written: it is accurate history, not a
+current-state claim. Read `/readyz` as `release.release_id`, never `release_id`.
+
+**The canary was green and blind — resolved with this redeploy.** Every scheduled
+canary run before 2026-08-10 took its *skip* path: `OATHCAST_MINER_API_KEY` was
+not configured as a repository secret, so "Verify public Miner" was skipped and
+the job succeeded having checked nothing. 96 consecutive green runs verified
+nothing. Both secrets are now set — `WEATHERAPI_KEY` 15:54:46Z and
+`OATHCAST_MINER_API_KEY` 17:57:36Z, the latter read from the host's `.env` and
+piped straight into `gh secret set` without being rendered anywhere.
+
+**A second canary defect, found while verifying this release.** Setting the
+secret exposed the next layer: the smoke test pinned `fixtures/question.json`,
+whose horizon is a fixed 2026-08-17T15:00Z. That is **past Open-Meteo's rolling
+7-day window today** — `select_exact_point` correctly refuses to substitute a
+neighbouring hour, so it surfaces as `provider_unavailable` → 502 — and it goes
+**past its own `forecast_cutoff` after 2026-08-17T12:00Z**, which `service.py:435`
+rejects. It therefore fails today, works for six days, then fails forever, and a
+genuine outage would be indistinguishable from it. `smoke_miner.py` now computes
+a rolling horizon: 12:00–13:00 UTC *tomorrow*, giving 12–36 h of lead and a
+cutoff always ≥11 h in the future.
+
+Anchoring to the next UTC **day** rather than `now + N hours` is deliberate and
+load-bearing. The receipt hash derives from the canonical question, so an
+identical question replays one receipt instead of writing a row. A horizon that
+moved with every run would make each of the 96 daily canary runs a distinct
+question and write **96 synthetic receipts per day** into the store that is meant
+to be evidence of *real* demand. Stable within the day, it costs at most one.
 
 **What changes at runtime**
 
@@ -207,14 +262,56 @@ UID/GID 1000:1000 to match the `ec2-user` owning the durable host directory
 `/home/ec2-user/oathcast/data`. A bind mount preserves *host* ownership, so a
 container running as any other UID cannot write receipts — while `/healthz` and
 `/readyz` both still return 200. Every forecast then fails at persistence time and
-nothing in the health surface says so. **Changing this UID requires chown-ing the
-host directory in the same change.** Docker Desktop on macOS virtualizes ownership
+nothing in the health surface says so. Docker Desktop on macOS virtualizes ownership
 for named volumes and will report a false success here; verify with real UID
 separation, not a named volume.
 
+**Measured on the host 2026-08-10 — this WOULD have broken the v5 deploy, and was
+fixed in the window.** Keep this section: the trap is a property of bind mounts and
+recurs on every host that has ever run the container as root.
+
+The check is not "is the *directory* owned by 1000", which was the assumption that
+nearly let this through — and which the previous version of this very section
+encouraged, by saying only that changing the UID "requires chown-ing the host
+directory." The directory was already correct. The file inside it was not:
+
+    /home/ec2-user/oathcast/data                 uid=1000 gid=1000 mode=700
+    /home/ec2-user/oathcast/data/receipts.sqlite3 uid=0    gid=0    mode=644   <-- root
+
+The running v4 container has **no `USER` set and runs as root** (`docker inspect
+oathcast --format '{{.Config.User}}'` is empty), so it created the database as root.
+v5 runs as 1000, and 1000 cannot write a root-owned `mode 644` file even inside a
+directory it owns — SQLite needs write permission on the *file*, and the directory
+bit only governs create/unlink. Proved on a byte-copy with identical ownership so
+production receipts were never touched:
+
+    as UID 1000, file root:root 644  -> OperationalError: attempt to write a readonly database
+    after chown 1000:1000 on file   -> write succeeded
+
+**Two probes disagree here; trust the SQLite one.** `test -w` reported the file as
+writable while a real `BEGIN IMMEDIATE` on the *live* database appeared to succeed —
+`test -w` is unreliable under some overlay/bind combinations, and a `BEGIN IMMEDIATE`
+that touches no page can defer the write fault. Only an actual write (`CREATE TABLE`)
+against an exact-ownership copy gives a trustworthy answer.
+
+Required step in the v5 window, before starting the new container:
+
+    sudo chown -R 1000:1000 /home/ec2-user/oathcast/data
+
+Then verify a real forecast persists and replays after the switch — a 200 from
+`/healthz` proves nothing about this failure mode.
+
+**Done 2026-08-10, in that order**: backup taken and verified by digest equality
+*before* the chown, chown applied, content digest re-verified after, then the v5
+container started and a real authenticated forecast through public HTTPS returned
+200 with receipt `276ca07d…5e281c` and persisted. Replay of the identical question
+returned the identical hash and wrote no new row. The receipt count went 5 → 6,
+which is the only observation that actually distinguishes "persisting" from
+"returning 200 and dropping the write."
+
 **Steps**
 
-    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # expect 193 OK
+    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # 198 OK as of 2026-08-10 evening
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
       --release-id 2026-08-10-hardened-v5 \
@@ -229,18 +326,41 @@ That digest is reproducible across runs, so the host build can be checked
 against it. **Re-run the manifest if any tracked file changes before the build**
 — the digest covers the tree, not the release name.
 
+**If the host reproduces a different digest, diff the manifests before assuming a
+bad transfer.** On 2026-08-10 the host produced `a5badc5a…` against the pinned
+`8b1788ca…`. The cause was not corruption: `create_release_manifest.py`'s
+`INCLUDE` tuple is `("src", "miners", "scripts", "Dockerfile", "Caddyfile",
+"pyproject.toml", ".env.example")` — and **`.env.example` is a dotfile**, which the
+sync had excluded. All 55 shared files matched byte-for-byte; one file was simply
+absent. After confirming `.env.example` carries empty values for every
+secret-bearing key, and that the real `.env` (mode 600) was untouched, copying it
+reproduced the pinned digest exactly. Diffing the two file lists takes a minute
+and tells you which of "wrong bytes" or "missing file" you have.
+
+**Do not use macOS `rsync` for this transfer.** rsync 3.4.0 on macOS crashes with
+`buffer overflow: recv_rules (exclude.c:1683)`. Worse, the `rsync exit=0` printed
+next to the crash was `tail`'s exit status, not rsync's — a pipeline reports the
+*last* command's status, so this failure can read as success. Use tar over SSH and
+verify a digest on both ends:
+
+    tar -cf - --exclude __pycache__ src scripts fixtures | ssh -i <key> host 'tar -xf - -C ~/oathcast/collection'
+
     docker build \
       --build-arg OATHCAST_RELEASE_ID=2026-08-10-hardened-v5 \
       --build-arg OATHCAST_SOURCE_SHA256=8b1788cae3c43bcadc03a7e1d9c5b390553fd7798b587e7a3b989ed833a10d46 \
       -t oathcast:2026-08-10-hardened-v5 .
 
-**This build happens on the host, which is why the redeploy needs SSH.** The
-running container was built from local tags (`oathcast:staging`,
-`oathcast:v3-2-correct`); there is no registry to pull from, so the source has
-to reach the host and be built there. Reopening port 22 scoped to a /32 is a
-specific, time-bounded maintenance operation and needs explicit authorization.
-Since the window has to open anyway, install the P4 collector cron in the same
-window — see `docs/p4-host-collection.md`.
+**This build happens on the host, which is why the redeploy needs SSH.** Every
+image the host has ever run was built locally on it — `oathcast:staging`, then
+`oathcast:v3-2-correct`, then `oathcast:oathcast-2026-08-09-readiness-v4`, then
+`oathcast:oathcast-2026-08-10-hardened-v5`. There is no registry to pull from,
+so the source has to reach the host and be built there. Reopening port 22 scoped
+to a /32 is a specific, time-bounded maintenance operation and needs explicit
+authorization. Since the window has to open anyway, install the P4 collector
+timer in the same window — see `docs/p4-host-collection.md` (Amazon Linux 2023
+has no cron; the runbook now uses systemd). The v4 container is
+the rollback target; leave it stopped rather than removed, as was done for v3.2
+(`oathcast-v3-2-rollback-20260809`).
 
 After deployment, verify without printing secrets:
 

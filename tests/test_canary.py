@@ -1,6 +1,7 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 
-from scripts.smoke_miner import receipt_capacity_check
+from scripts.smoke_miner import format_timestamp, receipt_capacity_check, rolling_horizon
 
 
 def readyz(**capacity) -> dict:
@@ -80,6 +81,59 @@ class ReceiptCapacityCheckTests(unittest.TestCase):
         check = receipt_capacity_check("service unavailable", min_headroom_percent=10.0)
         self.assertTrue(check["ok"])
         self.assertFalse(check["reported"])
+
+
+class RollingHorizonTests(unittest.TestCase):
+    """The recurring canary must always pick a requestable horizon.
+
+    A fixed date is squeezed between two independent failure modes: past the
+    provider's rolling 7-day window (Open-Meteo -> provider_unavailable -> 502)
+    and past its own forecast_cutoff (service.py:435 rejects when now >= cutoff).
+    The rolling horizon must stay between both bounds at every clock time, and
+    must stay stable within a UTC day so the 96 daily runs replay one receipt
+    instead of writing 96.
+    """
+
+    def test_horizon_lands_at_noon_utc_tomorrow(self):
+        now = datetime(2026, 8, 10, 18, 30, tzinfo=timezone.utc)
+        start, end, cutoff = rolling_horizon(now)
+        self.assertEqual(format_timestamp(start), "2026-08-11T12:00:00Z")
+        self.assertEqual(format_timestamp(end), "2026-08-11T13:00:00Z")
+        self.assertEqual(format_timestamp(cutoff), "2026-08-11T11:00:00Z")
+
+    def test_cutoff_stays_in_the_future_even_at_235959(self):
+        # service.py:435 rejects a request issued at or after forecast_cutoff,
+        # so the tightest time is the last instant of the UTC day.
+        now = datetime(2026, 8, 10, 23, 59, 59, tzinfo=timezone.utc)
+        _, _, cutoff = rolling_horizon(now)
+        self.assertGreater(cutoff, now)
+        self.assertLessEqual((cutoff - now).total_seconds(), 12 * 3600)
+
+    def test_lead_stays_inside_the_provider_window_at_midnight(self):
+        # The loosest time (just after UTC midnight) gives the largest lead.
+        # Open-Meteo publishes a rolling 7 days; select_exact_point refuses to
+        # substitute a neighbouring hour, so the horizon must stay inside it.
+        now = datetime(2026, 8, 11, 0, 1, tzinfo=timezone.utc)
+        start, end, cutoff = rolling_horizon(now)
+        lead_hours = (start - now).total_seconds() / 3600
+        self.assertLess(lead_hours, 7 * 24)
+        self.assertGreater(lead_hours, 12)
+        self.assertEqual(end - start, timedelta(hours=1))
+        self.assertEqual(start - cutoff, timedelta(hours=1))
+
+    def test_horizon_rolls_at_utc_midnight(self):
+        late = rolling_horizon(datetime(2026, 8, 10, 23, 59, tzinfo=timezone.utc))
+        early = rolling_horizon(datetime(2026, 8, 11, 0, 1, tzinfo=timezone.utc))
+        self.assertEqual(format_timestamp(late[0]), "2026-08-11T12:00:00Z")
+        self.assertEqual(format_timestamp(early[0]), "2026-08-12T12:00:00Z")
+
+    def test_stable_within_a_utc_day_replays_one_receipt(self):
+        # The receipt hash derives from the canonical question (event_id is
+        # excluded, service.py:603), so an identical horizon within a day must
+        # not multiply rows in the receipt store.
+        first = rolling_horizon(datetime(2026, 8, 10, 0, 5, tzinfo=timezone.utc))
+        last = rolling_horizon(datetime(2026, 8, 10, 23, 55, tzinfo=timezone.utc))
+        self.assertEqual(first, last)
 
 
 if __name__ == "__main__":

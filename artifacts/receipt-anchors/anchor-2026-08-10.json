@@ -1,0 +1,11 @@
+{
+  "algorithm": "oathcast-receipt-chain-v1",
+  "anchored_at": "2026-08-10T18:02:14.896909Z",
+  "first_receipt_created_at": "2026-08-04T18:51:27.282854Z",
+  "head_sha256": "8a63dba5afce18ba52eafd00ee1024f7596a94ece114bd51b4d950b66040e230",
+  "integrity_check": "ok",
+  "last_receipt_created_at": "2026-08-10T17:46:37.843831Z",
+  "receipt_count": 6,
+  "schema_version": 1,
+  "self_reported_digest_mismatches": []
+}

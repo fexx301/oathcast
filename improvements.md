@@ -6,11 +6,23 @@ Hackathon 1 window (Track 1 opens 2026-08-17; Track 3 opens 2026-08-31).
 Baseline at review time: 94/94 tests passing, no secrets in git history, staging live at
 `https://oathcastcourt.duckdns.org` (v3.2, auth enforced, `/readyz` healthy).
 
-**Status 2026-08-10: 193/193 tests passing.** The renderer rework (P0) and the entire
-security batch (S1–S6b) are merged and covered, and the P4 collection harness is built and
-verified against both live providers. Nothing in this file's completed items has
-been deployed yet — the running host is still v4 and lags these changes until the redeploy
-described in §D step 1.
+**Status 2026-08-10 (evening): 198/198 tests passing, and the work in this file is now
+DEPLOYED.** The renderer rework (P0) and the entire security batch (S1–S6b) are merged,
+covered, and **live** — the host runs `2026-08-10-hardened-v5`
+(`source_sha256 8b1788ca…a10d46`, `image_digest sha256:22a7c789…f96b3f`) as
+`uid=1000(oathcast)`, verified through public HTTPS with auth. Renderer v2 is therefore the
+**scored surface** now, which is the point of the whole exercise: Telegraph scores the
+response text, so P0 only counted once it was serving traffic.
+
+This supersedes the previous status note, which said "nothing in this file's completed items
+has been deployed yet" and named v4 as the running release. The P4 collection harness now
+runs on **two** legs (GitHub Actions + an EC2 systemd timer), and their outputs were
+cross-checked and found identical.
+
+Baseline line above says "v3.2" as of the 2026-08-07 review; that was correct then. A claim
+in this file and in `DEPLOYMENT.md` that the host *still* ran v3.2 on 2026-08-10 was wrong —
+it came from reading `/readyz`'s `release_id` at the top level when the field is nested under
+`release`. Read it as `release.release_id`.
 
 This register is an actionable list, not a claim that any item is complete. Mark items only
 when the change is merged and covered by tests.
@@ -132,6 +144,17 @@ when the change is merged and covered by tests.
   (git commit, X post, Explorer memo). An anchor file living only in this repo proves nothing
   against someone who can also edit the repo. This is stated in the script docstring.
 
+  **First real anchor written 2026-08-10** against the live production store:
+  `head_sha256 8a63dba5…40e230` over 6 receipts, `integrity_check: ok`, no self-reported
+  digest mismatches, first receipt 2026-08-04T18:51:27Z. Committed to this repo at
+  `artifacts/receipt-anchors/anchor-2026-08-10.json` and verified byte-identical to the host
+  copy (`ad116b0f…e835c4`). **By the standard in the paragraph above, this is not yet
+  evidence** — the git commit is the weakest of the three publication venues, since the same
+  party controls the repo and the receipts. It demonstrates the chain is internally consistent
+  and establishes a dated prefix; it becomes third-party checkable only when a head is
+  published somewhere append-only and outside this repo's control. The X post or an Explorer
+  memo is the step that actually closes this, and it is still open.
+
   Covered by 16 tests (`tests/test_receipt_chain.py`, `tests/test_receipt_anchor.py`),
   including a self-consistent forgery that defeats the per-receipt check but still moves the
   head, and a truncated store that must **not** verify against a shorter prefix. Tamper
@@ -231,9 +254,13 @@ evidence. Judging weights (from `handoff.md` §14):
   **`horizon_end`** (its probability is documented as ">0.1 mm in the *preceding* hour"), while
   `weatherapi.py:88` selects at **`horizon_start`** (WeatherAPI labels an hourly block by the
   hour it begins). Both readings match their own provider docs, but if either is wrong the two
-  providers are silently answering about different 60-minute windows. The first collected pair
-  showed **open_meteo 0.01 vs weatherapi 0.13** for the same hour — a 13x divergence against a
-  0.2305 climatology, in case one.
+  providers are silently answering about different 60-minute windows. The first two collected
+  pairs diverge in the **same direction**: 12:00Z **open_meteo 0.01 vs weatherapi 0.13**, and
+  16:00Z **0.00 vs 0.11**, against a 0.2305 climatology. The second is the sharper contrast —
+  "impossible" against "better than 1 in 10" for the identical hour. But both are *dry* calls,
+  so **two cases cannot yet separate the window hypothesis from Lagos simply being dry**; a
+  consistent gap is the expected signature, not proof of it. This is why the collector runs on
+  a schedule instead of being called once and declared conclusive.
 
   **`scripts/collect_provider_pairs.py` (new) collects the evidence.** Neither free tier sells
   a historical *forecast* archive, so this can only accumulate forward — a key on 2026-08-16
@@ -271,6 +298,40 @@ evidence. Judging weights (from `handoff.md` §14):
   single-season sample would have been unrepresentative.
 
   Covered by 23 tests in `tests/test_collect_provider_pairs.py`; none touch the network.
+
+  **Scheduling: both legs, not one — both now installed and cross-checked.** GitHub Actions
+  runs hourly against the `data/provider-pairs` branch and needs no inbound port; the EC2 host
+  leg is a **systemd timer**, not cron (`docs/p4-host-collection.md`), installed in the
+  redeploy's SSH window and firing every 3 hours at :07.
+
+  The losslessness argument below is no longer just an argument: the host's dataset was pulled
+  and merged into the branch copy on 2026-08-10 and added **0 cases** — and going further than
+  dedupe, the two legs' probabilities for the same hours are **byte-identical across all four
+  provider readings**. Two independent collectors, different networks, different schedulers,
+  same answers. That also means a case's value does not depend on which leg produced it, and it
+  isolates the provider divergence below as a genuine *provider* disagreement rather than
+  collector noise. Running both
+  is provably lossless rather than merely redundant: `case_id` is `slug-YYYYMMDDTHHMMZ` with
+  `issued_at` floored to the hour and `merge_cases` dedupes on it, so two collectors in the
+  same hour converge on **one** case, and drift into a different hour yields extra coverage
+  instead of corruption. Both run at lead 3, so the lead-change guard never trips. Their
+  failure modes are uncorrelated — GitHub queue load versus this host dying — and the marginal
+  cost is zero. The Actions leg is deliberately over-requested (hourly for a 3-hourly need)
+  because **GitHub delivers scheduled runs best-effort**: measured on this repository over
+  2026-08-06→10 (102.3 h), the `*/15` canary requested 409 runs and received **96 (23%)**, with
+  gaps of median 49 min and **max 360 min**, two of them over 180 min. That 23% is *not* the
+  drop rate a `0 */3` schedule would see — GitHub sheds high-frequency schedules first — but
+  the two six-hour silent windows in four days are directly observed, and a missed hour is
+  permanently unrecoverable because no free tier sells a historical *forecast* archive.
+
+  **Scope correction on the provider key.** An earlier draft treated putting `WEATHERAPI_KEY`
+  on the Miner host as crossing a documented boundary. It does not: `.env.example:4` has
+  carried it since the first spike and `service.py:244` reads it from the Miner's own
+  environment. The rule that does exist is narrower — the *payment wallet* private key stays
+  local and never enters the Miner container. A leaked weather key costs free quota; it grants
+  no access to receipts and cannot move funds. Conflating the two would have blocked a safe
+  action while teaching the wrong rule.
+
   **Still open:** accumulate paired cases, obtain an independent observation export (the
   bundled one is a fixture whose independence is not asserted), run the chronological backtest,
   and only then decide whether `weatherapi` earns `documented_match` and a place in
@@ -287,14 +348,17 @@ evidence. Judging weights (from `handoff.md` §14):
 ### Can do now (no external dependencies)
 
 **Closed 2026-08-10:** P0 (renderer), S1, S2, S3, S4, S5, S6a, S6b. Test suite 94 → 193.
-P4's collection harness is built; its verdict needs accumulated data.
+P4's collection harness is built, its `WEATHERAPI_KEY` secret is set, and it is collecting
+hourly on GitHub Actions; its verdict still needs accumulated data and an independent
+observation export.
 
 Still open, in priority order:
 
 | Item | Effort | Files |
 |---|---|---|
-| P4 set `WEATHERAPI_KEY` repo secret so the scheduled collector stops skipping | one command, time-sensitive | `.github/workflows/collect-provider-pairs.yml` |
-| Set `OATHCAST_MINER_API_KEY` repo secret — the canary has never verified anything | one command | `.github/workflows/oathcast-canary.yml` |
+| ~~Set `OATHCAST_MINER_API_KEY` repo secret~~ **DONE 2026-08-10 17:57:36Z** — piped host → `gh secret set` without entering the session. The canary now actually exercises the authenticated path | done | `.github/workflows/oathcast-canary.yml` |
+| **Publish a receipt-chain head outside this repo** (X post or Explorer memo). The first anchor exists and is committed, but repo-only publication is not third-party evidence — see §A2 | one post | `artifacts/receipt-anchors/` |
+| P4 install the EC2 host collector leg (second, uncorrelated schedule) | 20 min inside the SSH window | `docs/p4-host-collection.md` |
 | P3 public dashboard | medium | new web layer, existing presentation code |
 | P2 Planning Desk public web intake | medium | `src/oathcast/pilot.py` area |
 | P4 independent observation export for resolution | medium | `ground_truth.py` boundary |
@@ -355,20 +419,55 @@ live on GitHub Actions and verified by live dispatch.
 
 Remaining, in order:
 
-1. **One command, today:** set `WEATHERAPI_KEY` as a repository secret. The hourly collector
-   is installed and green but takes its *skip* path without it, so it is currently collecting
-   nothing. This is the only item that cannot be compressed later — neither provider sells a
-   historical forecast archive, so every hour not collected cannot be recovered.
-2. **Next, needs an SSH window:** ship S2/S5 to `oathcastcourt.duckdns.org`. `/readyz`
-   confirms the host still serves the 2026-08-04 v3.2 image, so renderer v2 — the Track 1
-   lever, 75% of that track — is currently worth zero. The host builds from source with no
-   registry, so this requires port 22 scoped to a /32; install the P4 host cron in the same
-   window rather than opening it twice. Bump the release ID, rebuild with the pinned UID,
-   update the canary pins, set `OATHCAST_MINER_API_KEY` (see item 2b), and write the first
-   receipt anchor. See `DEPLOYMENT.md` §"Release 2026-08-10".
-   **2b. The canary is green and blind.** Every scheduled run has skipped "Verify public
-   Miner" because `OATHCAST_MINER_API_KEY` was never configured — 96 consecutive successes
-   that verified nothing. Set the secret with the redeploy or the pins are decoration.
+1. ~~**One command, today:** set `WEATHERAPI_KEY` as a repository secret.~~ **DONE 2026-08-10
+   by the operator.** Collection is live and confirmed three independent ways rather than by
+   the run's green tick: step conclusion `success` (not `skipped`), branch commit `71ee312`,
+   and case count 1→2, then re-validated through the real `load_chronological_cases`. Two
+   paired cases now exist, both with both providers `valid`.
+2. ~~**Next, needs an SSH window:** ship S2/S5 to `oathcastcourt.duckdns.org`.~~ **DONE
+   2026-08-10.** `2026-08-10-hardened-v5` is live and serving renderer v2 through public
+   HTTPS with auth — the Track 1 lever (75% of that track) is no longer worth zero. Window
+   17:04:57Z → 18:13:02Z, port 22 scoped to a /32: **58 accepted sessions from one IP, 0
+   failed or invalid-user attempts** (read from the `sshd` *journal*; `/var/log/secure` is
+   empty on AL2023 and reports a misleading zero). Everything needing SSH was done in the one
+   window — build, cutover, collector install, receipt anchor, and pulling the anchor and
+   dataset back. Details in `handoff.md` and `DEPLOYMENT.md`.
+   **2c. The UID fix nearly shipped broken, and the runbook was the reason.** v5 drops to
+   `uid=1000`, and a bind mount preserves *host* ownership. `DEPLOYMENT.md` said to `chown`
+   the **directory** — which was already correct — while the receipts **file** inside it was
+   `root:root 644`. Following the runbook literally would have produced a Miner returning 200
+   on `/healthz` and `/readyz` while every forecast failed to persist, because neither probe
+   touches the receipt store. `test -w` and `BEGIN IMMEDIATE` both said "writable"; only a
+   real `CREATE TABLE` against an exact-ownership copy exposed
+   `attempt to write a readonly database`. **For SQLite, trust only an actual write, and
+   check the file, not the directory.**
+   **2d. The host has no cron.** AL2023 ships without `cronie`, so the runbook's `crontab -e`
+   was unexecutable. Replaced with a systemd timer — no new package or daemon, and
+   `Persistent=true` recovers a run missed while the instance was down, which cron cannot and
+   which matters because a missed collection hour is permanently unrecoverable.
+   **2a. Console and region.** The security group can only be reached through the AWS console:
+   no `aws` CLI, no `~/.aws`, no environment credentials, so there is no fallback if the
+   session fails. The console must be in **`eu-north-1` (Stockholm)** — security groups,
+   instances, and key pairs are regional, so `oathcast-web` is invisible from any other region.
+   Start only with a stable session and ~30 uninterrupted minutes: a half-open security group
+   plus an expired console session is the worst state to be in. Re-check the public IP
+   immediately before writing the /32 rule.
+   **2b.** ~~The canary is green and blind.~~ **RESOLVED 2026-08-10.** Both secrets are set
+   (`WEATHERAPI_KEY` 15:54:46Z, `OATHCAST_MINER_API_KEY` 17:57:36Z); the active Miner key was
+   piped host → `gh secret set` without being rendered into the session. For the record of what
+   was wrong: 96 consecutive "successes" had skipped "Verify public Miner" entirely because the
+   secret was unset. **The key is self-generated, not Telegraph-issued** — the YAML `auth` block
+   only declares that clients send `Authorization: Bearer <value>`, and the operator picks the
+   value. The copy at `~/Downloads/oathcast-miner.env` is the **retired** key (proved by a smoke
+   test returning 401 on the authenticated call).
+   **2e. The canary was also pinned to a fixture that could never keep passing.**
+   `fixtures/question.json` names a fixed 2026-08-17T15:00Z horizon, which is past Open-Meteo's
+   rolling 7-day window today *and* past its own `forecast_cutoff` after 2026-08-17T12:00Z — so
+   it 502s now, works for six days, then fails permanently, and a genuine outage would look
+   identical. `smoke_miner.py` now computes a rolling horizon (noon UTC tomorrow) anchored to
+   the **UTC day**, not to `now`: a per-run horizon would have made each of the 96 daily runs a
+   unique question and written 96 synthetic receipts a day into the store meant to evidence
+   *real* demand. 5 boundary tests added.
 3. **This week:** P3 dashboard + P2 web intake — the visible product; recruit pilot users in
    parallel, because recruiting takes calendar time and Track 3 opens 2026-08-31.
 4. **This week:** source an independent observation export so collected cases can be resolved.
