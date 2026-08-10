@@ -293,7 +293,8 @@ Still open, in priority order:
 
 | Item | Effort | Files |
 |---|---|---|
-| P4 run the collector daily until Track 1 opens | tiny per run, time-sensitive | `scripts/collect_provider_pairs.py` |
+| P4 set `WEATHERAPI_KEY` repo secret so the scheduled collector stops skipping | one command, time-sensitive | `.github/workflows/collect-provider-pairs.yml` |
+| Set `OATHCAST_MINER_API_KEY` repo secret — the canary has never verified anything | one command | `.github/workflows/oathcast-canary.yml` |
 | P3 public dashboard | medium | new web layer, existing presentation code |
 | P2 Planning Desk public web intake | medium | `src/oathcast/pilot.py` area |
 | P4 independent observation export for resolution | medium | `ground_truth.py` boundary |
@@ -348,16 +349,26 @@ does not convert devnet traffic into qualifying Track 3 usage.
 ## D. Suggested execution order
 
 **Done 2026-08-10:** P0 renderer, then the full security batch (S1–S6b), then the P4
-collection harness. 193 tests passing.
+collection harness. 193 tests passing. All of it **pushed** (`d48d13f`, `1c218c0`; CI green)
+after a session in which 24 files existed only on one laptop. The scheduled collector is
+live on GitHub Actions and verified by live dispatch.
 
 Remaining, in order:
 
-1. **Daily from now until 2026-08-17:** run `collect_provider_pairs.py --mode collect`. This
-   is the only item that cannot be compressed later — neither provider sells a historical
-   forecast archive, so every day not collected is a day of evidence that cannot be recovered.
-2. **Before redeploying:** ship S2/S5 to `oathcastcourt.duckdns.org` — bump the release ID,
-   rebuild with the pinned UID, update the canary's expected release/source digests, and
-   write the first receipt anchor. See `DEPLOYMENT.md` §"Release 2026-08-10".
+1. **One command, today:** set `WEATHERAPI_KEY` as a repository secret. The hourly collector
+   is installed and green but takes its *skip* path without it, so it is currently collecting
+   nothing. This is the only item that cannot be compressed later — neither provider sells a
+   historical forecast archive, so every hour not collected cannot be recovered.
+2. **Next, needs an SSH window:** ship S2/S5 to `oathcastcourt.duckdns.org`. `/readyz`
+   confirms the host still serves the 2026-08-04 v3.2 image, so renderer v2 — the Track 1
+   lever, 75% of that track — is currently worth zero. The host builds from source with no
+   registry, so this requires port 22 scoped to a /32; install the P4 host cron in the same
+   window rather than opening it twice. Bump the release ID, rebuild with the pinned UID,
+   update the canary pins, set `OATHCAST_MINER_API_KEY` (see item 2b), and write the first
+   receipt anchor. See `DEPLOYMENT.md` §"Release 2026-08-10".
+   **2b. The canary is green and blind.** Every scheduled run has skipped "Verify public
+   Miner" because `OATHCAST_MINER_API_KEY` was never configured — 96 consecutive successes
+   that verified nothing. Set the secret with the redeploy or the pins are decoration.
 3. **This week:** P3 dashboard + P2 web intake — the visible product; recruit pilot users in
    parallel, because recruiting takes calendar time and Track 3 opens 2026-08-31.
 4. **This week:** source an independent observation export so collected cases can be resolved.

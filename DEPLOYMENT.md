@@ -174,8 +174,16 @@ Hardened release verified and deployed on 2026-08-04:
 ## Release 2026-08-10 — renderer v2 and security batch (NOT YET DEPLOYED)
 
 The repository is ahead of the running host. These changes are merged and covered
-by 170 local tests but the live service still runs the earlier release. Redeploy
-before treating any of it as live behaviour.
+by 193 local tests but the live service still runs the earlier release. Redeploy
+before treating any of it as live behaviour. Confirmed 2026-08-10: `/readyz` on
+`oathcastcourt.duckdns.org` returns ready but reports **no release ID**, i.e. the
+host is still serving the 2026-08-04 v3.2 image.
+
+**The canary is green and blind — fix this with the redeploy.** Every scheduled
+canary run since it was added has taken its *skip* path: `OATHCAST_MINER_API_KEY`
+is not configured as a repository secret, so "Verify public Miner" is skipped and
+the job succeeds having checked nothing. 96 consecutive green runs verified
+nothing. Set the secret as part of this redeploy, or the pins below are decoration.
 
 **What changes at runtime**
 
@@ -206,16 +214,33 @@ separation, not a named volume.
 
 **Steps**
 
-    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # expect 170 OK
+    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # expect 193 OK
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
       --release-id 2026-08-10-hardened-v5 \
       --output /tmp/oathcast-release-manifest.json
 
+Run on 2026-08-10 at commit `1c218c0`: 193 tests OK, drafts valid, and the
+manifest covers 56 files with
+
+    source_sha256 = 8b1788cae3c43bcadc03a7e1d9c5b390553fd7798b587e7a3b989ed833a10d46
+
+That digest is reproducible across runs, so the host build can be checked
+against it. **Re-run the manifest if any tracked file changes before the build**
+— the digest covers the tree, not the release name.
+
     docker build \
       --build-arg OATHCAST_RELEASE_ID=2026-08-10-hardened-v5 \
-      --build-arg OATHCAST_SOURCE_SHA256=<manifest-source-sha256> \
+      --build-arg OATHCAST_SOURCE_SHA256=8b1788cae3c43bcadc03a7e1d9c5b390553fd7798b587e7a3b989ed833a10d46 \
       -t oathcast:2026-08-10-hardened-v5 .
+
+**This build happens on the host, which is why the redeploy needs SSH.** The
+running container was built from local tags (`oathcast:staging`,
+`oathcast:v3-2-correct`); there is no registry to pull from, so the source has
+to reach the host and be built there. Reopening port 22 scoped to a /32 is a
+specific, time-bounded maintenance operation and needs explicit authorization.
+Since the window has to open anyway, install the P4 collector cron in the same
+window — see `docs/p4-host-collection.md`.
 
 After deployment, verify without printing secrets:
 
@@ -231,6 +256,14 @@ Then confirm the new surfaces specifically:
 - A receipt is written to the host bind mount — this is what a wrong UID breaks
   silently, so check the file, not the health endpoint.
 - Update the canary's expected release and source digests, then run it.
+
+**Make the canary actually verify.** Update the three pins in
+`.github/workflows/oathcast-canary.yml` to the new release ID, the
+`source_sha256` above, and the image digest that `docker images --no-trunc` shows
+after the build. Then set `OATHCAST_MINER_API_KEY` as a repository secret —
+without it the canary skips its only real step and reports success regardless of
+what the host is doing. Confirm the fix by opening a canary run and checking that
+"Verify public Miner" says `success`, not `skipped`.
 
 **Write the first receipt anchor after the redeploy** (S5). The anchor is only
 worth something once published where OathCast cannot rewrite it:
@@ -249,16 +282,37 @@ anchored prefix has been altered.
 
 ## Provider-equivalence collection (P4, time-sensitive)
 
-Run daily until Track 1 opens on 2026-08-17. Neither Open-Meteo nor WeatherAPI
-sells a historical *forecast* archive, so every day not collected is evidence
-that cannot be recovered later:
+Collect until Track 1 opens on 2026-08-17. Neither Open-Meteo nor WeatherAPI
+sells a historical *forecast* archive, so every hour not collected is evidence
+that cannot be recovered later.
+
+**Scheduled leg (live).** `.github/workflows/collect-provider-pairs.yml` requests
+an hourly run and appends to the `data/provider-pairs` branch. It is deliberately
+over-requested: GitHub delivers scheduled runs best-effort — measured on this
+repository over 2026-08-06..10, the `*/15` canary received 96 of 409 requested
+runs (23%), with gaps up to 360 minutes. Over-requesting cannot double-count,
+because `case_id` floors `issued_at` to the hour, so extra runs converge on one
+case. The workflow **skips safely and reports success while `WEATHERAPI_KEY` is
+unset**, so check that the "Collect one paired case" step says `success` rather
+than `skipped` before believing collection is running.
+
+**Host leg (optional, needs the SSH window).** `docs/p4-host-collection.md`
+installs the same collector under `cron` on the EC2 host. Both legs can run: the
+merge dedupes by `case_id`, and their failure modes are uncorrelated (GitHub
+queue load vs host death). Install it inside the redeploy window rather than
+opening port 22 twice.
+
+**Manual run.**
 
     set -a; source .secrets/weatherapi.env; set +a
     PYTHONPATH=src python3 scripts/collect_provider_pairs.py --mode collect
 
 The key lives in `.secrets/weatherapi.env` (mode 0600, gitignored) and is read
-only from the environment. Do not pass it as an argument and do not place it in
-the Miner container — this collection runs on the operator's machine against the
+only from the environment. Do not pass it as an argument. It is safe on the Miner
+host — `.env.example` has carried `WEATHERAPI_KEY` since the first spike and
+`service.py` reads it there — but each scheduling leg is another copy to rotate.
+The rule that does apply is narrower: keep the payment wallet local, and never
+put its private key in the Miner container. This collection runs against the
 operator's own provider accounts, and is not Telegraph traffic or hackathon demand.
 
 Under `cron`, source the secret inside the job rather than exporting it globally,

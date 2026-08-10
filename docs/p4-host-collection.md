@@ -3,6 +3,20 @@
 Runbook for scheduling `collect_provider_pairs.py` on the `oathcastcourt`
 staging host. Written 2026-08-10.
 
+## Status: this is the second leg, not the only one
+
+`.github/workflows/collect-provider-pairs.yml` now requests an hourly run and
+appends to the `data/provider-pairs` branch. That leg needed no AWS access and
+is already live, so **collection is not blocked on this runbook.**
+
+Install this one anyway, inside the redeploy's SSH window. GitHub delivers
+scheduled runs best-effort — measured on this repository over 2026-08-06..10,
+the `*/15` canary received 96 of 409 requested runs (23%), with gaps up to 360
+minutes — so a host `cron` that actually fires on time is worth having. Both
+legs can run: cases converge by `case_id` (floored to the hour), so two
+collectors in the same hour produce one case rather than a duplicate, and their
+failure modes are uncorrelated — GitHub queue load versus this host dying.
+
 ## Why the host rather than the laptop
 
 The comparison needs cases accumulated at a fixed lead time. A laptop that
@@ -35,6 +49,11 @@ The security group exposes ports 80 and 443 only. The standing instruction is:
 *do not reopen SSH except for a specific, time-bounded maintenance operation.*
 This installation is such an operation, but it needs an explicit decision and
 console access, so **steps 1 and 7 are operator actions and are not automated.**
+
+**Do this inside the redeploy window.** The v5 redeploy also needs SSH — the host
+builds its image from source and there is no registry to pull from — so opening
+port 22 once covers both. Opening it a second time for collection alone is a
+worse trade than waiting for that window.
 
 ## Steps
 
@@ -106,17 +125,40 @@ group is back to 80/443 only, and record the open/close times in `handoff.md`.
 
 ## Retrieving the data
 
-The dataset lives on the host and is not in git. Pull it before running the
-backtest locally:
+Two legs write to two places: this host writes a local file, and the Actions leg
+writes `paired-forecasts.json` on the `data/provider-pairs` branch. They are not
+automatically joined.
+
+Pull the host's copy during a maintenance window:
 
     scp -i <key> \
       ec2-user@oathcastcourt.duckdns.org:~/oathcast/collection/paired-forecasts.json \
-      artifacts/provider-equivalence/paired-forecasts.json
+      /tmp/host-pairs.json
 
-Merging is by `case_id`, so a host-collected file and the two local cases already
-recorded can be combined without duplication. This needs SSH open, so either pull
-it during a later maintenance window or, if that becomes routine, move retrieval
-behind an authenticated endpoint instead of reopening port 22 on a schedule.
+Then merge it into the branch copy. Merging is by `case_id`, so overlapping hours
+collapse rather than double-count, and `--allow-lead-change` is not needed while
+both legs run at the same lead:
+
+    git fetch origin data/provider-pairs
+    git worktree add --detach /tmp/pairs FETCH_HEAD
+    PYTHONPATH=src python3 - <<'PY'
+    import json, pathlib, sys
+    sys.path.insert(0, "scripts")
+    from collect_provider_pairs import merge_cases, write_dataset
+    branch = pathlib.Path("/tmp/pairs/paired-forecasts.json")
+    existing = json.loads(branch.read_text())
+    host = json.loads(pathlib.Path("/tmp/host-pairs.json").read_text())
+    merged, added = merge_cases(existing, host)
+    write_dataset(branch, merged)
+    print(f"added {len(added)} host-only cases")
+    PY
+
+`write_dataset` validates through the real backtest loader before replacing the
+file, so a bad merge fails loudly instead of installing an unloadable dataset.
+
+Because retrieval needs SSH, prefer pulling during a window you are opening
+anyway. If it becomes routine, that is the signal to drop the host leg and let
+the Actions leg — which needs no inbound port — carry collection alone.
 
 ## What this still does not do
 
