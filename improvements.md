@@ -155,6 +155,28 @@ when the change is merged and covered by tests.
   published somewhere append-only and outside this repo's control. The X post or an Explorer
   memo is the step that actually closes this, and it is still open.
 
+  **Post drafted 2026-08-10** — `docs/x-update-drafts.md` §Draft 7, as a 3-post thread and a
+  single-post fallback, both under 280 characters (checked by counting, since the 64-character
+  hash is exactly what truncation would eat). Publishing is an operator action and remains the
+  open step; the draft only removes the excuse that it needed writing.
+
+  Two things the draft is deliberately careful about, both of which would have made the post
+  worse than not posting:
+  1. **It publishes `receipt_count` alongside the head.** `--verify` recomputes over the first
+     N rows, so a post carrying the hash alone commits to nothing anyone could ever check.
+  2. **It labels the 6 receipts as canary and smoke traffic.** They are ours, spread over six
+     days. A post that let "6 receipts" read as six forecasts served would be exactly the
+     automated-traffic-as-demand claim the guardrails prohibit — and self-published evidence
+     is where that temptation is strongest, since nobody else is checking the wording.
+
+  **The gap the X post does not close.** Even once published, no third party can *recompute*
+  the head: the receipt store lives on the Miner host and is not publicly readable. The post
+  fixes a prefix at a timestamp OathCast cannot backdate — genuinely binding on us — but it is
+  a commitment, not a proof. A **public read-only chain-head endpoint** (`chain_head()` already
+  returns digests and counts only, never receipt content, so the handler is thin) is what turns
+  it into something a reader can check against the live service. That needs a redeploy, so it
+  is queued for the next SSH window rather than done now; it is in the open table above.
+
   Covered by 16 tests (`tests/test_receipt_chain.py`, `tests/test_receipt_anchor.py`),
   including a self-consistent forgery that defeats the per-receipt check but still moves the
   head, and a truncated store that must **not** verify against a shorter prefix. Tamper
@@ -357,7 +379,8 @@ Still open, in priority order:
 | Item | Effort | Files |
 |---|---|---|
 | ~~Set `OATHCAST_MINER_API_KEY` repo secret~~ **DONE 2026-08-10 17:57:36Z** — piped host → `gh secret set` without entering the session. The canary now actually exercises the authenticated path | done | `.github/workflows/oathcast-canary.yml` |
-| **Publish a receipt-chain head outside this repo** (X post or Explorer memo). The first anchor exists and is committed, but repo-only publication is not third-party evidence — see §A2 | one post | `artifacts/receipt-anchors/` |
+| **Publish a receipt-chain head outside this repo** (X post or Explorer memo). Post drafted and length-checked at `docs/x-update-drafts.md` §Draft 7 — **operator action: publish it.** The first anchor exists and is committed, but repo-only publication is not third-party evidence — see §A2 | one post | `artifacts/receipt-anchors/`, `docs/x-update-drafts.md` |
+| **Public read-only chain-head endpoint** — what actually lets a reader *verify* a published anchor instead of only trusting it. Needs a redeploy, so it rides the next SSH window | small + redeploy | `src/oathcast/service.py` |
 | P4 install the EC2 host collector leg (second, uncorrelated schedule) | 20 min inside the SSH window | `docs/p4-host-collection.md` |
 | P3 public dashboard | medium | new web layer, existing presentation code |
 | P2 Planning Desk public web intake | medium | `src/oathcast/pilot.py` area |
