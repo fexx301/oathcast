@@ -4,6 +4,22 @@ These are drafts only. Publish manually after checking the evidence attached to
 each post. Tag `@Telegraphprotoc` in every update, and never describe fixtures,
 direct upstream calls, or the local queue as live Telegraph usage.
 
+## Published log
+
+The drafts below are written as if nothing has been posted, which stopped being
+true on 2026-08-10. Record every publication here with its URL: three separate
+lines in `docs/submission-checklist.md` ask for X evidence, and they want links,
+not a claim that posting happened. A post nobody can find is not evidence.
+
+| Draft | Published | URL |
+|---|---|---|
+| 2 — the Application spine | 2026-08-10 | *pending — paste it here* |
+
+Everything else in this file is unpublished. **Draft 7 is the one with an
+outstanding decision attached** — see `improvements.md` §A2 and the open-items
+table; its value decays the longer it waits, because an anchor is only credible
+while there is nothing to gain by rewriting the record it commits to.
+
 ## Draft 1 — the problem
 
 Weather forecasts are easy to display and hard to trust.
