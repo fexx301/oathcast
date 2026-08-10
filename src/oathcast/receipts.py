@@ -8,6 +8,7 @@ provider for a new answer.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -19,20 +20,75 @@ class ReceiptConflict(RuntimeError):
     """Raised when an event id is reused for a different forecast question."""
 
 
+class ReceiptStoreFull(RuntimeError):
+    """Raised when a *new* receipt would exceed the store's capacity cap.
+
+    Deliberately never raised for a replay of an existing receipt: see
+    ``SqliteReceiptStore.save``.
+    """
+
+
+class ReceiptTampering(RuntimeError):
+    """Raised when stored receipt bytes do not match their recorded digest."""
+
+
+def receipt_digest(receipt: dict[str, Any]) -> str:
+    """Hash canonical receipt bytes, excluding the digest field itself."""
+
+    unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+    encoded = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+# Domain separator for the receipt hash chain. Bumping this invalidates every
+# previously published anchor, so it changes only if the chain construction
+# itself changes.
+RECEIPT_CHAIN_DOMAIN = "oathcast-receipt-chain-v1"
+
+
+# `event_id` is caller-controlled and every receipt stores the full raw
+# provider payload, so an authenticated client can grow the disk unbounded.
+# These caps are a safety valve, not a security boundary. The row cap is the
+# binding one in practice; the byte cap catches unusually large payloads.
+DEFAULT_MAX_RECEIPT_ROWS = 200_000
+DEFAULT_MAX_RECEIPT_BYTES = 512 * 1024 * 1024
+
+
 class SqliteReceiptStore:
     """A small SQLite-backed append-only receipt store.
 
     The database schema also has SQLite triggers that reject updates and
     deletes. A repeated event id with the same question is idempotent; a
     repeated event id with different question data is a conflict.
+
+    Capacity is bounded by refusing new writes rather than by deleting old
+    receipts. Eviction would contradict the immutability the receipts exist to
+    provide — and the DELETE trigger would reject it anyway.
     """
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        max_rows: int | None = DEFAULT_MAX_RECEIPT_ROWS,
+        max_bytes: int | None = DEFAULT_MAX_RECEIPT_BYTES,
+    ) -> None:
+        if max_rows is not None and max_rows <= 0:
+            raise ValueError("max_rows must be positive or None")
+        if max_bytes is not None and max_bytes <= 0:
+            raise ValueError("max_bytes must be positive or None")
         self.path = str(path)
+        self.max_rows = max_rows
+        self.max_bytes = max_bytes
         self._lock = threading.RLock()
         self._memory_connection: sqlite3.Connection | None = None
         if self.path == ":memory:":
             self._memory_connection = sqlite3.connect(":memory:", check_same_thread=False)
+            # Every read in this class addresses columns by name, so the
+            # in-memory connection needs the same row factory as a file-backed
+            # one. _connect() returns this cached connection untouched, so it
+            # has to be set here or `row["..."]` raises TypeError.
+            self._memory_connection.row_factory = sqlite3.Row
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         connection = self._connect()
@@ -98,6 +154,15 @@ class SqliteReceiptStore:
         receipt = json.loads(row["receipt_json"])
         if not isinstance(receipt, dict):
             raise RuntimeError("stored forecast receipt is not a JSON object")
+        recorded = receipt.get("receipt_sha256")
+        # A receipt with no digest field predates the field; refusing it would
+        # turn a missing feature into data loss. A receipt that *has* one and
+        # does not match it has been rewritten outside the app, so serving it
+        # would hand out unverifiable evidence as if it were verified.
+        if isinstance(recorded, str) and recorded != receipt_digest(receipt):
+            raise ReceiptTampering(
+                f"stored receipt for event_id {event_id!r} does not match its recorded digest"
+            )
         return receipt
 
     def save(self, receipt: dict[str, Any]) -> dict[str, Any]:
@@ -115,6 +180,17 @@ class SqliteReceiptStore:
         with self._lock:
             connection = self._connect()
             try:
+                # A replay of an existing receipt must always succeed, even at
+                # capacity: the store is full of evidence precisely so it can
+                # be re-read, and refusing a replay would break durable receipt
+                # replay for events already committed to. Only genuinely new
+                # rows are subject to the cap.
+                existing = connection.execute(
+                    "SELECT 1 FROM forecast_receipts WHERE event_id = ?",
+                    (event_id,),
+                ).fetchone()
+                if existing is None:
+                    self._assert_capacity_for_new_receipt(connection)
                 connection.execute(
                     """
                     INSERT OR IGNORE INTO forecast_receipts
@@ -146,6 +222,83 @@ class SqliteReceiptStore:
             raise RuntimeError("stored forecast receipt is not a JSON object")
         return stored
 
+    def _assert_capacity_for_new_receipt(self, connection: sqlite3.Connection) -> None:
+        """Refuse a new receipt that would exceed a configured cap.
+
+        Called with the store lock held and only for rows that do not already
+        exist.
+        """
+
+        if self.max_rows is not None:
+            rows = connection.execute(
+                "SELECT COUNT(*) AS count FROM forecast_receipts"
+            ).fetchone()[0]
+            if rows >= self.max_rows:
+                raise ReceiptStoreFull(
+                    f"receipt store has reached its {self.max_rows} row cap; "
+                    "existing receipts remain readable and replayable"
+                )
+        if self.max_bytes is not None:
+            if self.used_bytes(connection) >= self.max_bytes:
+                raise ReceiptStoreFull(
+                    f"receipt store has reached its {self.max_bytes} byte cap; "
+                    "existing receipts remain readable and replayable"
+                )
+
+    def used_bytes(self, connection: sqlite3.Connection | None = None) -> int:
+        """Return the database size in bytes.
+
+        Uses SQLite's own page accounting rather than the file size so an
+        in-memory store and a WAL-mode file both report meaningfully.
+        """
+
+        def _measure(active: sqlite3.Connection) -> int:
+            page_count = active.execute("PRAGMA page_count").fetchone()[0]
+            page_size = active.execute("PRAGMA page_size").fetchone()[0]
+            return int(page_count) * int(page_size)
+
+        if connection is not None:
+            return _measure(connection)
+        with self._lock:
+            active = self._connect()
+            try:
+                return _measure(active)
+            finally:
+                if self._memory_connection is None:
+                    active.close()
+
+    def capacity(self) -> dict[str, Any]:
+        """Return non-secret capacity telemetry for readiness and the canary."""
+
+        with self._lock:
+            connection = self._connect()
+            try:
+                rows = int(
+                    connection.execute(
+                        "SELECT COUNT(*) AS count FROM forecast_receipts"
+                    ).fetchone()[0]
+                )
+                used = self.used_bytes(connection)
+            finally:
+                if self._memory_connection is None:
+                    connection.close()
+        report: dict[str, Any] = {
+            "rows": rows,
+            "max_rows": self.max_rows,
+            "used_bytes": used,
+            "max_bytes": self.max_bytes,
+            "accepting_new_receipts": True,
+        }
+        if self.max_rows is not None:
+            report["rows_remaining"] = max(0, self.max_rows - rows)
+            if rows >= self.max_rows:
+                report["accepting_new_receipts"] = False
+        if self.max_bytes is not None:
+            report["bytes_remaining"] = max(0, self.max_bytes - used)
+            if used >= self.max_bytes:
+                report["accepting_new_receipts"] = False
+        return report
+
     def integrity_check(self) -> str:
         """Run SQLite's full integrity check without exposing receipt data."""
 
@@ -172,6 +325,83 @@ class SqliteReceiptStore:
                 if self._memory_connection is None:
                     connection.close()
         return int(row[0]) if row is not None else 0
+
+    def chain_head(self, *, limit: int | None = None) -> dict[str, Any]:
+        """Compute the receipt hash chain head, newest receipt last.
+
+        ``chain[0] = sha256(domain)`` and
+        ``chain[i] = sha256(chain[i-1] || event_id || recomputed_digest)``.
+
+        Two properties make this worth publishing:
+
+        * **Prefix commitment.** Because it is a chain rather than a digest of
+          the whole set, a head published when the store held N receipts stays
+          verifiable forever: recomputing over the first N rows must reproduce
+          it exactly. Anchors do not go stale as the store grows.
+        * **Independent of the self-reported digest.** The chain uses a digest
+          recomputed from the stored bytes, not the ``receipt_sha256`` field
+          inside the receipt. Rewriting a receipt *and* its own digest field --
+          the exact gap that triggers this work, since SQLite triggers only
+          block SQL-level mutation and not edits to the file -- still moves the
+          chain head.
+
+        Rows are ordered by ``rowid``, the true insertion order: deletes are
+        trigger-blocked, so rowids are never reused and the order of any prefix
+        is stable as new receipts arrive. ``created_at`` is deliberately not
+        used for ordering because it is a wall-clock value and a replayed or
+        clock-skewed receipt could reorder an already-published prefix.
+
+        Only digests and counts are returned; no receipt content is exposed.
+        """
+
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be non-negative or None")
+
+        digest = hashlib.sha256(RECEIPT_CHAIN_DOMAIN.encode("utf-8")).hexdigest()
+        count = 0
+        mismatches: list[str] = []
+        first_created_at: str | None = None
+        last_created_at: str | None = None
+
+        with self._lock:
+            connection = self._connect()
+            try:
+                query = (
+                    "SELECT event_id, receipt_json, created_at "
+                    "FROM forecast_receipts ORDER BY rowid"
+                )
+                parameters: tuple[Any, ...] = ()
+                if limit is not None:
+                    query += " LIMIT ?"
+                    parameters = (limit,)
+                for row in connection.execute(query, parameters):
+                    event_id = str(row["event_id"])
+                    receipt = json.loads(row["receipt_json"])
+                    if not isinstance(receipt, dict):
+                        raise RuntimeError("stored forecast receipt is not a JSON object")
+                    recomputed = receipt_digest(receipt)
+                    recorded = receipt.get("receipt_sha256")
+                    if isinstance(recorded, str) and recorded != recomputed:
+                        mismatches.append(event_id)
+                    digest = hashlib.sha256(
+                        f"{digest}{event_id}{recomputed}".encode("utf-8")
+                    ).hexdigest()
+                    count += 1
+                    if first_created_at is None:
+                        first_created_at = str(row["created_at"])
+                    last_created_at = str(row["created_at"])
+            finally:
+                if self._memory_connection is None:
+                    connection.close()
+
+        return {
+            "algorithm": RECEIPT_CHAIN_DOMAIN,
+            "head_sha256": digest,
+            "receipt_count": count,
+            "self_reported_digest_mismatches": mismatches,
+            "first_receipt_created_at": first_created_at,
+            "last_receipt_created_at": last_created_at,
+        }
 
     def backup_to(self, destination: str | Path, *, overwrite: bool = False) -> dict[str, Any]:
         """Create and verify a consistent SQLite backup.

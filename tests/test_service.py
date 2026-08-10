@@ -1,20 +1,24 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
+import unittest.mock
 from urllib.parse import urlencode
 
 from oathcast.forecast import ForecastQuestion
-from oathcast.receipts import ReceiptConflict, SqliteReceiptStore
+from oathcast.receipts import ReceiptConflict, ReceiptStoreFull, SqliteReceiptStore
 from oathcast.service import (
     ForecastCutoffPassed,
     ForecastRequestHandler,
     ForecastService,
+    MAX_PROVIDER_BODY_BYTES,
     MAX_QUERY_LENGTH,
     ProviderUnavailable,
     RequestRateLimiter,
     authorization_valid,
+    fetch_json,
     question_from_query,
 )
 
@@ -37,6 +41,93 @@ def valid_query_params():
         "end": ["2026-08-17T16:00:00Z"],
         "cutoff": ["2026-08-17T12:00:00Z"],
     }
+
+
+class _FakeResponse:
+    """Minimal stand-in for the object `urlopen` yields as a context manager."""
+
+    def __init__(self, body: bytes, content_length=None):
+        self._body = body
+        self._position = 0
+        if content_length is None:
+            self.headers = {}
+        else:
+            self.headers = {"Content-Length": content_length}
+
+    def read(self, amount=None):
+        if amount is None:
+            chunk = self._body[self._position :]
+        else:
+            chunk = self._body[self._position : self._position + amount]
+        self._position += len(chunk)
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+class ProviderBodyCapTests(unittest.TestCase):
+    """`fetch_json` must not read an unbounded provider body into memory."""
+
+    def _fetch(self, body: bytes, *, content_length=None, cap=64):
+        response = _FakeResponse(body, content_length)
+        with unittest.mock.patch(
+            "oathcast.service.urlopen", return_value=response
+        ):
+            return fetch_json("https://provider.example/x", max_body_bytes=cap)
+
+    def test_default_cap_is_two_megabytes(self):
+        self.assertEqual(MAX_PROVIDER_BODY_BYTES, 2 * 1024 * 1024)
+
+    def test_small_body_is_parsed(self):
+        self.assertEqual(self._fetch(b'{"ok":true}'), {"ok": True})
+
+    def test_body_exactly_at_the_cap_is_accepted(self):
+        padding = "a" * (64 - len('{"k":""}'))
+        body = json.dumps({"k": padding}, separators=(",", ":")).encode("utf-8")
+        self.assertEqual(len(body), 64)
+        self.assertEqual(self._fetch(body), {"k": padding})
+
+    def test_body_one_byte_over_the_cap_is_rejected(self):
+        padding = "a" * (65 - len('{"k":""}'))
+        body = json.dumps({"k": padding}, separators=(",", ":")).encode("utf-8")
+        self.assertEqual(len(body), 65)
+        with self.assertRaises(ValueError) as caught:
+            self._fetch(body)
+        self.assertIn("byte cap", str(caught.exception))
+
+    def test_oversized_body_is_not_silently_truncated_into_valid_json(self):
+        """A truncating read could yield a parse error that hides the real cause."""
+
+        body = b'{"a":"' + b"x" * 500 + b'"}'
+        with self.assertRaises(ValueError) as caught:
+            self._fetch(body)
+        self.assertIn("byte cap", str(caught.exception))
+
+    def test_declared_content_length_over_cap_is_rejected_before_reading(self):
+        response = _FakeResponse(b'{"ok":true}', content_length="999999")
+        with unittest.mock.patch("oathcast.service.urlopen", return_value=response):
+            with self.assertRaises(ValueError) as caught:
+                fetch_json("https://provider.example/x", max_body_bytes=64)
+        self.assertIn("byte cap", str(caught.exception))
+        self.assertEqual(response._position, 0, "body was read despite the header")
+
+    def test_unparsable_content_length_falls_back_to_reading_under_the_cap(self):
+        self.assertEqual(
+            self._fetch(b'{"ok":true}', content_length="not-a-number"),
+            {"ok": True},
+        )
+
+    def test_non_object_payload_is_still_rejected(self):
+        with self.assertRaises(ValueError):
+            self._fetch(b"[1,2,3]")
+
+    def test_non_positive_cap_is_a_programming_error(self):
+        with self.assertRaises(ValueError):
+            fetch_json("https://provider.example/x", max_body_bytes=0)
 
 
 class ServiceTests(unittest.TestCase):
@@ -420,6 +511,125 @@ class ServiceTests(unittest.TestCase):
             conflicting_question = ForecastQuestion.from_dict(changed)
             with self.assertRaises(ReceiptConflict):
                 service.forecast(conflicting_question, request_id="conflict")
+
+
+class ReceiptCapacityHandlerTests(unittest.TestCase):
+    """A full receipt store must fail closed and be visible before it fills."""
+
+    def _handler(self, service, path, *, headers=None):
+        class RecordingHandler(ForecastRequestHandler):
+            def _send_json(self, status, payload, *, headers=None):
+                self.responses.append((status, payload, headers or {}))
+
+        handler = object.__new__(RecordingHandler)
+        handler.service = service
+        handler.client_address = ("203.0.113.10", 0)
+        handler.path = path
+        handler.headers = headers or {}
+        handler.responses = []
+        handler.do_GET()
+        return handler.responses[0]
+
+    def test_a_full_receipt_store_returns_507_rather_than_an_unrecorded_forecast(self):
+        # Serving a 200 with no receipt would hand out a forecast that cannot
+        # later be replayed or verified -- the opposite of what this service
+        # claims to sell. Fail closed instead.
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3", max_rows=1)
+            service = ForecastService(
+                fetcher=lambda url: load_json("open_meteo.json"),
+                provider_order=["open_meteo"],
+                receipt_store=store,
+                require_auth=False,
+                clock=lambda: FIXED_NOW,
+            )
+            first = valid_query_params()
+            first["event_id"] = ["cap-first"]
+            status, _, _ = self._handler(
+                service, "/v1/forecast/point?" + urlencode(first, doseq=True)
+            )
+            self.assertEqual(status, 200)
+
+            second = valid_query_params()
+            second["event_id"] = ["cap-second"]
+            status, payload, headers = self._handler(
+                service, "/v1/forecast/point?" + urlencode(second, doseq=True)
+            )
+            self.assertEqual(status, 507)
+            self.assertEqual(payload["error"], "receipt_store_full")
+            self.assertIn("X-OathCast-Request-ID", headers)
+
+            # The already-recorded event still replays at capacity.
+            status, _, _ = self._handler(
+                service, "/v1/forecast/point?" + urlencode(first, doseq=True)
+            )
+            self.assertEqual(status, 200)
+            store.close()
+
+    def test_readyz_reports_receipt_capacity_and_goes_unready_when_full(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3", max_rows=1)
+            service = ForecastService(
+                fetcher=lambda url: load_json("open_meteo.json"),
+                provider_order=["open_meteo"],
+                receipt_store=store,
+                require_auth=False,
+                clock=lambda: FIXED_NOW,
+            )
+            status, payload, _ = self._handler(service, "/readyz")
+            self.assertEqual(status, 200)
+            self.assertTrue(payload["ready"])
+            self.assertTrue(payload["receipt_store"]["accepting_new_receipts"])
+            self.assertEqual(payload["receipt_store"]["max_rows"], 1)
+
+            params = valid_query_params()
+            params["event_id"] = ["ready-first"]
+            self._handler(service, "/v1/forecast/point?" + urlencode(params, doseq=True))
+
+            status, payload, _ = self._handler(service, "/readyz")
+            self.assertEqual(status, 503)
+            self.assertFalse(payload["ready"])
+            self.assertFalse(payload["receipt_store"]["accepting_new_receipts"])
+            self.assertEqual(payload["receipt_store"]["rows_remaining"], 0)
+            store.close()
+
+    def test_healthz_stays_200_when_the_receipt_store_is_full(self):
+        # Docker's HEALTHCHECK probes /healthz. If a full store failed the
+        # liveness probe, the container would restart-loop instead of showing
+        # an operator a stable, diagnosable 507/503.
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3", max_rows=1)
+            service = ForecastService(
+                fetcher=lambda url: load_json("open_meteo.json"),
+                provider_order=["open_meteo"],
+                receipt_store=store,
+                require_auth=False,
+                clock=lambda: FIXED_NOW,
+            )
+            params = valid_query_params()
+            params["event_id"] = ["health-first"]
+            self._handler(service, "/v1/forecast/point?" + urlencode(params, doseq=True))
+            self.assertFalse(store.capacity()["accepting_new_receipts"])
+
+            status, payload, _ = self._handler(service, "/healthz")
+            self.assertEqual(status, 200)
+            self.assertTrue(payload["ok"])
+            store.close()
+
+    def test_readyz_is_unready_when_capacity_cannot_be_read(self):
+        class BrokenStore:
+            def capacity(self):
+                raise sqlite3.OperationalError("database is locked")
+
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            receipt_store=BrokenStore(),
+            require_auth=False,
+        )
+        status, payload, _ = self._handler(service, "/readyz")
+        self.assertEqual(status, 503)
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["receipt_store"], {"error": "capacity_unavailable"})
 
 
 if __name__ == "__main__":

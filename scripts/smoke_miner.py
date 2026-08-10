@@ -39,6 +39,57 @@ def request_json(url: str, *, headers: dict[str, str] | None = None) -> tuple[in
         raise RuntimeError(f"request failed: {exc.reason}") from exc
 
 
+def receipt_capacity_check(ready: object, *, min_headroom_percent: float) -> dict[str, object]:
+    """Alert on a filling receipt store *before* it starts refusing forecasts.
+
+    A full store makes every new forecast return 507, so the useful signal is
+    headroom, not the cliff itself. Whichever caps are configured are checked;
+    an uncapped store trivially passes.
+
+    A deployed release older than the capacity change does not report the
+    field at all. That is recorded as ``reported: False`` rather than failed --
+    the canary runs against a live host that can legitimately lag the repo
+    between a merge and a redeploy -- but it stays visible in the output so the
+    absence is never mistaken for a healthy reading.
+    """
+
+    check: dict[str, object] = {"name": "receipt_capacity", "ok": True, "reported": False}
+    if not isinstance(ready, dict):
+        return check
+    capacity = ready.get("receipt_store")
+    if not isinstance(capacity, dict):
+        return check
+
+    check["reported"] = True
+    check["accepting_new_receipts"] = capacity.get("accepting_new_receipts")
+    headrooms: list[float] = []
+    for used_key, max_key, label in (
+        ("rows", "max_rows", "rows"),
+        ("used_bytes", "max_bytes", "bytes"),
+    ):
+        limit = capacity.get(max_key)
+        used = capacity.get(used_key)
+        if not isinstance(limit, (int, float)) or not isinstance(used, (int, float)):
+            continue
+        if limit <= 0:
+            continue
+        headroom = max(0.0, (limit - used) / limit) * 100.0
+        check[f"{label}_headroom_percent"] = round(headroom, 3)
+        headrooms.append(headroom)
+
+    if capacity.get("accepting_new_receipts") is False:
+        check["ok"] = False
+        check["error"] = "receipt store is full; new forecasts will return 507"
+        return check
+    if headrooms and min(headrooms) < min_headroom_percent:
+        check["ok"] = False
+        check["error"] = (
+            f"receipt store headroom {min(headrooms):.2f}% is below the "
+            f"{min_headroom_percent}% threshold"
+        )
+    return check
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default=os.getenv("OATHCAST_PUBLIC_URL", "https://oathcastcourt.duckdns.org"))
@@ -46,6 +97,12 @@ def main() -> None:
     parser.add_argument("--expected-release-id")
     parser.add_argument("--expected-source-sha256")
     parser.add_argument("--expected-image-digest")
+    parser.add_argument(
+        "--min-receipt-headroom-percent",
+        type=float,
+        default=10.0,
+        help="fail the canary when receipt-store headroom drops below this percentage",
+    )
     parser.add_argument("--question-file", type=Path, default=ROOT / "fixtures" / "question.json")
     parser.add_argument("--skip-authenticated", action="store_true")
     args = parser.parse_args()
@@ -81,6 +138,9 @@ def main() -> None:
 
     ready_status, _, ready = request_json(f"{base_url}/readyz")
     checks.append({"name": "readyz", "status": ready_status, "ok": ready_status == 200 and isinstance(ready, dict) and ready.get("ready") is True})
+    checks.append(
+        receipt_capacity_check(ready, min_headroom_percent=args.min_receipt_headroom_percent)
+    )
 
     question = json.loads(args.question_file.read_text(encoding="utf-8"))
     params = {

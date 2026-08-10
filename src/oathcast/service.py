@@ -33,7 +33,14 @@ from oathcast.forecast import (
     format_timestamp,
     parse_timestamp,
 )
-from oathcast.receipts import ReceiptConflict, SqliteReceiptStore
+from oathcast.receipts import (
+    DEFAULT_MAX_RECEIPT_BYTES,
+    DEFAULT_MAX_RECEIPT_ROWS,
+    ReceiptConflict,
+    ReceiptStoreFull,
+    SqliteReceiptStore,
+    receipt_digest,
+)
 from oathcast.render import public_response
 from oathcast.release import ReleaseInfo, current_release
 
@@ -56,18 +63,45 @@ class ForecastCutoffPassed(ValueError):
     """Raised when a new forecast arrives at or after its declared cutoff."""
 
 
-def receipt_digest(receipt: dict[str, Any]) -> str:
-    """Hash canonical receipt bytes, excluding the digest field itself."""
-
-    unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
-    encoded = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+MAX_PROVIDER_BODY_BYTES = 2 * 1024 * 1024
 
 
-def fetch_json(url: str, timeout_seconds: float = 12.0) -> dict[str, Any]:
+def fetch_json(
+    url: str,
+    timeout_seconds: float = 12.0,
+    *,
+    max_body_bytes: int = MAX_PROVIDER_BODY_BYTES,
+) -> dict[str, Any]:
+    """Fetch and parse a provider JSON body under a hard byte cap.
+
+    An unbounded ``read()`` lets a hostile or malfunctioning upstream exhaust
+    memory, so the body is capped. One extra byte is requested so that a
+    response sitting exactly on the limit is accepted while a larger one is
+    detected rather than silently truncated into a parse error. A declared
+    ``Content-Length`` over the cap is rejected before any body is read.
+    """
+
+    if max_body_bytes <= 0:
+        raise ValueError("max_body_bytes must be positive")
+
     request = Request(url, headers={"Accept": "application/json", "User-Agent": "OathCast/0.1"})
     with urlopen(request, timeout=timeout_seconds) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+        declared = response.headers.get("Content-Length")
+        if declared is not None:
+            try:
+                declared_bytes = int(declared)
+            except ValueError:
+                declared_bytes = None
+            if declared_bytes is not None and declared_bytes > max_body_bytes:
+                raise ValueError(
+                    f"provider response exceeds {max_body_bytes} byte cap"
+                )
+        body = response.read(max_body_bytes + 1)
+
+    if len(body) > max_body_bytes:
+        raise ValueError(f"provider response exceeds {max_body_bytes} byte cap")
+
+    payload = json.loads(body.decode("utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("provider response must be a JSON object")
     return payload
@@ -423,6 +457,12 @@ class ForecastService:
                 raise
             except ReceiptConflict:
                 raise
+            except ReceiptStoreFull:
+                # A full local store is not an upstream failure. Falling through
+                # to the next provider would re-fetch upstream for a receipt
+                # that still cannot be written, and would surface as a 502 that
+                # sends an operator to debug the wrong system.
+                raise
             except Exception as exc:
                 failures.append(f"{provider}: {exc}")
         raise ProviderUnavailable("; ".join(failures))
@@ -699,15 +739,31 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/readyz":
             ready = bool(self.service.receipt_store is not None or not self.service.require_auth)
-            self._send_json(
-                200 if ready else 503,
-                {
-                    "ready": ready,
-                    "auth_configured": bool(self.service.auth_tokens),
-                    "receipt_store_configured": self.service.receipt_store is not None,
-                    "release": self.service.release.to_dict(),
-                },
-            )
+            payload: dict[str, Any] = {
+                "ready": ready,
+                "auth_configured": bool(self.service.auth_tokens),
+                "receipt_store_configured": self.service.receipt_store is not None,
+                "release": self.service.release.to_dict(),
+            }
+            if self.service.receipt_store is not None:
+                # Capacity is surfaced so an operator (and the canary) sees the
+                # store filling up before every new forecast starts returning
+                # 507. A full store is genuinely not-ready: the service will
+                # refuse new work. This does not restart the container --
+                # Docker's HEALTHCHECK probes /healthz, not /readyz -- so a
+                # capacity stall stays visible instead of turning into a
+                # restart loop.
+                try:
+                    capacity = self.service.receipt_store.capacity()
+                except Exception:
+                    ready = False
+                    payload["receipt_store"] = {"error": "capacity_unavailable"}
+                else:
+                    payload["receipt_store"] = capacity
+                    if not capacity.get("accepting_new_receipts", True):
+                        ready = False
+                payload["ready"] = ready
+            self._send_json(200 if ready else 503, payload)
             return
         if parsed.path != "/v1/forecast/point":
             self._send_json(404, {"error": "not_found"})
@@ -783,6 +839,15 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
             self._send_json(410, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except ReceiptConflict as exc:
             self._send_json(409, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
+        except ReceiptStoreFull:
+            # Fail closed rather than serve an unrecorded forecast. A forecast
+            # without a receipt is not a product this service offers, so
+            # returning it silently would break the evidence chain.
+            self._send_json(
+                507,
+                {"error": "receipt_store_full", "request_id": request_id},
+                headers={"X-OathCast-Request-ID": request_id},
+            )
         except ProviderUnavailable:
             self._send_json(502, {"error": "provider_unavailable", "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except ValueError as exc:
@@ -799,10 +864,31 @@ def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
             return default
         return raw.strip().lower() in {"1", "true", "yes", "on"}
 
+    def env_cap(name: str, default: int | None) -> int | None:
+        """Read a receipt-store capacity cap from the environment.
+
+        An unset variable keeps the built-in default; ``none``/``off``/``0``
+        disables the cap explicitly. An unparseable value is a startup error
+        rather than a silent fallback -- a typo must not quietly remove a
+        capacity bound.
+        """
+
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        cleaned = raw.strip().lower()
+        if cleaned in {"none", "off", "0", ""}:
+            return None
+        return int(cleaned)
+
     receipt_path = os.getenv("OATHCAST_RECEIPT_DB", "data/oathcast/receipts.sqlite3")
     service = ForecastService(
         require_auth=env_flag("OATHCAST_REQUIRE_AUTH", True),
-        receipt_store=SqliteReceiptStore(receipt_path),
+        receipt_store=SqliteReceiptStore(
+            receipt_path,
+            max_rows=env_cap("OATHCAST_RECEIPT_MAX_ROWS", DEFAULT_MAX_RECEIPT_ROWS),
+            max_bytes=env_cap("OATHCAST_RECEIPT_MAX_BYTES", DEFAULT_MAX_RECEIPT_BYTES),
+        ),
     )
 
     class BoundHandler(ForecastRequestHandler):
