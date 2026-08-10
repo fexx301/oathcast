@@ -32,6 +32,12 @@ after their cutoff; an immutable SQLite receipt is stored under
 `X-OathCast-Receipt-SHA256`. Mount `/data/oathcast` to durable host storage
 when deploying the corrected image.
 
+The receipt store is capacity-bounded (default 200,000 rows / 512 MiB, override
+with `OATHCAST_RECEIPT_MAX_ROWS` and `OATHCAST_RECEIPT_MAX_BYTES`, or `none` to
+disable a cap). Once full it returns HTTP 507 for **new** events rather than
+serving a forecast it cannot record; replays of existing receipts keep working,
+so already-issued commitments are always honoured.
+
 ## x402 boundary
 
 `payment-canary/` is the current live-compatible boundary. It uses the official
@@ -164,6 +170,105 @@ Hardened release verified and deployed on 2026-08-04:
 - Staging key rotation evidence: overlap old/new `200/200`, then retired old
   `401` and active new `200`; public health/readiness remained `200`. The
   security group was restored to public ports 80/443 only.
+
+## Release 2026-08-10 — renderer v2 and security batch (NOT YET DEPLOYED)
+
+The repository is ahead of the running host. These changes are merged and covered
+by 170 local tests but the live service still runs the earlier release. Redeploy
+before treating any of it as live behaviour.
+
+**What changes at runtime**
+
+- **Response text changed.** `render.py` now emits `semantic_text_v2`, which leads
+  with IPCC AR6 calibrated wording and readable UTC clock time instead of ISO-8601
+  stamps. This is the Miner's scored surface, so the change is deliberate and
+  measured; see `docs/renderer-experiment.md`. Receipts issued before the redeploy
+  keep their original text, which is correct: a receipt records what was actually
+  answered.
+- **Container runs as non-root**, `USER 1000:1000`, plus a `HEALTHCHECK` against
+  `/healthz`.
+- **Receipt store is capacity-bounded.** New receipts past the cap return HTTP 507;
+  replays of existing receipts always succeed. `/readyz` reports `receipt_store`
+  capacity and returns 503 when full.
+- **Provider bodies are capped at 2 MB** (`MAX_PROVIDER_BODY_BYTES`).
+- **`get()` now raises on a rewritten receipt** whose bytes disagree with its
+  recorded digest.
+
+**The UID is load-bearing — read this before rebuilding.** The image is pinned to
+UID/GID 1000:1000 to match the `ec2-user` owning the durable host directory
+`/home/ec2-user/oathcast/data`. A bind mount preserves *host* ownership, so a
+container running as any other UID cannot write receipts — while `/healthz` and
+`/readyz` both still return 200. Every forecast then fails at persistence time and
+nothing in the health surface says so. **Changing this UID requires chown-ing the
+host directory in the same change.** Docker Desktop on macOS virtualizes ownership
+for named volumes and will report a false success here; verify with real UID
+separation, not a named volume.
+
+**Steps**
+
+    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # expect 170 OK
+    PYTHONPATH=src python3 scripts/validate_miner_drafts.py
+    PYTHONPATH=src python3 scripts/create_release_manifest.py \
+      --release-id 2026-08-10-hardened-v5 \
+      --output /tmp/oathcast-release-manifest.json
+
+    docker build \
+      --build-arg OATHCAST_RELEASE_ID=2026-08-10-hardened-v5 \
+      --build-arg OATHCAST_SOURCE_SHA256=<manifest-source-sha256> \
+      -t oathcast:2026-08-10-hardened-v5 .
+
+After deployment, verify without printing secrets:
+
+    PYTHONPATH=src python3 scripts/smoke_miner.py \
+      --base-url https://oathcastcourt.duckdns.org \
+      --expected-release-id 2026-08-10-hardened-v5
+
+Then confirm the new surfaces specifically:
+
+- `docker inspect --format '{{.State.Health.Status}}' oathcast` is `healthy`.
+- `docker exec oathcast id -u` prints `1000` (non-root).
+- `/readyz` includes `receipt_store` with `accepting_new_receipts: true`.
+- A receipt is written to the host bind mount — this is what a wrong UID breaks
+  silently, so check the file, not the health endpoint.
+- Update the canary's expected release and source digests, then run it.
+
+**Write the first receipt anchor after the redeploy** (S5). The anchor is only
+worth something once published where OathCast cannot rewrite it:
+
+    PYTHONPATH=src python3 scripts/anchor_receipt_head.py \
+      --database /home/ec2-user/oathcast/data/receipts.sqlite3 \
+      --output artifacts/receipt-anchors/anchor-2026-08-10.json \
+      --note "post-redeploy baseline"
+
+Commit that file, and re-verify later with `--verify`; a non-zero exit means the
+anchored prefix has been altered.
+
+    PYTHONPATH=src python3 scripts/anchor_receipt_head.py \
+      --database /home/ec2-user/oathcast/data/receipts.sqlite3 \
+      --verify artifacts/receipt-anchors/anchor-2026-08-10.json
+
+## Provider-equivalence collection (P4, time-sensitive)
+
+Run daily until Track 1 opens on 2026-08-17. Neither Open-Meteo nor WeatherAPI
+sells a historical *forecast* archive, so every day not collected is evidence
+that cannot be recovered later:
+
+    set -a; source .secrets/weatherapi.env; set +a
+    PYTHONPATH=src python3 scripts/collect_provider_pairs.py --mode collect
+
+The key lives in `.secrets/weatherapi.env` (mode 0600, gitignored) and is read
+only from the environment. Do not pass it as an argument and do not place it in
+the Miner container — this collection runs on the operator's machine against the
+operator's own provider accounts, and is not Telegraph traffic or hackathon demand.
+
+Under `cron`, source the secret inside the job rather than exporting it globally,
+and keep the job's log out of any shared location. The script scrubs the key from
+its own error output, but a log that is world-readable is still a mistake.
+
+`--mode resolve --observations <path>` fills outcomes once windows close. It
+needs an **independent** observation export; the bundled
+`fixtures/observation_export.json` is a development fixture whose independence is
+not asserted, so results resolved against it are not evidence of provider quality.
 
 ## Deployment gate
 
