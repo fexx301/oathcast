@@ -7,10 +7,10 @@ this document is a Telegraph score or a prediction of one.
 
 ## Why the renderer is the Track 1 lever
 
-Miner performance is 75% of the Track 1 score. The scoring model recorded in
-`handoff.md` (`:87`, `:249`) is a `0..1` composite over **cosine similarity,
-BM25 word overlap, and response-length quality** — all computed on the response
-**text**. Brier is not currently part of it.
+Miner performance is 75% of the Track 1 score. The scoring model is a `0..1`
+composite over **cosine similarity, BM25 word overlap, and response-length
+quality** — all computed on the response **text**. Brier is not currently part
+of it.
 
 That makes `src/oathcast/render.py` the scoring surface. A calibration layer
 improves a number that is not currently being scored; the sentence the Miner

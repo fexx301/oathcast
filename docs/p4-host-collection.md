@@ -195,7 +195,8 @@ including the URL-bearing connection failures urllib produces — but a
 world-readable log is still a mistake.
 
 **7. Close SSH again (operator).** Remove the port-22 rule. Confirm the security
-group is back to 80/443 only, and record the open/close times in `handoff.md`.
+group is back to 80/443 only, and record the open/close times in the local
+operations notes.
 
 Everything that needs SSH should be finished first — during the 2026-08-10
 window that meant the v5 build, the collector install, the receipt anchor, and
@@ -255,7 +256,7 @@ It also sharpens the P4 divergence: `weatherapi` reads 0.13-0.14 where
 `open_meteo` reads 0.00-0.01 on the same hour, and that gap now reproduces
 across independent collectors. It is a real disagreement between the providers,
 not collection noise. Whether it is the `horizon_start`/`horizon_end` selection
-bug is still unresolved — see `improvements.md` §P4.
+bug is still unresolved.
 
 Pull the host's copy during a maintenance window:
 

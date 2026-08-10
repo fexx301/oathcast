@@ -263,4 +263,5 @@ https://explorer.telegraphprotocol.com/.
 - OpenWeather One Call 3.0: https://openweathermap.org/api/one-call-3
 - Telegraph Miner YAML: https://docs.telegraphprotocol.com/docs/miners/yaml-config
 
-Read handoff.md before making strategic or protocol decisions.
+Strategic and protocol context is kept in local-only working notes that are not
+part of this repository.

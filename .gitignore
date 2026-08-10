@@ -59,3 +59,8 @@ node_modules/
 .terraform/
 *.tfstate
 *.tfstate.*
+
+# Local-only working notes (kept on disk, not published)
+handoff.md
+docs/x-update-drafts.md
+improvements.md
