@@ -48,12 +48,15 @@ relevant to that track.
   is retained per request and is the primary source for our own claims.)*
 - [ ] Real users and legitimate request volume.
 - [ ] Resolved receipts and scorecards published.
-- [~] X update evidence tagged `@Telegraphprotoc` — **one post published**,
-  2026-08-10, the Application spine:
-  https://x.com/fexx_off/status/2086925135554982049 (tag confirmed present).
-  Left unticked deliberately: X is 25% of this track's score and one post is a
-  start, not a body of evidence. The receipt-chain anchor is drafted and is the
-  next publication.
+- [~] X update evidence tagged `@Telegraphprotoc` — **two posts published**:
+  2026-08-10, the Application spine,
+  https://x.com/fexx_off/status/2086925135554982049; and 2026-08-11, the
+  receipt-chain anchor thread,
+  https://x.com/fexx_off/status/2087190115395183088 (publishes `head_sha256
+  8a63dba5…40e230` over 6 receipts). Both tags confirmed present.
+  Left unticked deliberately: X is 25% of this track's score, and two posts are
+  cadence starting, not a body of evidence. The next scheduled publications are
+  in the local drafting log.
 
 ## Submission integrity
 
