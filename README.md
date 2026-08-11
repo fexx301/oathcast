@@ -263,5 +263,11 @@ https://explorer.telegraphprotocol.com/.
 - OpenWeather One Call 3.0: https://openweathermap.org/api/one-call-3
 - Telegraph Miner YAML: https://docs.telegraphprotocol.com/docs/miners/yaml-config
 
+`docs/engineering-log.md` records the decisions where the obvious answer turned
+out to be wrong — a green CI canary whose only real step had never executed, two
+filesystem probes that both reported a database was writable when it was not, a
+port scan that passed because the binary was missing, and why the receipt chain
+hashes a recomputed digest rather than the one the receipt reports about itself.
+
 Strategic and protocol context is kept in local-only working notes that are not
 part of this repository.
