@@ -41,7 +41,11 @@ relevant to that track.
 - [x] Local Planning Desk intake pilot.
 - [ ] Official payment/signer/settlement flow verified.
 - [ ] Real Application calls routed through Telegraph.
-- [ ] Independent Explorer/payment evidence retained per request.
+- [ ] Independent Explorer/payment evidence retained per request. *(Telegraph
+  confirmed 2026-08-11 that requests served through Telegraph are tracked and
+  counted server-side even if they do not surface on the Explorer, so Explorer
+  visibility is corroboration rather than a gate. Payment evidence via Solana RPC
+  is retained per request and is the primary source for our own claims.)*
 - [ ] Real users and legitimate request volume.
 - [ ] Resolved receipts and scorecards published.
 - [~] X update evidence tagged `@Telegraphprotoc` — **one post published**,
