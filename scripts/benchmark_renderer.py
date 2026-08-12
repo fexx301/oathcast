@@ -492,6 +492,15 @@ def main() -> int:
     print("proxy = recall-only overlap (length-biased); guard = F1 (penalises padding).")
     print("Ranked on guard. Where the two lanes disagree, prefer guard.")
     print()
+    print(
+        "These are LOCAL PROXY scores. They are not comparable to the Telegraph\n"
+        "leaderboard numbers from scripts/read_leaderboard.py, even though both\n"
+        "land in the same 0.4-0.7 range — that coincidence is why the comparison\n"
+        "is tempting. This proxy is 0.8*overlap + 0.2*length_quality; Telegraph\n"
+        "scores cosine + BM25 + length quality, which is not implemented here.\n"
+        "A proxy score above the live target does not mean the bar is cleared."
+    )
+    print()
     if report["ranking_by_mean_expected_score"]:
         best = report["ranking_by_mean_expected_score"][0]
         print(f"best eligible variant: {best}")

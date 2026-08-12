@@ -112,6 +112,7 @@ From the OathCast directory:
       --database state/receipts.sqlite3 \
       --output state/backups/receipts-backup.sqlite3
     PYTHONPATH=src python3 scripts/discover_live_miners.py
+    PYTHONPATH=src python3 scripts/read_leaderboard.py
     PYTHONPATH=src python3 scripts/inspect_demand.py --db state/demand.sqlite3
     PYTHONPATH=src python3 scripts/preflight_miner.py --miner-id 18 --endpoint predict
 
@@ -189,6 +190,35 @@ capabilities. It does not sign a wallet challenge, make a paid request, or
 claim demand. Pass `--output path.json` to retain a timestamped, hashed
 observation snapshot. Run it again immediately before live routing because the
 registry is volatile.
+
+`read_leaderboard.py` reads the Explorer's **per-Intent** Miner leaderboard and
+prints the score to beat in each declared Intent:
+
+    PYTHONPATH=src python3 scripts/read_leaderboard.py
+    PYTHONPATH=src python3 scripts/read_leaderboard.py --output snapshot.json
+
+It is read-only and makes no payment or signature. Four behaviours of that API
+are enforced in `src/oathcast/leaderboard.py` rather than left to the operator,
+because each produces a plausible wrong answer instead of an error. **`?intent=`
+is the only filter that works** — `intent_type=` and `epoch=` are accepted and
+silently ignored, returning the full board — so a **negative control runs first**
+and the read is refused unless a nonsense Intent returns zero entries. **`avg_score`
+is per-Intent but `total_requests_served` is not** (it is the Miner's cross-Intent
+total, identical in every per-Intent view), so per-Intent reads drop it. **`position`
+includes inactive Miners** — a `superseded` Miner can hold position 1 — so the
+target is the best *active* Miner and no position is printed without its
+activation status. And a rank is always reported with its population, because
+the same score read as "6/17" and "4/41" is the denominator moving, not the score.
+
+The target is the **maximum** across declared Intents, not the mean: clearing the
+hardest one clears the others, whereas an average sits between the real bars and
+is wrong in both directions at once.
+
+Its numbers are other Miners' Telegraph scores and are **not comparable** to the
+local proxy in `benchmark_renderer.py`, which is `0.8*overlap +
+0.2*length_quality` rather than Telegraph's cosine + BM25 + length composite.
+Both land in 0.4–0.7, which is exactly why the comparison is tempting; both
+tools now print that warning next to their scores.
 
 `DemandLedger` and `inspect_demand.py` retain append-only local provenance for
 Application requests. A conservative local candidate requires an Application
