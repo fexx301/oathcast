@@ -132,7 +132,8 @@ An anchor's value comes **entirely** from being published somewhere its author
 cannot rewrite. Publishing it externally binds us: those 6 receipts can no longer
 be revised without contradicting a timestamp we cannot backdate. It still does
 not let a reader *verify* anything, because the receipt store is not publicly
-readable — which is why the next release exposes the chain head read-only.
+readable. A public read-only chain-head endpoint remains pending; do not claim
+that the next release exposes it unless it is separately implemented and tested.
 
 Also, deliberately: the 6 receipts are canary and smoke traffic. Six receipts
 over six days is not adoption, and any public statement of that number says so.

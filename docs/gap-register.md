@@ -1,6 +1,12 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-05
+Last reviewed: 2026-08-12
+
+Current baseline: the public Miner runs `2026-08-12-hardened-v6`, while the
+decision UI remains fail-closed without a runner. The v6 release passed the full
+Python suite, nine payment-canary tests, a disposable-container smoke, public
+identity/write-readiness checks, and restart/replay persistence on the live
+receipt volume.
 
 This register separates work we can complete without Telegraph releasing the
 official WASM/harness and registration materials from work that must remain a
@@ -33,8 +39,8 @@ platform gate.
 - A receipt-store backup/integrity utility using SQLite's online backup API,
   including a restore-count check and tests that refuse accidental overwrite.
 - An external-canary entry point plus a no-cost scheduled GitHub Actions
-  workflow; the workflow is inactive until this project is hosted in a
-  repository with the API key configured as a secret.
+  workflow. The repository secret is configured, missing-secret runs fail
+  visibly, and the workflow is pinned to the deployed v6 identity.
 - A demo ablation mode that runs the Application with the owned Miner disabled
   and asserts that valid external responses still drive the decision.
 - Staging API-key rotation: the old/new overlap was exercised through public
@@ -87,12 +93,18 @@ platform gate.
 
 ## Actionable next, not platform-blocked
 
-- The public repository is hosted at `https://github.com/fexx301/oathcast` and
-  the reviewed `main` branch is pushed. Configure the external canary secret
-  `OATHCAST_MINER_API_KEY` when the active staging credential is intentionally
-  shared with GitHub Actions; until then, the workflow skips authenticated
-  checks safely. No paid AWS monitoring component is required for the
-  preparation baseline.
+- Keep the deployed v6 Miner and its recurring canary pinned to the release,
+  source, and image identities; retain the stopped v5 rollback container until
+  v6 has accumulated an adequate stable operating window.
+- Run and verify the new provider-evidence freshness workflow. It alerts
+  separately on stale collection and stale resolution; workflow code is local
+  until the branch is pushed and manually dispatched once.
+- Establish an independently sourced observation pipeline and resolve the
+  accumulated provider cases before using them for reliability weights or
+  WeatherAPI failover.
+- Write the payment-boundary ADR and threat model, then implement one private,
+  authenticated, allowlisted, transactionally budgeted Solana request with a
+  durable payment journal. Do not enable the public decision endpoint first.
 
 ## Blocked on Telegraph or external participants
 
@@ -115,17 +127,10 @@ platform gate.
   availability. The cash-prize guardrail states three active Miners and 100
   real Track 3 requests, but the full qualification semantics still need
   written confirmation.
-- A protocol-compatible signer/SDK, official Telegraph settlement/Explorer
-  reconciliation path, and verified HTTPS dispatcher path for one capped Base
-  Sepolia test request.
-  The whitepaper specifies the generic 402 → wallet broadcast → Telegraph
-  verification → Miner response → cryptographic receipt sequence, but the
-  hackathon's concrete endpoint, credentials, and client-side evidence format
-  still govern implementation. Ahmed confirmed that served requests and their
-  attached payments are public/on-chain and visible in the Explorer; a
-  non-empty settlement header alone is still explicitly treated as unverified.
-  The Explorer is the current manual checking path; Telegraph's API docs are
-  promised but not yet released, so no client-side Explorer API is assumed.
+- The Solana x402 canary has completed one independently RPC-verified devnet
+  payment, but it is an isolated CLI. A production Application boundary still
+  needs authenticated principals, transactional budgets, idempotency binding,
+  durable ambiguous-outcome reconciliation, and capture of the paid Miner body.
 
 ## Non-goals
 

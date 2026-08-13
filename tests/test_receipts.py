@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 
@@ -131,6 +132,185 @@ class ReceiptCapacityTests(unittest.TestCase):
                 self.assertEqual(second.save(_receipt("persist-1")), _receipt("persist-1"))
             finally:
                 second.close()
+
+
+class ReceiptWriteReadinessTests(unittest.TestCase):
+    def test_transactional_write_probe_succeeds(self):
+        store = SqliteReceiptStore(":memory:")
+        try:
+            self.assertEqual(
+                store.write_readiness(),
+                {
+                    "ready": True,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                },
+            )
+        finally:
+            store.close()
+
+    def test_transactional_write_probe_rolls_back_without_accumulating_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            store = SqliteReceiptStore(database)
+            try:
+                store.save(_receipt("probe-preserves-receipts"))
+                for _ in range(3):
+                    self.assertTrue(store.write_readiness()["ready"])
+                self.assertEqual(store.row_count(), 1)
+            finally:
+                store.close()
+
+            connection = sqlite3.connect(database)
+            try:
+                probe_rows = connection.execute(
+                    "SELECT COUNT(*) FROM receipt_store_write_probe"
+                ).fetchone()[0]
+            finally:
+                connection.close()
+            self.assertEqual(probe_rows, 0)
+
+    def test_transactional_write_probe_rolls_back_when_update_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            store = SqliteReceiptStore(database)
+            # The probe table is intentionally created lazily so an existing
+            # read-only database can start and report an unready write probe.
+            # Initialize it before installing a trigger that simulates a
+            # rejected update.
+            self.assertTrue(store.write_readiness()["ready"])
+            connection = sqlite3.connect(database)
+            try:
+                connection.executescript(
+                    """
+                    CREATE TRIGGER receipt_store_write_probe_no_update
+                    BEFORE UPDATE ON receipt_store_write_probe
+                    BEGIN
+                        SELECT RAISE(ABORT, 'probe update rejected');
+                    END;
+                    """
+                )
+            finally:
+                connection.close()
+
+            try:
+                status = store.write_readiness()
+            finally:
+                store.close()
+
+            self.assertFalse(status["ready"])
+            self.assertTrue(status["rolled_back"])
+            self.assertEqual(status["error"], "write_unavailable")
+
+            connection = sqlite3.connect(database)
+            try:
+                probe_rows = connection.execute(
+                    "SELECT COUNT(*) FROM receipt_store_write_probe"
+                ).fetchone()[0]
+            finally:
+                connection.close()
+            self.assertEqual(probe_rows, 0)
+
+    def test_transactional_write_probe_rejects_a_read_only_connection(self):
+        class ReadOnlyReceiptStore(SqliteReceiptStore):
+            def _connect(self) -> sqlite3.Connection:
+                connection = sqlite3.connect(
+                    f"file:{self.path}?mode=ro",
+                    uri=True,
+                    timeout=10,
+                )
+                connection.row_factory = sqlite3.Row
+                return connection
+
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            writable = SqliteReceiptStore(database)
+            writable.close()
+
+            store = ReadOnlyReceiptStore(database)
+            try:
+                # This is the production failure mode the probe must catch:
+                # acquiring a write transaction appears healthy, but the first
+                # actual write reports SQLITE_READONLY.
+                connection = store._connect()
+                try:
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.rollback()
+                finally:
+                    connection.close()
+
+                status = store.write_readiness()
+            finally:
+                store.close()
+
+            self.assertEqual(
+                status,
+                {
+                    "ready": False,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                    "error": "write_unavailable",
+                },
+            )
+            self.assertNotIn(str(database), str(status))
+
+    def test_legacy_read_only_store_starts_and_reports_missing_probe_table(self):
+        """A post-v5 migration fault belongs on /readyz, not at startup."""
+
+        class ReadOnlyReceiptStore(SqliteReceiptStore):
+            def _connect(self) -> sqlite3.Connection:
+                connection = sqlite3.connect(
+                    f"file:{self.path}?mode=ro",
+                    uri=True,
+                    timeout=10,
+                )
+                connection.row_factory = sqlite3.Row
+                return connection
+
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "legacy-receipts.sqlite3"
+            connection = sqlite3.connect(database)
+            try:
+                connection.executescript(
+                    """
+                    CREATE TABLE forecast_receipts (
+                        event_id TEXT PRIMARY KEY,
+                        question_json TEXT NOT NULL,
+                        receipt_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+
+                    CREATE TRIGGER forecast_receipts_no_update
+                    BEFORE UPDATE ON forecast_receipts
+                    BEGIN
+                        SELECT RAISE(ABORT, 'forecast receipts are immutable');
+                    END;
+
+                    CREATE TRIGGER forecast_receipts_no_delete
+                    BEFORE DELETE ON forecast_receipts
+                    BEGIN
+                        SELECT RAISE(ABORT, 'forecast receipts are immutable');
+                    END;
+                    """
+                )
+            finally:
+                connection.close()
+
+            store = ReadOnlyReceiptStore(database)
+            try:
+                status = store.write_readiness()
+            finally:
+                store.close()
+
+            self.assertEqual(
+                status,
+                {
+                    "ready": False,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                    "error": "write_unavailable",
+                },
+            )
 
 
 class ReceiptBackupTests(unittest.TestCase):

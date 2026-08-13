@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from oathcast.protocol import outbound_headers
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,8 +67,15 @@ def header_value(headers: dict[str, str], name: str) -> str | None:
     return next((value for key, value in headers.items() if key.lower() == wanted), None)
 
 
+def json_sha256(value: object) -> str:
+    """Hash a public JSON value canonically for release-to-release comparison."""
+
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def request_json(url: str, *, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], object]:
-    request = Request(url, headers={"Accept": "application/json", **(headers or {})})
+    request = Request(url, headers=outbound_headers(headers))
     try:
         with urlopen(request, timeout=20) as response:
             body = response.read().decode("utf-8")
@@ -132,6 +142,45 @@ def receipt_capacity_check(ready: object, *, min_headroom_percent: float) -> dic
     return check
 
 
+def receipt_write_check(ready: object, *, required: bool = False) -> dict[str, object]:
+    """Require the deployed readiness surface to prove SQLite write access.
+
+    This is intentionally stricter than the capacity check. The post-v5
+    release exists partly to close a production failure where health/readiness
+    looked healthy while the receipt database could not persist forecasts. The
+    recurring canary may still observe a deliberately older live release during
+    a staged cutover, so absence is visible but only fails when the v6 release
+    smoke opts in with ``required=True``.
+    """
+
+    check: dict[str, object] = {
+        "name": "receipt_store_write",
+        "ok": not required,
+        "required": required,
+        "reported": False,
+    }
+    if not isinstance(ready, dict):
+        check["error"] = "readyz payload is not an object"
+        return check
+    probe = ready.get("receipt_store_write")
+    if not isinstance(probe, dict):
+        check["error"] = "readyz does not report receipt_store_write"
+        return check
+
+    check["reported"] = True
+    check["probe"] = probe.get("probe")
+    check["rolled_back"] = probe.get("rolled_back")
+    check["cached"] = probe.get("cached")
+    check["ok"] = (
+        probe.get("ready") is True
+        and probe.get("probe") == "sqlite_transactional_write"
+        and probe.get("rolled_back") is True
+    )
+    if not check["ok"]:
+        check["error"] = "transactional receipt-store write probe is not ready"
+    return check
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default=os.getenv("OATHCAST_PUBLIC_URL", "https://oathcastcourt.duckdns.org"))
@@ -139,6 +188,11 @@ def main() -> None:
     parser.add_argument("--expected-release-id")
     parser.add_argument("--expected-source-sha256")
     parser.add_argument("--expected-image-digest")
+    parser.add_argument(
+        "--require-receipt-write-probe",
+        action="store_true",
+        help="fail unless /readyz proves the transactional SQLite write probe",
+    )
     parser.add_argument(
         "--min-receipt-headroom-percent",
         type=float,
@@ -153,6 +207,12 @@ def main() -> None:
             "question to smoke with. Defaults to a rolling horizon (12:00-13:00 UTC "
             "tomorrow) so the check keeps working as dates pass; pass a file to pin one."
         ),
+    )
+    parser.add_argument(
+        "--question-output",
+        type=Path,
+        default=None,
+        help="write the exact non-secret question used by this run for a later replay",
     )
     parser.add_argument("--skip-authenticated", action="store_true")
     args = parser.parse_args()
@@ -191,6 +251,7 @@ def main() -> None:
     checks.append(
         receipt_capacity_check(ready, min_headroom_percent=args.min_receipt_headroom_percent)
     )
+    checks.append(receipt_write_check(ready, required=args.require_receipt_write_probe))
 
     if args.question_file is not None:
         question = json.loads(args.question_file.read_text(encoding="utf-8"))
@@ -211,6 +272,16 @@ def main() -> None:
         # naming the real horizon costs no replay stability and keeps the stored
         # receipt honest about what was asked.
         question["event_id"] = f"canary-lagos-{start:%Y%m%dT%H%M}z"
+
+    question["horizon_start"] = horizon_start
+    question["horizon_end"] = horizon_end
+    question["forecast_cutoff"] = forecast_cutoff
+    if args.question_output is not None:
+        args.question_output.parent.mkdir(parents=True, exist_ok=True)
+        args.question_output.write_text(
+            json.dumps(question, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     params = {
         "event_id": question["event_id"],
@@ -235,16 +306,40 @@ def main() -> None:
                 forecast_url,
                 headers={"Authorization": f"Bearer {token}", "X-Request-ID": "smoke-release"},
             )
+            receipt_sha256 = header_value(
+                forecast_headers, "X-OathCast-Receipt-SHA256"
+            )
+            response_request_id = header_value(
+                forecast_headers, "X-OathCast-Request-ID"
+            )
             response_ok = (
                 forecast_status == 200
                 and isinstance(forecast, dict)
                 and isinstance(forecast.get("content"), str)
-                and bool(header_value(forecast_headers, "X-OathCast-Receipt-SHA256"))
-                and bool(header_value(forecast_headers, "X-OathCast-Request-ID"))
+                and bool(receipt_sha256)
+                and bool(response_request_id)
             )
-            checks.append({"name": "authenticated_forecast", "status": forecast_status, "ok": response_ok})
+            forecast_check: dict[str, object] = {
+                "name": "authenticated_forecast",
+                "status": forecast_status,
+                "ok": response_ok,
+                "event_id": question["event_id"],
+            }
+            if receipt_sha256:
+                forecast_check["receipt_sha256"] = receipt_sha256
+            if response_request_id:
+                forecast_check["request_id"] = response_request_id
+            if isinstance(forecast, dict):
+                forecast_check["public_response_sha256"] = json_sha256(forecast)
+            checks.append(forecast_check)
 
-    result = {"base_url": base_url, "release_id": release_id, "checks": checks}
+    result = {
+        "base_url": base_url,
+        "release_id": release_id,
+        "release": release,
+        "question": question,
+        "checks": checks,
+    }
     result["ok"] = all(bool(check.get("ok")) for check in checks)
     print(json.dumps(result, indent=2, sort_keys=True))
     if not result["ok"]:

@@ -14,6 +14,7 @@ from pathlib import Path
 import sqlite3
 import threading
 from typing import Any
+import uuid
 
 
 class ReceiptConflict(RuntimeError):
@@ -115,6 +116,23 @@ class SqliteReceiptStore:
                 END;
                 """
             )
+            # New writable stores get the probe table during initialization so
+            # migrations/tests can attach constraints to it immediately. A
+            # legacy database mounted read-only may not have this post-v5
+            # table; defer that one migration to write_readiness(), where the
+            # failure is reported through /readyz instead of aborting startup.
+            try:
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS receipt_store_write_probe (
+                        probe_token TEXT PRIMARY KEY,
+                        touched INTEGER NOT NULL CHECK (touched IN (0, 1))
+                    )
+                    """
+                )
+                connection.commit()
+            except sqlite3.Error:
+                connection.rollback()
         finally:
             if self.path != ":memory:":
                 connection.close()
@@ -297,6 +315,96 @@ class SqliteReceiptStore:
             report["bytes_remaining"] = max(0, self.max_bytes - used)
             if used >= self.max_bytes:
                 report["accepting_new_receipts"] = False
+        return report
+
+    def write_readiness(self) -> dict[str, Any]:
+        """Verify that SQLite can write and roll back a real transaction.
+
+        Opening the database, finding its tables, and even ``BEGIN IMMEDIATE``
+        can all succeed on a connection whose first page write will fail. This
+        probe therefore inserts and updates a row in a dedicated mutable table,
+        verifies the result, and always rolls the transaction back. It never
+        writes to the immutable receipt table and returns no path, SQL, or
+        exception text that could expose deployment details.
+
+        The result is intentionally uncached. Readiness callers can apply a
+        cache policy appropriate to their request rate without weakening the
+        store's write check or coupling it to HTTP concerns.
+        """
+
+        report: dict[str, Any] = {
+            "ready": False,
+            "probe": "sqlite_transactional_write",
+            "rolled_back": False,
+        }
+        failure: str | None = None
+        connection: sqlite3.Connection | None = None
+
+        with self._lock:
+            try:
+                connection = self._connect()
+                # This table is a post-v5 schema addition. Create it lazily so
+                # an existing receipt database mounted read-only can still
+                # start the service and report a failed write probe through
+                # /readyz instead of crashing during store construction. A
+                # genuinely new/uninitialized read-only database still fails
+                # during the core receipt-schema initialization above.
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS receipt_store_write_probe (
+                        probe_token TEXT PRIMARY KEY,
+                        touched INTEGER NOT NULL CHECK (touched IN (0, 1))
+                    )
+                    """
+                )
+                connection.commit()
+                connection.execute("BEGIN IMMEDIATE")
+                probe_token = uuid.uuid4().hex
+                connection.execute(
+                    """
+                    INSERT INTO receipt_store_write_probe (probe_token, touched)
+                    VALUES (?, 0)
+                    """,
+                    (probe_token,),
+                )
+                updated = connection.execute(
+                    """
+                    UPDATE receipt_store_write_probe
+                    SET touched = 1
+                    WHERE probe_token = ?
+                    """,
+                    (probe_token,),
+                )
+                row = connection.execute(
+                    """
+                    SELECT touched
+                    FROM receipt_store_write_probe
+                    WHERE probe_token = ?
+                    """,
+                    (probe_token,),
+                ).fetchone()
+                if updated.rowcount != 1 or row is None or int(row[0]) != 1:
+                    failure = "write_verification_failed"
+            except sqlite3.Error:
+                failure = "write_unavailable"
+            finally:
+                if connection is not None:
+                    try:
+                        # rollback() is also safe when SQLite has already
+                        # aborted the transaction after a write failure.
+                        connection.rollback()
+                        report["rolled_back"] = not connection.in_transaction
+                    except sqlite3.Error:
+                        failure = "rollback_failed"
+                        report["rolled_back"] = False
+                    finally:
+                        if self._memory_connection is None:
+                            connection.close()
+
+        if failure is None and report["rolled_back"]:
+            report["ready"] = True
+        else:
+            report["error"] = failure or "transaction_not_rolled_back"
         return report
 
     def integrity_check(self) -> str:

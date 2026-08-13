@@ -22,23 +22,20 @@ jobs:
         with:
           python-version: "3.12"
       - name: Check canary secret
-        id: secret
         env:
           OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
         run: |
           if [ -z "$OATHCAST_MINER_API_KEY" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::OATHCAST_MINER_API_KEY is not configured; canary skipped safely."
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "::error::OATHCAST_MINER_API_KEY is not configured; the public Miner cannot be verified."
+            exit 1
           fi
       - name: Verify public Miner
-        if: steps.secret.outputs.configured == 'true'
         env:
           OATHCAST_PUBLIC_URL: https://oathcastcourt.duckdns.org
           OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
         run: |
           PYTHONPATH=src python3 scripts/public_canary.py \
-            --expected-release-id 2026-08-10-hardened-v5 \
-            --expected-source-sha256 8b1788cae3c43bcadc03a7e1d9c5b390553fd7798b587e7a3b989ed833a10d46 \
-            --expected-image-digest sha256:22a7c7893e2339cae070de9b2676845684008a438133eb69a098e914c4f96b3f
+            --expected-release-id 2026-08-12-hardened-v6 \
+            --expected-source-sha256 2bc559e5673297b84e119ac03c0b63304638c13c6ee985ab42a9bd44dbfb4a66 \
+            --expected-image-digest sha256:679b5dc3960757061e2a56d56cafc1b36176bb560e8dca78f3eb05308029e285 \
+            --require-receipt-write-probe

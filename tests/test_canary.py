@@ -1,7 +1,12 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from scripts.smoke_miner import format_timestamp, receipt_capacity_check, rolling_horizon
+from scripts.smoke_miner import (
+    format_timestamp,
+    receipt_capacity_check,
+    receipt_write_check,
+    rolling_horizon,
+)
 
 
 def readyz(**capacity) -> dict:
@@ -81,6 +86,64 @@ class ReceiptCapacityCheckTests(unittest.TestCase):
         check = receipt_capacity_check("service unavailable", min_headroom_percent=10.0)
         self.assertTrue(check["ok"])
         self.assertFalse(check["reported"])
+
+
+class ReceiptWriteCheckTests(unittest.TestCase):
+    def test_verified_transactional_probe_passes(self):
+        check = receipt_write_check(
+            {
+                "ready": True,
+                "receipt_store_write": {
+                    "ready": True,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                    "cached": False,
+                },
+            }
+        )
+        self.assertTrue(check["ok"])
+        self.assertTrue(check["reported"])
+
+    def test_missing_probe_is_visible_but_legacy_canary_compatible(self):
+        check = receipt_write_check({"ready": True})
+        self.assertTrue(check["ok"])
+        self.assertFalse(check["required"])
+        self.assertFalse(check["reported"])
+
+    def test_missing_probe_fails_the_v6_release_smoke(self):
+        check = receipt_write_check({"ready": True}, required=True)
+        self.assertFalse(check["ok"])
+        self.assertFalse(check["reported"])
+        self.assertIn("does not report", check["error"])
+
+    def test_ready_without_verified_rollback_fails(self):
+        check = receipt_write_check(
+            {
+                "receipt_store_write": {
+                    "ready": True,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": False,
+                }
+            },
+            required=True,
+        )
+        self.assertFalse(check["ok"])
+        self.assertTrue(check["reported"])
+
+    def test_reported_failed_probe_fails_even_in_legacy_canary_mode(self):
+        check = receipt_write_check(
+            {
+                "receipt_store_write": {
+                    "ready": False,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                    "error": "write_unavailable",
+                }
+            }
+        )
+        self.assertFalse(check["ok"])
+        self.assertFalse(check["required"])
+        self.assertTrue(check["reported"])
 
 
 class RollingHorizonTests(unittest.TestCase):

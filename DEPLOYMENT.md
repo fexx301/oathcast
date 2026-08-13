@@ -1,19 +1,20 @@
 # Deployment and payment boundary
 
-The repository is ready to package as one public HTTPS OathCast Miner. The
-`oathcast-2026-08-09-readiness-v4` release is running in Docker on AWS EC2
+The repository packages one public HTTPS OathCast Miner. The
+`2026-08-12-hardened-v6` release is running in Docker on AWS EC2
 behind private host port 8080, with Caddy terminating HTTPS at
 `https://oathcastcourt.duckdns.org`.
 Set the environment variables from `.env.example` and validate the canonical
 YAML before registration. The exact deployed release, public smoke output, and
 runtime details are archived under `artifacts/release-evidence/`.
 
-## Timing
+## Current deployment status
 
-Do not spend the remaining Railway trial during preparation. The current
-target is to deploy around Aug 16–17, 2026 so the trial overlaps the official
-Aug 17–Sep 7 hackathon window. Railway's current trial terms are recorded in
-the handoff; use another host only if a pre-launch public URL becomes necessary.
+The deployed Miner is v6; the v5 and v4 sections below are historical release
+records. The public decision UI is deployed separately but
+intentionally fails closed: it has no Telegraph-backed runner and returns 503
+for decision requests. It must not be enabled until the authenticated, budgeted
+payment path has been reviewed and deployed.
 
 ## Local run
 
@@ -81,25 +82,79 @@ Create a source manifest before each deployment:
 
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
-      --release-id 2026-08-04-preflight \
+      --release-id 2026-08-12-hardened-v6 \
       --output /tmp/oathcast-release-manifest.json
 
 Build the image with the manifest's `source_sha256` and a unique release ID:
 
     docker build \
-      --build-arg OATHCAST_RELEASE_ID=2026-08-04-preflight \
+      --build-arg OATHCAST_RELEASE_ID=2026-08-12-hardened-v6 \
       --build-arg OATHCAST_SOURCE_SHA256=<manifest-source-sha256> \
-      -t oathcast:2026-08-04-preflight .
+      -t oathcast:2026-08-12-hardened-v6 .
 
 After deployment, verify the exact release without printing secrets:
 
     PYTHONPATH=src python3 scripts/smoke_miner.py \
       --base-url https://oathcastcourt.duckdns.org \
-      --expected-release-id 2026-08-04-preflight
+      --expected-release-id 2026-08-12-hardened-v6 \
+      --require-receipt-write-probe
 
 The smoke test is non-destructive with respect to Telegraph and uses one
 ordinary authenticated request against the OathCast service only; it does not
 create paid demand. Record its JSON output with the release manifest.
+
+For the cutover itself, freeze one v5 question and its safe fingerprints before
+replacing the container, then replay that exact question after v6 starts:
+
+    PYTHONPATH=src python3 scripts/smoke_miner.py \
+      --base-url https://oathcastcourt.duckdns.org \
+      --expected-release-id 2026-08-10-hardened-v5 \
+      --question-output /tmp/oathcast-v5-replay-question.json \
+      > /tmp/oathcast-v5-before.json
+
+    PYTHONPATH=src python3 scripts/smoke_miner.py \
+      --base-url https://oathcastcourt.duckdns.org \
+      --expected-release-id 2026-08-12-hardened-v6 \
+      --require-receipt-write-probe \
+      --question-file /tmp/oathcast-v5-replay-question.json \
+      > /tmp/oathcast-v6-after.json
+
+    PYTHONPATH=src python3 scripts/compare_release_replay.py \
+      --before /tmp/oathcast-v5-before.json \
+      --after /tmp/oathcast-v6-after.json \
+      --output /tmp/oathcast-v5-to-v6-replay.json
+
+The comparator requires distinct release IDs and exact equality of the event
+ID, receipt hash, and canonical public-response hash. Archive all three JSON
+files as release evidence. It never needs or records the Bearer token.
+
+Before changing the live container, treat these as hard gates rather than
+follow-up checks:
+
+1. Transfer the complete candidate file set, including every currently
+   untracked runtime file; reproduce source digest
+   `2bc559e5673297b84e119ac03c0b63304638c13c6ee985ab42a9bd44dbfb4a66`
+   on the host and abort on any mismatch.
+2. Back up a pre-v6 live database with the standard-library SQLite online
+   backup API, opening the source in read-only URI mode. Do not construct the
+   v6 `SqliteReceiptStore` against the live legacy database merely to back it
+   up: initialization may create the write-probe table. Verify source and
+   backup integrity plus row-count equality, then audit the stored receipt JSON
+   for missing `public_response` without printing receipt content; any such row
+   will intentionally replay as 503 under v6 and must be understood before
+   cutover. `scripts/backup_receipts.py` is appropriate after v6 owns the schema.
+3. Build v6 and record its image digest. Start a disposable candidate container
+   on loopback with a copy of the receipt database; require health, readiness,
+   the transactional write probe, authenticated forecast, replay, non-root UID,
+   and durable-volume behavior to pass before replacing v5.
+4. Capture the v5 replay question/fingerprints above and preserve the stopped v5
+   container as the immediate rollback target.
+
+After cutover, require the strict v6 smoke, the exact replay comparator, a
+second persistence/restart check against the real host volume, and a manual
+canary pass. Roll back immediately on any identity, replay, readiness, or
+persistence mismatch. Update the canary release/source/image pins only after
+the real v6 image digest exists.
 
 Live execution remains gated on a dedicated faucet-funded Solana-devnet wallet.
 The unpaid Miner-18 preflight passed on 2026-08-09 and is archived under
@@ -131,9 +186,11 @@ The staging host is an Amazon Linux 2023 `t3.micro` in `eu-north-1`
 key pair `oathcast-ec2`. Region matters operationally: the security group,
 the instance, and the key pair are all regional objects, so the console must
 be switched to `eu-north-1` before any of them is visible. The
-`oathcast:oathcast-2026-08-09-readiness-v4` image runs as container `oathcast`
-with restart policy `unless-stopped`; `/healthz` and authenticated forecast
-smoke tests have passed. The Miner is bound to loopback port 8080 and the `oathcast-caddy`
+`oathcast:2026-08-12-hardened-v6` runs as container `oathcast` with restart
+policy `unless-stopped`; stopped container `oathcast-v5-rollback-20260813`
+preserves the previous release. `/healthz`, `/readyz`, authenticated forecast,
+transactional write, and restart/replay smoke tests have passed. The Miner is
+bound to loopback port 8080 and the `oathcast-caddy`
 container uses host networking to terminate HTTPS and redirect HTTP to it. The
 security group exposes only ports 80 and 443. DuckDNS currently maps
 `oathcastcourt.duckdns.org` to `13.49.229.253`. An EC2-side DuckDNS updater is
@@ -251,8 +308,15 @@ to be evidence of *real* demand. Stable within the day, it costs at most one.
 - **Container runs as non-root**, `USER 1000:1000`, plus a `HEALTHCHECK` against
   `/healthz`.
 - **Receipt store is capacity-bounded.** New receipts past the cap return HTTP 507;
-  replays of existing receipts always succeed. `/readyz` reports `receipt_store`
-  capacity and returns 503 when full.
+  replays of existing receipts always succeed. V6 adds two post-v5 hardening
+  changes: replay returns the stored, digest-covered `public_response` instead
+  of invoking the current renderer, and `/readyz` reports a cached
+  transactional SQLite write probe. This bullet records the v5→v6 change; both
+  behaviors are now deployed.
+- **Legacy replay fails closed.** A receipt without a stored `public_response`
+  cannot prove what bytes the Miner originally served. It returns HTTP 503
+  `receipt_store_unavailable`; do not regenerate or backfill it with the current
+  renderer. Recover the original response evidence from a verified backup.
 - **Provider bodies are capped at 2 MB** (`MAX_PROVIDER_BODY_BYTES`).
 - **`get()` now raises on a rewritten receipt** whose bytes disagree with its
   recorded digest.
@@ -311,7 +375,7 @@ which is the only observation that actually distinguishes "persisting" from
 
 **Steps**
 
-    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # 198 OK as of 2026-08-10 evening
+    PYTHONPATH=src python3 -m unittest discover -s tests -t .   # full suite passes locally
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
       --release-id 2026-08-10-hardened-v5 \
@@ -377,13 +441,12 @@ Then confirm the new surfaces specifically:
   silently, so check the file, not the health endpoint.
 - Update the canary's expected release and source digests, then run it.
 
-**Make the canary actually verify.** Update the three pins in
+**Keep the canary verifying.** Update the three pins in
 `.github/workflows/oathcast-canary.yml` to the new release ID, the
 `source_sha256` above, and the image digest that `docker images --no-trunc` shows
-after the build. Then set `OATHCAST_MINER_API_KEY` as a repository secret —
-without it the canary skips its only real step and reports success regardless of
-what the host is doing. Confirm the fix by opening a canary run and checking that
-"Verify public Miner" says `success`, not `skipped`.
+after the build. `OATHCAST_MINER_API_KEY` is already a repository secret. If it
+is missing, the workflow now fails visibly instead of skipping. Confirm the run
+reaches and passes "Verify public Miner".
 
 **Write the first receipt anchor after the redeploy** (S5). The anchor is only
 worth something once published where OathCast cannot rewrite it:
@@ -412,12 +475,13 @@ over-requested: GitHub delivers scheduled runs best-effort — measured on this
 repository over 2026-08-06..10, the `*/15` canary received 96 of 409 requested
 runs (23%), with gaps up to 360 minutes. Over-requesting cannot double-count,
 because `case_id` floors `issued_at` to the hour, so extra runs converge on one
-case. The workflow **skips safely and reports success while `WEATHERAPI_KEY` is
-unset**, so check that the "Collect one paired case" step says `success` rather
-than `skipped` before believing collection is running.
+case. The workflow now fails if `WEATHERAPI_KEY` is absent or fewer than two
+provider attempts are valid. A degraded case is still committed with the failed
+provider marked `missing`, preserving availability evidence without presenting
+the run as a successful pair.
 
-**Host leg (optional, needs the SSH window).** `docs/p4-host-collection.md`
-installs the same collector under `cron` on the EC2 host. Both legs can run: the
+**Host leg (installed under systemd).** `docs/p4-host-collection.md`
+installs the same collector under a systemd timer on the EC2 host. Both legs can run: the
 merge dedupes by `case_id`, and their failure modes are uncorrelated (GitHub
 queue load vs host death). Install it inside the redeploy window rather than
 opening port 22 twice.
@@ -435,9 +499,10 @@ The rule that does apply is narrower: keep the payment wallet local, and never
 put its private key in the Miner container. This collection runs against the
 operator's own provider accounts, and is not Telegraph traffic or hackathon demand.
 
-Under `cron`, source the secret inside the job rather than exporting it globally,
-and keep the job's log out of any shared location. The script scrubs the key from
-its own error output, but a log that is world-readable is still a mistake.
+In the systemd service wrapper, source the secret inside the job rather than
+exporting it globally, and keep the job's log out of any shared location. The
+script scrubs the key from its own error output, but a log that is world-readable
+is still a mistake.
 
 `--mode resolve --observations <path>` fills outcomes once windows close. It
 needs an **independent** observation export; the bundled

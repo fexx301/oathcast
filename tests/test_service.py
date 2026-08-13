@@ -8,7 +8,13 @@ import unittest.mock
 from urllib.parse import urlencode
 
 from oathcast.forecast import ForecastQuestion
-from oathcast.receipts import ReceiptConflict, ReceiptStoreFull, SqliteReceiptStore
+from oathcast.receipts import (
+    ReceiptConflict,
+    ReceiptStoreFull,
+    ReceiptTampering,
+    SqliteReceiptStore,
+    receipt_digest,
+)
 from oathcast.service import (
     ForecastCutoffPassed,
     ForecastRequestHandler,
@@ -16,6 +22,7 @@ from oathcast.service import (
     MAX_PROVIDER_BODY_BYTES,
     MAX_QUERY_LENGTH,
     ProviderUnavailable,
+    ReceiptStoreUnavailable,
     RequestRateLimiter,
     authorization_valid,
     fetch_json,
@@ -133,6 +140,15 @@ class ProviderBodyCapTests(unittest.TestCase):
 class ServiceTests(unittest.TestCase):
     def setUp(self):
         self.question = ForecastQuestion.from_dict(load_json("question.json"))
+
+    def test_receipt_write_probe_interval_must_be_finite_and_non_negative(self):
+        for invalid in (float("nan"), float("inf"), float("-inf"), -0.001):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "finite and not negative"):
+                    ForecastService(
+                        provider_order=["open_meteo"],
+                        receipt_write_probe_interval_seconds=invalid,
+                    )
 
     def test_service_wraps_a_provider_and_keeps_provenance(self):
         def fake_fetcher(url):
@@ -496,6 +512,48 @@ class ServiceTests(unittest.TestCase):
             self.assertIsNotNone(stored)
             self.assertEqual(stored["receipt_sha256"], replay_service.receipt_store.get(self.question.event_id)["receipt_sha256"])
 
+    def test_receipt_replay_returns_the_frozen_response_after_renderer_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipts.sqlite3"
+            first_service = ForecastService(
+                fetcher=lambda url: load_json("open_meteo.json"),
+                provider_order=["open_meteo"],
+                receipt_store=SqliteReceiptStore(path),
+                clock=lambda: FIXED_NOW,
+            )
+            first = first_service.forecast(self.question, request_id="first")
+            frozen_response = first.to_public_response()
+
+            replay_service = ForecastService(
+                fetcher=lambda url: self.fail("replay must not call the provider"),
+                provider_order=["open_meteo"],
+                receipt_store=SqliteReceiptStore(path),
+                clock=lambda: datetime(2026, 8, 17, 13, tzinfo=timezone.utc),
+            )
+            with unittest.mock.patch(
+                "oathcast.service.public_response",
+                return_value={"content": "changed renderer", "probability": 0.01},
+            ):
+                replay = replay_service.forecast(self.question, request_id="retry")
+                self.assertEqual(replay.to_public_response(), frozen_response)
+
+    def test_persistence_failure_is_not_mislabeled_as_provider_unavailable(self):
+        class BrokenStore:
+            def get(self, event_id):
+                return None
+
+            def save(self, receipt):
+                raise sqlite3.OperationalError("database is readonly")
+
+        service = ForecastService(
+            fetcher=lambda url: load_json("open_meteo.json"),
+            provider_order=["open_meteo"],
+            receipt_store=BrokenStore(),
+            clock=lambda: FIXED_NOW,
+        )
+        with self.assertRaises(ReceiptStoreUnavailable):
+            service.forecast(self.question, request_id="persist-failure")
+
     def test_receipt_rejects_same_event_id_with_a_different_question(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "receipts.sqlite3"
@@ -529,6 +587,50 @@ class ReceiptCapacityHandlerTests(unittest.TestCase):
         handler.responses = []
         handler.do_GET()
         return handler.responses[0]
+
+    def test_legacy_receipt_without_public_response_fails_closed_with_503(self):
+        """Never reconstruct an old response with today's renderer."""
+
+        question = ForecastQuestion.from_dict(load_json("question.json"))
+        source = ForecastService(
+            fetcher=lambda url: load_json("open_meteo.json"),
+            provider_order=["open_meteo"],
+            clock=lambda: FIXED_NOW,
+        ).forecast(question, request_id="legacy-original")
+        legacy_receipt = {
+            "schema_version": 1,
+            "created_at": "2026-08-12T00:00:00Z",
+            "request_id": source.request_id,
+            "question": source.question.to_dict(),
+            "forecast": source.forecast.to_dict(),
+            "raw_payload": source.raw_payload,
+        }
+        legacy_receipt["receipt_sha256"] = receipt_digest(legacy_receipt)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            store.save(legacy_receipt)
+            service = ForecastService(
+                fetcher=lambda url: self.fail(
+                    "a legacy receipt must not fall through to the provider"
+                ),
+                provider_order=["open_meteo"],
+                receipt_store=store,
+                require_auth=False,
+                clock=lambda: FIXED_NOW,
+            )
+            params = valid_query_params()
+            params["event_id"] = [question.event_id]
+            with self.assertLogs("oathcast.service", level="ERROR"):
+                status, payload, headers = self._handler(
+                    service,
+                    "/v1/forecast/point?" + urlencode(params, doseq=True),
+                )
+
+            self.assertEqual(status, 503)
+            self.assertEqual(payload["error"], "receipt_store_unavailable")
+            self.assertIn("X-OathCast-Request-ID", headers)
+            store.close()
 
     def test_a_full_receipt_store_returns_507_rather_than_an_unrecorded_forecast(self):
         # Serving a 200 with no receipt would hand out a forecast that cannot
@@ -581,6 +683,15 @@ class ReceiptCapacityHandlerTests(unittest.TestCase):
             self.assertTrue(payload["ready"])
             self.assertTrue(payload["receipt_store"]["accepting_new_receipts"])
             self.assertEqual(payload["receipt_store"]["max_rows"], 1)
+            self.assertEqual(
+                payload["receipt_store_write"],
+                {
+                    "ready": True,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                    "cached": False,
+                },
+            )
 
             params = valid_query_params()
             params["event_id"] = ["ready-first"]
@@ -630,6 +741,128 @@ class ReceiptCapacityHandlerTests(unittest.TestCase):
         self.assertEqual(status, 503)
         self.assertFalse(payload["ready"])
         self.assertEqual(payload["receipt_store"], {"error": "capacity_unavailable"})
+
+    def test_readyz_is_unready_when_transactional_write_probe_fails(self):
+        class ReadableButNotWritableStore:
+            def capacity(self):
+                return {"accepting_new_receipts": True}
+
+            def write_readiness(self):
+                return {
+                    "ready": False,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                    "error": "write_unavailable",
+                }
+
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            receipt_store=ReadableButNotWritableStore(),
+            require_auth=False,
+        )
+        status, payload, _ = self._handler(service, "/readyz")
+        self.assertEqual(status, 503)
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["receipt_store_write"]["error"], "write_unavailable")
+
+    def test_readyz_caches_write_probe_between_requests(self):
+        class ProbeStore:
+            def __init__(self):
+                self.calls = 0
+
+            def capacity(self):
+                return {"accepting_new_receipts": True}
+
+            def write_readiness(self):
+                self.calls += 1
+                return {
+                    "ready": True,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": True,
+                }
+
+        store = ProbeStore()
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            receipt_store=store,
+            require_auth=False,
+            receipt_write_probe_interval_seconds=60,
+        )
+        first_status, first_payload, _ = self._handler(service, "/readyz")
+        second_status, second_payload, _ = self._handler(service, "/readyz")
+        self.assertEqual((first_status, second_status), (200, 200))
+        self.assertEqual(store.calls, 1)
+        self.assertFalse(first_payload["receipt_store_write"]["cached"])
+        self.assertTrue(second_payload["receipt_store_write"]["cached"])
+
+    def test_readyz_rejects_a_probe_that_claims_ready_without_rollback(self):
+        class InconsistentProbeStore:
+            def capacity(self):
+                return {"accepting_new_receipts": True}
+
+            def write_readiness(self):
+                return {
+                    "ready": True,
+                    "probe": "sqlite_transactional_write",
+                    "rolled_back": False,
+                }
+
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            receipt_store=InconsistentProbeStore(),
+            require_auth=False,
+        )
+        status, payload, _ = self._handler(service, "/readyz")
+        self.assertEqual(status, 503)
+        self.assertFalse(payload["ready"])
+        self.assertFalse(payload["receipt_store_write"]["ready"])
+        self.assertEqual(
+            payload["receipt_store_write"]["error"], "rollback_unverified"
+        )
+
+    def test_receipt_store_failure_returns_sanitized_json_and_logs_types(self):
+        class BrokenStore:
+            def get(self, event_id):
+                raise sqlite3.OperationalError("secret path /data/private.sqlite3 is readonly")
+
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            receipt_store=BrokenStore(),
+            require_auth=False,
+        )
+        with self.assertLogs("oathcast.service", level="ERROR") as captured:
+            status, payload, headers = self._handler(
+                service,
+                "/v1/forecast/point?" + urlencode(valid_query_params(), doseq=True),
+            )
+        self.assertEqual(status, 503)
+        self.assertEqual(payload["error"], "receipt_store_unavailable")
+        self.assertIn("request_id", payload)
+        self.assertEqual(headers["X-OathCast-Request-ID"], payload["request_id"])
+        log_payload = json.loads(captured.records[0].getMessage())
+        self.assertEqual(log_payload["event"], "receipt_store_unavailable")
+        self.assertEqual(log_payload["error_type"], "ReceiptStoreUnavailable")
+        self.assertEqual(log_payload["cause_type"], "OperationalError")
+        self.assertNotIn("private.sqlite3", captured.output[0])
+
+    def test_receipt_tampering_returns_sanitized_500(self):
+        class TamperedStore:
+            def get(self, event_id):
+                raise ReceiptTampering("stored secret receipt bytes changed")
+
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            receipt_store=TamperedStore(),
+            require_auth=False,
+        )
+        with self.assertLogs("oathcast.service", level="ERROR") as captured:
+            status, payload, _ = self._handler(
+                service,
+                "/v1/forecast/point?" + urlencode(valid_query_params(), doseq=True),
+            )
+        self.assertEqual(status, 500)
+        self.assertEqual(payload["error"], "receipt_integrity_failure")
+        self.assertNotIn("secret receipt", captured.output[0])
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from oathcast.protocol import outbound_headers
+
 
 DEFAULT_DISPATCHER_URL = os.getenv(
     "OATHCAST_DISPATCHER_URL",
@@ -376,7 +378,18 @@ Transport = Callable[[str, str, dict[str, str]], HttpResult]
 
 
 def urllib_transport(method: str, url: str, headers: dict[str, str]) -> HttpResult:
-    request = Request(url, method=method, headers=headers)
+    """Transport for the x402 flow.
+
+    A non-2xx response is *returned* rather than raised, deliberately: the 402
+    challenge lives in the error response's headers and body, so raising here
+    would break the payment handshake. That also means a bot-filter 403 would
+    arrive as an ordinary `HttpResult` rather than an obvious failure, which is
+    why the agent is set explicitly here — see `protocol.USER_AGENT`. Telegraph's
+    dispatcher does not filter agents today; it is a bare IP with no CDN, and the
+    planned HTTPS switch could put it behind the same edge as the Explorer.
+    """
+
+    request = Request(url, method=method, headers=outbound_headers(headers))
     try:
         with urlopen(request, timeout=20) as response:
             return HttpResult(response.status, dict(response.headers.items()), response.read())

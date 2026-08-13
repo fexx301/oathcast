@@ -15,8 +15,10 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import logging
 import math
 import os
+import sqlite3
 import threading
 import time
 import uuid
@@ -26,6 +28,7 @@ from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 from oathcast.adapters import OpenMeteoAdapter, OpenWeatherAdapter, WeatherApiAdapter
+from oathcast.protocol import outbound_headers
 from oathcast.forecast import (
     SUPPORTED_EVENT_OPERATOR,
     CanonicalForecast,
@@ -38,6 +41,7 @@ from oathcast.receipts import (
     DEFAULT_MAX_RECEIPT_ROWS,
     ReceiptConflict,
     ReceiptStoreFull,
+    ReceiptTampering,
     SqliteReceiptStore,
     receipt_digest,
 )
@@ -46,6 +50,7 @@ from oathcast.release import ReleaseInfo, current_release
 
 
 UTC = timezone.utc
+LOGGER = logging.getLogger("oathcast.service")
 JsonFetcher = Callable[[str], dict[str, Any]]
 MAX_REQUEST_TARGET_LENGTH = 8192
 MAX_QUERY_LENGTH = 4096
@@ -55,8 +60,37 @@ MAX_LOCATION_NAME_LENGTH = 256
 DEFAULT_TRUSTED_PROXY_NETWORKS = ("127.0.0.0/8", "::1/128")
 
 
+def _log_request_failure(
+    event: str,
+    *,
+    request_id: str,
+    path: str,
+    error: BaseException,
+) -> None:
+    """Emit a machine-readable failure record without sensitive error text."""
+
+    cause = error.__cause__ or error
+    LOGGER.error(
+        json.dumps(
+            {
+                "event": event,
+                "request_id": request_id,
+                "path": path,
+                "error_type": type(error).__name__,
+                "cause_type": type(cause).__name__,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
 class ProviderUnavailable(RuntimeError):
     """Raised when every configured provider failed for the same request."""
+
+
+class ReceiptStoreUnavailable(RuntimeError):
+    """Raised when receipt evidence cannot be read or persisted safely."""
 
 
 class ForecastCutoffPassed(ValueError):
@@ -84,7 +118,7 @@ def fetch_json(
     if max_body_bytes <= 0:
         raise ValueError("max_body_bytes must be positive")
 
-    request = Request(url, headers={"Accept": "application/json", "User-Agent": "OathCast/0.1"})
+    request = Request(url, headers=outbound_headers())
     with urlopen(request, timeout=timeout_seconds) as response:
         declared = response.headers.get("Content-Length")
         if declared is not None:
@@ -208,6 +242,7 @@ class ServiceForecast:
     raw_payload: dict[str, Any]
     request_id: str
     receipt_sha256: str | None = None
+    stored_public_response: dict[str, Any] | None = None
 
     @property
     def provenance(self) -> dict[str, Any]:
@@ -228,6 +263,8 @@ class ServiceForecast:
         }
 
     def to_public_response(self) -> dict[str, Any]:
+        if self.stored_public_response is not None:
+            return dict(self.stored_public_response)
         return public_response(self.question, self.forecast)
 
 
@@ -262,6 +299,7 @@ class ForecastService:
         auth_failure_limit_per_minute: int | None = None,
         trusted_proxy_networks: Iterable[str] | None = None,
         release: ReleaseInfo | None = None,
+        receipt_write_probe_interval_seconds: float | None = None,
     ) -> None:
         self.fetcher = fetcher
         self.provider_order = provider_order or self._provider_order_from_env()
@@ -290,6 +328,26 @@ class ForecastService:
         self.allow_unverified_providers = allow_unverified_providers
         self.receipt_store = receipt_store
         self.clock = clock or (lambda: datetime.now(tz=UTC))
+        if receipt_write_probe_interval_seconds is None:
+            try:
+                receipt_write_probe_interval_seconds = float(
+                    os.getenv("OATHCAST_RECEIPT_WRITE_PROBE_INTERVAL_SECONDS", "30")
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "OATHCAST_RECEIPT_WRITE_PROBE_INTERVAL_SECONDS must be numeric"
+                ) from exc
+        if (
+            not math.isfinite(receipt_write_probe_interval_seconds)
+            or receipt_write_probe_interval_seconds < 0
+        ):
+            raise ValueError(
+                "receipt write probe interval must be finite and not negative"
+            )
+        self.receipt_write_probe_interval_seconds = receipt_write_probe_interval_seconds
+        self._receipt_write_probe_lock = threading.Lock()
+        self._receipt_write_probe_checked_at: float | None = None
+        self._receipt_write_probe_status: dict[str, Any] | None = None
         if rate_limit_per_minute is None:
             try:
                 rate_limit_per_minute = int(os.getenv("OATHCAST_RATE_LIMIT_PER_MINUTE", "120"))
@@ -324,6 +382,69 @@ class ForecastService:
                 "trusted proxy networks must be valid IP addresses or CIDR ranges"
             ) from exc
         self.release = release or current_release()
+
+    def receipt_store_write_readiness(self, *, force: bool = False) -> dict[str, Any]:
+        """Return a sanitized, briefly cached transactional-write status."""
+
+        if self.receipt_store is None:
+            return {
+                "ready": False,
+                "probe": "sqlite_transactional_write",
+                "error": "receipt_store_unconfigured",
+                "cached": False,
+            }
+        probe = getattr(self.receipt_store, "write_readiness", None)
+        if not callable(probe):
+            return {
+                "ready": False,
+                "probe": "sqlite_transactional_write",
+                "error": "write_probe_unavailable",
+                "cached": False,
+            }
+
+        with self._receipt_write_probe_lock:
+            now = time.monotonic()
+            if (
+                not force
+                and self._receipt_write_probe_status is not None
+                and self._receipt_write_probe_checked_at is not None
+                and now - self._receipt_write_probe_checked_at
+                < self.receipt_write_probe_interval_seconds
+            ):
+                return {**self._receipt_write_probe_status, "cached": True}
+
+            try:
+                raw_status = probe()
+            except Exception:
+                raw_status = {
+                    "ready": False,
+                    "probe": "sqlite_transactional_write",
+                    "error": "write_probe_failed",
+                }
+            if not isinstance(raw_status, dict):
+                raw_status = {
+                    "ready": False,
+                    "probe": "sqlite_transactional_write",
+                    "error": "invalid_write_probe_result",
+                }
+            rolled_back = raw_status.get("rolled_back") is True
+            status: dict[str, Any] = {
+                "ready": raw_status.get("ready") is True and rolled_back,
+                "probe": "sqlite_transactional_write",
+            }
+            if isinstance(raw_status.get("rolled_back"), bool):
+                status["rolled_back"] = raw_status["rolled_back"]
+            if not status["ready"]:
+                error = raw_status.get("error")
+                if isinstance(error, str):
+                    status["error"] = error
+                elif raw_status.get("ready") is True and not rolled_back:
+                    status["error"] = "rollback_unverified"
+                else:
+                    status["error"] = "write_unavailable"
+            self._receipt_write_probe_status = status
+            self._receipt_write_probe_checked_at = now
+            return {**status, "cached": False}
 
     def _is_trusted_proxy(self, remote_address: str) -> bool:
         if not isinstance(remote_address, str):
@@ -427,9 +548,19 @@ class ForecastService:
         requested_provider: str | None = None,
     ) -> ServiceForecast:
         if self.receipt_store is not None:
-            stored = self.receipt_store.get(question.event_id)
+            try:
+                stored = self.receipt_store.get(question.event_id)
+            except ReceiptTampering:
+                raise
+            except (sqlite3.Error, OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+                raise ReceiptStoreUnavailable("receipt evidence is unavailable") from exc
             if stored is not None:
-                return self._service_forecast_from_receipt(stored, question)
+                try:
+                    return self._service_forecast_from_receipt(stored, question)
+                except (ReceiptConflict, ReceiptTampering):
+                    raise
+                except (ValueError, KeyError, TypeError, RuntimeError) as exc:
+                    raise ReceiptStoreUnavailable("stored receipt evidence is malformed") from exc
 
         now = self.clock().astimezone(UTC)
         if now >= question.forecast_cutoff:
@@ -452,19 +583,20 @@ class ForecastService:
                         "forecast_cutoff_passed: upstream response completed at or after "
                         f"{format_timestamp(question.forecast_cutoff)}"
                     )
-                return self._persist_receipt(result)
             except ForecastCutoffPassed:
-                raise
-            except ReceiptConflict:
-                raise
-            except ReceiptStoreFull:
-                # A full local store is not an upstream failure. Falling through
-                # to the next provider would re-fetch upstream for a receipt
-                # that still cannot be written, and would surface as a 502 that
-                # sends an operator to debug the wrong system.
                 raise
             except Exception as exc:
                 failures.append(f"{provider}: {exc}")
+                continue
+            try:
+                return self._persist_receipt(result)
+            except (ReceiptConflict, ReceiptStoreFull, ReceiptTampering):
+                raise
+            except (sqlite3.Error, ValueError, KeyError, TypeError, RuntimeError) as exc:
+                # A receipt is the durable product contract. Its failure is
+                # neither a retryable upstream-provider failure nor a reason to
+                # fetch another provider response that also cannot be saved.
+                raise ReceiptStoreUnavailable("receipt evidence is unavailable") from exc
         raise ProviderUnavailable("; ".join(failures))
 
     def _service_forecast_from_receipt(
@@ -474,7 +606,7 @@ class ForecastService:
     ) -> ServiceForecast:
         expected_digest = receipt.get("receipt_sha256")
         if expected_digest is not None and expected_digest != receipt_digest(receipt):
-            raise RuntimeError("stored forecast receipt failed its integrity check")
+            raise ReceiptTampering("stored forecast receipt failed its integrity check")
         stored_question = ForecastQuestion.from_dict(receipt["question"])
         if stored_question.to_dict() != requested_question.to_dict():
             raise ReceiptConflict(
@@ -500,12 +632,16 @@ class ForecastService:
             ),
             raw_payload_sha256=forecast_data.get("raw_payload_sha256"),
         )
+        stored_public_response = receipt.get("public_response")
+        if not isinstance(stored_public_response, dict):
+            raise RuntimeError("stored forecast receipt has no public response object")
         return ServiceForecast(
             question=stored_question,
             forecast=forecast,
             raw_payload=receipt.get("raw_payload", {}),
             request_id=str(receipt["request_id"]),
             receipt_sha256=expected_digest,
+            stored_public_response=dict(stored_public_response),
         )
 
     def _persist_receipt(self, result: ServiceForecast) -> ServiceForecast:
@@ -762,6 +898,10 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                     payload["receipt_store"] = capacity
                     if not capacity.get("accepting_new_receipts", True):
                         ready = False
+                    write_status = self.service.receipt_store_write_readiness()
+                    payload["receipt_store_write"] = write_status
+                    if not write_status.get("ready", False):
+                        ready = False
                 payload["ready"] = ready
             self._send_json(200 if ready else 503, payload)
             return
@@ -839,6 +979,18 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
             self._send_json(410, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except ReceiptConflict as exc:
             self._send_json(409, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
+        except ReceiptTampering as exc:
+            _log_request_failure(
+                "receipt_integrity_failure",
+                request_id=request_id,
+                path=parsed.path,
+                error=exc,
+            )
+            self._send_json(
+                500,
+                {"error": "receipt_integrity_failure", "request_id": request_id},
+                headers={"X-OathCast-Request-ID": request_id},
+            )
         except ReceiptStoreFull:
             # Fail closed rather than serve an unrecorded forecast. A forecast
             # without a receipt is not a product this service offers, so
@@ -848,10 +1000,34 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 {"error": "receipt_store_full", "request_id": request_id},
                 headers={"X-OathCast-Request-ID": request_id},
             )
+        except ReceiptStoreUnavailable as exc:
+            _log_request_failure(
+                "receipt_store_unavailable",
+                request_id=request_id,
+                path=parsed.path,
+                error=exc,
+            )
+            self._send_json(
+                503,
+                {"error": "receipt_store_unavailable", "request_id": request_id},
+                headers={"X-OathCast-Request-ID": request_id},
+            )
         except ProviderUnavailable:
             self._send_json(502, {"error": "provider_unavailable", "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except ValueError as exc:
             self._send_json(400, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
+        except Exception as exc:  # noqa: BLE001 - final HTTP safety boundary
+            _log_request_failure(
+                "forecast_request_failed",
+                request_id=request_id,
+                path=parsed.path,
+                error=exc,
+            )
+            self._send_json(
+                500,
+                {"error": "internal_error", "request_id": request_id},
+                headers={"X-OathCast-Request-ID": request_id},
+            )
 
     def log_message(self, format: str, *args: Any) -> None:
         del format, args

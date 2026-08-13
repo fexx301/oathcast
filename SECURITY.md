@@ -16,7 +16,8 @@ documented, non-destructive canary behavior.
 - Keep runtime secrets in the host secret store or GitHub Actions secrets.
 - Do not commit `.env` files, databases, wallet files, private keys, or API
   tokens. The repository `.gitignore` covers the local forms of these files.
-- Treat settlement headers as unverified until the official independent
-  verification path is available.
+- Treat a settlement header alone as unverified. The payment canary performs
+  independent Solana RPC verification, but that isolated check is not yet a
+  production Application payment boundary.
 - Keep payment tests and development fixtures separate from live Telegraph
   traffic.

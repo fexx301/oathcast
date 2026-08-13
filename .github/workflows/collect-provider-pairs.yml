@@ -39,19 +39,15 @@ jobs:
           python-version: "3.12"
 
       - name: Check collection secret
-        id: secret
         env:
           WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
         run: |
           if [ -z "$WEATHERAPI_KEY" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::WEATHERAPI_KEY is not configured; skipping, because a single-provider case cannot support a paired comparison."
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "::error::WEATHERAPI_KEY is not configured; paired collection cannot run."
+            exit 1
           fi
 
       - name: Collect one paired case
-        if: steps.secret.outputs.configured == 'true'
         env:
           WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
           DATA_BRANCH: data/provider-pairs
@@ -99,17 +95,22 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
 
             valid=$(python3 -c "import json;print(json.load(open('collect-summary.json'))['valid_provider_attempts'])")
-            if [ "$valid" -lt 2 ]; then
-              # One provider answered. The case is still recorded (a failed
-              # provider is 'missing', not dropped) but flag it loudly: a run
-              # of these is a silently useless dataset.
-              echo "::warning::only $valid/2 providers answered this run"
+            expected=$(python3 -c "import json;print(json.load(open('collect-summary.json'))['expected_provider_attempts'])")
+            degraded=0
+            if [ "$valid" -lt "$expected" ]; then
+              # Failed providers remain recorded as 'missing', but this run
+              # must not be reported green as complete paired evidence.
+              echo "::error::only $valid/$expected provider attempts were valid"
+              degraded=1
             fi
 
             cd databranch
             if git diff --quiet -- paired-forecasts.json; then
               echo "no new case this hour (already collected); nothing to push"
               cd ..
+              if [ "$degraded" -ne 0 ]; then
+                exit 1
+              fi
               exit 0
             fi
             git add paired-forecasts.json
@@ -117,6 +118,9 @@ jobs:
             if git push -q origin HEAD:"$DATA_BRANCH"; then
               echo "pushed $(git rev-parse --short HEAD) to $DATA_BRANCH"
               cd ..
+              if [ "$degraded" -ne 0 ]; then
+                exit 1
+              fi
               exit 0
             fi
             cd ..

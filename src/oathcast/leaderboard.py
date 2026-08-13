@@ -1,39 +1,30 @@
-"""Read-only per-Intent leaderboard parsing for Telegraph's Explorer API.
+"""Read-only parsing for Telegraph's epoch-keyed Explorer leaderboard.
 
-This module exists because the numbers it produces were originally gathered by
-hand and could not be reproduced. It is read-only: no payment, no signature, no
-registration side effect.
+The current Explorer endpoint returns one snapshot containing every Intent::
 
-Four properties of the live API are enforced here rather than left as prose,
-because each one produces a *plausible wrong answer* rather than an error:
+    {"epoch": 178, "intents": {"WEATHER_FORECAST": [...]}}
 
-1. `?intent=<INTENT>` is the real filter. `?intent_type=` and `?epoch=` are
-   silently ignored and return the unfiltered board — which looks like a
-   successful narrow query. `assert_filter_supported` therefore requires a
-   negative control (a nonsense Intent returning zero entries) before any score
-   from a filtered response may be trusted.
-2. `avg_score` is genuinely per-Intent, but `total_requests_served` is NOT: it
-   is identical across every per-Intent view of the same Miner, because it is
-   that Miner's total across all Intents. Per-Intent entries drop it rather than
-   report a number that invites a per-Intent reading.
-3. `position` includes non-active Miners. A `superseded` Miner can hold position
-   1, so a position is never reported without its activation status, and
-   "leading" is computed over active Miners only.
-4. A rank without its denominator is not citable. `Leaderboard.population`
-   carries the entry count so "4 of 41" can never be recorded as a bare "4".
+Intent selection therefore happens locally by exact mapping key.  No query
+parameter, echoed filter, or negative control is trusted.  The parser also
+rejects the obsolete ``entries``/``avg_score``/``position`` shape instead of
+quietly interpreting a stale capture as the live contract.
 
-None of these values are OathCast's own score, and none are comparable to the
-local renderer proxy in `reference_evaluator` — that proxy is an overlap/length
-stand-in, not Telegraph's cosine + BM25 + length composite. See
-`docs/renderer-experiment.md`.
+Ranks in the live response can have gaps, so ``Leaderboard.population`` is only
+the number of entries returned for an Intent; it is not necessarily the rank's
+denominator.  The target remains the highest score among active Miners.
+
+These are other Miners' Telegraph scores.  They are not comparable to the local
+renderer proxy in ``reference_evaluator`` (an overlap/length stand-in rather
+than Telegraph's cosine + BM25 + length composite).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Any, Callable
-from urllib.parse import urlencode
+import math
+from typing import Any, Callable, Iterable
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .discovery import WEATHER_INTENTS
@@ -41,67 +32,67 @@ from .discovery import WEATHER_INTENTS
 
 EXPLORER_ORIGIN = "https://explorer.telegraphprotocol.com"
 LEADERBOARD_PATH = "/api/leaderboard/miners"
-
-#: Intent name used as the negative control. It must never be a real Intent.
-CONTROL_INTENT = "NOT_A_REAL_INTENT"
-
-#: Parameters the live API accepts silently without applying them. Passing one
-#: of these and reading the result as filtered is the trap this module prevents.
-IGNORED_PARAMS = frozenset({"intent_type", "epoch"})
-
 ACTIVE_STATUS = "active"
 
-#: The Explorer rejects the default `Python-urllib/*` agent with HTTP 403, so a
-#: descriptive one is required. It names the project and the read-only intent
-#: rather than impersonating a browser — an operator seeing this in a log should
-#: be able to tell who is calling and that nothing is being purchased.
+# Fields that identify the endpoint's obsolete per-Intent response.  Mixing
+# either generation is ambiguous, so the parser fails closed instead of trying
+# to guess which values should win.
+LEGACY_ROOT_FIELDS = frozenset({"entries", "epoch_start", "epoch_end", "intent_id"})
+LEGACY_ENTRY_FIELDS = frozenset(
+    {
+        "avg_score",
+        "position",
+        "best_rank",
+        "epochs_participated",
+        "total_requests_served",
+    }
+)
+
+# The Explorer rejects the default ``Python-urllib/*`` agent with HTTP 403, so
+# use a descriptive project agent without impersonating a browser.
 USER_AGENT = "OathCast-Leaderboard-Reader/1.0 (read-only; +https://github.com/fexx301/oathcast)"
+MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
 Fetcher = Callable[[str], Any]
 
 
 class LeaderboardError(RuntimeError):
-    """Raised when the leaderboard response cannot be trusted as filtered."""
+    """Raised when a leaderboard read or response cannot be trusted."""
 
 
 @dataclass(frozen=True)
 class LeaderboardEntry:
-    """One Miner's standing. `requests_served` is None for per-Intent reads."""
+    """One Miner's standing in a single Intent snapshot."""
 
     slug: str
     activation_status: str
-    avg_score: float
-    position: int
-    epochs_participated: int
-    best_rank: int | None = None
-    requests_served: int | None = None
+    score: float
+    rank: int
 
     @property
     def is_active(self) -> bool:
         return self.activation_status == ACTIVE_STATUS
 
     def describe(self) -> str:
-        """Render for human copy, never a bare position number."""
+        """Render the server rank together with its activation status."""
 
         return (
-            f"{self.slug} {self.avg_score:.4f} "
-            f"(position {self.position}, {self.activation_status})"
+            f"{self.slug} {self.score:.4f} "
+            f"(rank {self.rank}, {self.activation_status})"
         )
 
 
 @dataclass(frozen=True)
 class Leaderboard:
-    """A leaderboard read. `intent` is None for the unfiltered board."""
+    """One Intent's entries selected from an epoch-wide response."""
 
     entries: tuple[LeaderboardEntry, ...]
-    epoch_start: int | None
-    epoch_end: int | None
-    intent: str | None
-    filter_verified: bool
+    epoch: int
+    intent: str
 
     @property
     def population(self) -> int:
-        """Entry count — the denominator any position must be quoted against."""
+        """Number of returned entries, not necessarily a rank denominator."""
 
         return len(self.entries)
 
@@ -110,47 +101,51 @@ class Leaderboard:
         return tuple(entry for entry in self.entries if entry.is_active)
 
     def leader(self) -> LeaderboardEntry | None:
-        """Best *active* Miner. Position 1 may be superseded, so it is not used."""
+        """Highest-scoring active Miner, independent of inactive rank holders."""
 
         actives = self.active_entries
         if not actives:
             return None
-        return max(actives, key=lambda entry: entry.avg_score)
+        return max(actives, key=lambda entry: (entry.score, -entry.rank))
 
     def target_score(self) -> float | None:
-        """The score to beat: the best active Miner's average."""
+        """The score to beat: the best active Miner's score."""
 
         leader = self.leader()
-        return None if leader is None else leader.avg_score
-
-    def single_epoch(self) -> bool:
-        """True when every Miner has one epoch — thin evidence, worth flagging."""
-
-        return bool(self.entries) and all(
-            entry.epochs_participated <= 1 for entry in self.entries
-        )
+        return None if leader is None else leader.score
 
 
 def leaderboard_url(intent: str | None = None, limit: int | None = None) -> str:
-    """Build a leaderboard URL, refusing parameters the API silently ignores."""
+    """Return the epoch-wide endpoint and refuse obsolete query filtering.
 
-    params: dict[str, str] = {}
-    if intent is not None:
-        if not intent.strip():
-            raise ValueError("intent must be a non-empty string or None")
-        params["intent"] = intent
-    if limit is not None:
-        if limit <= 0:
-            raise ValueError("limit must be positive")
-        params["limit"] = str(limit)
-    query = f"?{urlencode(params)}" if params else ""
-    return f"{EXPLORER_ORIGIN}{LEADERBOARD_PATH}{query}"
+    The optional arguments remain only as a safety rail for older callers: the
+    current endpoint returns every Intent in one response, so accepting either
+    would risk silently trusting an ignored server-side filter.
+    """
+
+    if intent is not None or limit is not None:
+        raise ValueError(
+            "the leaderboard endpoint returns all intents; fetch it without "
+            "query parameters and select an exact key from 'intents' locally"
+        )
+    return f"{EXPLORER_ORIGIN}{LEADERBOARD_PATH}"
 
 
-def _coerce_float(value: Any) -> float:
+def _coerce_score(value: Any, *, intent: str, slug: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise LeaderboardError(f"avg_score must be numeric, got {value!r}")
-    return float(value)
+        raise LeaderboardError(
+            f"{intent}/{slug} score must be numeric, got {value!r}"
+        )
+    score = float(value)
+    if not math.isfinite(score):
+        raise LeaderboardError(
+            f"{intent}/{slug} score must be finite, got {value!r}"
+        )
+    if not 0 <= score <= 1:
+        raise LeaderboardError(
+            f"{intent}/{slug} score must be in [0, 1], got {score!r}"
+        )
+    return score
 
 
 def _coerce_int(value: Any, field: str) -> int:
@@ -159,115 +154,204 @@ def _coerce_int(value: Any, field: str) -> int:
     return value
 
 
-def parse_leaderboard(
-    payload: Any,
-    *,
-    intent: str | None = None,
-    filter_verified: bool = False,
-) -> Leaderboard:
-    """Parse an Explorer leaderboard payload.
-
-    Drops `total_requests_served` on per-Intent reads: the live API reports the
-    Miner's cross-Intent total there, so retaining it would invite a per-Intent
-    reading that contradicts the question-feed census.
-    """
-
-    if not isinstance(payload, dict):
-        raise LeaderboardError("leaderboard payload must be a JSON object")
-    raw_entries = payload.get("entries")
+def _parse_entries(intent: str, raw_entries: Any) -> tuple[LeaderboardEntry, ...]:
     if not isinstance(raw_entries, list):
-        raise LeaderboardError("leaderboard payload must contain an 'entries' list")
-
-    echoed = payload.get("intent_id")
-    if intent is not None and echoed is not None and echoed != intent:
-        raise LeaderboardError(
-            f"requested intent {intent!r} but payload echoed {echoed!r}"
-        )
+        raise LeaderboardError(f"intents[{intent!r}] must be a list")
 
     entries: list[LeaderboardEntry] = []
+    seen_slugs: set[str] = set()
     for raw in raw_entries:
         if not isinstance(raw, dict):
-            raise LeaderboardError("each leaderboard entry must be an object")
+            raise LeaderboardError(f"each {intent} leaderboard entry must be an object")
+
+        legacy = LEGACY_ENTRY_FIELDS.intersection(raw)
+        if legacy:
+            fields = ", ".join(sorted(legacy))
+            raise LeaderboardError(
+                f"{intent} entry mixes in obsolete leaderboard fields: {fields}"
+            )
+
         slug = raw.get("miner_slug")
-        if not isinstance(slug, str) or not slug:
-            raise LeaderboardError("entry is missing miner_slug")
+        if not isinstance(slug, str) or not slug or slug.strip() != slug:
+            raise LeaderboardError(f"{intent} entry has an invalid miner_slug")
+        if slug in seen_slugs:
+            raise LeaderboardError(f"{intent} contains duplicate miner_slug {slug!r}")
+
         status = raw.get("activation_status")
-        if not isinstance(status, str) or not status:
-            raise LeaderboardError(f"{slug} is missing activation_status")
-        best_rank = raw.get("best_rank")
+        if not isinstance(status, str) or not status or status.strip() != status:
+            raise LeaderboardError(f"{intent}/{slug} has an invalid activation_status")
+
+        rank = _coerce_int(raw.get("rank"), f"{intent}/{slug} rank")
+        if rank <= 0:
+            raise LeaderboardError(f"{intent}/{slug} rank must be positive, got {rank}")
         entries.append(
             LeaderboardEntry(
                 slug=slug,
                 activation_status=status,
-                avg_score=_coerce_float(raw.get("avg_score")),
-                position=_coerce_int(raw.get("position"), "position"),
-                epochs_participated=_coerce_int(
-                    raw.get("epochs_participated", 0), "epochs_participated"
-                ),
-                best_rank=best_rank if isinstance(best_rank, int) else None,
-                requests_served=(
-                    None
-                    if intent is not None
-                    else raw.get("total_requests_served")
-                    if isinstance(raw.get("total_requests_served"), int)
-                    else None
-                ),
+                score=_coerce_score(raw.get("score"), intent=intent, slug=slug),
+                rank=rank,
             )
         )
+        seen_slugs.add(slug)
 
-    return Leaderboard(
-        entries=tuple(entries),
-        epoch_start=payload.get("epoch_start"),
-        epoch_end=payload.get("epoch_end"),
-        intent=intent,
-        filter_verified=filter_verified,
-    )
+    return tuple(sorted(entries, key=lambda entry: entry.rank))
+
+
+def parse_leaderboards(
+    payload: Any,
+    intents: Iterable[str] | None = None,
+) -> dict[str, Leaderboard]:
+    """Parse an epoch-wide response, optionally selecting exact Intent keys.
+
+    The complete response is validated before selection.  This makes malformed
+    or mixed-generation payloads fail closed even when their bad entry belongs
+    to an Intent the caller did not request.
+    """
+
+    if not isinstance(payload, dict):
+        raise LeaderboardError("leaderboard payload must be a JSON object")
+
+    legacy = LEGACY_ROOT_FIELDS.intersection(payload)
+    if legacy:
+        fields = ", ".join(sorted(legacy))
+        if "intents" in payload:
+            raise LeaderboardError(
+                f"leaderboard payload ambiguously mixes current 'intents' with "
+                f"obsolete fields: {fields}"
+            )
+        raise LeaderboardError(
+            f"obsolete leaderboard payload shape detected ({fields}); expected "
+            "the epoch/intents response"
+        )
+
+    epoch = _coerce_int(payload.get("epoch"), "epoch")
+    if epoch < 0:
+        raise LeaderboardError(f"epoch must be non-negative, got {epoch}")
+
+    raw_intents = payload.get("intents")
+    if not isinstance(raw_intents, dict):
+        raise LeaderboardError("leaderboard payload must contain an 'intents' object")
+
+    parsed: dict[str, Leaderboard] = {}
+    for intent, raw_entries in raw_intents.items():
+        if not isinstance(intent, str) or not intent or intent.strip() != intent:
+            raise LeaderboardError("every leaderboard intent key must be a non-empty string")
+        parsed[intent] = Leaderboard(
+            entries=_parse_entries(intent, raw_entries),
+            epoch=epoch,
+            intent=intent,
+        )
+
+    if intents is None:
+        return parsed
+
+    names = tuple(intents)
+    if any(not isinstance(name, str) or not name or name.strip() != name for name in names):
+        raise LeaderboardError("requested intents must be non-empty strings")
+    if len(set(names)) != len(names):
+        raise LeaderboardError("requested intents must not contain duplicates")
+
+    missing = [name for name in names if name not in parsed]
+    if missing:
+        available = ", ".join(sorted(parsed)) or "none"
+        raise LeaderboardError(
+            f"leaderboard response is missing requested intent(s) "
+            f"{', '.join(repr(name) for name in missing)}; available: {available}"
+        )
+    return {name: parsed[name] for name in names}
+
+
+def parse_leaderboard(payload: Any, *, intent: str | None = None) -> Leaderboard:
+    """Parse one exact Intent from the epoch-wide Explorer response."""
+
+    if intent is None:
+        raise LeaderboardError(
+            "intent is required because the leaderboard response contains multiple intents"
+        )
+    return parse_leaderboards(payload, (intent,))[intent]
 
 
 def urllib_fetch(url: str) -> Any:
-    """Minimal read-only GET returning parsed JSON."""
+    """Read-only GET returning parsed JSON with structured failure translation."""
 
     request = Request(
         url,
         method="GET",
         headers={"Accept": "application/json", "User-Agent": USER_AGENT},
     )
-    with urlopen(request, timeout=25) as response:  # noqa: S310 - pinned origin
-        return json.loads(response.read().decode("utf-8"))
-
-
-def assert_filter_supported(fetch: Fetcher = urllib_fetch) -> None:
-    """Verify `?intent=` filters before any filtered score is trusted.
-
-    A silently-ignored filter returns the full board, so a filtered read that is
-    never controlled cannot be distinguished from an unfiltered one. This sends
-    a nonsense Intent and requires zero entries back.
-    """
-
-    control = parse_leaderboard(
-        fetch(leaderboard_url(CONTROL_INTENT)), intent=CONTROL_INTENT
-    )
-    if control.population != 0:
+    try:
+        with urlopen(request, timeout=25) as response:  # noqa: S310 - pinned origin
+            encoded_body = response.read(MAX_RESPONSE_BYTES + 1)
+    except HTTPError as error:
+        if error.code == 403:
+            raise LeaderboardError(
+                f"Explorer refused the request with HTTP 403 for {url}. The agent "
+                f"string is most likely being filtered: the default "
+                f"'Python-urllib/*' agent is blocked, which is why USER_AGENT is "
+                f"set explicitly in this module. Verify with curl -A "
+                f"'{USER_AGENT}' before assuming the endpoint moved, and do not "
+                f"work around it by impersonating a browser."
+            ) from error
         raise LeaderboardError(
-            f"negative control returned {control.population} entries for "
-            f"{CONTROL_INTENT!r}; the intent filter is not being applied, so no "
-            "per-Intent score from this endpoint can be trusted"
-        )
+            f"Explorer returned HTTP {error.code} for {url}: {error.reason}"
+        ) from error
+    except URLError as error:
+        raise LeaderboardError(
+            f"could not reach the Explorer at {url}: {error.reason}"
+        ) from error
+    except TimeoutError as error:
+        raise LeaderboardError(
+            f"timed out reading the Explorer response from {url} after 25s"
+        ) from error
+
+    try:
+        if not isinstance(encoded_body, (bytes, bytearray)):
+            raise LeaderboardError(
+                f"Explorer returned a response body of type "
+                f"{type(encoded_body).__name__}, not bytes, for {url}"
+            )
+        if len(encoded_body) > MAX_RESPONSE_BYTES:
+            raise LeaderboardError(
+                f"Explorer response exceeded the {MAX_RESPONSE_BYTES}-byte cap for {url}"
+            )
+        body = encoded_body.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise LeaderboardError(
+            f"Explorer returned {len(encoded_body)} bytes that were not UTF-8 for {url}"
+        ) from error
+
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as error:
+        raise LeaderboardError(
+            f"Explorer returned {len(body)} bytes of non-JSON for {url}; a web-app "
+            f"HTML fallback here means the path is not an API route"
+        ) from error
+
+
+def _read(fetch: Fetcher, url: str) -> Any:
+    """Call a replaceable fetcher without leaking foreign exception types."""
+
+    try:
+        return fetch(url)
+    except LeaderboardError:
+        raise
+    except Exception as error:  # noqa: BLE001 - public fetcher seam
+        raise LeaderboardError(
+            f"leaderboard read for {url} failed with "
+            f"{type(error).__name__}: {error}"
+        ) from error
 
 
 def fetch_intent_leaderboard(
     intent: str,
     *,
     fetch: Fetcher = urllib_fetch,
-    verify_filter: bool = True,
 ) -> Leaderboard:
-    """Read one Intent's leaderboard, running the negative control first."""
+    """Read the epoch-wide response once and select one exact Intent locally."""
 
-    if verify_filter:
-        assert_filter_supported(fetch)
-    return parse_leaderboard(
-        fetch(leaderboard_url(intent)), intent=intent, filter_verified=verify_filter
-    )
+    payload = _read(fetch, leaderboard_url())
+    return parse_leaderboard(payload, intent=intent)
 
 
 def fetch_weather_leaderboards(
@@ -275,27 +359,23 @@ def fetch_weather_leaderboards(
     *,
     fetch: Fetcher = urllib_fetch,
 ) -> dict[str, Leaderboard]:
-    """Read every weather Intent, running the negative control exactly once."""
+    """Read once and select the requested weather Intents by exact mapping key."""
 
-    assert_filter_supported(fetch)
     names = intents if intents is not None else tuple(sorted(WEATHER_INTENTS))
-    return {
-        name: fetch_intent_leaderboard(name, fetch=fetch, verify_filter=False)
-        for name in names
-    }
+    payload = _read(fetch, leaderboard_url())
+    return parse_leaderboards(payload, names)
 
 
-def renderer_target(boards: dict[str, Leaderboard], declared: tuple[str, ...]) -> float | None:
-    """Highest active score across our declared Intents.
+def renderer_target(
+    boards: dict[str, Leaderboard], declared: tuple[str, ...]
+) -> float | None:
+    """Highest active score across our declared Intents."""
 
-    Clearing the hardest declared Intent clears the others, so the maximum is
-    the target. A mean would sit between the real bars and be wrong in both
-    directions at once, which is how a flat cross-Intent average misled us.
-    """
-
-    scores = [
-        board.target_score()
-        for name, board in boards.items()
-        if name in declared and board.target_score() is not None
-    ]
+    scores: list[float] = []
+    for name, board in boards.items():
+        if name not in declared:
+            continue
+        score = board.target_score()
+        if score is not None:
+            scores.append(score)
     return max(scores) if scores else None

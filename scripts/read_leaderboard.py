@@ -8,9 +8,9 @@ could not be reproduced.
     PYTHONPATH=src python3 scripts/read_leaderboard.py
     PYTHONPATH=src python3 scripts/read_leaderboard.py --output snapshot.json
 
-The negative control runs first. If Telegraph's `?intent=` filter stops being
-applied, this exits non-zero instead of printing the unfiltered board as though
-it were one Intent's standings.
+The Explorer returns one epoch snapshot containing all Intents. This reader
+fetches that response once and selects requested Intent keys locally; it does
+not rely on query filters that the server may silently ignore.
 
 The scores printed here are other Miners' Telegraph scores. They are NOT
 comparable to the local renderer proxy in `benchmark_renderer.py`, which is an
@@ -61,13 +61,13 @@ def main() -> int:
         return 2
 
     observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    print(f"observed_at {observed_at}   (negative control passed)")
+    print(f"observed_at {observed_at}   (intents selected locally)")
     print()
 
     snapshot: dict[str, object] = {
         "observed_at_utc": observed_at,
         "source": "telegraph_explorer_leaderboard_read_only",
-        "filter_verified": True,
+        "selection": "exact_local_intent_key",
         "declared_intents": list(DECLARED_INTENTS),
         "comparability_warning": PROXY_WARNING,
         "intents": {},
@@ -77,7 +77,7 @@ def main() -> int:
         declared = " [declared]" if name in DECLARED_INTENTS else ""
         plural = "miner" if board.population == 1 else "miners"
         print(
-            f"{name}{declared}  ({board.population} {plural}, epoch {board.epoch_end})"
+            f"{name}{declared}  ({board.population} returned {plural}, epoch {board.epoch})"
         )
         for item in board.entries:
             marker = "  <- best active" if item is board.leader() else ""
@@ -85,24 +85,19 @@ def main() -> int:
         actives = len(board.active_entries)
         note = "  <- zero margin: we would be the third" if actives == 2 else ""
         print(f"    active miners: {actives}{note}")
-        if board.single_epoch():
-            print("    single-epoch averages only — thin evidence, re-read later")
         print()
 
         snapshot["intents"][name] = {
             "population": board.population,
-            "epoch_start": board.epoch_start,
-            "epoch_end": board.epoch_end,
+            "epoch": board.epoch,
             "active_miners": actives,
-            "single_epoch": board.single_epoch(),
             "target_score": board.target_score(),
             "entries": [
                 {
                     "miner_slug": item.slug,
                     "activation_status": item.activation_status,
-                    "avg_score": item.avg_score,
-                    "position": item.position,
-                    "epochs_participated": item.epochs_participated,
+                    "score": item.score,
+                    "rank": item.rank,
                 }
                 for item in board.entries
             ],

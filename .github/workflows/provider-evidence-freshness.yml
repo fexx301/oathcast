@@ -1,0 +1,55 @@
+name: Provider evidence freshness
+
+# This monitors the forward-collected provider dataset only. It is intentionally
+# separate from oathcast-canary.yml: provider evidence can be stale while the
+# public Miner is healthy, and neither condition should hide the other.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # The collector is requested at :23. Check later in the hour so an ordinary
+    # run has time to push before freshness is evaluated.
+    - cron: "53 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-evidence-freshness
+  cancel-in-progress: true
+
+jobs:
+  freshness:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      # A stale collector and overdue observations are independent alerts.
+      fail-fast: false
+      matrix:
+        include:
+          - check: collection
+            label: Collection data age
+          - check: resolution
+            label: Observation resolution lag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch provider evidence branch
+        env:
+          DATA_BRANCH: data/provider-pairs
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "refs/heads/$DATA_BRANCH"
+          git show FETCH_HEAD:paired-forecasts.json > "$RUNNER_TEMP/paired-forecasts.json"
+
+      - name: Check ${{ matrix.label }}
+        run: |
+          PYTHONPATH=src python3 scripts/check_provider_freshness.py \
+            --dataset "$RUNNER_TEMP/paired-forecasts.json" \
+            --check "${{ matrix.check }}" \
+            --max-collection-age-hours 6 \
+            --max-resolution-age-hours 48

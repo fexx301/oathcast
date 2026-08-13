@@ -1,0 +1,48 @@
+{
+  "database": {
+    "backup": "/home/ec2-user/oathcast/receipts-preV6-cutover-backup.sqlite3",
+    "backup_bytes": 73728,
+    "backup_integrity_check": "ok",
+    "backup_row_count": 10,
+    "backup_sha256": "00d818149b95366de7acba0ccd64811d21fe3408bddb3c4d443da14b92061a42",
+    "final_integrity_check": "ok",
+    "final_row_count": 11,
+    "legacy_audit": {
+      "malformed_receipts": 0,
+      "missing_public_response": 0,
+      "receipt_digest_present": 9,
+      "total_receipts_at_initial_audit": 9
+    }
+  },
+  "deployment_receipt": {
+    "event_id": "deployment-v6-lagos-20260814T1200z",
+    "note": "Synthetic deployment verification only; not Telegraph traffic or qualifying demand.",
+    "public_response_sha256": "3c609cde3f2e999c3a95b1118f23e6b1530938bd929b68e2b6861615e41f209b",
+    "receipt_sha256": "883e580c4d2de5269d272815b2afd8d54fb6e4301918a4e0171281811963ffc8",
+    "row_count_after_first_write": 11,
+    "row_count_after_restart_replay": 11,
+    "restart_replay_identical": true
+  },
+  "image_id": "sha256:679b5dc3960757061e2a56d56cafc1b36176bb560e8dca78f3eb05308029e285",
+  "network": {
+    "durable_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "port_binding": "127.0.0.1:8080->8080/tcp",
+    "security_group": "sg-086d2585c6a32fa07"
+  },
+  "payment_and_telegraph": {
+    "miner_registered": false,
+    "paid_request_created": false,
+    "ui_decision_enabled": false
+  },
+  "release_id": "2026-08-12-hardened-v6",
+  "rollback_container": "oathcast-v5-rollback-20260813",
+  "runtime_container": "oathcast",
+  "runtime_user": "1000:1000",
+  "source_sha256": "2bc559e5673297b84e119ac03c0b63304638c13c6ee985ab42a9bd44dbfb4a66",
+  "v5_to_v6_replay": {
+    "event_id": "dev-lagos-2026-08-17-1500z",
+    "public_response_sha256": "ff5622ced36919f61a4d0c701d5ec31f5580967eb8543d7491b0cef68960afa4",
+    "receipt_sha256": "9f095877bd3d803034678fba7501fce9ba13b12af8910090a46e4e68a85b0faf",
+    "verified": true
+  }
+}

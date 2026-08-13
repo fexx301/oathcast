@@ -20,7 +20,7 @@ from urllib.request import Request, urlopen
 from oathcast.discovery import MinerCapability
 from oathcast.forecast import ForecastQuestion, format_timestamp
 from oathcast.miner_adapters import AdaptedMinerResponse, adapter_for_miner
-from oathcast.protocol import ProtocolResultEnvelope
+from oathcast.protocol import ProtocolResultEnvelope, outbound_headers
 
 
 UTC = timezone.utc
@@ -217,7 +217,7 @@ class HttpMinerClient:
             "threshold_mm": f"{question.threshold_mm:g}",
         }
         url = f"{self.capability.base_url.rstrip('/')}{self.capability.endpoint_path}?{urlencode(params)}"
-        headers = {"Accept": "application/json", **self.headers}
+        headers = outbound_headers(self.headers)
         if request_id:
             headers["X-Request-ID"] = request_id
             headers["X-OathCast-Application-Request-ID"] = request_id

@@ -1,0 +1,12 @@
+{
+  "algorithm": "oathcast-receipt-chain-v1",
+  "anchored_at": "2026-08-13T00:19:49.292133Z",
+  "first_receipt_created_at": "2026-08-04T18:51:27.282854Z",
+  "head_sha256": "4e4d1edf475e33e67ef5671855841156712bffd0c34cb1d1b21fd0f3f5096029",
+  "integrity_check": "ok",
+  "last_receipt_created_at": "2026-08-13T00:03:15.265955Z",
+  "note": "post-v6 deployment baseline; includes one labeled synthetic deployment receipt",
+  "receipt_count": 11,
+  "schema_version": 1,
+  "self_reported_digest_mismatches": []
+}

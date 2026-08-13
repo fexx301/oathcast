@@ -2,13 +2,13 @@
 
 The project contains a no-state canary at
 `.github/workflows/oathcast-canary.yml`. It checks the public staging Miner
-every 15 minutes, verifies the expected v3.2 release identity, rejects
+every 15 minutes, verifies the expected v6 release identity, rejects
 unauthenticated forecasting, and uses the API key only through the repository
 secret `OATHCAST_MINER_API_KEY`.
 
-The workflow is intentionally fail-closed. It skips cleanly until the project
-is pushed to a hosted repository and that secret is configured; once the secret
-exists, scheduled and manual runs perform the authenticated checks.
+The workflow is intentionally fail-closed. The repository and secret are
+already configured; if the secret disappears, scheduled and manual runs fail
+visibly rather than reporting a skipped success.
 
 ## Local repository
 
@@ -45,26 +45,30 @@ repository-creation flow is also acceptable; otherwise use the GitHub web UI.
 
 ## Canary secret
 
-Add `OATHCAST_MINER_API_KEY` as an Actions secret, not as a repository variable
-and not in YAML. Use the GitHub repository Settings → Secrets and variables →
-Actions → New repository secret flow. The value must be the active staging
-Bearer token, and it must never be committed or printed.
+`OATHCAST_MINER_API_KEY` is configured as an Actions secret, not a repository
+variable or YAML value. If it must be rotated, update the secret through GitHub
+Settings → Secrets and variables → Actions; never commit or print the value.
 
-After the remote and secret exist, run the workflow manually once from the
+After a rotation or workflow change, run the workflow manually once from the
 Actions tab. Confirm that the job reports:
 
 - `/healthz` = `200`;
 - `/readyz` = `200`;
+- `receipt_store_write` reports a successful transactional write and rollback
+  after the v6 cutover;
 - unauthenticated forecast = `401`; and
 - authenticated forecast = `200` with a receipt and request ID.
 
 This proves service availability only. It is not Miner registration, paid
 Telegraph traffic, Explorer demand, or Track 3 qualification.
 
-## Current blocker
+## Current scope
 
-The repository is now public at `https://github.com/fexx301/oathcast` and the
-reviewed `main` branch is pushed. The remaining canary step is to add the active
-staging Bearer token as the `OATHCAST_MINER_API_KEY` Actions secret. Until then,
-scheduled and manual canary runs skip the authenticated check without exposing
-or inventing a credential.
+The public canary proves Miner availability only. It does not prove Miner
+registration, paid Telegraph traffic, Explorer demand, or Track 3 qualification.
+
+Provider collection and resolution have their own read-only monitor at
+`.github/workflows/provider-evidence-freshness.yml`; see
+`docs/provider-evidence-freshness.md`. Keeping it separate prevents a healthy
+Miner from hiding stale evidence, or stale evidence from disguising a service
+outage.

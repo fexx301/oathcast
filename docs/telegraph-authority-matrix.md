@@ -1,6 +1,6 @@
 # Telegraph authority matrix
 
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-12
 
 This matrix prevents the protocol whitepaper, Hackathon 1 instructions, and
 local engineering assumptions from being merged into one unverified contract.

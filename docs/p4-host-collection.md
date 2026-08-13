@@ -98,10 +98,14 @@ The host runs a container image, not a source checkout, so the collector and its
 dependencies need to be present as source. From the repository root:
 
     ssh -i <key> ec2-user@oathcastcourt.duckdns.org 'mkdir -p ~/oathcast/collection'
-    rsync -av -e "ssh -i <key>" \
-      --exclude '__pycache__' \
-      src scripts fixtures \
-      ec2-user@oathcastcourt.duckdns.org:~/oathcast/collection/
+    tar --exclude='__pycache__' -cf - src scripts fixtures \
+      | ssh -i <key> ec2-user@oathcastcourt.duckdns.org \
+          'tar -xf - -C ~/oathcast/collection'
+
+Use tar-over-SSH on this macOS workstation. Its installed rsync crashed during
+the verified v5 transfer, and a piped `tail` then obscured rsync's real exit
+status; the tar path is the proven transfer method. Verify the copied files on
+the host before enabling the timer.
 
 **3. Place the key in an owner-only env file.**
 Follow the pattern already used for `/home/ec2-user/oathcast/.env`. On the host:

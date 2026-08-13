@@ -1,15 +1,18 @@
-# OathCast preparation spike
+# OathCast
 
 [![CI](https://github.com/fexx301/oathcast/actions/workflows/ci.yml/badge.svg)](https://github.com/fexx301/oathcast/actions/workflows/ci.yml)
 
-This folder contains the first implementation spike for OathCast: three
-provider adapters, one shared forecast contract, deterministic public text
-rendering, local development fixtures, and a leakage-safe Brier benchmark.
+OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
+forecasts and later calibration evidence. One authenticated Miner is deployed
+publicly on release `2026-08-12-hardened-v6`. The separate public decision UI
+is intentionally degraded and returns 503 because no reviewed paid Application
+runner is configured yet.
 
-It now also contains the first vertical-slice scaffolding: a standard-library
-HTTP Miner service, an Application-side cross-Miner router, registry capability
-filtering, and a development reference evaluator for the future Script Author
-input contract.
+The repository also contains provider adapters, a cross-Miner Application
+scaffold, durable case and receipt stores, a development Script Author proxy,
+an isolated TypeScript Solana x402 canary, and leakage-safe evaluation tools.
+These components are tested, but they are not yet composed into a live paid
+Application.
 
 The project deliberately separates two scoring paths:
 
@@ -78,6 +81,11 @@ A provider that fails is recorded with `status: "missing"` rather than dropped,
 so availability differences cannot bias the comparison. Datasets are validated
 through the real backtest loader before replacing the previous file.
 
+The separate provider-evidence freshness workflow checks the live data branch
+for collection gaps and overdue unresolved cases without calling the public
+Miner. Its exact thresholds and failure semantics are documented in
+`docs/provider-evidence-freshness.md`.
+
 The baseline in `fixtures/collection_locations.json` is a frozen 0.2305,
 derived from 7,440 ERA5 August hours (2015-2024) at the Lagos point using the
 same 0.1 mm threshold the question asks about. That reanalysis is retrieved
@@ -140,13 +148,24 @@ of an already-issued receipt always succeeds, even at capacity. Defaults are
 200,000 rows and 512 MiB, overridable with `OATHCAST_RECEIPT_MAX_ROWS` and
 `OATHCAST_RECEIPT_MAX_BYTES` (`none` disables a cap).
 
+The deployed v6 release makes replay compatibility deliberately fail-closed.
+New receipts freeze the exact digest-covered `public_response`; replay serves
+those stored bytes rather than invoking a newer renderer. If a legacy receipt
+lacks `public_response`, v6 returns HTTP 503 `receipt_store_unavailable` instead
+of synthesizing an answer that was never part of the original receipt. Restore
+original response evidence rather than backfilling it with current rendering
+code.
+
 The fixtures are development-only. They are not Telegraph traffic and must not
 be used to inflate the hackathon request count.
 
 `validate_miner_drafts.py` is a project-owned pre-schema check only; it does
 not replace Telegraph's official registration validator. `smoke_miner.py` is a
 non-destructive release check covering health, readiness, auth rejection, an
-authenticated forecast, receipt provenance, and release/request headers.
+authenticated forecast, receipt provenance, response fingerprints, and
+release/request headers. `compare_release_replay.py` compares two smoke reports
+and proves a stored event's receipt and public response survived a release
+cutover unchanged.
 
 `public_canary.py` is the same no-state check intended to run from an
 independent scheduler such as GitHub Actions; `.github/workflows/oathcast-canary.yml`
@@ -154,6 +173,8 @@ contains the no-cost scheduled path and expects the API key in a repository
 secret. See `docs/repository-and-canary.md` for the safe repository/secret
 setup. `backup_receipts.py` uses SQLite's online backup API, runs integrity
 checks on both copies, and verifies that the row count survives restoration.
+Because it initializes the current v6 store, use raw read-only `sqlite3.backup`
+instead when taking a pre-migration backup of a legacy live database.
 
 `anchor_receipt_head.py` makes the receipt set tamper-**evident**. Immutability
 triggers stop SQL-level mutation, but anyone with the database file can rewrite a
@@ -191,24 +212,19 @@ claim demand. Pass `--output path.json` to retain a timestamped, hashed
 observation snapshot. Run it again immediately before live routing because the
 registry is volatile.
 
-`read_leaderboard.py` reads the Explorer's **per-Intent** Miner leaderboard and
+`read_leaderboard.py` reads the Explorer's epoch-wide Miner leaderboard and
 prints the score to beat in each declared Intent:
 
     PYTHONPATH=src python3 scripts/read_leaderboard.py
     PYTHONPATH=src python3 scripts/read_leaderboard.py --output snapshot.json
 
-It is read-only and makes no payment or signature. Four behaviours of that API
-are enforced in `src/oathcast/leaderboard.py` rather than left to the operator,
-because each produces a plausible wrong answer instead of an error. **`?intent=`
-is the only filter that works** — `intent_type=` and `epoch=` are accepted and
-silently ignored, returning the full board — so a **negative control runs first**
-and the read is refused unless a nonsense Intent returns zero entries. **`avg_score`
-is per-Intent but `total_requests_served` is not** (it is the Miner's cross-Intent
-total, identical in every per-Intent view), so per-Intent reads drop it. **`position`
-includes inactive Miners** — a `superseded` Miner can hold position 1 — so the
-target is the best *active* Miner and no position is printed without its
-activation status. And a rank is always reported with its population, because
-the same score read as "6/17" and "4/41" is the denominator moving, not the score.
+It is read-only and makes no payment or signature. The current API returns one
+`{"epoch": ..., "intents": {...}}` snapshot using `score` and `rank` fields.
+The reader fetches once, selects exact Intent keys locally, caps the response
+body, enforces scores in `0..1`, and rejects the retired
+`entries/avg_score/position` shape. Inactive Miners may still occupy a rank, so
+the target is always the best *active* Miner. Returned entry count is reported
+separately because rank gaps mean it is not necessarily a denominator.
 
 The target is the **maximum** across declared Intents, not the mean: clearing the
 hardest one clears the others, whereas an average sits between the real bars and

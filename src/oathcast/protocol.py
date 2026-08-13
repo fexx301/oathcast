@@ -18,6 +18,36 @@ import json
 from typing import Any
 
 
+#: Agent string for every outbound OathCast request to a host we do not own.
+#:
+#: This is not cosmetic. Probing the Explorer on 2026-08-12 showed it rejects
+#: urllib's default `Python-urllib/*` agent with HTTP 403 on an anchored,
+#: case-sensitive match of that literal prefix, while accepting any descriptive
+#: string. Telegraph's dispatcher does not filter today, but it is currently a
+#: bare IP with no CDN in front of it; the moment it moves behind the same edge
+#: as the Explorer, any caller still sending the default agent starts failing.
+#: Sending one honest string everywhere means that change is a non-event.
+#:
+#: It names the project and links the source so an operator reading their logs
+#: can tell who is calling. It deliberately does **not** impersonate a browser:
+#: the point is to be identifiable, not to evade a bot filter.
+USER_AGENT = "OathCast/1.0 (+https://github.com/fexx301/oathcast)"
+
+
+def outbound_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Standard headers for an outbound call, with `User-Agent` always set.
+
+    Callers may override any value, including the agent, by passing it in
+    `extra` — a caller that must present a different identity should do so
+    explicitly rather than by omission, which is how the default agent reached
+    the Explorer in the first place.
+    """
+
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
+    headers.update(extra or {})
+    return headers
+
+
 ROUTE_MODES = frozenset({"telegraph", "direct", "auto", "fixture", "unknown"})
 SETTLEMENT_VERIFICATION_STATES = frozenset(
     {"not_attempted", "unverified", "verified", "invalid", "unknown"}

@@ -1,0 +1,47 @@
+{
+  "base_url": "https://oathcastcourt.duckdns.org",
+  "checks": [
+    {
+      "name": "healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "readyz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "receipt_capacity",
+      "ok": true,
+      "reported": true
+    },
+    {
+      "cached": false,
+      "name": "receipt_store_write",
+      "ok": true,
+      "probe": "sqlite_transactional_write",
+      "reported": true,
+      "required": true,
+      "rolled_back": true
+    },
+    {
+      "name": "unauthorized_rejected",
+      "ok": true,
+      "status": 401
+    },
+    {
+      "event_id": "dev-lagos-2026-08-17-1500z",
+      "name": "authenticated_forecast",
+      "ok": true,
+      "public_response_sha256": "ff5622ced36919f61a4d0c701d5ec31f5580967eb8543d7491b0cef68960afa4",
+      "receipt_sha256": "9f095877bd3d803034678fba7501fce9ba13b12af8910090a46e4e68a85b0faf",
+      "request_id": "smoke-release",
+      "status": 200
+    }
+  ],
+  "image_digest": "sha256:679b5dc3960757061e2a56d56cafc1b36176bb560e8dca78f3eb05308029e285",
+  "ok": true,
+  "release_id": "2026-08-12-hardened-v6",
+  "source_sha256": "2bc559e5673297b84e119ac03c0b63304638c13c6ee985ab42a9bd44dbfb4a66"
+}
