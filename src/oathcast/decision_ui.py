@@ -19,6 +19,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, Protocol
 import json
 import math
@@ -26,11 +27,16 @@ import re
 import uuid
 from urllib.parse import urlsplit
 
+from oathcast.release import current_release
+
 
 SERVICE_NAME = "oathcast-decision-ui"
 API_PATH = "/api/decision"
 HEALTH_PATH = "/health"
 STATUS_PATH = "/status"
+LOGO_PATH = "/assets/oathcast-mark.webp"
+LOGO_FILE = Path(__file__).with_name("assets") / "oathcast-mark.webp"
+LOGO_VERSION = "16fae356"
 
 # The cap is intentionally small: the request contains a few human-entered
 # scalar values, not a forecast payload or an upstream response.
@@ -438,7 +444,15 @@ class DecisionResult:
 
 
 class DecisionRunner(Protocol):
-    """Callable seam for a real Telegraph-backed decision implementation."""
+    """Capability-bearing seam for a real Telegraph-backed implementation."""
+
+    @property
+    def configured(self) -> bool:
+        ...
+
+    @property
+    def telegraph_configured(self) -> bool:
+        ...
 
     def __call__(self, request: DecisionInput) -> DecisionResult | Mapping[str, Any]:
         ...
@@ -492,7 +506,7 @@ class DecisionApplication:
 
     def __init__(
         self,
-        decision_runner: DecisionRunner | Callable[[DecisionInput], Any] | None = None,
+        decision_runner: DecisionRunner | None = None,
         *,
         max_body_bytes: int = MAX_JSON_BODY_BYTES,
     ) -> None:
@@ -505,11 +519,16 @@ class DecisionApplication:
 
     @property
     def runner_configured(self) -> bool:
-        configured = getattr(self.decision_runner, "configured", None)
-        if configured is not None:
-            return bool(configured)
-        return callable(self.decision_runner) or callable(
-            getattr(self.decision_runner, "run", None)
+        # A bare callable is not proof that real Telegraph routing and payment
+        # are ready. Public execution requires an explicit capability-bearing
+        # runner so an accidentally injected fixture cannot enable the API.
+        return bool(
+            getattr(self.decision_runner, "configured", False)
+            and getattr(self.decision_runner, "telegraph_configured", False)
+            and (
+                callable(self.decision_runner)
+                or callable(getattr(self.decision_runner, "run", None))
+            )
         )
 
     @property
@@ -523,7 +542,13 @@ class DecisionApplication:
             "status": "ok" if ready else "degraded",
             "ready": ready,
             "runner_configured": ready,
+            "public_mode": "read_only_fixture",
+            "api_mode": "live_decisions" if ready else "fail_closed",
+            "fixture_available": True,
+            "live_decision_available": ready,
+            "decision_api_available": ready,
             "telegraph_routing_and_payment_configured": self.telegraph_configured,
+            "release": current_release().to_dict(),
             "decision_path": API_PATH,
             "max_json_body_bytes": self.max_body_bytes,
             "wallet_secrets_exposed": False,
@@ -600,20 +625,8 @@ def _json_bytes(payload: Mapping[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
-def _offset_options() -> str:
-    options: list[str] = []
-    for minutes in range(-12 * 60, 14 * 60 + 1, 30):
-        sign = "+" if minutes >= 0 else "-"
-        absolute = abs(minutes)
-        label = f"UTC{sign}{absolute // 60:02d}:{absolute % 60:02d}"
-        value = f"{sign}{absolute // 60:02d}:{absolute % 60:02d}"
-        selected = " selected" if value == "+00:00" else ""
-        options.append(f'<option value="{value}"{selected}>{label}</option>')
-    return "".join(options)
-
-
 def _format_percent(value: float | None) -> str:
-    return "—" if value is None else f"{value:g}%"
+    return "Not available" if value is None else f"{value:g}%"
 
 
 def render_decision_result(result: DecisionResult) -> str:
@@ -643,7 +656,7 @@ def render_decision_result(result: DecisionResult) -> str:
         f'<p>{escape(safe.rationale)}</p>'
         '<dl class="result-facts">'
         f'<div><dt>Risk estimate</dt><dd>{escape(_format_percent(safe.risk_percent))}</dd></div>'
-        f'<div><dt>Request ID</dt><dd>{escape(safe.request_id or "—")}</dd></div>'
+        f'<div><dt>Request ID</dt><dd>{escape(safe.request_id or "Not available")}</dd></div>'
         '</dl>'
         '<h3>Miner evidence</h3>'
         '<div class="table-wrap"><table><thead><tr>'
@@ -656,7 +669,7 @@ def render_decision_result(result: DecisionResult) -> str:
 
 
 def render_page(*, result: DecisionResult | None = None, error: str | None = None) -> str:
-    """Return the accessible, dependency-free public page."""
+    """Return the accessible, dependency-free public status and fixture page."""
 
     feedback = ""
     if error:
@@ -667,212 +680,243 @@ def render_page(*, result: DecisionResult | None = None, error: str | None = Non
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OathCast outdoor decision check</title>
-  <meta name="description" content="A privacy-minimal outdoor activity decision check.">
+  <title>OathCast public status and development fixture</title>
+  <meta name="description" content="OathCast public release status and a clearly labeled, client-only development fixture.">
   <style>
-    :root {{ color-scheme: light; --ink: #17221d; --muted: #5b6b62; --paper: #f7f5ef; --panel: #fffdf8; --line: #d8dfd6; --accent: #166534; --accent-dark: #0f4322; --danger: #9f1239; }}
+    :root {{ color-scheme: dark; --ink: #f4f1ed; --muted: #aaa6a2; --paper: #000000; --panel: #080808; --panel-strong: #0e0e0e; --line: #282828; --line-strong: #3a3a3a; --accent: #d82335; --accent-bright: #f04452; --accent-soft: #26070b; --focus: #ff5a66; --danger: #ff8a94; --danger-soft: #26070b; --shadow: rgba(216, 35, 53, .12); }}
     * {{ box-sizing: border-box; }}
-    body {{ margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-    main {{ width: min(100% - 2rem, 920px); margin: 0 auto; padding: clamp(2rem, 7vw, 5rem) 0; }}
-    .intro {{ max-width: 680px; margin-bottom: 2rem; }}
-    h1, h2, h3 {{ line-height: 1.15; letter-spacing: -0.02em; }}
-    h1 {{ max-width: 13ch; margin: .2rem 0 1rem; font-size: clamp(2.3rem, 8vw, 4.6rem); }}
-    h2 {{ margin-top: 0; font-size: clamp(1.65rem, 4vw, 2.4rem); }}
-    h3 {{ margin-top: 2rem; font-size: 1.05rem; }}
-    .eyebrow {{ margin: 0; color: var(--accent); font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }}
-    .lede, .fine-print {{ color: var(--muted); }}
-    .grid {{ display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-    .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 1.1rem; padding: clamp(1rem, 3vw, 1.6rem); box-shadow: 0 12px 35px rgba(23, 34, 29, .06); }}
-    form {{ display: grid; gap: 1.25rem; }}
-    fieldset {{ min-width: 0; margin: 0; padding: 0; border: 0; }}
-    legend {{ margin-bottom: .9rem; font-size: 1.1rem; font-weight: 750; }}
-    label {{ display: block; margin-bottom: .35rem; font-weight: 650; }}
-    .help {{ margin: .25rem 0 0; color: var(--muted); font-size: .88rem; }}
-    input, select, button {{ width: 100%; min-height: 2.9rem; border: 1px solid #aebbb0; border-radius: .65rem; background: #fff; color: var(--ink); font: inherit; padding: .65rem .75rem; }}
-    input:focus, select:focus, button:focus-visible {{ outline: 3px solid rgba(22, 101, 52, .27); outline-offset: 2px; border-color: var(--accent); }}
-    .consent {{ display: flex; align-items: flex-start; gap: .7rem; }}
-    .consent input {{ width: 1.25rem; min-width: 1.25rem; height: 1.25rem; min-height: 1.25rem; margin-top: .2rem; padding: 0; accent-color: var(--accent); }}
-    .consent label {{ margin: 0; font-weight: 500; }}
-    button {{ width: auto; cursor: pointer; border-color: var(--accent); background: var(--accent); color: white; font-weight: 750; padding-inline: 1.2rem; }}
-    button:hover {{ background: var(--accent-dark); }}
-    .privacy {{ border-left: .3rem solid var(--accent); background: #edf6ee; }}
-    .privacy strong {{ color: var(--accent-dark); }}
-    .feedback {{ margin: 1rem 0 0; border-radius: .6rem; padding: .7rem .85rem; }}
-    .feedback.error {{ background: #fff1f2; color: var(--danger); }}
-    .result {{ margin-top: 1.5rem; border: 2px solid var(--accent); border-radius: 1.1rem; background: var(--panel); padding: clamp(1rem, 3vw, 1.6rem); }}
-    .result h2 {{ color: var(--accent-dark); }}
-    .summary {{ font-size: 1.2rem; font-weight: 700; }}
-    .result-facts {{ display: grid; gap: .7rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 1.25rem 0; }}
-    .result-facts div {{ padding: .7rem; border-radius: .6rem; background: #f0f4ee; }}
-    dt {{ color: var(--muted); font-size: .83rem; }}
-    dd {{ margin: .1rem 0 0; font-weight: 750; overflow-wrap: anywhere; }}
+    html {{ scroll-behavior: smooth; }}
+    body {{ min-height: 100dvh; margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.58 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    body::before {{ content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,.026) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(to bottom, black 0, transparent 54rem); }}
+    a {{ color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: .24em; }}
+    button, input, select {{ font: inherit; }}
+    button, a {{ -webkit-tap-highlight-color: transparent; }}
+    .shell {{ width: min(100% - 2rem, 1160px); margin: 0 auto; padding: 1.25rem 0 3rem; }}
+    .site-header {{ min-height: 4.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }}
+    .brand {{ display: inline-flex; align-items: center; gap: .5rem; margin: 0; font-size: 1.05rem; font-weight: 860; letter-spacing: 0; }}
+    .brand-mark {{ width: 2.4rem; height: 2.4rem; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 0 .5rem rgba(216, 35, 53, .14)); }}
+    .status-link {{ font-size: .86rem; font-weight: 720; }}
+    .skip-link {{ position: fixed; top: .75rem; left: .75rem; z-index: 2; transform: translateY(-5rem); border: 1px solid var(--accent); border-radius: .3rem; background: var(--paper); padding: .65rem .85rem; font-weight: 800; transition: transform .18s ease; }}
+    .skip-link:focus {{ transform: translateY(0); }}
+    main {{ display: grid; gap: clamp(1.5rem, 3vw, 2.5rem); padding-top: clamp(3rem, 8vw, 7rem); }}
+    h1, h2, h3 {{ line-height: 1.12; letter-spacing: 0; }}
+    h1 {{ max-width: 13ch; margin: 1rem 0 1.15rem; font-size: 6.25rem; line-height: .94; text-wrap: balance; }}
+    h2 {{ margin: 0 0 .75rem; font-size: 2.65rem; text-wrap: balance; }}
+    h3 {{ margin: 0; font-size: 1.08rem; }}
+    p {{ max-width: 68ch; }}
+    .lede, .supporting, .help, footer {{ color: var(--muted); }}
+    .lede {{ margin: 0; font-size: 1.22rem; }}
+    .semantic-status {{ display: inline-flex; align-items: center; min-height: 2rem; border: 1px solid #6e111a; border-radius: .3rem; background: var(--accent-soft); color: #ff8c96; padding: .32rem .62rem; font-size: .78rem; font-weight: 820; }}
+    .hero {{ position: relative; display: grid; gap: 2rem; grid-template-columns: minmax(0, 1.55fr) minmax(17rem, .45fr); align-items: end; padding-bottom: clamp(2rem, 5vw, 4rem); border-bottom: 1px solid var(--line); }}
+    .hero::after {{ content: "42"; position: absolute; right: 0; top: -4.5rem; z-index: -1; color: rgba(216, 35, 53, .11); font-size: 20rem; font-weight: 900; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums; }}
+    .hero-status {{ border-left: .22rem solid var(--accent); padding: .45rem 0 .45rem 1rem; }}
+    .hero-status strong {{ display: block; margin-bottom: .25rem; }}
+    .panel {{ border: 1px solid var(--line); border-radius: .45rem; background: var(--panel); padding: clamp(1.25rem, 3vw, 2.25rem); box-shadow: 0 1.5rem 4rem var(--shadow); }}
+    .status-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line-strong); }}
+    .status-item {{ min-height: 8.5rem; border-bottom: 1px solid var(--line); padding: 1.25rem 1rem 1.25rem 0; }}
+    .status-item:nth-child(odd) {{ border-right: 1px solid var(--line); }}
+    .status-item:nth-child(even) {{ padding-left: 1.25rem; }}
+    .status-item strong {{ display: block; margin-bottom: .35rem; }}
+    .status-item p {{ margin: 0; color: var(--muted); }}
+    .available {{ color: var(--ink); }}
+    .unavailable {{ color: #ff7883; }}
+    .fixture-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }}
+    .fixture-note {{ border-left: .2rem solid var(--accent); background: #100304; color: #d8d1ce; padding: .82rem 1rem; font-size: .9rem; }}
+    .fixture-layout {{ display: grid; gap: 1.25rem; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); margin-top: 1.25rem; }}
+    .fixture-controls {{ display: grid; gap: 1rem; }}
+    label {{ display: block; margin-bottom: .35rem; font-weight: 720; }}
+    input, select, button {{ width: 100%; min-height: 3rem; border: 1px solid var(--line-strong); border-radius: .35rem; background: #030303; color: var(--ink); padding: .68rem .78rem; }}
+    input {{ font-variant-numeric: tabular-nums; }}
+    input:focus, select:focus, button:focus-visible, a:focus-visible {{ outline: 3px solid rgba(255, 90, 102, .42); outline-offset: 2px; border-color: var(--focus); }}
+    @supports (outline-color: color-mix(in srgb, black 50%, white)) {{ input:focus, select:focus, button:focus-visible, a:focus-visible {{ outline-color: color-mix(in srgb, var(--focus) 38%, transparent); }} }}
+    button {{ width: auto; cursor: pointer; border-color: var(--accent); background: var(--accent); color: #ffffff; font-weight: 800; padding-inline: 1.1rem; transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }}
+    button:hover {{ border-color: var(--accent-bright); background: var(--accent-bright); }}
+    button:active {{ transform: translateY(1px); }}
+    button[disabled] {{ cursor: not-allowed; border-color: var(--line-strong); background: #090909; color: #706d6b; transform: none; }}
+    .button-row {{ display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }}
+    .result {{ border: 1px solid var(--line-strong); border-radius: .4rem; background: var(--panel-strong); padding: clamp(1.15rem, 3vw, 1.7rem); }}
+    .result .semantic-status {{ border-color: var(--line-strong); background: #050505; color: var(--muted); }}
+    .result h3 {{ margin-top: 1rem; font-size: 2rem; }}
+    .summary {{ font-size: 1.12rem; font-weight: 750; }}
+    .result-facts {{ display: grid; gap: .7rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 1.15rem 0; }}
+    .result-facts div {{ border-top: 1px solid var(--line-strong); background: transparent; padding: .75rem 0; }}
+    dt {{ color: var(--muted); font-size: .82rem; }}
+    dd {{ margin: .1rem 0 0; font-weight: 760; overflow-wrap: anywhere; }}
+    .limits {{ display: grid; gap: .65rem; margin: 1rem 0 0; padding: 0; list-style: none; }}
+    .limits li {{ padding-left: 1rem; border-left: .18rem solid #4a1218; }}
+    .feedback {{ min-height: 1.5rem; margin: 0; font-size: .9rem; }}
+    .feedback.error {{ border-radius: .65rem; background: var(--danger-soft); color: var(--danger); padding: .7rem .85rem; }}
+    .live-disabled {{ position: relative; overflow: hidden; border-color: #621018; background: #0d0203; }}
+    .live-disabled::after {{ content: "LOCKED"; position: absolute; right: 1rem; bottom: -1.7rem; color: rgba(216,35,53,.14); font-size: 8rem; font-weight: 900; line-height: 1; letter-spacing: 0; }}
+    .live-disabled > * {{ position: relative; z-index: 1; }}
+    .live-disabled .supporting {{ color: #d39aa0; }}
+    .live-disabled p {{ margin-bottom: 0; }}
     .table-wrap {{ overflow-x: auto; }}
     table {{ width: 100%; border-collapse: collapse; font-size: .9rem; }}
     th, td {{ border-bottom: 1px solid var(--line); padding: .65rem .5rem; text-align: left; vertical-align: top; }}
-    th {{ color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }}
-    footer {{ margin-top: 2rem; color: var(--muted); font-size: .88rem; }}
-    @media (max-width: 640px) {{ .grid, .result-facts {{ grid-template-columns: 1fr; }} main {{ width: min(100% - 1rem, 920px); }} .panel {{ border-radius: .8rem; }} }}
+    th {{ color: var(--muted); font-size: .78rem; letter-spacing: 0; }}
+    footer {{ margin-top: 1rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .88rem; }}
+    input, select {{ color-scheme: dark; }}
+    @media (max-width: 960px) {{
+      h1 {{ font-size: 4.75rem; }}
+      h2 {{ font-size: 2.15rem; }}
+      .hero::after {{ font-size: 16rem; }}
+    }}
+    @media (max-width: 760px) {{
+      .shell {{ width: min(100% - 1.25rem, 1160px); }}
+      .site-header {{ align-items: flex-start; padding: .9rem 0; }}
+      .hero, .fixture-layout, .status-grid, .result-facts {{ grid-template-columns: 1fr; }}
+      .fixture-head {{ display: block; }}
+      .fixture-head .semantic-status {{ margin-bottom: .75rem; }}
+      h1 {{ max-width: 11ch; font-size: 3rem; }}
+      h2 {{ font-size: 1.65rem; }}
+      .lede {{ font-size: 1.04rem; }}
+      .result h3 {{ font-size: 1.45rem; }}
+      .hero::after {{ top: -1rem; font-size: 12rem; }}
+      .live-disabled::after {{ font-size: 4rem; }}
+      .status-item, .status-item:nth-child(even) {{ border-right: 0; padding: 1.1rem 0; }}
+      .panel {{ border-radius: .35rem; }}
+      .button-row button {{ width: 100%; }}
+    }}
+    @media (prefers-reduced-motion: reduce) {{ html {{ scroll-behavior: auto; }} * {{ transition: none !important; }} }}
   </style>
 </head>
 <body>
-  <main>
-    <header class="intro">
-      <p class="eyebrow">OathCast · Track 3</p>
-      <h1>Make the outdoor call with evidence.</h1>
-      <p class="lede">Describe one activity, place, and time. A configured decision runner returns one clear action: go, delay, relocate, or contingency.</p>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="shell">
+    <header class="site-header">
+      <p class="brand"><img class="brand-mark" src="{LOGO_PATH}?v={LOGO_VERSION}" width="192" height="192" alt="" aria-hidden="true">OathCast</p>
+      <a class="status-link" href="{STATUS_PATH}">Machine-readable status</a>
     </header>
-
-    <section class="panel privacy" aria-labelledby="privacy-heading">
-      <h2 id="privacy-heading">Consent and privacy</h2>
-      <p><strong>Use only details you are comfortable sending.</strong> The service uses this information for one decision request. Do not enter names, contact details, medical information, wallet addresses, private keys, payment credentials, or other secrets. We do not need an account.</p>
-      <p class="fine-print">The public service does not create or sign payments. If real Telegraph routing and payment are not configured, a decision is unavailable rather than guessed.</p>
-    </section>
-
-    <section class="panel" aria-labelledby="form-heading" style="margin-top: 1rem;">
-      <h2 id="form-heading">Your decision</h2>
-      <form id="decision-form" novalidate>
-        <fieldset>
-          <legend>What are you planning?</legend>
-          <div class="grid">
-            <div>
-              <label for="activity">Outdoor activity</label>
-              <input id="activity" name="activity" type="text" maxlength="120" autocomplete="off" placeholder="Trail run, picnic, football" required>
-            </div>
-            <div>
-              <label for="location">Location</label>
-              <input id="location" name="location" type="text" maxlength="200" autocomplete="off" placeholder="Park or neighborhood" required>
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Where and when?</legend>
-          <div class="grid">
-            <div>
-              <label for="latitude">Latitude</label>
-              <input id="latitude" name="latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" placeholder="6.5244" required>
-              <p class="help" id="latitude-help">Decimal degrees, from -90 to 90.</p>
-            </div>
-            <div>
-              <label for="longitude">Longitude</label>
-              <input id="longitude" name="longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" placeholder="3.3792" required>
-              <p class="help" id="longitude-help">Decimal degrees, from -180 to 180.</p>
-            </div>
-            <div>
-              <label for="local_datetime">Local date and time</label>
-              <input id="local_datetime" name="local_datetime" type="datetime-local" required>
-              <p class="help" id="local-datetime-help">Choose the local time at the location.</p>
-            </div>
-            <div>
-              <label for="timezone_offset">UTC offset</label>
-              <select id="timezone_offset" name="timezone_offset" aria-describedby="local-datetime-help">{_offset_options()}</select>
-              <p class="help">Use the location's offset at that date.</p>
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>How much risk can you accept?</legend>
-          <label for="risk_threshold_percent">Maximum acceptable risk (%)</label>
-          <input id="risk_threshold_percent" name="risk_threshold_percent" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="30" required>
-          <p class="help">This is a decision threshold, not a promise that conditions are safe.</p>
-        </fieldset>
-
-        <div class="consent">
-          <input id="consent" name="consent" type="checkbox" required>
-          <label for="consent">I consent to sending these planning details for this decision, and I have not included secrets or sensitive personal information.</label>
+    <main id="main-content">
+      <section class="hero" aria-labelledby="page-heading">
+        <div>
+          <span class="semantic-status">Live decisions unavailable</span>
+          <h1 id="page-heading">OathCast is online. Live decisions are not.</h1>
+          <p class="lede">The Miner is registered and active. This interface stays read-only while paid Application flows remain disabled.</p>
         </div>
-        <button type="submit">Check the decision</button>
-        <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
-      </form>
-    </section>
+        <div class="hero-status" role="status">
+          <strong>Current public mode</strong>
+          <span>Miner live. Fixture local. Decision API closed.</span>
+        </div>
+      </section>
 
-    <div id="result" aria-live="polite">{result_markup}</div>
-    {feedback}
-    <noscript><p class="feedback error">JavaScript is required to send this JSON request. No external runtime dependency is used.</p></noscript>
-    <footer>Decision responses show public Miner evidence only. Payment and wallet material never belongs in this interface.</footer>
-  </main>
+      <section aria-labelledby="availability-heading">
+        <h2 id="availability-heading">What is available now</h2>
+        <div class="status-grid">
+          <div class="status-item">
+            <strong class="available">Public Miner</strong>
+            <p>The authenticated forecast service is deployed separately and reports its release identity.</p>
+          </div>
+          <div class="status-item">
+            <strong class="available">Development fixture</strong>
+            <p>A static example demonstrates the intended decision language without a network request.</p>
+          </div>
+          <div class="status-item">
+            <strong class="available">Telegraph registration</strong>
+            <p>Active as on-chain registration ID 78 and dispatcher routing ID 64173 under WEATHER_FORECAST.</p>
+          </div>
+          <div class="status-item">
+            <strong class="unavailable">Paid Application requests</strong>
+            <p>No wallet signing, payment composition, live Application intake, or qualifying demand is enabled here.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="fixture-heading">
+        <div class="fixture-head">
+          <span class="semantic-status">Development fixture</span>
+          <div>
+            <h2 id="fixture-heading">Try the decision presentation</h2>
+            <p class="supporting">Adjust the sample risk and threshold. The result is calculated only in this browser from those two values.</p>
+          </div>
+        </div>
+        <p class="fixture-note"><strong>This example is not Telegraph-routed.</strong> It makes no payment, creates no qualifying demand, and is not a safety guarantee.</p>
+        <div class="fixture-layout">
+          <div class="fixture-controls" id="fixture-controls">
+            <div>
+              <label for="fixture-risk">Example rain risk (%)</label>
+              <input id="fixture-risk" type="number" min="0" max="100" step="1" value="42" inputmode="numeric" required aria-describedby="fixture-risk-help">
+              <p class="help" id="fixture-risk-help">Development input only. No provider is called.</p>
+            </div>
+            <div>
+              <label for="fixture-threshold">Example decision threshold (%)</label>
+              <input id="fixture-threshold" type="number" min="0" max="100" step="1" value="30" inputmode="numeric" required aria-describedby="fixture-threshold-help">
+              <p class="help" id="fixture-threshold-help">At or above the threshold, the example recommends a contingency.</p>
+            </div>
+            <div class="button-row">
+              <button id="fixture-update" type="button">Update example</button>
+            </div>
+            <p class="feedback" id="fixture-feedback" role="status" aria-live="polite">Example ready.</p>
+          </div>
+          <section class="result" id="fixture-result" aria-labelledby="fixture-result-heading">
+            <span class="semantic-status">Static example</span>
+            <h3 id="fixture-result-heading">Example outcome: CONTINGENCY</h3>
+            <p class="summary" id="fixture-summary">Prepare a covered alternative for the sample outdoor activity.</p>
+            <p id="fixture-rationale">The development risk of 42% is at or above the example threshold of 30%.</p>
+            <dl class="result-facts">
+              <div><dt>Example risk</dt><dd id="fixture-risk-output">42%</dd></div>
+              <div><dt>Example threshold</dt><dd id="fixture-threshold-output">30%</dd></div>
+            </dl>
+            <ul class="limits">
+              <li>Development fixture</li>
+              <li>Not Telegraph-routed</li>
+              <li>No payment</li>
+              <li>Not qualifying demand</li>
+              <li>Not a safety guarantee</li>
+            </ul>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel live-disabled" aria-labelledby="live-heading">
+        <h2 id="live-heading">Live Planning Desk intake is disabled</h2>
+        <p>No personal planning details are accepted from this public page. The live action stays unavailable until reviewed Telegraph routing, payment authorization, and evidence handling are deliberately enabled.</p>
+        <div class="button-row">
+          <button type="button" disabled aria-describedby="live-disabled-reason">Run live decision</button>
+          <span id="live-disabled-reason" class="supporting">Unavailable in this release</span>
+        </div>
+      </section>
+
+      <div id="result" aria-live="polite">{result_markup}</div>
+      {feedback}
+      <noscript><p class="feedback error">JavaScript is only needed to update the local development fixture. No live request is available.</p></noscript>
+      <footer>OathCast does not expose wallet material here. Fixture activity is local to the browser and is never counted as Telegraph traffic.</footer>
+    </main>
+  </div>
   <script>
     (() => {{
-      const form = document.getElementById("decision-form");
-      const feedback = document.getElementById("feedback");
-      const result = document.getElementById("result");
-      const setFeedback = (message, isError = false) => {{
-        feedback.textContent = message;
-        feedback.className = isError ? "feedback error" : "feedback";
-      }};
-      const addText = (parent, tag, value, className) => {{
-        const node = document.createElement(tag);
-        if (className) node.className = className;
-        node.textContent = value;
-        parent.appendChild(node);
-        return node;
-      }};
-      form.addEventListener("submit", async (event) => {{
-        event.preventDefault();
-        if (!form.checkValidity()) {{
-          form.reportValidity();
+      const updateButton = document.getElementById("fixture-update");
+      const riskInput = document.getElementById("fixture-risk");
+      const thresholdInput = document.getElementById("fixture-threshold");
+      const heading = document.getElementById("fixture-result-heading");
+      const summary = document.getElementById("fixture-summary");
+      const rationale = document.getElementById("fixture-rationale");
+      const riskOutput = document.getElementById("fixture-risk-output");
+      const thresholdOutput = document.getElementById("fixture-threshold-output");
+      const feedback = document.getElementById("fixture-feedback");
+      updateButton.addEventListener("click", () => {{
+        const risk = Number(riskInput.value);
+        const threshold = Number(thresholdInput.value);
+        if (riskInput.value.trim() === "" || thresholdInput.value.trim() === "" || !Number.isFinite(risk) || !Number.isFinite(threshold) || risk < 0 || risk > 100 || threshold < 0 || threshold > 100) {{
+          riskInput.setAttribute("aria-invalid", String(riskInput.value.trim() === "" || !Number.isFinite(risk) || risk < 0 || risk > 100));
+          thresholdInput.setAttribute("aria-invalid", String(thresholdInput.value.trim() === "" || !Number.isFinite(threshold) || threshold < 0 || threshold > 100));
+          feedback.textContent = "Use values from 0 to 100.";
+          feedback.className = "feedback error";
           return;
         }}
-        const local = document.getElementById("local_datetime").value;
-        const offset = document.getElementById("timezone_offset").value;
-        const payload = {{
-          activity: document.getElementById("activity").value,
-          location: document.getElementById("location").value,
-          latitude: Number(document.getElementById("latitude").value),
-          longitude: Number(document.getElementById("longitude").value),
-          local_datetime: local + offset,
-          risk_threshold_percent: Number(document.getElementById("risk_threshold_percent").value),
-          consent: document.getElementById("consent").checked
-        }};
-        setFeedback("Checking…");
-        try {{
-          const response = await fetch("{API_PATH}", {{
-            method: "POST",
-            headers: {{ "Content-Type": "application/json", "Accept": "application/json" }},
-            body: JSON.stringify(payload)
-          }});
-          const data = await response.json();
-          if (!response.ok) {{
-            setFeedback(data.message || "The decision service is unavailable.", true);
-            return;
-          }}
-          result.replaceChildren();
-          const section = document.createElement("section");
-          section.className = "result";
-          section.setAttribute("aria-labelledby", "live-result-heading");
-          addText(section, "p", "Decision returned", "eyebrow");
-          const heading = addText(section, "h2", String(data.action || data.decision || "unknown").toUpperCase());
-          heading.id = "live-result-heading";
-          addText(section, "p", data.summary || "No summary returned.", "summary");
-          addText(section, "p", data.rationale || "No rationale returned.");
-          const facts = document.createElement("dl");
-          facts.className = "result-facts";
-          const risk = document.createElement("div");
-          addText(risk, "dt", "Risk estimate");
-          addText(risk, "dd", data.risk_percent == null ? "—" : String(data.risk_percent) + "%");
-          facts.appendChild(risk);
-          const request = document.createElement("div");
-          addText(request, "dt", "Request ID");
-          addText(request, "dd", data.request_id || "—");
-          facts.appendChild(request);
-          section.appendChild(facts);
-          addText(section, "h3", "Miner evidence");
-          const evidence = Array.isArray(data.miner_evidence) ? data.miner_evidence : [];
-          if (!evidence.length) {{
-            addText(section, "p", "No public Miner evidence was returned.");
-          }} else {{
-            evidence.forEach((item) => {{
-              const line = document.createElement("p");
-              line.textContent = String(item.miner_id || "Miner") + " · " + String(item.status || "unknown") + " · " + (item.probability_percent == null ? "risk unavailable" : String(item.probability_percent) + "% risk");
-              section.appendChild(line);
-            }});
-          }}
-          result.appendChild(section);
-          setFeedback("Decision received.");
-        }} catch (error) {{
-          setFeedback("The decision service could not be reached.", true);
-        }}
+        riskInput.setAttribute("aria-invalid", "false");
+        thresholdInput.setAttribute("aria-invalid", "false");
+        const contingency = risk >= threshold;
+        heading.textContent = "Example outcome: " + (contingency ? "CONTINGENCY" : "GO");
+        summary.textContent = contingency
+          ? "Prepare a covered alternative for the sample outdoor activity."
+          : "The sample activity stays within the selected development threshold.";
+        rationale.textContent = "The development risk of " + risk + "% is " + (contingency ? "at or above" : "below") + " the example threshold of " + threshold + "%.";
+        riskOutput.textContent = risk + "%";
+        thresholdOutput.textContent = threshold + "%";
+        feedback.textContent = "Local example updated. No request was sent.";
+        feedback.className = "feedback";
       }});
     }})();
   </script>
@@ -890,9 +934,9 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
     def application(self) -> DecisionApplication:
         return self.server.application  # type: ignore[attr-defined]
 
-    def _headers(self, *, content_type: str) -> None:
+    def _headers(self, *, content_type: str, cache_control: str = "no-store") -> None:
         self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache_control)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")
@@ -913,11 +957,27 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
         self._headers(content_type="text/html; charset=utf-8")
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'",
+            "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'",
         )
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
+
+    def _send_logo(self) -> None:
+        try:
+            body = LOGO_FILE.read_bytes()
+        except OSError:
+            self._error(404, "Not found.", error="not_found")
+            return
+        self.close_connection = True
+        self.send_response(200)
+        self._headers(
+            content_type="image/webp",
+            cache_control="public, max-age=31536000, immutable",
+        )
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _error(self, status: int, message: str, *, error: str) -> None:
         self._send_json(status, {"error": error, "message": message})
@@ -927,6 +987,9 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
         if path in {"/", "/index.html"}:
             self._send_html(200, render_page())
             return
+        if path == LOGO_PATH:
+            self._send_logo()
+            return
         if path in {HEALTH_PATH, STATUS_PATH}:
             self._send_json(200, self.application.status_payload())
             return
@@ -934,8 +997,19 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
         path = urlsplit(self.path).path
-        if path not in {API_PATH, "/decision", "/v1/decision"}:
+        if path != API_PATH:
             self._error(404, "Not found.", error="not_found")
+            return
+
+        # The public release has no live intake. Reject before inspecting
+        # metadata or reading a body so direct HTTP clients cannot submit
+        # planning details to a disabled integration.
+        if not self.application.runner_configured:
+            self._error(
+                503,
+                "Live Telegraph routing and payment are not configured.",
+                error="decision_unavailable",
+            )
             return
 
         content_types = self.headers.get_all("Content-Type", [])
@@ -989,13 +1063,6 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
             self._send_json(422, exc.to_public_dict())
             return
 
-        if not self.application.runner_configured:
-            self._error(
-                503,
-                "Live Telegraph routing and payment are not configured.",
-                error="decision_unavailable",
-            )
-            return
         try:
             result = self.application.decide(request)
         except TelegraphNotConfigured:
@@ -1032,7 +1099,7 @@ class DecisionHTTPServer(ThreadingHTTPServer):
         self,
         server_address: tuple[str, int],
         *,
-        decision_runner: DecisionRunner | Callable[[DecisionInput], Any] | None = None,
+        decision_runner: DecisionRunner | None = None,
         max_body_bytes: int = MAX_JSON_BODY_BYTES,
     ) -> None:
         self.application = DecisionApplication(
@@ -1046,7 +1113,7 @@ def make_server(
     host: str = "127.0.0.1",
     port: int = 8787,
     *,
-    decision_runner: DecisionRunner | Callable[[DecisionInput], Any] | None = None,
+    decision_runner: DecisionRunner | None = None,
     max_body_bytes: int = MAX_JSON_BODY_BYTES,
 ) -> DecisionHTTPServer:
     """Build a server; callers may inject a real, already-authorized runner."""
@@ -1062,7 +1129,7 @@ def run_server(
     host: str = "127.0.0.1",
     port: int = 8787,
     *,
-    decision_runner: DecisionRunner | Callable[[DecisionInput], Any] | None = None,
+    decision_runner: DecisionRunner | None = None,
     max_body_bytes: int = MAX_JSON_BODY_BYTES,
 ) -> None:
     """Run until interrupted.  No runner means a deliberately unavailable API."""
@@ -1091,6 +1158,7 @@ __all__ = [
     "DecisionRunner",
     "DecisionUnavailable",
     "EVIDENCE_STATUSES",
+    "LOGO_PATH",
     "MAX_BODY_BYTES",
     "MAX_JSON_BODY_BYTES",
     "MinerEvidence",

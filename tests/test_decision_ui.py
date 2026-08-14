@@ -3,19 +3,26 @@ from __future__ import annotations
 from datetime import timezone
 import http.client
 import json
+import os
 import threading
 import unittest
+from unittest.mock import patch
 
 from oathcast.decision_ui import (
     API_PATH,
+    LOGO_PATH,
+    LOGO_VERSION,
     MAX_JSON_BODY_BYTES,
     DecisionHTTPServer,
+    DecisionApplication,
     DecisionResult,
     MinerEvidence,
+    TelegraphDecisionRunner,
     TelegraphNotConfigured,
     ValidationError,
     parse_decision_input,
     render_decision_result,
+    render_page,
 )
 
 
@@ -68,7 +75,12 @@ class DecisionUITests(unittest.TestCase):
             calls.append(request)
             return {"action": "go", "summary": "ok", "rationale": "ok"}
 
-        with running_server(runner) as address:
+        enabled_runner = TelegraphDecisionRunner(
+            runner,
+            routing_configured=True,
+            payment_configured=True,
+        )
+        with running_server(enabled_runner) as address:
             body = b"{" + b"x" * MAX_JSON_BODY_BYTES + b"}"
             status, payload = post_json(address, body)
 
@@ -84,15 +96,77 @@ class DecisionUITests(unittest.TestCase):
         self.assertEqual(payload["error"], "decision_unavailable")
         self.assertNotIn("wallet", json.dumps(payload).lower())
 
-    def test_http_validation_happens_before_runner_readiness(self):
+    def test_bare_callable_cannot_enable_the_public_api(self):
+        calls = []
+
+        def fixture_runner(request):
+            calls.append(request)
+            return {"action": "go", "summary": "fixture", "rationale": "fixture"}
+
+        with running_server(fixture_runner) as address:
+            status, payload = post_json(address, json.dumps(VALID_REQUEST).encode())
+
+        self.assertEqual(status, 503)
+        self.assertEqual(payload["error"], "decision_unavailable")
+        self.assertEqual(calls, [])
+
+    def test_status_describes_read_only_fixture_mode_and_release_identity(self):
+        with patch.dict(
+            os.environ,
+            {
+                "OATHCAST_RELEASE_ID": "safe-ui-test",
+                "OATHCAST_SOURCE_SHA256": "a" * 64,
+                "OATHCAST_IMAGE_DIGEST": "sha256:" + "b" * 64,
+            },
+        ):
+            payload = DecisionApplication().status_payload()
+
+        self.assertEqual(payload["status"], "degraded")
+        self.assertEqual(payload["public_mode"], "read_only_fixture")
+        self.assertEqual(payload["api_mode"], "fail_closed")
+        self.assertTrue(payload["fixture_available"])
+        self.assertFalse(payload["live_decision_available"])
+        self.assertFalse(payload["decision_api_available"])
+        self.assertEqual(payload["release"]["release_id"], "safe-ui-test")
+        self.assertEqual(payload["release"]["source_sha256"], "a" * 64)
+
+    def test_status_reports_live_decisions_when_guarded_runner_is_ready(self):
+        runner = TelegraphDecisionRunner(
+            lambda request: {
+                "action": "go",
+                "summary": "ok",
+                "rationale": "ok",
+            },
+            routing_configured=True,
+            payment_configured=True,
+        )
+
+        payload = DecisionApplication(runner).status_payload()
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["api_mode"], "live_decisions")
+        self.assertTrue(payload["live_decision_available"])
+        self.assertTrue(payload["decision_api_available"])
+
+    def test_disabled_api_rejects_before_request_parsing(self):
         invalid = dict(VALID_REQUEST)
         invalid["consent"] = False
-        with running_server() as address:
-            status, payload = post_json(address, json.dumps(invalid).encode())
+        with patch(
+            "oathcast.decision_ui.decode_json_body",
+            side_effect=AssertionError("disabled API must not parse a body"),
+        ):
+            with running_server() as address:
+                status, payload = post_json(address, json.dumps(invalid).encode())
 
-        self.assertEqual(status, 422)
-        self.assertEqual(payload["error"], "invalid_request")
-        self.assertIn("consent", payload["fields"])
+        self.assertEqual(status, 503)
+        self.assertEqual(payload["error"], "decision_unavailable")
+
+    def test_noncanonical_decision_aliases_are_not_exposed(self):
+        with running_server() as address:
+            for path in ("/decision", "/v1/decision"):
+                status, payload = post_json(address, json.dumps(VALID_REQUEST).encode(), path=path)
+                self.assertEqual(status, 404)
+                self.assertEqual(payload["error"], "not_found")
 
     def test_safe_output_escaping(self):
         result = DecisionResult(
@@ -107,7 +181,7 @@ class DecisionUITests(unittest.TestCase):
         self.assertNotIn("<script>alert", rendered)
         self.assertNotIn("<miner>", rendered)
 
-    def test_injected_runner_returns_clear_decision_and_miner_evidence(self):
+    def test_capability_bearing_runner_returns_clear_decision_and_miner_evidence(self):
         seen = []
 
         def runner(request):
@@ -129,7 +203,12 @@ class DecisionUITests(unittest.TestCase):
                 ),
             )
 
-        with running_server(runner) as address:
+        enabled_runner = TelegraphDecisionRunner(
+            runner,
+            routing_configured=True,
+            payment_configured=True,
+        )
+        with running_server(enabled_runner) as address:
             status, payload = post_json(address, json.dumps(VALID_REQUEST).encode())
 
         self.assertEqual(status, 200)
@@ -139,6 +218,21 @@ class DecisionUITests(unittest.TestCase):
         self.assertTrue(payload["miner_evidence"][0]["payment_verified"])
         self.assertEqual(len(seen), 1)
         self.assertEqual(seen[0].location, VALID_REQUEST["location"])
+
+    def test_each_incomplete_telegraph_capability_stays_fail_closed(self):
+        def runner(request):
+            return {"action": "go", "summary": "ok", "rationale": "ok"}
+
+        for routing_configured, payment_configured in ((True, False), (False, True), (False, False)):
+            guarded = TelegraphDecisionRunner(
+                runner,
+                routing_configured=routing_configured,
+                payment_configured=payment_configured,
+            )
+            with running_server(guarded) as address:
+                status, payload = post_json(address, json.dumps(VALID_REQUEST).encode())
+            self.assertEqual(status, 503)
+            self.assertEqual(payload["error"], "decision_unavailable")
 
     def test_health_reports_degraded_without_calling_the_runner(self):
         with running_server() as address:
@@ -151,6 +245,54 @@ class DecisionUITests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertFalse(payload["ready"])
         self.assertFalse(payload["wallet_secrets_exposed"])
+
+    def test_public_page_is_truthful_and_has_no_live_submit_path(self):
+        rendered = render_page()
+
+        self.assertIn("Live decisions are not", rendered)
+        self.assertIn(f'src="{LOGO_PATH}?v={LOGO_VERSION}"', rendered)
+        self.assertIn('class="brand-mark"', rendered)
+        self.assertNotIn(".brand::before", rendered)
+        self.assertIn("registered and active", rendered)
+        self.assertIn("registration ID 78", rendered)
+        self.assertIn("routing ID 64173", rendered)
+        self.assertIn("Development fixture", rendered)
+        self.assertIn("Not Telegraph-routed", rendered)
+        self.assertIn("No payment", rendered)
+        self.assertIn("Not qualifying demand", rendered)
+        self.assertIn("Not a safety guarantee", rendered)
+        self.assertIn("Run live decision", rendered)
+        self.assertIn("disabled aria-describedby", rendered)
+        self.assertNotIn("fetch(", rendered)
+        self.assertNotIn("XMLHttpRequest", rendered)
+        self.assertNotIn("sendBeacon", rendered)
+        self.assertNotIn("WebSocket", rendered)
+        self.assertNotIn('id="decision-form"', rendered)
+        self.assertNotIn("<form", rendered)
+        self.assertIn('type="button">Update example', rendered)
+        self.assertIn("Example outcome: CONTINGENCY", rendered)
+        self.assertNotIn("—", rendered)
+        self.assertNotIn("–", rendered)
+
+    def test_logo_asset_is_served_as_cacheable_webp(self):
+        with running_server() as address:
+            connection = http.client.HTTPConnection(*address, timeout=2)
+            connection.request("GET", LOGO_PATH)
+            response = connection.getresponse()
+            body = response.read()
+            content_type = response.getheader("Content-Type")
+            cache_controls = response.msg.get_all("Cache-Control")
+            connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(content_type, "image/webp")
+        self.assertEqual(
+            cache_controls,
+            ["public, max-age=31536000, immutable"],
+        )
+        self.assertGreater(len(body), 1000)
+        self.assertEqual(body[:4], b"RIFF")
+        self.assertEqual(body[12:16], b"VP8L")
 
 
 class RunnerBoundaryTests(unittest.TestCase):
@@ -185,11 +327,11 @@ class running_server:
         self.thread.join(timeout=2)
 
 
-def post_json(address, body: bytes):
+def post_json(address, body: bytes, *, path: str = API_PATH):
     connection = http.client.HTTPConnection(*address, timeout=2)
     connection.request(
         "POST",
-        API_PATH,
+        path,
         body=body,
         headers={
             "Content-Type": "application/json",
