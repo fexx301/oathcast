@@ -1,0 +1,280 @@
+{
+  "fixture_version": "oathcast_weather_wasm_scoring_cases_v1",
+  "abi": "rank_answer(question_utf8, ground_truth_utf8, miner_answer_utf8) -> f32",
+  "score_policy": "fatal cases require exactly zero; other expectations use f32-safe ranges or ordering groups",
+  "cases": [
+    {
+      "case_id": "good_plain_positive",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "miner_answer": "Yes — there is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "expected_score": {"min": 0.8, "max": 1.0},
+      "ordering_group": "precipitation_positive",
+      "quality_rank": 3
+    },
+    {
+      "case_id": "good_structured_positive",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "miner_answer": "{\"content\":\"Yes. Measurable precipitation occurred in Lagos during the requested UTC hour. Probability: 70%.\",\"probability\":0.7}",
+      "expected_score": {"min": 0.8, "max": 1.0},
+      "ordering_group": "precipitation_positive",
+      "quality_rank": 3
+    },
+    {
+      "case_id": "good_chat_negative",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "miner_answer": "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"No. The probability of measurable precipitation in Lagos during the requested UTC hour is 20%.\"}}]}",
+      "expected_score": {"min": 0.75, "max": 1.0}
+    },
+    {
+      "case_id": "bad_wrong_outcome",
+      "case_class": "bad",
+      "expected_good": false,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "miner_answer": "Yes. There is a 90% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "adversarial_keyword_stuffing",
+      "case_class": "adversarial",
+      "expected_good": false,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "miner_answer": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour. measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos measurable precipitation Lagos.",
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "adversarial_contradictory_probability",
+      "case_class": "adversarial",
+      "expected_good": false,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "miner_answer": "{\"content\":\"No. Measurable precipitation will not occur in Lagos during the requested UTC hour.\",\"probability\":0.9}",
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "adversarial_wrong_time_window",
+      "case_class": "adversarial",
+      "expected_good": false,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "miner_answer": "Yes. Measurable precipitation occurred in Lagos from 10:00 to 11:00 UTC. Probability: 80%.",
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "invalid_empty",
+      "case_class": "invalid",
+      "expected_good": false,
+      "question": "Will measurable precipitation occur?",
+      "ground_truth": "No measurable precipitation occurred.",
+      "miner_answer": "",
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "invalid_malformed_json_like_response",
+      "case_class": "invalid",
+      "expected_good": false,
+      "question": "Will measurable precipitation occur?",
+      "ground_truth": "Yes. Measurable precipitation occurred.",
+      "miner_answer": "{\"content\": \"Yes. Measurable precipitation occurred.\"",
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "invalid_overlong",
+      "case_class": "invalid",
+      "expected_good": false,
+      "question": "Will measurable precipitation occur?",
+      "ground_truth": "Yes. Measurable precipitation occurred.",
+      "miner_answer_repeat": {"value": "Yes. Measurable precipitation occurred. ", "count": 160},
+      "expected_score": {"exact": 0.0}
+    },
+    {
+      "case_id": "generic_temperature_good",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "What will the maximum temperature and sky condition be in Lagos tomorrow?",
+      "ground_truth": "The maximum temperature in Lagos will be 31 C with partly cloudy conditions.",
+      "miner_answer": "Lagos should reach a high near 31°C with some cloud cover.",
+      "expected_score": {"min": 0.55, "max": 1.0},
+      "ordering_group": "temperature_forecast",
+      "quality_rank": 3
+    },
+    {
+      "case_id": "generic_temperature_partial",
+      "case_class": "partial",
+      "expected_good": false,
+      "question": "What will the maximum temperature and sky condition be in Lagos tomorrow?",
+      "ground_truth": "The maximum temperature in Lagos will be 31 C with partly cloudy conditions.",
+      "miner_answer": "Lagos should be cloudy tomorrow.",
+      "expected_score": {"min": 0.15, "max": 0.7},
+      "ordering_group": "temperature_forecast",
+      "quality_rank": 2
+    },
+    {
+      "case_id": "generic_temperature_wrong",
+      "case_class": "bad",
+      "expected_good": false,
+      "question": "What will the maximum temperature and sky condition be in Lagos tomorrow?",
+      "ground_truth": "The maximum temperature in Lagos will be 31 C with partly cloudy conditions.",
+      "miner_answer": "Lagos will have a low near 19 C with clear skies.",
+      "expected_score": {"min": 0.0, "max": 0.65},
+      "ordering_group": "temperature_forecast",
+      "quality_rank": 1
+    },
+    {
+      "case_id": "adversarial_question_copy",
+      "case_class": "adversarial",
+      "expected_good": false,
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "miner_answer": "Will measurable precipitation occur in Lagos during the requested UTC hour?",
+      "expected_score": {"min": 0.0, "max": 0.49},
+      "ordering_group": "precipitation_positive",
+      "quality_rank": 1
+    },
+    {
+      "case_id": "unicode_valid",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "What is tomorrow's weather in São Paulo?",
+      "ground_truth": "São Paulo will reach 27 C with rain.",
+      "miner_answer": "São Paulo should reach 27°C with precipitation.",
+      "expected_score": {"min": 0.55, "max": 1.0}
+    },
+    {
+      "case_id": "exact_negative_statement",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will rain occur tomorrow?",
+      "ground_truth": "No rain is expected.",
+      "miner_answer": "No rain is expected.",
+      "expected_score": {"min": 0.99, "max": 1.0},
+      "ordering_group": "negative_rain_statement",
+      "quality_rank": 3
+    },
+    {
+      "case_id": "negated_expectation_paraphrase",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will rain occur tomorrow?",
+      "ground_truth": "No rain is expected.",
+      "miner_answer": "Rain is not expected.",
+      "expected_score": {"min": 0.8, "max": 1.0},
+      "ordering_group": "negative_rain_statement",
+      "quality_rank": 2
+    },
+    {
+      "case_id": "genuine_polarity_contradiction",
+      "case_class": "adversarial",
+      "expected_good": false,
+      "question": "Will rain occur tomorrow?",
+      "ground_truth": "No rain is expected.",
+      "miner_answer": "No rain is expected, but yes, rain is likely.",
+      "expected_score": {"exact": 0.0},
+      "ordering_group": "negative_rain_statement",
+      "quality_rank": 1
+    },
+    {
+      "case_id": "signed_temperature_exact",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "What will the minimum temperature be tomorrow?",
+      "ground_truth": "The minimum temperature will be -5 C.",
+      "miner_answer": "The minimum temperature will be -5 C.",
+      "expected_score": {"min": 0.99, "max": 1.0},
+      "ordering_group": "signed_temperature",
+      "quality_rank": 2
+    },
+    {
+      "case_id": "signed_temperature_wrong_sign",
+      "case_class": "bad",
+      "expected_good": false,
+      "question": "What will the minimum temperature be tomorrow?",
+      "ground_truth": "The minimum temperature will be -5 C.",
+      "miner_answer": "The minimum temperature will be 5 C.",
+      "expected_score": {"min": 0.0, "max": 0.49},
+      "ordering_group": "signed_temperature",
+      "quality_rank": 1
+    },
+    {
+      "case_id": "probability_close_match",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "What is the probability that rain will occur tomorrow?",
+      "ground_truth": "Yes. Rain is expected with 90% probability.",
+      "miner_answer": "Yes. Rain is expected with 85% probability.",
+      "expected_score": {"min": 0.84, "max": 1.0},
+      "ordering_group": "probability_agreement",
+      "quality_rank": 2
+    },
+    {
+      "case_id": "probability_distant_match",
+      "case_class": "partial",
+      "expected_good": false,
+      "question": "What is the probability that rain will occur tomorrow?",
+      "ground_truth": "Yes. Rain is expected with 90% probability.",
+      "miner_answer": "Yes. Rain is expected with 51% probability.",
+      "expected_score": {"min": 0.0, "max": 0.61},
+      "ordering_group": "probability_agreement",
+      "quality_rank": 1
+    },
+    {
+      "case_id": "qualified_duration_negation",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will rain occur tomorrow?",
+      "ground_truth": "Yes. Rain is expected tomorrow.",
+      "miner_answer": "Rain is expected, although it won't last long.",
+      "expected_score": {"min": 0.6, "max": 1.0}
+    },
+    {
+      "case_id": "qualified_uncertainty_negation",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "Will rain occur tomorrow?",
+      "ground_truth": "Yes. Rain is expected tomorrow.",
+      "miner_answer": "Rain is likely, but not certain.",
+      "expected_score": {"min": 0.55, "max": 1.0}
+    },
+    {
+      "case_id": "combined_probability_temperature_exact",
+      "case_class": "good",
+      "expected_good": true,
+      "question": "What temperature and rain probability are expected tomorrow?",
+      "ground_truth": "The temperature will be 31 C with a 90% rain probability.",
+      "miner_answer": "The temperature will be 31 C with a 90% rain probability.",
+      "expected_score": {"min": 0.99, "max": 1.0},
+      "ordering_group": "combined_probability_temperature",
+      "quality_rank": 2
+    },
+    {
+      "case_id": "combined_probability_wrong_temperature",
+      "case_class": "bad",
+      "expected_good": false,
+      "question": "What temperature and rain probability are expected tomorrow?",
+      "ground_truth": "The temperature will be 31 C with a 90% rain probability.",
+      "miner_answer": "The temperature will be 19 C with a 90% rain probability.",
+      "expected_score": {"min": 0.0, "max": 0.49},
+      "ordering_group": "combined_probability_temperature",
+      "quality_rank": 1
+    },
+    {
+      "case_id": "combined_probability_wrong_temperature_sign",
+      "case_class": "bad",
+      "expected_good": false,
+      "question": "What minimum temperature and snow probability are expected tomorrow?",
+      "ground_truth": "The minimum temperature will be -5 C with a 90% snow probability.",
+      "miner_answer": "The minimum temperature will be 5 C with a 90% snow probability.",
+      "expected_score": {"min": 0.0, "max": 0.49}
+    }
+  ]
+}

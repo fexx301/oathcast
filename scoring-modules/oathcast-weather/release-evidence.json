@@ -1,0 +1,76 @@
+{
+  "schema_version": "oathcast_weather_wasm_release_evidence_v1",
+  "recorded_at": "2026-08-14T11:48:06Z",
+  "status": "built_tested_not_uploaded_not_registered",
+  "artifact": {
+    "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
+    "byte_size": 16292,
+    "maximum_allowed_bytes": 33554432,
+    "sha256": "97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af",
+    "keccak256_raw_bytes": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8"
+  },
+  "fixture": {
+    "path": "fixtures/wasm_scoring_cases.json",
+    "sha256": "ceaa3d168b78f7eef1f95b70af940b3d117b181d7f55879c8e9e01c595f7303d"
+  },
+  "build": {
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "cargo": "1.95.0 (f2d3ce0bd 2026-03-21)",
+    "target": "wasm32-unknown-unknown",
+    "profile": "release",
+    "host": "Darwin arm64",
+    "ci_rust_toolchain_action_commit": "6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772",
+    "isolated_clean_builds": 2,
+    "byte_identical": true
+  },
+  "abi": {
+    "exported_memory": "memory",
+    "function_exports": {
+      "alloc": "(i32) -> i32",
+      "dealloc": "(i32, i32) -> void",
+      "rank_answer": "(i32, i32, i32, i32, i32, i32) -> f32"
+    },
+    "maximum_linear_memory_bytes": 4194304,
+    "import_section_present": false,
+    "start_section_present": false
+  },
+  "authority_snapshots": {
+    "telegraph_docs": {
+      "repository": "https://github.com/telegraphprotocol/telegraph-docs.git",
+      "commit": "ddca0645a80846dd2843e57847cfd1f00800c6b9"
+    },
+    "telegraph_examples": {
+      "repository": "https://github.com/telegraphprotocol/telegraph-examples.git",
+      "commit": "facdb95e4139fb2075e795c648296a23b7df8ba9"
+    }
+  },
+  "verification": {
+    "sha256_implementations": [
+      "shasum 6.02",
+      "OpenSSL 3.6.2 digest",
+      "Python hashlib"
+    ],
+    "keccak256_implementations": [
+      "OpenSSL 3.6.2 KECCAK-256",
+      "PyCryptodome Crypto.Hash.keccak",
+      "viem 2.55.11 keccak256(raw bytes)"
+    ],
+    "rust_native_tests_passed": 14,
+    "python_repository_tests_passed": 324,
+    "wazero_host_suite_passed": true,
+    "deterministic_repeated_calls": 5000,
+    "official_unmodified_tester_passed": true,
+    "official_tester_example_score": 0.85
+  },
+  "registration_boundary": {
+    "uploaded": false,
+    "hosted_bytes_verified": false,
+    "transaction_submitted": false,
+    "validator_active": false,
+    "requires_separate_authorization": true,
+    "unresolved": [
+      "Portal-only breakdown_answer helper text has no authoritative signature.",
+      "Portal Intent selection is not reflected in its current registerWasm(..., []) call."
+    ]
+  }
+}

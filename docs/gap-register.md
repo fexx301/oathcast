@@ -1,6 +1,6 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-13
+Last reviewed: 2026-08-14
 
 Current baseline: the public Miner runs `2026-08-12-hardened-v6`. The separate
 decision UI provides a read-only status shell and development fixture while its
@@ -91,6 +91,20 @@ is no longer a platform blocker.
   report that rejects wrong outcomes, malformed/overlong responses,
   wrong-window answers, contradictions, and keyword stuffing. It is explicitly
   labeled development-only and does not claim Telegraph's Canonical Script.
+- A standalone OathCast Track 2 scorer under
+  `scoring-modules/oathcast-weather/`: pinned Rust `1.95.0`, dependency-free
+  `no_std` WASM, exported bounded memory, checked allocation/input validation,
+  and the published `alloc`/`dealloc`/`rank_answer` ABI. It handles generic
+  weather semantics, probability/polarity consistency, numeric facts, UTC time
+  windows, JSON envelopes, stuffing, and concision. Rust tests, the local
+  wazero ABI/adversarial suite, 5,000 deterministic repeated calls, and
+  Telegraph's unmodified tester pass; the official tester example scores
+  `0.8500`. Two clean Rust `1.95.0` release builds were byte-identical; the
+  frozen artifact is 16,292 bytes with SHA-256
+  `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`
+  and raw-byte Keccak-256
+  `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
+  No upload or registration has occurred.
 - A leakage-safe chronological provider backtest with timestamped synthetic
   cases, a frozen warmup/holdout split, resolution-aware prior-only selection,
   simultaneous-timestamp batching, common-case Brier, coverage, and explicit
@@ -120,16 +134,24 @@ is no longer a platform blocker.
   counts, and the `WEATHER_FORECAST` leaderboard. Registration and catalog
   activation are complete, but no paid request or leaderboard score has yet
   been claimed.
-- Port the identity-blind robust evaluator to the official standalone WASM
-  interface (`alloc`, `dealloc`, `rank_answer`), compile it within the 32 MB
-  limit, and run the official wazero tester and adversarial corpus. Registration
-  of that module remains a separately authorized wallet action.
+- Preserve the byte-identical scorer artifact and its recorded size, SHA-256,
+  and independently checked raw-byte Keccak-256. Do not upload or register it
+  until the portal-only
+  `breakdown_answer` discrepancy and `registerWasm` Intent-array semantics have
+  been resolved and the user separately authorizes IPFS upload and the Base
+  Sepolia wallet transaction.
 - Write the payment-boundary ADR and threat model, then implement one private,
   authenticated, allowlisted, transactionally budgeted Solana request with a
   durable payment journal. Do not enable the public decision endpoint first.
 
 ## Blocked on Telegraph or external participants
 
+- Current scoring docs and the official example define exactly three exports
+  (`alloc`, `dealloc`, `rank_answer`), but portal helper text additionally names
+  `breakdown_answer` without a signature. The portal also requires visible
+  Intent selection while its current transaction call passes an empty Intent
+  array. Treat both as operationally unresolved registration/validator
+  questions; do not invent an ABI or infer activation from transaction success.
 - Official ground-truth source, deadline/finality, revision, and extraction
   rules.
 - Ahmed clarified that Application agents may call Miners directly through

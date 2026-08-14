@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -20,9 +21,16 @@ from scripts.validate_miner_drafts import validate_draft
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_MINER = ROOT / "miners" / "oathcast-weather.yaml"
+REGISTERED_YAML_SIZE = 4_960
+REGISTERED_YAML_SHA256 = "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
 
 
 class RegistrationDeclarationTests(unittest.TestCase):
+    def test_registered_yaml_bytes_are_frozen(self):
+        raw = CANONICAL_MINER.read_bytes()
+        self.assertEqual(len(raw), REGISTERED_YAML_SIZE)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), REGISTERED_YAML_SHA256)
+
     def _mutated_canonical(self, old: str, new: str) -> dict[str, object]:
         yaml_text = CANONICAL_MINER.read_text(encoding="utf-8")
         self.assertIn(old, yaml_text)

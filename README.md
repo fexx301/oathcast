@@ -257,14 +257,32 @@ request and print the 402 challenge. It never supplies a signer or
 `PAYMENT-SIGNATURE`; use it to verify a live target before requesting payment
 authorization.
 
-The reference evaluator remains a development proxy, but the platform gate has
-changed: Telegraph published the official scoring-module ABI, Rust example, and
-wazero-based tester on 2026-08-13. A module must export `alloc`, `dealloc`, and
-`rank_answer`, return a score in `[0, 1]`, run without network/filesystem/shared
-state, and compile to a standalone WASM file no larger than 32 MB. The next
-Track 2 task is to port the robust local evaluator to that interface and test
-the compiled artifact with Telegraph's official tester. Until that succeeds,
-the Python proxy is not a WASM result or an official baseline improvement.
+The reference evaluator remains a development proxy, but the official Track 2
+port now lives in `scoring-modules/oathcast-weather/`. It is a dependency-free
+Rust `no_std` module with exported memory and the published three-function ABI:
+`alloc(i32) -> i32`, `dealloc(i32, i32)`, and
+`rank_answer(6 x i32) -> f32`. Inputs are UTF-8 pointer/byte-length pairs; blank
+answers return exactly `0`, every result is finite and clamped to `[0, 1]`, and
+the standalone artifact has no host imports or start section. The pinned release
+build passes the Rust tests, OathCast's wazero ABI/adversarial harness, and
+Telegraph's unmodified official tester (published example score `0.8500`). See the
+[scoring-module README](scoring-modules/oathcast-weather/README.md) for the
+build commands and safeguards. Two clean Rust `1.95.0` builds were
+byte-identical; the frozen artifact is 16,292 bytes with SHA-256
+`97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af` and
+raw-byte Keccak-256
+`0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
+The machine-readable record is
+[`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json).
+
+One operational discrepancy remains: the portal helper text also names an
+undocumented `breakdown_answer` export, while the current guide, official
+example, and tester specify exactly the three functions above. OathCast does not
+invent a signature and treats that portal-only requirement as likely stale but
+unresolved. The portal also collects selected Intents but currently submits
+`registerWasm(..., [])`; validator/intent semantics must be confirmed before
+registration. No scorer upload, wallet signature, or on-chain WASM registration
+has been performed.
 
 `benchmark_script_author.py` compares that baseline proxy with a transparent
 development candidate across good, wrong-outcome, malformed, overlong,

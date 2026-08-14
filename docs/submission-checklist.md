@@ -29,7 +29,23 @@ relevant to that track.
 - [x] Adversarial corpus and deterministic local robustness report.
 - [x] Explicit separation between semantic proxy and Brier domain benchmark.
 - [x] Official scoring-module ABI, Rust example, and wazero tester published.
-- [ ] OathCast scoring module compiled and tested with the official tester.
+- [x] OathCast `no_std` scoring module compiled with pinned Rust and tested with
+  native Rust tests, a wazero ABI/adversarial harness, 5,000 deterministic
+  calls, and Telegraph's unmodified official tester (`0.8500` published example score).
+- [x] Final reproducible artifact evidence frozen: two byte-identical clean
+  builds; 16,292 bytes; SHA-256
+  `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`;
+  raw-byte Keccak-256
+  `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
+  Machine-readable record:
+  `scoring-modules/oathcast-weather/release-evidence.json`.
+- [ ] Portal discrepancy resolved: current docs/example specify exactly
+  `alloc`, `dealloc`, and `rank_answer`, while helper text additionally names
+  undocumented `breakdown_answer`.
+- [ ] `registerWasm` Intent-array semantics confirmed; current portal UI
+  requires Intent selection but submits an empty array.
+- [ ] Exact WASM uploaded and hosted bytes verified. Requires separate
+  authorization; do not infer this from local build completion.
 - [ ] Scoring module registered and active.
 - [ ] Improvement measured against the official baseline.
 - [ ] Community/adoption evidence from independent users.

@@ -56,6 +56,7 @@ wallet*.json
 # OS and dependency-manager noise
 .DS_Store
 node_modules/
+target/
 .terraform/
 *.tfstate
 *.tfstate.*
