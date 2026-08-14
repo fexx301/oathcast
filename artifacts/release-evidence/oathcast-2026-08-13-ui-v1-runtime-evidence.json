@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "release_id": "2026-08-13-ui-v1",
+  "verified_at": "2026-08-13",
+  "ok": true,
+  "source_sha256": "2c55f77e29e6d75953dfefece7aa070eef8b2a6bc101d6e2eab70dec3c92bc76",
+  "clean_context_archive_sha256": "e2ea36fcd94536d3018355cb896dcb9260524549bccee1c5c82045d51f7e6427",
+  "image_digest": "sha256:b4a9c8b70e9219f9b2edeaa9793b61db73e31d20f2b44f165fa53daf79655966",
+  "ui_cutover": {
+    "active_container": {
+      "container_id": "1c6afb3524a698a7cf9fceabe2d4669a017a4520926970e5d291518684878228",
+      "image_digest": "sha256:b4a9c8b70e9219f9b2edeaa9793b61db73e31d20f2b44f165fa53daf79655966",
+      "started_at": "2026-08-13T05:59:08.789726398Z",
+      "running": true,
+      "healthy": true,
+      "runtime_user": "1000:1000",
+      "network_mode": "default bridge",
+      "loopback_binding": "127.0.0.1:8787",
+      "restart_policy": "unless-stopped",
+      "restart_count": 0
+    },
+    "rollback_container": {
+      "container_id": "8f546ca879fcac5b24d60afe6ed567defc705fc1b116b351bca5648a0018c2a7",
+      "image_digest": "sha256:6cd62e074ccd33aa1233e6e750d9163bcd09870981c05a92045ecd3938e6a66a",
+      "stopped": true,
+      "renamed_to": "oathcast-decision-ui-rollback-20260813-pre-ui-v1"
+    }
+  },
+  "unchanged_services": {
+    "miner": {
+      "unchanged_across_cutover": true,
+      "container_id": "ea9ba5a169edbbe8ccd825701cd2b883014b3b3505d17db40310a939c423ed57",
+      "image_digest": "sha256:679b5dc3960757061e2a56d56cafc1b36176bb560e8dca78f3eb05308029e285",
+      "started_at": "2026-08-13T00:04:58.128396644Z",
+      "restart_count": 0,
+      "healthy": true
+    },
+    "caddy": {
+      "unchanged_across_cutover": true,
+      "container_id": "d860ddcbcf5941ac50c7a35729724847130723fd4815754a1ad7393c70abccc0",
+      "image_digest": "sha256:af555904a0961945f16bb323a501457b13a4f7e9bde969b145b97da80b38ecbe",
+      "started_at": "2026-08-03T17:09:15.825117469Z",
+      "restart_count": 0,
+      "network_mode": "host"
+    }
+  },
+  "verification": {
+    "decision_fail_closed": {
+      "method": "POST",
+      "path": "/api/decision",
+      "local_http_status": 503,
+      "public_http_status": 503
+    },
+    "public_status": {
+      "path": "/status",
+      "release_id_matches": true,
+      "source_sha256_matches": true,
+      "image_digest_matches": true
+    },
+    "public_page": {
+      "path": "/",
+      "h1": "OathCast is online. Live decisions are not.",
+      "body_background_rgb": "rgb(0,0,0)",
+      "viewport_width_px": 1512,
+      "horizontal_overflow": false
+    }
+  },
+  "cleanup": {
+    "candidate_removed": true,
+    "temporary_port_18787_present": false
+  },
+  "network_security": {
+    "security_group_id": "sg-086d2585c6a32fa07",
+    "temporary_ssh_rule": {
+      "rule_id": "sgr-09fbb078d7c0162d3",
+      "removed": true
+    },
+    "remaining_ipv4_ingress": [
+      {
+        "protocol": "tcp",
+        "port": 80,
+        "source": "0.0.0.0/0"
+      },
+      {
+        "protocol": "tcp",
+        "port": 443,
+        "source": "0.0.0.0/0"
+      }
+    ]
+  },
+  "side_effects": {
+    "api_key_operations": false,
+    "secret_operations": false,
+    "wallet_actions": false,
+    "registration": false,
+    "pinning": false,
+    "signing": false,
+    "transactions": false,
+    "paid_requests": false,
+    "secret_material_recorded": false
+  }
+}
