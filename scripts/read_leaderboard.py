@@ -35,7 +35,7 @@ from oathcast.leaderboard import (
 
 
 #: Intents declared in miners/oathcast-weather.yaml. Keep in sync with the YAML.
-DECLARED_INTENTS = ("WEATHER_FORECAST", "WEATHER_CHECK")
+DECLARED_INTENTS = ("WEATHER_FORECAST",)
 
 PROXY_WARNING = (
     "Not comparable to the local renderer proxy (overlap/length stand-in, not "

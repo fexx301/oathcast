@@ -1,0 +1,67 @@
+{
+  "artifact_type": "telegraph_portal_validation",
+  "artifact_version": 1,
+  "observed_at": "2026-08-13T11:08:29.132957Z",
+  "candidate": {
+    "id": 64173,
+    "slug": "oathcast-weather"
+  },
+  "dispatcher_recheck": {
+    "observed_at": "2026-08-13T11:06:46.560205Z",
+    "record_count": 41,
+    "exact_match_count": 0,
+    "status": "observed_absence_not_reservation"
+  },
+  "portal": {
+    "origin": "https://integrate.telegraphprotocol.com",
+    "path": "/api/validate",
+    "http_status": 200,
+    "redirected": false,
+    "content_type": "application/json",
+    "valid": true,
+    "api_key_stored": true,
+    "endpoint_case_results": "not_exposed_by_portal_response",
+    "response_bytes": 196,
+    "response_sha256": "9214433ba2843483e54ef0e12958acc17fae82e42bc71c5d91fafbe4e5170a2d"
+  },
+  "canonical_yaml": {
+    "path": "miners/oathcast-weather.yaml",
+    "bytes": 4960,
+    "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+  },
+  "credential": {
+    "scope": "dedicated_telegraph_only_bearer",
+    "stored_by_telegraph": true,
+    "kept_active_after_validation": true,
+    "value_recorded": false
+  },
+  "synthetic_preflight": {
+    "classification": "synthetic Telegraph registration preflight; exclude from demand evidence",
+    "event_id": "registration-preflight-oathcast-weather-20260814T1200Z",
+    "receipt_count_before": 12,
+    "receipt_count_after": 13,
+    "dedicated_status": 200,
+    "primary_status": 200,
+    "identical_response_and_receipt": true,
+    "public_response_sha256": "3bbcfe53f68c4e092a4fdacb9fda19d1621f08af34e90fca5397474666f149f1",
+    "receipt_sha256": "bb495a10674d4d1f8c691280de465f529458e303f207e7c5416b239b9761e3ab"
+  },
+  "portal_receipt_delta": {
+    "count_before_validation": 13,
+    "count_after_validation": 13,
+    "rows_added": 0,
+    "note": "Portal endpoint checks replayed an existing canonical request or did not create a durable receipt; no new row was observed."
+  },
+  "actions": {
+    "wallet_connected": false,
+    "calldata_encoded": false,
+    "signature_created": false,
+    "transaction_submitted": false,
+    "paid_telegraph_request_created": false
+  },
+  "secret_safety": {
+    "contains_credentials": false,
+    "contains_api_key": false,
+    "contains_wallet_material": false
+  }
+}

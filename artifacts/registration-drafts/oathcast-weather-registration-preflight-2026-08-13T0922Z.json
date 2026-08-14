@@ -1,0 +1,60 @@
+{
+  "artifact_type": "telegraph_registration_preflight",
+  "artifact_version": 1,
+  "observed_at": "2026-08-13T09:22Z",
+  "mode": "read_only",
+  "candidate": {
+    "id": 64173,
+    "slug": "oathcast-weather"
+  },
+  "dispatcher_registry": {
+    "record_count": 41,
+    "exact_match_count": 0,
+    "exact_match_definition": "record id equals 64173 or record slug equals oathcast-weather",
+    "uniqueness_status": "observed_absence",
+    "uniqueness_statement": "No exact candidate ID or slug match was observed in the 41-record dispatcher registry response. This is an observed absence only; it is not a reservation or proof of uniqueness."
+  },
+  "portal": {
+    "url": "https://integrate.telegraphprotocol.com/",
+    "validation": {
+      "status": "not_run",
+      "reason": "A Telegraph API key was not supplied."
+    },
+    "empty_key_probe": {
+      "status": "rejected",
+      "http_status": 400,
+      "response_message": "yaml and api_key are required",
+      "interpretation": "The request was rejected before portal YAML validation."
+    }
+  },
+  "canonical_yaml": {
+    "path": "miners/oathcast-weather.yaml",
+    "bytes": 4960,
+    "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+  },
+  "registration_target": {
+    "chain_id": 84532,
+    "contract": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "function_signature": "registerMiner(string,bytes32,address,uint256,string[])"
+  },
+  "actions": {
+    "credential_supplied": false,
+    "yaml_uploaded": false,
+    "content_pinned": false,
+    "wallet_connected": false,
+    "signing_performed": false,
+    "transaction_submitted": false
+  },
+  "claims": {
+    "candidate_reserved": false,
+    "portal_validated": false,
+    "registered": false,
+    "transaction_created": false
+  },
+  "secret_safety": {
+    "contains_credentials": false,
+    "contains_api_key": false,
+    "contains_wallet_address": false,
+    "contains_secrets": false
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "artifact_type": "oathcast_base_sepolia_wallet_readiness",
+  "artifact_version": 1,
+  "observed_at": "2026-08-13T16:43:48Z",
+  "source": {
+    "rpc_origin": "https://sepolia.base.org",
+    "methods": [
+      "eth_chainId",
+      "eth_blockNumber",
+      "eth_getBalance",
+      "eth_getCode"
+    ],
+    "read_only": true
+  },
+  "wallet": {
+    "address": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "checksum": "valid_eip55",
+    "chain_id": 84532,
+    "block_number": 45435543,
+    "balance_wei": "100000000000000000",
+    "balance_eth": "0.1",
+    "code_at_block": "0x",
+    "gas_readiness": "confirmed_by_public_balance_observation"
+  },
+  "operator_inputs": {
+    "fee_address_supplied": true,
+    "min_price_micro_usdc_confirmed": 10000,
+    "supported_intents_proposed": [
+      "WEATHER_FORECAST"
+    ],
+    "supported_intents_status": "canonical_and_portal_validated; retained for final action-time payload authorization"
+  },
+  "claims": {
+    "private_key_received": false,
+    "wallet_connected": false,
+    "signature_created": false,
+    "transaction_submitted": false
+  }
+}

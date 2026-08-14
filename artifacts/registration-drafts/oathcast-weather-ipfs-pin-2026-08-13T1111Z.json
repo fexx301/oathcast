@@ -1,0 +1,50 @@
+{
+  "artifact_type": "telegraph_yaml_ipfs_pin",
+  "artifact_version": 1,
+  "uploaded_at": "2026-08-13T11:11:49.883705Z",
+  "portal": {
+    "origin": "https://integrate.telegraphprotocol.com",
+    "path": "/api/upload",
+    "http_status": 200,
+    "redirected": false,
+    "response_bytes": 212,
+    "response_sha256": "67c18c78f2d4d4f284c66e3d6c498f1443201a4797427b73ff51e85472289987"
+  },
+  "ipfs": {
+    "cid": "QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+    "uri": "ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+    "portal_gateway": "https://gateway.pinata.cloud/ipfs/QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F"
+  },
+  "canonical_yaml": {
+    "path": "miners/oathcast-weather.yaml",
+    "bytes": 4960,
+    "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+  },
+  "byte_verification": {
+    "accept_encoding": "identity",
+    "pinata_gateway": {
+      "verified": true,
+      "bytes": 4960,
+      "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e",
+      "exact_local_match": true
+    },
+    "independent_gateway": {
+      "verified": false,
+      "attempted": [
+        "https://ipfs.io/ipfs/QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+        "https://w3s.link/ipfs/QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+        "https://nftstorage.link/ipfs/QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+        "https://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F.ipfs.dweb.link/"
+      ],
+      "result": "HTTP 500/504 during initial propagation",
+      "follow_up_required": false,
+      "note": "Historical propagation observation. The current readiness classification treats alternate gateway verification as optional because one stable public IPFS or HTTPS URL is the documented requirement."
+    }
+  },
+  "actions": {
+    "public_content_pinned": true,
+    "wallet_connected": false,
+    "signature_created": false,
+    "transaction_submitted": false
+  }
+}

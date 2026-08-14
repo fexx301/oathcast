@@ -1,0 +1,99 @@
+{
+  "artifact_type": "oathcast_registration_readiness_manifest",
+  "artifact_version": 1,
+  "created_at": "2026-08-13T16:48:37Z",
+  "evidence_window": {
+    "first_observation_at": "2026-08-13T09:22Z",
+    "manifest_finalized_at": "2026-08-13T16:48:37Z"
+  },
+  "candidate": {
+    "routing_id": 64173,
+    "routing_id_is_on_chain_registration_id": false,
+    "slug": "oathcast-weather",
+    "registry_observation": "absent_from_40_record_recheck_not_reserved"
+  },
+  "canonical_yaml": {
+    "path": "miners/oathcast-weather.yaml",
+    "bytes": 4960,
+    "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e",
+    "cid": "QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+    "uri": "ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F"
+  },
+  "evidence": {
+    "local_dry_run": {
+      "path": "artifacts/registration-drafts/oathcast-weather-registration-draft.json",
+      "sha256": "b9e81078400ef794f43696c65d333ad5b0ed683dd6b4e586af6513093da2786e"
+    },
+    "dispatcher_preflight": {
+      "path": "artifacts/registration-drafts/oathcast-weather-registration-preflight-2026-08-13T0922Z.json",
+      "sha256": "fa13bd56d855052ebb648a165e260618fcce82862cffcbb0ef423e46121301fd"
+    },
+    "dispatcher_recheck": {
+      "path": "artifacts/registration-drafts/oathcast-weather-dispatcher-recheck-2026-08-13T1504Z.json",
+      "sha256": "79834399074a14226a70345852dfa53202a53ea060e3c00433213f89bfdd1603"
+    },
+    "portal_validation": {
+      "path": "artifacts/registration-drafts/oathcast-weather-portal-validation-2026-08-13T1108Z.json",
+      "sha256": "6222f6ca8eb9cc77e03eb5c7acb5a49ffcb5a3cfae397063298b091e03533ad5"
+    },
+    "ipfs_pin": {
+      "path": "artifacts/registration-drafts/oathcast-weather-ipfs-pin-2026-08-13T1111Z.json",
+      "sha256": "a131120a912148d6a5e9d8411d189710241da0e870b4b4cf5c7564be66173fa4"
+    },
+    "credential_cutover": {
+      "path": "artifacts/release-evidence/oathcast-2026-08-13-telegraph-credential-cutover.json",
+      "sha256": "64cc677576efe01c130ef61c36deef142e7b2e35938d207fe73260627844a673"
+    },
+    "wallet_readiness": {
+      "path": "artifacts/registration-drafts/oathcast-weather-wallet-readiness-2026-08-13T1643Z.json",
+      "sha256": "398f1b3bfc13f950ce602201eff920e832a9d6e51cb5483547b4b5b8bc63928a"
+    }
+  },
+  "local_dry_run_scope": {
+    "status": "offline_generator_only",
+    "not_run_fields_mean": "the local generator did not contact Telegraph",
+    "external_validation_record": "this readiness manifest and its referenced portal/IPFS artifacts"
+  },
+  "portal_validation": {
+    "valid": true,
+    "api_key_stored": true,
+    "endpoint_case_results": "not_exposed_by_portal_response"
+  },
+  "ipfs_verification": {
+    "pinata_exact_byte_match": true,
+    "independent_non_pinata_gateway_verified": false,
+    "follow_up_required": false,
+    "note": "One stable public IPFS or HTTPS URL is the documented requirement; alternate gateway verification remains optional resilience evidence."
+  },
+  "current_contract_observation": {
+    "chain_id": 84532,
+    "live_portal_bundle_contract": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "older_integration_source_contract": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
+    "function_signature": "registerMiner(string,bytes32,address,uint256,string[])",
+    "status": "current_registration_guide_confirmed; older_address_retained_as_historical_context"
+  },
+  "remaining_gates": [
+    "fresh slug availability check and conservative routing-id inspection",
+    "final WEATHER_FORECAST payload review",
+    "explicit action-time wallet connection, signature, and submission authorization"
+  ],
+  "post_submission_checks": [
+    "record MinerRegistered event and sequential registrationId",
+    "query getMiner(registrationId)",
+    "wait for oathcast-weather to appear in /miner-dispatcher/integrations"
+  ],
+  "claims": {
+    "scope": "Miner registration readiness and the 2026-08-13 credential/portal/IPFS operation",
+    "historical_solana_devnet_payment_canary_excluded_from_this_scope": true,
+    "portal_validated": true,
+    "public_yaml_pinned": true,
+    "fee_address_supplied": true,
+    "min_price_micro_usdc_confirmed": 10000,
+    "base_sepolia_gas_balance_observed_wei": "100000000000000000",
+    "registered_on_chain": false,
+    "wallet_connected": false,
+    "signature_created": false,
+    "transaction_submitted": false,
+    "paid_telegraph_request_created": false
+  }
+}

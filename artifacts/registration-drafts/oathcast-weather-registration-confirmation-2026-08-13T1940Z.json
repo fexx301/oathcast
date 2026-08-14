@@ -1,0 +1,102 @@
+{
+  "artifact_type": "oathcast_miner_registration_confirmation",
+  "artifact_version": 1,
+  "observed_at": "2026-08-13T19:40:44Z",
+  "network": {
+    "name": "Base Sepolia",
+    "chain_id": 84532,
+    "diamond_contract": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8"
+  },
+  "transaction": {
+    "hash": "0x937d45d8108b905a551608707755e47899a41046436038a315a859d2f497b5d2",
+    "block_number": 45439694,
+    "block_timestamp": "2026-08-13T19:01:16Z",
+    "receipt_status": 1,
+    "gas_used": 518287,
+    "native_value_wei": "0",
+    "transaction_type": "0x4",
+    "submission_context": "EIP-7702 smart-wallet wrapper",
+    "outer_from": "0xb42f812a44c22cc6b861478900401ee759ebead6",
+    "outer_to": "0xdb9b1e94b5b69df7e401ddbede43491141047db3",
+    "inner_target": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "inner_selector": "0x876b2422",
+    "inner_signature": "registerMiner(string,bytes32,address,uint256,string[])",
+    "public_transaction_response_sha256": "e7cd078bd384ee378560f995d639c7c3163417d35affd20bba191f9aba8ba392",
+    "public_receipt_response_sha256": "904d699883fc04262ffa59bd031efafc324ecf7a440e926a1fc87ed4474b06d9"
+  },
+  "miner_registered_event": {
+    "event_signature": "MinerRegistered(uint256,address,string,bytes32,address,uint256,string[])",
+    "topic0": "0x7305b0d0f2fed40b03fb6b42dfaa5d50920aa0312578b5ed482f1072942823a4",
+    "registration_id": 78,
+    "registrant": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "yaml_uri": "ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F",
+    "yaml_sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e",
+    "fee_address": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "min_price_micro_usdc": 10000,
+    "supported_intents": [
+      "WEATHER_FORECAST"
+    ]
+  },
+  "contract_state": {
+    "method": "getMiner(uint256)",
+    "selector": "0x3cc8f306",
+    "registration_id": 78,
+    "lookup_succeeded": true,
+    "registrant_matches": true,
+    "active": true,
+    "yaml_uri_matches": true,
+    "yaml_hash_matches": true,
+    "fee_address_matches": true,
+    "price_matches": true,
+    "intents_match": true,
+    "public_eth_call_result_sha256": "6d7c549d9d12f7fd246029af1a7c630ca921295cd8b07ac5aa2f6ef0dada22da"
+  },
+  "telegraph_portal": {
+    "registration_api": "https://integrate.telegraphprotocol.com/api/registrations/0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "miner_count": 1,
+    "registration_id": 78,
+    "activation_status": "active",
+    "slug": "oathcast-weather",
+    "routing_id": 64173,
+    "raw_yaml_retrieved": true,
+    "raw_yaml_matches_committed_hash": true,
+    "registered_at": "2026-08-13T19:09:13.899306Z",
+    "public_response_sha256": "7affd871a607581cea54aee30c421f420ec331ba6ac5532fff3ef12fafc96176"
+  },
+  "telegraph_dispatcher": {
+    "catalog_url": "http://13.237.89.59:7044/miner-dispatcher/integrations",
+    "record_count": 41,
+    "matching_record_count": 1,
+    "routing_id": "64173",
+    "routing_id_is_on_chain_registration_id": false,
+    "slug": "oathcast-weather",
+    "activation_status": "active",
+    "endpoint": {
+      "path": "/predict",
+      "method": "GET"
+    },
+    "supported_intents": [
+      "WEATHER_FORECAST"
+    ],
+    "min_price_micro_usdc": 10000,
+    "total_requests_served": null,
+    "public_oathcast_record_sha256": "f16422c11505c75fa4512a6f78ae2be5455fe5a512118e82ccccc497e0d61e40"
+  },
+  "claims": {
+    "registered_on_chain": true,
+    "transaction_confirmed": true,
+    "on_chain_registration_id": 78,
+    "dispatcher_activated": true,
+    "endpoint_authentication_previously_validated": true,
+    "paid_telegraph_request_created": false,
+    "qualifying_track_3_demand_claimed": false,
+    "leaderboard_score_observed": false
+  },
+  "historical_evidence_note": "Pre-submit readiness artifacts remain immutable historical records and are superseded for current registration status by this confirmation artifact.",
+  "secret_safety": {
+    "contains_api_key": false,
+    "contains_private_key": false,
+    "contains_seed_phrase": false,
+    "contains_wallet_signature": false
+  }
+}

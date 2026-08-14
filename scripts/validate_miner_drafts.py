@@ -19,9 +19,9 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_PRICE_USDC = Decimal("0.01")
-INTEGRATION_ID_PLACEHOLDER = "REPLACE_WITH_UNIQUE_INTEGRATION_ID"
 VALIDATION_SCOPE = "draft_local"
 OFFICIAL_PORTAL_STATUS = "not_run"
+CANONICAL_INTENTS = ["WEATHER_FORECAST"]
 
 EXPECTED_INPUT_PROPERTIES = {
     "event_id": "string",
@@ -37,21 +37,24 @@ EXPECTED_INPUT_PROPERTIES = {
 }
 EXPECTED_INPUT_REQUIRED = {"lat", "lon", "start", "end"}
 EXPECTED_OUTPUT_REQUIRED = {"content", "probability"}
-EXPECTED_REQUEST_MAPPINGS = {
-    "event_id": {"source": "strings.0", "optional": True},
-    "location_name": {"source": "strings.1", "optional": True},
-    "lat": {"source": "strings.2", "type": "float"},
-    "lon": {"source": "strings.3", "type": "float"},
-    "start": {"source": "strings.4", "format": "date-time"},
-    "end": {"source": "strings.5", "format": "date-time"},
-    "cutoff": {
-        "source": "strings.6",
-        "optional": True,
-        "format": "date-time",
-    },
-    "threshold_mm": {"source": "strings.7", "optional": True, "type": "float"},
-    "operator": {"source": "strings.8", "optional": True},
-    "provider": {"source": "strings.9", "optional": True},
+EXPECTED_ENDPOINT_REQUIRED_PARAMS = {
+    "lat": "number",
+    "lon": "number",
+    "start": "string",
+    "end": "string",
+}
+EXPECTED_ENDPOINT_OPTIONAL_PARAMS = {
+    "cutoff": "string",
+    "threshold_mm": "number",
+    "operator": "string",
+    "event_id": "string",
+    "location_name": "string",
+    "provider": "string",
+}
+EXPECTED_SIGNAL_MAPPING = {
+    "label_field": "content",
+    "confidence_field": "probability",
+    "reason_field": "content",
 }
 
 
@@ -153,6 +156,56 @@ def _list_values(lines: list[str], header_index: int, header_indent: int) -> lis
     return values
 
 
+def _parse_flow_sequence(value: str) -> list[Any]:
+    value = value.strip()
+    if not (value.startswith("[") and value.endswith("]")):
+        return []
+    inner = value[1:-1].strip()
+    if not inner:
+        return []
+    return [_clean_scalar(item) for item in inner.split(",")]
+
+
+def _nested_list_values(lines: list[str], section: str, key: str) -> list[Any] | None:
+    section_index = _find_header(lines, section, indent=0)
+    if section_index is None:
+        return None
+    section_indent = _indent(lines[section_index])
+    for index in range(section_index + 1, len(lines)):
+        line = lines[index]
+        if line.strip() and _indent(line) <= section_indent:
+            break
+        if line.strip() == f"{key}:" and _indent(line) == section_indent + 2:
+            return _list_values(lines, index, _indent(line))
+    return None
+
+
+def _nested_mapping(
+    lines: list[str], section: str, key: str
+) -> list[tuple[str, Any]] | None:
+    section_index = _find_header(lines, section, indent=0)
+    if section_index is None:
+        return None
+    section_indent = _indent(lines[section_index])
+    for index in range(section_index + 1, len(lines)):
+        line = lines[index]
+        if line.strip() and _indent(line) <= section_indent:
+            break
+        if line.strip() == f"{key}:" and _indent(line) == section_indent + 2:
+            mapping_indent = _indent(line)
+            items: list[tuple[str, Any]] = []
+            for nested_line in lines[index + 1 :]:
+                if nested_line.strip() and _indent(nested_line) <= mapping_indent:
+                    break
+                if _indent(nested_line) != mapping_indent + 2:
+                    continue
+                pair = _split_key_value(nested_line.strip())
+                if pair:
+                    items.append((pair[0], _clean_scalar(pair[1])))
+            return items
+    return None
+
+
 def _schema_contract(lines: list[str], section: str) -> dict[str, Any] | None:
     header_index = _find_header(lines, section, indent=0)
     if header_index is None:
@@ -231,121 +284,123 @@ def _schema_contract(lines: list[str], section: str) -> dict[str, Any] | None:
     return contract
 
 
-def _parse_flow_mapping(value: str) -> dict[str, Any]:
-    value = value.strip()
-    if not (value.startswith("{") and value.endswith("}")):
-        return {}
-    inner = value[1:-1].strip()
-    if not inner:
-        return {}
-    result: dict[str, Any] = {}
-    for part in inner.split(","):
-        pair = _split_key_value(part.strip())
-        if pair:
-            result[pair[0]] = _clean_scalar(pair[1])
-    return result
-
-
 def _endpoint_contract(lines: list[str]) -> dict[str, Any] | None:
     header_index = _find_header(lines, "endpoints", indent=0)
     if header_index is None:
         return None
-    endpoint: dict[str, Any] = {"param_map": {}}
+    endpoint: dict[str, Any] = {
+        "count": 0,
+        "intents": [],
+        "params_header_count": 0,
+        "query_header_count": 0,
+        "param_group_counts": {"required": 0, "optional": 0},
+        "params": {"required": [], "optional": []},
+        "param_map": {},
+    }
     endpoint_indent = _indent(lines[header_index]) + 2
-    param_map_index: int | None = None
+    active_param_group: str | None = None
+    current_param: dict[str, Any] | None = None
+    in_param_map = False
+
+    def flush_param() -> None:
+        nonlocal current_param
+        if active_param_group is not None and current_param is not None:
+            endpoint["params"][active_param_group].append(current_param)
+        current_param = None
+
     for index in range(header_index + 1, len(lines)):
         line = lines[index]
         if line.strip() and _indent(line) <= _indent(lines[header_index]):
             break
-        if _indent(line) == endpoint_indent and line.strip().startswith("-"):
+        line_indent = _indent(line)
+        stripped = line.strip()
+        if line_indent == endpoint_indent and stripped.startswith("-"):
+            flush_param()
+            endpoint["count"] += 1
             pair = _split_key_value(line.strip()[1:].strip())
-            if pair:
+            if pair and endpoint["count"] == 1:
                 endpoint[pair[0]] = _clean_scalar(pair[1])
             continue
-        if _indent(line) == endpoint_indent + 2:
-            pair = _split_key_value(line.strip())
-            if pair and pair[0] == "param_map":
-                param_map_index = index
-            elif pair:
+        if endpoint["count"] != 1:
+            continue
+        if line_indent <= endpoint_indent + 2:
+            in_param_map = False
+        if line_indent == endpoint_indent + 2:
+            flush_param()
+            active_param_group = None
+            pair = _split_key_value(stripped)
+            if pair and pair[0] == "params" and pair[1] == "":
+                endpoint["params_header_count"] += 1
+            elif pair and pair[0] == "param_map" and pair[1] == "":
+                in_param_map = True
+            elif pair and pair[0] == "intents":
+                endpoint["intents"] = _parse_flow_sequence(pair[1])
+            elif pair and pair[0] != "params":
                 endpoint[pair[0]] = _clean_scalar(pair[1])
-        elif param_map_index is not None and _indent(line) == endpoint_indent + 4:
-            pair = _split_key_value(line.strip())
-            if pair:
+        elif line_indent == endpoint_indent + 4 and stripped == "query:":
+            endpoint["query_header_count"] += 1
+        elif in_param_map and line_indent == endpoint_indent + 4:
+            pair = _split_key_value(stripped)
+            if pair is not None:
                 endpoint["param_map"][pair[0]] = _clean_scalar(pair[1])
+        elif line_indent == endpoint_indent + 6 and stripped in {
+            "required:",
+            "optional:",
+        }:
+            flush_param()
+            active_param_group = stripped[:-1]
+            endpoint["param_group_counts"][active_param_group] += 1
+        elif (
+            active_param_group is not None
+            and line_indent == endpoint_indent + 8
+            and stripped.startswith("-")
+        ):
+            flush_param()
+            current_param = {}
+            pair = _split_key_value(stripped[1:].strip())
+            if pair:
+                current_param[pair[0]] = _clean_scalar(pair[1])
+        elif (
+            active_param_group is not None
+            and current_param is not None
+            and line_indent == endpoint_indent + 10
+        ):
+            pair = _split_key_value(stripped)
+            if pair:
+                if pair[0] == "intents":
+                    current_param[pair[0]] = _parse_flow_sequence(pair[1])
+                else:
+                    current_param[pair[0]] = _clean_scalar(pair[1])
+    flush_param()
     return endpoint
 
 
-def _on_chain_fields(lines: list[str]) -> dict[str, list[dict[str, Any]]]:
-    header_index = _find_header(lines, "on_chain", indent=0)
-    if header_index is None:
-        return {}
-    fields_index = _find_header(lines, "fields", indent=2, start=header_index + 1)
-    if fields_index is None:
-        return {}
-
-    result: dict[str, list[dict[str, Any]]] = {}
-    current_group: str | None = None
-    current_item: dict[str, Any] | None = None
-
-    def flush() -> None:
-        nonlocal current_item
-        if current_group is not None and current_item is not None:
-            result.setdefault(current_group, []).append(current_item)
-        current_item = None
-
-    for line in lines[fields_index + 1 :]:
-        if line.strip() and _indent(line) <= 2:
-            break
-        stripped = line.strip()
-        if _indent(line) == 4 and stripped in {"strings:", "integers:", "bools:"}:
-            flush()
-            current_group = stripped[:-1]
+def _endpoint_param_errors(
+    endpoint: dict[str, Any], group: str, expected: dict[str, str]
+) -> list[str]:
+    errors: list[str] = []
+    params = endpoint.get("params", {}).get(group, [])
+    names = [param.get("name") for param in params]
+    expected_names = list(expected)
+    if len(names) != len(expected_names) or set(names) != set(expected_names):
+        errors.append(
+            f"canonical endpoint {group} query params must be exactly "
+            + ", ".join(expected_names)
+        )
+    for name, expected_type in expected.items():
+        matches = [param for param in params if param.get("name") == name]
+        if len(matches) != 1:
             continue
-        if _indent(line) == 6 and stripped.startswith("-"):
-            flush()
-            pair = _split_key_value(stripped[1:].strip())
-            current_item = {}
-            if pair:
-                current_item[pair[0]] = _clean_scalar(pair[1])
-            continue
-        if _indent(line) == 8 and current_item is not None:
-            pair = _split_key_value(stripped)
-            if pair:
-                current_item[pair[0]] = _clean_scalar(pair[1])
-    flush()
-    return result
-
-
-def _on_chain_request(lines: list[str]) -> dict[str, Any] | None:
-    header_index = _find_header(lines, "on_chain", indent=0)
-    if header_index is None:
-        return None
-    request_index = _find_header(lines, "request", indent=2, start=header_index + 1)
-    if request_index is None:
-        return None
-
-    request: dict[str, Any] = {"query_params": {}}
-    request_indent = _indent(lines[request_index])
-    query_index: int | None = None
-    for line in lines[request_index + 1 :]:
-        if line.strip() and _indent(line) <= request_indent:
-            break
-        if _indent(line) == request_indent + 2 and line.strip().startswith("-"):
-            pair = _split_key_value(line.strip()[1:].strip())
-            if pair:
-                request[pair[0]] = _clean_scalar(pair[1])
-            continue
-        if _indent(line) == request_indent + 4:
-            pair = _split_key_value(line.strip())
-            if pair and pair[0] == "query_params":
-                query_index = 0
-            elif pair:
-                request[pair[0]] = _clean_scalar(pair[1])
-        elif query_index is not None and _indent(line) == request_indent + 6:
-            pair = _split_key_value(line.strip())
-            if pair:
-                request["query_params"][pair[0]] = _parse_flow_mapping(pair[1])
-    return request
+        param = matches[0]
+        if param.get("type") != expected_type:
+            errors.append(
+                f"canonical endpoint query param {name}.type must be {expected_type}"
+            )
+        if param.get("intents") != CANONICAL_INTENTS:
+            errors.append(
+                f"canonical endpoint query param {name} intents must be WEATHER_FORECAST"
+            )
+    return errors
 
 
 def _canonical_contract_errors(lines: list[str]) -> list[str]:
@@ -407,12 +462,37 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
     if endpoint is None:
         errors.append("canonical endpoint contract is required")
     else:
+        if endpoint.get("count") != 1:
+            errors.append("canonical draft must define exactly one endpoint")
         if endpoint.get("path") != "/predict":
             errors.append("canonical endpoint path must be /predict")
         if endpoint.get("external_path") != "/v1/forecast/point":
             errors.append("canonical endpoint external_path must be /v1/forecast/point")
         if endpoint.get("method") != "GET":
             errors.append("canonical endpoint method must be GET")
+        if endpoint.get("intents") != CANONICAL_INTENTS:
+            errors.append(
+                "canonical endpoint intents must match semantics: WEATHER_FORECAST only"
+            )
+        if endpoint.get("params_header_count") != 1:
+            errors.append("canonical endpoint must define exactly one params mapping")
+        if endpoint.get("query_header_count") != 1:
+            errors.append("canonical endpoint params must define exactly one query mapping")
+        for group in ("required", "optional"):
+            if endpoint.get("param_group_counts", {}).get(group) != 1:
+                errors.append(
+                    f"canonical endpoint query must define exactly one {group} group"
+                )
+        errors.extend(
+            _endpoint_param_errors(
+                endpoint, "required", EXPECTED_ENDPOINT_REQUIRED_PARAMS
+            )
+        )
+        errors.extend(
+            _endpoint_param_errors(
+                endpoint, "optional", EXPECTED_ENDPOINT_OPTIONAL_PARAMS
+            )
+        )
         if endpoint.get("param_map") != {
             "lat": "latitude",
             "lon": "longitude",
@@ -422,35 +502,26 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
         }:
             errors.append("canonical endpoint param_map must match the service aliases")
 
-    fields = _on_chain_fields(lines)
-    strings = next((item for item in fields.get("strings", []) if item.get("index") == "0"), None)
-    integers = next((item for item in fields.get("integers", []) if item.get("index") == "0"), None)
-    if (
-        strings is None
-        or strings.get("name") != "content"
-        or strings.get("description") is None
-        or strings.get("source_path") != "content"
-    ):
-        errors.append("canonical on_chain.fields.strings[0] must map content completely")
-    if (
-        integers is None
-        or integers.get("name") != "probability_x10000"
-        or integers.get("description") is None
-        or integers.get("source_path") != "probability"
-        or integers.get("multiplier") != "10000"
-    ):
-        errors.append("canonical on_chain.fields.integers[0] must map probability completely")
+    supported_intents = _nested_list_values(lines, "semantics", "supported_intents")
+    if supported_intents != CANONICAL_INTENTS:
+        errors.append(
+            "canonical semantics.supported_intents must contain exactly WEATHER_FORECAST"
+        )
 
-    request = _on_chain_request(lines)
-    if request is None:
-        errors.append("canonical on_chain.request is required")
-    else:
-        if request.get("endpoint") != "predict":
-            errors.append("canonical on_chain.request endpoint must be predict")
-        if request.get("method") != "GET":
-            errors.append("canonical on_chain.request method must be GET")
-        if request.get("query_params") != EXPECTED_REQUEST_MAPPINGS:
-            errors.append("canonical on_chain.request.query_params must map every GET input")
+    signal_mapping_items = _nested_mapping(lines, "semantics", "signal_mapping")
+    signal_mapping = (
+        dict(signal_mapping_items) if signal_mapping_items is not None else None
+    )
+    if (
+        signal_mapping_items is None
+        or len(signal_mapping_items) != len(EXPECTED_SIGNAL_MAPPING)
+        or len({key for key, _ in signal_mapping_items}) != len(signal_mapping_items)
+        or signal_mapping != EXPECTED_SIGNAL_MAPPING
+    ):
+        errors.append(
+            "canonical semantics.signal_mapping must map label=content, "
+            "confidence=probability, and reason=content"
+        )
     return errors
 
 
@@ -479,8 +550,8 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
         errors.append("kind must be miner")
     if integration_id is None or integration_id == "":
         errors.append("id is required")
-    elif integration_id != INTEGRATION_ID_PLACEHOLDER and not integration_id.isdigit():
-        errors.append("id must be numeric or the explicit local placeholder")
+    elif not integration_id.isdigit():
+        errors.append("id must be numeric")
     if not slug:
         errors.append("slug is required")
     if not base_url:
@@ -489,9 +560,7 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
         errors.append("auth block is required")
     if "endpoints:" not in lines:
         errors.append("endpoints block is required")
-    if price_text is None:
-        errors.append("on_chain.min_price_usdc is required")
-    else:
+    if price_text is not None:
         try:
             price = Decimal(price_text)
             if not price.is_finite() or price < MINIMUM_PRICE_USDC:
@@ -506,13 +575,16 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
             errors.append("canonical base_url must use HTTPS")
         if base_url and "REPLACE" in base_url:
             errors.append("canonical base_url still contains a placeholder")
-        if integration_id == INTEGRATION_ID_PLACEHOLDER:
+        if integration_id is not None and integration_id.isdigit():
+            if int(integration_id) <= 0:
+                errors.append("canonical id must be a positive numeric routing ID")
+            else:
+                warnings.append(
+                    "canonical numeric ID is only a local routing candidate; it is not the sequential on-chain registrationId"
+                )
+        if integration_id is not None and integration_id.isdigit() and int(integration_id) > 0:
             warnings.append(
-                "canonical Integration ID is a local placeholder; uniqueness must be verified in the official portal"
-            )
-        elif integration_id is not None:
-            warnings.append(
-                "canonical Integration ID is not portal-verified by this local validator"
+                "official portal validation and endpoint sandbox testing were not run"
             )
         if _nested_scalar(lines, "auth", "type") != "bearer":
             errors.append("canonical auth.type must be bearer")
@@ -525,8 +597,10 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
     official_pending = [
         "official tg-miner-integration portal validation was not run",
     ]
-    if canonical and integration_id == INTEGRATION_ID_PLACEHOLDER:
-        official_pending.append("replace the Integration ID placeholder after uniqueness verification")
+    if canonical:
+        official_pending.append(
+            "recheck candidate slug availability through the live portal/node; inspect the numeric routing ID conservatively because it is not the on-chain registrationId"
+        )
     official_portal_validation = {
         "status": OFFICIAL_PORTAL_STATUS,
         "validated": False,

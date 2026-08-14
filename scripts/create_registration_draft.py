@@ -13,12 +13,25 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
-from typing import Any
 
-from oathcast.registration import MinerRegistrationDeclaration, decimal_usdc_to_micro
+from oathcast.registration import (
+    MINIMUM_PRICE_MICRO_USDC,
+    MinerRegistrationDeclaration,
+)
+
+try:
+    from scripts.validate_miner_drafts import validate_draft
+except ModuleNotFoundError:
+    from validate_miner_drafts import validate_draft
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BASE_SEPOLIA_CHAIN_ID = 84532
+MINER_REGISTRY_DIAMOND = "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8"
+REGISTER_MINER_SIGNATURE = "registerMiner(string,bytes32,address,uint256,string[])"
+CANONICAL_INTENTS = ("WEATHER_FORECAST",)
+EVM_ADDRESS_PATTERN = re.compile(r"^0x[0-9a-fA-F]{40}$")
+ZERO_EVM_ADDRESS = "0x" + ("0" * 40)
 
 
 def _scalar(lines: list[str], pattern: str) -> str | None:
@@ -49,106 +62,145 @@ def _supported_intents(lines: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(intents))
 
 
-def _output_mapping(lines: list[str]) -> dict[str, Any]:
-    """Parse the deliberately small local on_chain.fields subset."""
-
-    transform = _scalar(lines, r"^\s+transform:\s*(.*?)\s*$")
-    fields: dict[str, list[dict[str, Any]]] = {}
-    current_group: str | None = None
-    current_item: dict[str, Any] | None = None
-
-    def flush() -> None:
-        nonlocal current_item
-        if current_group is not None and current_item is not None:
-            fields.setdefault(current_group, []).append(current_item)
-        current_item = None
-
-    in_on_chain = False
-    in_fields = False
-    for line in lines:
-        if line.strip() == "on_chain:":
-            in_on_chain = True
-            continue
-        if in_on_chain and line and not line[0].isspace():
-            break
-        if not in_on_chain:
-            continue
-        if line.strip() == "fields:":
-            in_fields = True
-            continue
-        if in_fields and line.startswith("  ") and not line.startswith("    "):
-            flush()
-            in_fields = False
-            continue
-        if not in_fields:
-            continue
-        group_match = re.match(r"^\s{4}(strings|integers):\s*$", line)
-        if group_match:
-            flush()
-            current_group = group_match.group(1)
-            continue
-        item_match = re.match(r"^\s+-\s+index:\s*(\d+)\s*$", line)
-        if item_match:
-            flush()
-            current_item = {"index": int(item_match.group(1))}
-            continue
-        value_match = re.match(r"^\s{8}(name|source_path|multiplier):\s*(.*?)\s*$", line)
-        if value_match and current_item is not None:
-            key, value = value_match.groups()
-            if key == "multiplier":
-                current_item[key] = int(value)
-            else:
-                current_item[key] = value.strip("\"'")
-    flush()
-    if not transform or not fields:
-        raise ValueError("canonical YAML has no parseable on_chain output mapping")
-    return {"transform": transform, "fields": fields}
+def _candidate_miner_id(lines: list[str]) -> str:
+    miner_id = _scalar(lines, r"^id:\s*(.*?)\s*$")
+    if miner_id is None or not miner_id.isdigit() or int(miner_id) <= 0:
+        raise ValueError("canonical YAML must define a positive numeric candidate id")
+    return miner_id
 
 
-def build_registration_draft(yaml_path: Path) -> dict[str, Any]:
+def _optional_yaml_uri(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value.startswith(("ipfs://", "https://")):
+        raise ValueError("yaml_uri must use ipfs:// or https://")
+    return value
+
+
+def _optional_fee_address(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not EVM_ADDRESS_PATTERN.fullmatch(value) or value.lower() == ZERO_EVM_ADDRESS:
+        raise ValueError("fee_address must be a nonzero EVM address")
+    return value
+
+
+def build_registration_draft(
+    yaml_path: Path,
+    *,
+    min_price_micro_usdc: int = MINIMUM_PRICE_MICRO_USDC,
+    yaml_uri: str | None = None,
+    fee_address: str | None = None,
+) -> dict[str, object]:
     yaml_path = yaml_path.resolve()
     if not yaml_path.exists():
         raise FileNotFoundError(yaml_path)
+    local_validation = validate_draft(yaml_path, canonical=True)
+    if not local_validation["valid"]:
+        raise ValueError(
+            "canonical YAML failed local validation: "
+            + "; ".join(local_validation["errors"])
+        )
     raw_lines = yaml_path.read_text(encoding="utf-8").splitlines()
     slug = _scalar(raw_lines, r"^slug:\s*(.*?)\s*$")
-    price = _scalar(raw_lines, r"^\s+min_price_usdc:\s*(.*?)\s*$")
-    if not slug or not price:
-        raise ValueError("canonical YAML must define slug and on_chain.min_price_usdc")
+    if not slug:
+        raise ValueError("canonical YAML must define slug")
+    miner_id = _candidate_miner_id(raw_lines)
     intents = _supported_intents(raw_lines)
-    if not intents:
-        raise ValueError("canonical YAML must define at least one supported Intent")
+    if intents != CANONICAL_INTENTS:
+        raise ValueError("canonical YAML must support exactly WEATHER_FORECAST")
+    if (
+        isinstance(min_price_micro_usdc, bool)
+        or not isinstance(min_price_micro_usdc, int)
+        or min_price_micro_usdc < MINIMUM_PRICE_MICRO_USDC
+    ):
+        raise ValueError("min_price_micro_usdc must be an integer at least 10000")
+    yaml_uri = _optional_yaml_uri(yaml_uri)
+    fee_address = _optional_fee_address(fee_address)
 
-    output_mapping = _output_mapping(raw_lines)
     declaration = MinerRegistrationDeclaration.from_yaml(
         yaml_path,
         miner_slug=slug,
         supported_intents=intents,
-        min_price_micro_usdc=decimal_usdc_to_micro(price),
-        output_mapping=output_mapping,
-        source_authority="local_draft",
+        min_price_micro_usdc=min_price_micro_usdc,
+        yaml_uri=yaml_uri,
+        miner_id=miner_id,
+        fee_address=fee_address,
+        source_authority="telegraph_live_docs_local_draft",
         confirmation_status="draft",
-        schema_profile="unconfirmed_hackathon_1",
+        schema_profile="telegraph_live_2026-08-13",
     )
+    pending = [
+        "consult the separate registration-readiness manifest for external portal/IPFS observations; this offline generator does not perform them",
+        "live portal/node recheck that the candidate slug remains available; the numeric routing id is not the on-chain registrationId",
+    ]
+    if yaml_uri is None:
+        pending.append("pin the exact final YAML bytes to stable IPFS or HTTPS")
+    if fee_address is None:
+        pending.append("provide and verify a nonzero EVM fee address")
+    pending.append("fund the registering wallet with a small amount of Base Sepolia ETH for gas")
+    pending.append("obtain action-time confirmation before wallet signature or submission")
     return {
         "artifact_type": "oathcast_miner_registration_dry_run",
-        "artifact_version": 1,
+        "artifact_version": 2,
         "generated_at": datetime.now(tz=timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": {
             "path": str(yaml_path.relative_to(ROOT)),
             "yaml_sha256": declaration.yaml_sha256,
+            "yaml_hash_bytes32": f"0x{declaration.yaml_sha256}",
             "local_validator": "scripts/validate_miner_drafts.py",
+            "local_validation": {
+                "status": "passed",
+                "scope": local_validation["validation_scope"],
+                "warnings": local_validation["warnings"],
+            },
         },
         "registration": declaration.to_dict(),
-        "output_mapping": output_mapping,
+        "registration_call": {
+            "chain_id": BASE_SEPOLIA_CHAIN_ID,
+            "contract": MINER_REGISTRY_DIAMOND,
+            "signature": REGISTER_MINER_SIGNATURE,
+            "arguments": {
+                "yaml_uri": yaml_uri,
+                "yaml_hash_bytes32": f"0x{declaration.yaml_sha256}",
+                "fee_address": fee_address,
+                "min_price_micro_usdc": min_price_micro_usdc,
+                "supported_intents": list(intents),
+            },
+            "ready_to_encode": False,
+            "encoded_calldata": None,
+        },
+        "registration_input_sources": {
+            "candidate_id": "canonical YAML id",
+            "supported_intents": "canonical YAML semantics.supported_intents",
+            "yaml_hash_bytes32": "SHA-256 of the exact raw YAML bytes",
+            "yaml_uri": (
+                "explicit --yaml-uri operator/portal input"
+                if yaml_uri is not None
+                else "operator/portal input; absent from this generated draft"
+            ),
+            "fee_address": (
+                "explicit --fee-address operator input"
+                if fee_address is not None
+                else "operator/portal input; absent from this generated draft"
+            ),
+            "min_price_micro_usdc": "explicit generator input; protocol floor defaults to 10000",
+        },
         "official_registration": {
+            "status_scope": "local_generator_only",
+            "status_scope_note": (
+                "not_run means this offline generator did not contact Telegraph; "
+                "external portal and IPFS observations, when available, are recorded "
+                "in the separate registration-readiness manifest"
+            ),
+            "portal_validation_status": "not_run",
+            "endpoint_sandbox_status": "not_run",
             "submitted": False,
             "registered": False,
             "transaction_hash": None,
-            "blocked_on": [
-                "Hackathon 1 integration-interface YAML freeze",
-                "official portal validation",
-                "official Base Sepolia registration flow and contract details",
-            ],
+            "pending": pending,
         },
         "claims": {
             "telegraph_registered": False,
@@ -174,15 +226,38 @@ def main() -> None:
         / "registration-drafts"
         / "oathcast-weather-registration-draft.json",
     )
+    parser.add_argument(
+        "--min-price-micro-usdc",
+        type=int,
+        default=MINIMUM_PRICE_MICRO_USDC,
+        help="registration transaction price; defaults to the 10000 micro-USDC floor",
+    )
+    parser.add_argument(
+        "--yaml-uri",
+        help="optional stable ipfs:// or https:// URI for the exact final YAML bytes",
+    )
+    parser.add_argument(
+        "--fee-address",
+        help="optional nonzero EVM fee address; omit for an unsigned incomplete draft",
+    )
     args = parser.parse_args()
-    artifact = build_registration_draft(args.yaml)
+    artifact = build_registration_draft(
+        args.yaml,
+        min_price_micro_usdc=args.min_price_micro_usdc,
+        yaml_uri=args.yaml_uri,
+        fee_address=args.fee_address,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(
         json.dumps(
-            {"output": str(args.output), "yaml_sha256": artifact["registration"]["yaml_sha256"]}
+            {
+                "output": str(args.output),
+                "yaml_sha256": artifact["registration"]["yaml_sha256"],
+                "ready_to_encode": artifact["registration_call"]["ready_to_encode"],
+            }
         )
     )
 

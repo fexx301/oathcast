@@ -1,65 +1,82 @@
 {
   "artifact_type": "oathcast_miner_registration_dry_run",
-  "artifact_version": 1,
+  "artifact_version": 2,
   "claims": {
     "official_request_count": null,
     "paid_telegraph_traffic": false,
     "telegraph_registered": false
   },
-  "generated_at": "2026-08-05T07:45:30.173315Z",
+  "generated_at": "2026-08-13T16:33:42.993048Z",
   "official_registration": {
-    "blocked_on": [
-      "Hackathon 1 integration-interface YAML freeze",
-      "official portal validation",
-      "official Base Sepolia registration flow and contract details"
+    "endpoint_sandbox_status": "not_run",
+    "pending": [
+      "consult the separate registration-readiness manifest for external portal/IPFS observations; this offline generator does not perform them",
+      "live portal/node recheck that the candidate slug remains available; the numeric routing id is not the on-chain registrationId",
+      "fund the registering wallet with a small amount of Base Sepolia ETH for gas",
+      "obtain action-time confirmation before wallet signature or submission"
     ],
+    "portal_validation_status": "not_run",
     "registered": false,
+    "status_scope": "local_generator_only",
+    "status_scope_note": "not_run means this offline generator did not contact Telegraph; external portal and IPFS observations, when available, are recorded in the separate registration-readiness manifest",
     "submitted": false,
     "transaction_hash": null
-  },
-  "output_mapping": {
-    "fields": {
-      "integers": [
-        {
-          "index": 0,
-          "multiplier": 10000,
-          "name": "probability_x10000",
-          "source_path": "probability"
-        }
-      ],
-      "strings": [
-        {
-          "index": 0,
-          "name": "content",
-          "source_path": "content"
-        }
-      ]
-    },
-    "transform": "direct"
   },
   "registration": {
     "chain": "eip155:84532",
     "confirmation_status": "draft",
     "evidence_uri": null,
-    "fee_address": null,
+    "fee_address": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
     "generation": 1,
     "min_price_micro_usdc": 10000,
     "min_price_usdc": "0.010000",
-    "miner_id": null,
+    "miner_id": "64173",
     "miner_slug": "oathcast-weather",
-    "output_mapping_sha256": "a6302fbb533a17957abc2b57c8aaf4bfb59b12af24d6e08c72091877d0f8d08c",
-    "schema_profile": "unconfirmed_hackathon_1",
-    "source_authority": "local_draft",
+    "output_mapping_sha256": null,
+    "schema_profile": "telegraph_live_2026-08-13",
+    "source_authority": "telegraph_live_docs_local_draft",
     "supported_intents": [
-      "WEATHER_FORECAST",
-      "WEATHER_CHECK"
+      "WEATHER_FORECAST"
     ],
-    "yaml_sha256": "233cebbd0287e2dfd71a9856175724551c409292dc928b956e2b8e00610397e1",
-    "yaml_uri": null
+    "yaml_sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e",
+    "yaml_uri": "ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F"
+  },
+  "registration_call": {
+    "arguments": {
+      "fee_address": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+      "min_price_micro_usdc": 10000,
+      "supported_intents": [
+        "WEATHER_FORECAST"
+      ],
+      "yaml_hash_bytes32": "0x9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e",
+      "yaml_uri": "ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F"
+    },
+    "chain_id": 84532,
+    "contract": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "encoded_calldata": null,
+    "ready_to_encode": false,
+    "signature": "registerMiner(string,bytes32,address,uint256,string[])"
+  },
+  "registration_input_sources": {
+    "candidate_id": "canonical YAML id",
+    "fee_address": "explicit --fee-address operator input",
+    "min_price_micro_usdc": "explicit generator input; protocol floor defaults to 10000",
+    "supported_intents": "canonical YAML semantics.supported_intents",
+    "yaml_hash_bytes32": "SHA-256 of the exact raw YAML bytes",
+    "yaml_uri": "explicit --yaml-uri operator/portal input"
   },
   "source": {
+    "local_validation": {
+      "scope": "draft_local",
+      "status": "passed",
+      "warnings": [
+        "canonical numeric ID is only a local routing candidate; it is not the sequential on-chain registrationId",
+        "official portal validation and endpoint sandbox testing were not run"
+      ]
+    },
     "local_validator": "scripts/validate_miner_drafts.py",
     "path": "miners/oathcast-weather.yaml",
-    "yaml_sha256": "233cebbd0287e2dfd71a9856175724551c409292dc928b956e2b8e00610397e1"
+    "yaml_hash_bytes32": "0x9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e",
+    "yaml_sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
   }
 }

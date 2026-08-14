@@ -1,0 +1,21 @@
+{
+  "artifact_type": "telegraph_dispatcher_candidate_recheck",
+  "artifact_version": 1,
+  "observed_at": "2026-08-13T15:04:02Z",
+  "dispatcher": {
+    "url": "http://13.237.89.59:7044/miner-dispatcher/integrations",
+    "record_count": 40,
+    "response_bytes": 68727,
+    "response_sha256": "482c85a6da47d238a68b60488e3143fbeba94ad8907093c664b9ad36077429fd"
+  },
+  "candidate": {
+    "routing_id": 64173,
+    "routing_id_is_on_chain_registration_id": false,
+    "slug": "oathcast-weather"
+  },
+  "exact_match_count": 0,
+  "status": "observed_absence_not_reservation",
+  "scope": "read_only dispatcher recheck; no wallet, signature, transaction, or paid request",
+  "raw_snapshot_retained": false,
+  "contains_credentials": false
+}

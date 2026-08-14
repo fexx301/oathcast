@@ -1,11 +1,11 @@
-# CANONICAL REGISTRATION DRAFT — the Integration ID is intentionally unresolved.
-# Replace only the ID placeholder after uniqueness is verified in the official
-# portal; this file is still a local draft until that portal check succeeds.
+# CANONICAL REGISTRATION DRAFT - 64173 is a numeric candidate routing ID.
+# Confirm that both the ID and slug are unused in the official registration
+# interface before publishing or signing; this remains a local draft until then.
 # The three provider-specific YAMLs are adapter experiments, not separate
 # ecosystem Miners. This single service is the candidate OathCast Miner.
 version: "1"
 kind: miner
-id: REPLACE_WITH_UNIQUE_INTEGRATION_ID
+id: 64173
 slug: oathcast-weather
 protocol: generic
 name: OathCast Weather Forecast Miner
@@ -28,6 +28,57 @@ endpoints:
     external_path: /v1/forecast/point
     method: GET
     description: Forecast one UTC hour and return a short semantic response.
+    intents: [WEATHER_FORECAST]
+    params:
+      query:
+        required:
+          - name: lat
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point latitude in decimal degrees (-90 to 90).
+            example: 6.5244
+          - name: lon
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point longitude in decimal degrees (-180 to 180).
+            example: 3.3792
+          - name: start
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Inclusive UTC start of the one-hour forecast window.
+            example: "2026-08-17T15:00:00Z"
+          - name: end
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Exclusive UTC end of the one-hour forecast window.
+            example: "2026-08-17T16:00:00Z"
+        optional:
+          - name: cutoff
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: UTC deadline before which a new forecast must be issued.
+          - name: threshold_mm
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Fixed measurable precipitation threshold.
+            default: 0.1
+          - name: operator
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Fixed precipitation comparison operator.
+            default: ">"
+          - name: event_id
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Stable event identifier.
+          - name: location_name
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Human-readable point name.
+          - name: provider
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Optional provider selector.
     param_map:
       lat: latitude
       lon: longitude
@@ -102,38 +153,8 @@ output_schema:
 
 semantics:
   signal_mapping:
+    label_field: content
     confidence_field: probability
     reason_field: content
   supported_intents:
     - WEATHER_FORECAST
-    - WEATHER_CHECK
-
-on_chain:
-  transform: direct
-  min_price_usdc: 0.01
-  fields:
-    strings:
-      - index: 0
-        name: content
-        description: Deterministic human-readable forecast sentence.
-        source_path: content
-    integers:
-      - index: 0
-        name: probability_x10000
-        description: Probability in the inclusive range 0 to 1 scaled by 10000.
-        source_path: probability
-        multiplier: 10000
-  request:
-    - endpoint: predict
-      method: GET
-      query_params:
-        event_id: { source: strings.0, optional: true }
-        location_name: { source: strings.1, optional: true }
-        lat: { source: strings.2, type: float }
-        lon: { source: strings.3, type: float }
-        start: { source: strings.4, format: date-time }
-        end: { source: strings.5, format: date-time }
-        cutoff: { source: strings.6, optional: true, format: date-time }
-        threshold_mm: { source: strings.7, optional: true, type: float }
-        operator: { source: strings.8, optional: true }
-        provider: { source: strings.9, optional: true }
