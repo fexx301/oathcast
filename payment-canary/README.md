@@ -4,7 +4,8 @@ This is a one-shot, explicitly gated canary for the Telegraph Miner x402
 flow. It is self-contained under `payment-canary/` and uses the official v2.11
 fetch/SVM client pattern with `@solana/kit` and `@scure/base`.
 
-The policy is fixed to the current devnet challenge:
+The retained policy is fixed to the Solana Devnet challenge observed for the
+authorized August 9 rehearsal:
 
 - network: `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
 - asset: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
@@ -46,10 +47,9 @@ Use `--target-url https://host/v1/18/predict` instead of
 `--dispatcher-url ...` for a direct registered route. The challenge resource
 URL must exactly equal the resulting URL, including sorted query parameters.
 
-Telegraph's current live hackathon dispatcher is temporarily exposed over HTTP
-on Solana devnet and advertises its canonical resource without the gateway's
-`/miner-dispatcher` prefix. That narrowly pinned compatibility mode must be
-enabled explicitly:
+The August 9 dispatcher was exposed over HTTP on Solana Devnet and advertised
+its canonical resource without the gateway's `/miner-dispatcher` prefix. That
+historical, narrowly pinned compatibility mode must be enabled explicitly:
 
 ```bash
 npm run canary -- \
@@ -66,8 +66,10 @@ npm run canary -- \
 
 The flag permits no other HTTP authority. Redirects are disabled, and the
 prefix-free challenge URL must retain the same origin, Miner route, endpoint,
-and complete query string. Remove this exception when Telegraph publishes an
-HTTPS dispatcher.
+and complete query string. Current official docs use an HTTPS dev node; do not
+use this exception for a new request merely because it remains in the canary.
+Follow and validate the exact `accepts[]` entry received for any separately
+authorized call.
 
 ## One-shot execute
 

@@ -4,9 +4,10 @@
 
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
-publicly on release `2026-08-12-hardened-v6`. The separate public decision UI
-is intentionally degraded and returns 503 because no reviewed paid Application
-runner is configured yet.
+publicly on release `2026-08-12-hardened-v6`. The separate public UI exposes a
+truthful read-only status surface and client-only development fixture. Its live
+decision endpoint remains degraded and returns 503 because no reviewed paid
+Application runner is configured.
 
 The repository also contains provider adapters, a cross-Miner Application
 scaffold, durable case and receipt stores, a development Script Author proxy,
@@ -16,9 +17,11 @@ Application.
 
 The project deliberately separates two scoring paths:
 
-1. Telegraph's current Script Author path receives the question, ground truth,
-   and raw Miner response, then uses a 0–1 semantic composite based on cosine
-   similarity, BM25 overlap, and length quality.
+1. Telegraph's official scoring-module contract receives the question, ground
+   truth, and raw Miner response and calls an identity-blind WASM
+   `rank_answer` export that returns a score in `[0, 1]`. The earlier
+   cosine/BM25/length description came from pre-launch team guidance and is not
+   assumed to be the current Canonical Script implementation.
 2. OathCast's local domain benchmark evaluates calibrated binary probabilities
    with Brier score, Brier skill against frozen climatology, and coverage.
 
@@ -167,6 +170,12 @@ release/request headers. `compare_release_replay.py` compares two smoke reports
 and proves a stored event's receipt and public response survived a release
 cutover unchanged.
 
+`create_registration_draft.py` first requires that local check to pass, then
+records an unsigned registration snapshot. It hashes the exact YAML bytes and
+keeps price, pinned YAML URI, and fee address as explicit registration inputs;
+it never validates through the live portal, connects a wallet, encodes calldata,
+or submits `registerMiner`.
+
 `public_canary.py` is the same no-state check intended to run from an
 independent scheduler such as GitHub Actions; `.github/workflows/oathcast-canary.yml`
 contains the no-cost scheduled path and expects the API key in a repository
@@ -231,10 +240,10 @@ hardest one clears the others, whereas an average sits between the real bars and
 is wrong in both directions at once.
 
 Its numbers are other Miners' Telegraph scores and are **not comparable** to the
-local proxy in `benchmark_renderer.py`, which is `0.8*overlap +
-0.2*length_quality` rather than Telegraph's cosine + BM25 + length composite.
-Both land in 0.4–0.7, which is exactly why the comparison is tempting; both
-tools now print that warning next to their scores.
+local proxy in `benchmark_renderer.py`, which is
+`0.8*overlap + 0.2*length_quality` and does not implement the official WASM or
+Canonical Script. Both land in a similar numeric range, which is exactly why the
+comparison is tempting; both tools print the warning next to their scores.
 
 `DemandLedger` and `inspect_demand.py` retain append-only local provenance for
 Application requests. A conservative local candidate requires an Application
@@ -248,9 +257,14 @@ request and print the 402 challenge. It never supplies a signer or
 `PAYMENT-SIGNATURE`; use it to verify a live target before requesting payment
 authorization.
 
-The reference evaluator is a contract/proxy test only. Ahmed confirmed that
-Telegraph has not released the public WASM boilerplates or harness yet; replace
-the proxy with the official module and rerun its tests when released.
+The reference evaluator remains a development proxy, but the platform gate has
+changed: Telegraph published the official scoring-module ABI, Rust example, and
+wazero-based tester on 2026-08-13. A module must export `alloc`, `dealloc`, and
+`rank_answer`, return a score in `[0, 1]`, run without network/filesystem/shared
+state, and compile to a standalone WASM file no larger than 32 MB. The next
+Track 2 task is to port the robust local evaluator to that interface and test
+the compiled artifact with Telegraph's official tester. Until that succeeds,
+the Python proxy is not a WASM result or an official baseline improvement.
 
 `benchmark_script_author.py` compares that baseline proxy with a transparent
 development candidate across good, wrong-outcome, malformed, overlong,
@@ -268,38 +282,42 @@ report includes conditional Brier, coverage, common-case Brier, and the
 prior-only selection trace. The timestamped fixture is synthetic development
 evidence, not real provider performance or Telegraph traffic.
 
-The current paid boundary is `payment-canary/`. It uses the official x402 fetch
-and SVM clients, pins Solana Devnet, Circle's Devnet USDC mint, the 0.01-USDC
-cap, recipient, fee payer, Miner route, and endpoint, and independently checks
-the settlement transaction through Solana RPC. Preflight never reads a key.
-Execution requires both `--execute` and `SOLANA_PRIVATE_KEY`, sends at most one
-paid retry, and emits only sanitized evidence. Telegraph's temporary HTTP
-dispatcher and prefix-free canonical resource are accepted only by an explicit
-flag pinned to the current live authority; redirects and every other HTTP host
-remain blocked. `src/oathcast/payment.py` is retained as a legacy Base-Sepolia
-policy/journal regression harness and is not the current live signer.
+The retained paid-rehearsal boundary is `payment-canary/`. It uses the official
+x402 fetch and SVM clients, caps Solana Devnet USDC at 0.01, and independently
+checks settlement through Solana RPC. Preflight never reads a key; execution
+requires both `--execute` and `SOLANA_PRIVATE_KEY`, sends at most one paid retry,
+and emits only sanitized evidence. Its raw-IP HTTP compatibility mode is a
+historical August 9 exception, not the current default. Current official docs
+use an HTTPS dev node and offer Base Sepolia or Solana Devnet; for any separately
+authorized request, validate the exact received `accepts[]` entry. The legacy
+Python Base-Sepolia module remains regression coverage, not a live signer.
 
 When deployed behind a host such as Railway, the service honors the host's
 `PORT` value. Set `OATHCAST_MINER_API_KEY` to enable the Bearer protection that
 matches the canonical YAML's `auth` block; keep that secret in the host secret
 store, never in the repository.
 
-## Miner drafts
+## Miner registration
 
 The three provider-specific YAMLs under miners/ remain adapter experiments. The
-recommended registration unit is the single oathcast-weather.yaml draft, which
-wraps those adapters behind one public Miner service. Before registration:
+single `oathcast-weather.yaml` service was registered on Base Sepolia on
+2026-08-13 and is active in Telegraph's dispatcher:
 
 - keep the provider adapters behind the one public service and verify their event semantics;
-- replace the canonical draft's `id` and `base_url` with registration values;
 - keep upstream API keys in the host secret store;
-- validate the canonical YAML against a running Telegraph node and the released Intent/harness;
-- define the canonical request price; the current Discord clarification sets the minimum at 0.01 USDC.
+- retain the dedicated Telegraph credential validated by the portal until a documented rotation path replaces it;
+- use the exact pinned URI `ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F` and confirm its raw-byte SHA-256 remains `9ad11f06…56ee0e`;
+- on-chain registration ID is `78`; YAML routing ID `64173` is a separate identifier;
+- transaction `0x937d45d8108b905a551608707755e47899a41046436038a315a859d2f497b5d2` confirmed with zero native value;
+- `getMiner(78)`, the portal registration API, and the dispatcher all match the approved fee address, `10000` micro-USDC price, and `WEATHER_FORECAST` intent;
+- dispatcher slug `oathcast-weather` is active at `GET /predict`.
 
-Miner registration remains a separate Base-Sepolia portal/contract concern.
-The current live consumption challenge uses Solana Devnet USDC; these testnet
-tokens have no monetary value. Each Miner YAML must still define a price, and
-the minimum allowed price is 0.01 USDC. The explorer is at
+The sanitized post-submit record is
+`artifacts/registration-drafts/oathcast-weather-registration-confirmation-2026-08-13T1940Z.json`.
+Current official x402 docs offer Base Sepolia USDC and Solana Devnet USDC; the
+received 402 challenge is authoritative for a specific request. These testnet
+tokens have no monetary value. Registration price is supplied to the contract,
+not embedded in the canonical service YAML. The explorer is at
 https://explorer.telegraphprotocol.com/.
 
 ## Official provider references

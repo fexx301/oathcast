@@ -2,15 +2,18 @@
 
 Date: 2026-08-10
 Status: **local development evidence only.** Every number here comes from local
-proxy scorers. Telegraph's Canonical Script has not been released. Nothing in
-this document is a Telegraph score or a prediction of one.
+proxy scorers. Telegraph has since published the scoring-module ABI and tester,
+but OathCast has not reproduced the platform's Canonical Script. Nothing in this
+document is a Telegraph score or a prediction of one.
 
 ## Why the renderer is the Track 1 lever
 
-Miner performance is 75% of the Track 1 score. The scoring model is a `0..1`
-composite over **cosine similarity, BM25 word overlap, and response-length
-quality** — all computed on the response **text**. Brier is not currently part
-of it.
+Miner performance is 75% of the Track 1 score. At the time of this experiment,
+team guidance described a `0..1` cosine/BM25/length composite over response
+text. The finalized public contract now establishes only that an identity-blind
+WASM module receives question, ground truth, and Miner answer and returns a
+score in `[0, 1]`; it does not make this local proxy the Canonical Script. Brier
+remains a separate local domain metric.
 
 That makes `src/oathcast/render.py` the scoring surface. A calibration layer
 improves a number that is not currently being scored; the sentence the Miner
@@ -71,9 +74,10 @@ The honest gain dropped from +0.37 to **+0.18**.
 recall — matched truth tokens over truth tokens — so it can only ever be raised
 by adding words. A deliberately verbose variant (`resolution_concepts`) topped
 that lane at 0.6600 while scoring **last but one** on the F1 integrity lane
-(0.4889), which penalises padding through precision. Telegraph's published
-composite uses cosine and BM25, both of which normalise for length, so the F1
-lane is the closer analogue. **The harness now ranks on the guard lane.** Ranking
+(0.4889), which penalises padding through precision. Earlier team guidance
+described cosine and BM25, both of which normalise for length, so the F1 lane
+was chosen as a closer local analogue. **The harness now ranks on the guard
+lane.** Ranking
 on the proxy alone would have shipped the longest sentence on merit it did not
 have.
 
@@ -138,8 +142,10 @@ Full suite: 126 tests passing.
 
 ## Limitations
 
-- Telegraph's Canonical Script is unreleased; these are local proxies.
-- The question and ground-truth wording approximate an unpublished format.
+- Telegraph's scoring-module ABI/tester are public, but the Canonical Script's
+  exact scoring logic is not reproduced here; these remain local proxies.
+- The question and ground-truth wording approximate platform inputs rather than
+  proving the production evaluation corpus.
 - A proxy gain is directional evidence only, not a predicted protocol score.
 - No variant that trips an anti-gaming issue is eligible regardless of score.
 

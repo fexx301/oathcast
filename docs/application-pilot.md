@@ -1,8 +1,9 @@
 # OathCast Planning Desk pilot
 
-The Planning Desk is the first user-facing Application surface. It collects a
-concrete planning question while the official Telegraph payment and Miner
-registration surfaces are still pending.
+The Planning Desk is the first user-facing Application surface. OathCast Miner
+registration is complete and active, but this local intake remains deliberately
+disconnected from Telegraph routing and payment until the Application track and
+reviewed paid-request boundary are enabled.
 
 ## Run locally
 
@@ -56,8 +57,8 @@ the tool framed as non-binding planning support.
 
 Before routing any queued request through Telegraph, the operator must verify:
 
-- the official Hackathon YAML and Intent contract;
-- a registered OathCast Miner and available independent Miners;
+- the still-current frozen YAML and canonical Intent contract;
+- the active OathCast registration and fresh availability of independent Miners;
 - the official HTTPS payment/signer/settlement path;
 - the approved observation source and resolution policy; and
 - user permission to route the planning question.

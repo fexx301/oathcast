@@ -1,8 +1,9 @@
 # Repository and external-canary setup
 
 The project contains a no-state canary at
-`.github/workflows/oathcast-canary.yml`. It checks the public staging Miner
-every 15 minutes, verifies the expected v6 release identity, rejects
+`.github/workflows/oathcast-canary.yml`. It requests a run every 15 minutes
+(GitHub scheduling is best-effort), checks the public staging Miner, verifies the
+expected v6 release identity, rejects
 unauthenticated forecasting, and uses the API key only through the repository
 secret `OATHCAST_MINER_API_KEY`.
 
@@ -59,13 +60,15 @@ Actions tab. Confirm that the job reports:
 - unauthenticated forecast = `401`; and
 - authenticated forecast = `200` with a receipt and request ID.
 
-This proves service availability only. It is not Miner registration, paid
+This proves service availability only. Miner registration is established by
+separate on-chain/portal evidence; the canary itself does not prove paid
 Telegraph traffic, Explorer demand, or Track 3 qualification.
 
 ## Current scope
 
-The public canary proves Miner availability only. It does not prove Miner
-registration, paid Telegraph traffic, Explorer demand, or Track 3 qualification.
+The public canary proves Miner availability only. It does not replace the
+separate Miner-registration record and does not prove paid Telegraph traffic,
+Explorer demand, or Track 3 qualification.
 
 Provider collection and resolution have their own read-only monitor at
 `.github/workflows/provider-evidence-freshness.yml`; see

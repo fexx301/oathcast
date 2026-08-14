@@ -18,10 +18,10 @@ estimated.
 
 ## The canary was green for 96 consecutive runs and verified nothing
 
-**2026-08-10.** A public canary ran every 15 minutes against the deployed Miner
-and reported success 96 times in a row. Its most important step — "Verify public
-Miner", the one making an authenticated forecast request — had never once
-executed. `OATHCAST_MINER_API_KEY` was not configured as a repository secret, so
+**2026-08-10.** A public canary requested runs every 15 minutes against the
+deployed Miner and reported success 96 times in a row. Its most important step —
+"Verify public Miner", the one making an authenticated forecast request — had
+never once executed. `OATHCAST_MINER_API_KEY` was not configured as a repository secret, so
 a guard step skipped the check and the run reported success having tested nothing.
 
 Skipping safely when a secret is absent is the right pattern. The defect is that
@@ -229,10 +229,12 @@ verification at both ends.
 ## Optimising the metric nobody scores
 
 **2026-08-10.** A calibration layer was planned as a priority: better-calibrated
-probabilities, lower Brier score. Reading the actual scoring model changed the
-ranking. The live scorer is a `0..1` composite over cosine similarity, BM25 word
-overlap, and response-length quality — **all computed on the response text**.
-Brier is not currently part of it.
+probabilities, lower Brier score. The then-current team description of the
+scorer — a `0..1` cosine/BM25/length composite over response text — changed the
+ranking. Telegraph later published the general WASM scoring contract, but this
+entry records the evidence available when the decision was made; it does not
+claim the pre-launch formula is the current Canonical Script. Brier remains a
+separate local domain metric.
 
 So calibration work improves a number that is not being measured, while the
 *renderer* — how the probability is phrased — is the entire scored surface. The

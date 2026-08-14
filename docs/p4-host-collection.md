@@ -186,8 +186,10 @@ Then:
     systemctl list-timers oathcast-collect.timer --no-pager
 
 Every 3 hours at :07 — off the hour, because every scheduler on earth fires at
-:00. That yields ~8 cases/day, ~56 by 2026-08-17, which is enough to split into
-warmup and holdout. Daily collection would yield 7 total, too few to split.
+:00. That yields roughly eight cases per day and should continue through the
+hackathon window. The earlier `~56 by 2026-08-17` estimate was a pre-launch
+planning target, not a stopping condition. Daily collection remains too sparse
+for a useful chronological warmup/holdout split.
 
 `Persistent=true` is the reason this beats cron on a host that can be stopped: a
 run missed while the instance was down fires once on the next boot. Cron simply

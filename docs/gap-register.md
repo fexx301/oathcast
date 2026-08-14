@@ -1,21 +1,28 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-12
+Last reviewed: 2026-08-13
 
-Current baseline: the public Miner runs `2026-08-12-hardened-v6`, while the
-decision UI remains fail-closed without a runner. The v6 release passed the full
+Current baseline: the public Miner runs `2026-08-12-hardened-v6`. The separate
+decision UI provides a read-only status shell and development fixture while its
+live API remains fail-closed without a runner. The v6 release passed the full
 Python suite, nine payment-canary tests, a disposable-container smoke, public
 identity/write-readiness checks, and restart/replay persistence on the live
-receipt volume.
+receipt volume. OathCast is registered on Base Sepolia as on-chain registration
+ID `78` and active in the Telegraph dispatcher as routing ID `64173`, slug
+`oathcast-weather`.
 
-This register separates work we can complete without Telegraph releasing the
-official WASM/harness and registration materials from work that must remain a
-platform gate.
+This register separates work we can complete now that Miner registration is
+live from work that still depends on external participants, independent
+observations, or explicit payment/publication authorization. Telegraph's
+official scoring-module ABI and tester are now public, so Track 2 implementation
+is no longer a platform blocker.
 
 ## Fixed in this preparation slice
 
-- Local Miner draft validation for required fields, canonical HTTPS, unique
-  slugs, and the `0.01 USDC` price floor.
+- Local Miner draft validation for a positive numeric routing candidate,
+  canonical HTTPS, exact `WEATHER_FORECAST` semantics, endpoint query contracts,
+  and signal mappings. Slug availability remains a live portal check; routing-ID
+  collision inspection is conservative and is not the on-chain registration ID.
 - Release provenance through a non-secret release ID, source-tree digest, and
   image digest fields exposed by `/healthz` and response headers.
 - `/readyz` readiness endpoint and a reproducible public Miner smoke script
@@ -57,16 +64,23 @@ platform gate.
   hashes, challenge/deadline metadata, registry snapshot provenance, optional
   Signal Receipt identity, and explicit settlement verification state.
 - Immutable per-generation Miner registration declarations with raw-YAML
-  SHA-256, supported Intent strings, explicit integer micro-USDC price, output
-  mapping fingerprint, chain profile, source authority, and confirmation state.
+  SHA-256, supported Intent strings, explicit integer micro-USDC price, chain
+  profile, source authority, and confirmation state.
 - Demand-ledger SQLite triggers and a full event-hash verification check.
 - A human-readable Markdown Application evidence shell that presents the
   question, Miner comparison, external influence, later resolution, durable
   hashes, raw responses, and owned-Miner-disabled ablation without claiming
   live protocol evidence.
 - A registration dry-run generator and snapshot for the canonical YAML. It
-  records the raw-YAML digest, supported Intents, integer micro-USDC price,
-  output mapping fingerprint, and explicit non-submission claims.
+  records the candidate ID, raw-YAML digest/bytes32, exact Intent, integer
+  micro-USDC price, live Base Sepolia contract signature, missing operator
+  inputs, and explicit non-submission claims.
+- Confirmed Miner registration and activation: transaction
+  `0x937d45d8108b905a551608707755e47899a41046436038a315a859d2f497b5d2`
+  emitted on-chain registration ID `78`; `getMiner(78)`, the portal registration
+  API, and dispatcher activation all match the frozen YAML, fee address,
+  `10000` micro-USDC price, and `WEATHER_FORECAST` intent. The sanitized record
+  is `artifacts/registration-drafts/oathcast-weather-registration-confirmation-2026-08-13T1940Z.json`.
 - Human and JSON Explorer evidence templates that separate local receipts,
   payment artifacts, settlement verification, and future manual Explorer
   confirmation.
@@ -102,31 +116,33 @@ platform gate.
 - Establish an independently sourced observation pipeline and resolve the
   accumulated provider cases before using them for reliability weights or
   WeatherAPI failover.
+- Monitor `oathcast-weather` health, authenticated dispatcher traffic, request
+  counts, and the `WEATHER_FORECAST` leaderboard. Registration and catalog
+  activation are complete, but no paid request or leaderboard score has yet
+  been claimed.
+- Port the identity-blind robust evaluator to the official standalone WASM
+  interface (`alloc`, `dealloc`, `rank_answer`), compile it within the 32 MB
+  limit, and run the official wazero tester and adversarial corpus. Registration
+  of that module remains a separately authorized wallet action.
 - Write the payment-boundary ADR and threat model, then implement one private,
   authenticated, allowlisted, transactionally budgeted Solana request with a
   durable payment journal. Do not enable the public decision endpoint first.
 
 ## Blocked on Telegraph or external participants
 
-- Official WASM boilerplate, ABI, resource limits, schema, and public harness.
 - Official ground-truth source, deadline/finality, revision, and extraction
   rules.
-- Hackathon 1 registration compatibility and a successful registration/
-  discovery proof for the canonical Miner. Ahmed clarified that the Machina
-  bond was removed from Hackathon 1 contracts and that the integration-interface
-  YAML overrides the whitepaper. The YAML is still being finalized; released
-  hash/schema-URI/output requirements and contract addresses must be frozen and
-  validated before any transaction is encoded or submitted.
 - Ahmed clarified that Application agents may call Miners directly through
   Telegraph; Engine auto-routing is optional, and those Telegraph-routed calls
   count. Payment is required for every request flowing through Telegraph via
   x402 or another supported method. The remaining demand requirement is to
   generate genuine Track 3 Application usage and avoid artificial inflation;
   do not reopen the already-answered Engine-routing question.
-- Independently operated active Miners in the same Intent and their continued
-  availability. The cash-prize guardrail states three active Miners and 100
-  real Track 3 requests, but the full qualification semantics still need
-  written confirmation.
+- Continued availability of independently operated Miners in the same Intent.
+  Five active `WEATHER_FORECAST` Miners, including OathCast, were observed on
+  2026-08-13, so the three-Miner condition was met at that snapshot. It must be
+  rechecked near submission, and the separate 100-real-request condition remains
+  unmet.
 - The Solana x402 canary has completed one independently RPC-verified devnet
   payment, but it is an isolated CLI. A production Application boundary still
   needs authenticated principals, transactional budgets, idempotency binding,

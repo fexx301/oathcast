@@ -4,17 +4,27 @@ The repository packages one public HTTPS OathCast Miner. The
 `2026-08-12-hardened-v6` release is running in Docker on AWS EC2
 behind private host port 8080, with Caddy terminating HTTPS at
 `https://oathcastcourt.duckdns.org`.
-Set the environment variables from `.env.example` and validate the canonical
-YAML before registration. The exact deployed release, public smoke output, and
-runtime details are archived under `artifacts/release-evidence/`.
+Set the environment variables from `.env.example`. Registration is complete and
+the registered YAML is frozen; validate a new canonical YAML only before a
+separately authorized update or re-registration. The exact deployed release,
+public smoke output, and runtime details are archived under
+`artifacts/release-evidence/`.
 
 ## Current deployment status
 
 The deployed Miner is v6; the v5 and v4 sections below are historical release
-records. The public decision UI is deployed separately but
-intentionally fails closed: it has no Telegraph-backed runner and returns 503
-for decision requests. It must not be enabled until the authenticated, budgeted
-payment path has been reviewed and deployed.
+records. The public decision UI is deployed separately. Its safe public surface
+is a read-only release/status page plus a client-only development fixture. It
+has no Telegraph-backed runner, accepts no live Planning Desk intake, and
+returns 503 for decision requests. Live decisions must not be enabled until the
+authenticated, budgeted payment path has been reviewed and deployed.
+
+UI-only replacements must override the Dockerfile health check, which targets
+the Miner on port 8080. Run the UI on Docker bridge networking, publish only
+`127.0.0.1:8787:8787`, bind the process to `0.0.0.0:8787` inside the container,
+and probe `http://127.0.0.1:8787/health` internally. Caddy sends `/v1/*` to the
+Miner, so the public decision fail-closed probe is `/api/decision`, not
+`/v1/decision`. The disabled API returns 503 before reading a request body.
 
 ## Local run
 
@@ -42,26 +52,26 @@ so already-issued commitments are always honoured.
 
 ## x402 boundary
 
-`payment-canary/` is the current live-compatible boundary. It uses the official
-x402 fetch/SVM client packages and permits one unpaid preflight followed by at
-most one explicitly enabled paid retry. Before loading a signer it validates
-x402 v2, Solana Devnet, Circle's Devnet USDC mint, the 0.01-USDC cap, recipient,
-fee payer, Miner ID, endpoint, and complete request URL. It never fabricates a
-signature and never emits signing material or a raw settlement header.
+`payment-canary/` is the retained one-shot Solana rehearsal boundary. It uses
+the official x402 fetch/SVM client packages and permits one unpaid preflight
+followed by at most one explicitly enabled paid retry. Before loading a signer
+it validates x402 v2, the approved amount cap, recipient, fee payer, Miner ID,
+endpoint, and complete request URL. It never fabricates a signature or emits
+signing material or a raw settlement header.
 
-The current Telegraph dispatcher is HTTP and its challenge removes the
-`/miner-dispatcher` gateway prefix from the canonical resource. The canary
-supports this only through `--allow-insecure-http-devnet`, pinned to
-`http://13.237.89.59:7044`; redirects, other HTTP authorities, changed paths,
-and changed queries fail closed. Remove this exception when Telegraph exposes
-HTTPS.
+The raw-IP `--allow-insecure-http-devnet` path is preserved only to reproduce
+the authorized August 9 canary. Current official docs use an HTTPS dev node and
+offer Base Sepolia or Solana Devnet payment choices. For any future separately
+authorized request, treat the exact received `accepts[]` entry as authoritative
+for network, asset, amount, recipient, fee payer when present, and resource;
+keep redirects and mismatched authorities/paths/queries fail-closed.
 
-After settlement, the canary queries Solana Devnet RPC and requires a confirmed,
-error-free transaction with the expected signature, fee payer, mint, and exact
-token movement. Telegraph Explorer reconciliation is still required before a
-request is counted as local evidence. `src/oathcast/payment.py` remains a legacy
-Base-Sepolia policy/journal regression harness and must not be used as the
-current signer.
+After a Solana settlement, the canary queries Devnet RPC and requires a
+confirmed, error-free transaction with the expected signature, fee payer, mint,
+and exact token movement. Preserve Telegraph `signal_hash`/node evidence and
+independent settlement proof separately; the August 9 result remains a rehearsal,
+not qualifying demand. `src/oathcast/payment.py` remains a legacy Base-Sepolia
+policy/journal regression harness and must not be used as the current signer.
 
 Set `OATHCAST_MINER_API_KEY` on the host to enforce the Bearer token declared in
 the canonical YAML. Keep the payment wallet local; never put its private key
@@ -75,6 +85,20 @@ recreate the container so its `--env-file` is reloaded, run the public smoke
 test with both credentials, and then remove the retired key. The staging
 rotation on 2026-08-04 followed that procedure; see the non-secret evidence
 artifact in `artifacts/release-evidence/`.
+
+Telegraph's dedicated registration credential is a persistent client credential,
+not a disposable validation token: the portal returned `api_key_stored: true`.
+Keep it active until Telegraph documents and verifies a coordinated replacement.
+A rollback must therefore recreate the pinned image from the **current** owner-only
+env file and preserved mount/network/restart settings. Starting a container that
+predates the Telegraph credential can restore process availability while silently
+breaking Telegraph routing. The sanitized 2026-08-13 cutover evidence is
+`artifacts/release-evidence/oathcast-2026-08-13-telegraph-credential-cutover.json`.
+That procedure was rehearsed with both credentials on `127.0.0.1:18080` against
+a disposable copy of the verified 12-row backup. The replay was identical for
+both credentials, the source/copy SHA-256 stayed exact, row count stayed 12,
+the transactional write probe rolled back, and the disposable container and
+directory were removed. The live receipt database was never mounted.
 
 ## Release provenance and smoke test
 
@@ -187,8 +211,9 @@ key pair `oathcast-ec2`. Region matters operationally: the security group,
 the instance, and the key pair are all regional objects, so the console must
 be switched to `eu-north-1` before any of them is visible. The
 `oathcast:2026-08-12-hardened-v6` runs as container `oathcast` with restart
-policy `unless-stopped`; stopped container `oathcast-v5-rollback-20260813`
-preserves the previous release. `/healthz`, `/readyz`, authenticated forecast,
+policy `unless-stopped`; stopped container
+`oathcast-image-identity-rollback-20260813` preserves the immediate pre-identity
+replacement state on the same pinned image. `/healthz`, `/readyz`, authenticated forecast,
 transactional write, and restart/replay smoke tests have passed. The Miner is
 bound to loopback port 8080 and the `oathcast-caddy`
 container uses host networking to terminate HTTPS and redirect HTTP to it. The
@@ -465,9 +490,9 @@ anchored prefix has been altered.
 
 ## Provider-equivalence collection (P4, time-sensitive)
 
-Collect until Track 1 opens on 2026-08-17. Neither Open-Meteo nor WeatherAPI
-sells a historical *forecast* archive, so every hour not collected is evidence
-that cannot be recovered later.
+Continue collecting throughout the hackathon window. Neither Open-Meteo nor
+WeatherAPI sells a historical *forecast* archive, so every missed collection
+hour is evidence that cannot be recovered later.
 
 **Scheduled leg (live).** `.github/workflows/collect-provider-pairs.yml` requests
 an hourly run and appends to the `data/provider-pairs` branch. It is deliberately
@@ -511,9 +536,18 @@ not asserted, so results resolved against it are not evidence of provider qualit
 
 ## Deployment gate
 
-The service is not a registered Miner until it has a public HTTPS URL, a
-validated YAML, a live upstream path, the 0.01 USDC floor, and a successful
-paid request. The Application is not demo-complete until it has also made a
+The Miner registration gate is complete. Transaction
+`0x937d45d8108b905a551608707755e47899a41046436038a315a859d2f497b5d2`
+confirmed on Base Sepolia, emitted sequential registration ID `78`, and
+`getMiner(78)` returns the exact approved record. Telegraph's portal and
+dispatcher both report `oathcast-weather` active under routing ID `64173`; do
+not confuse that YAML routing ID with the on-chain registration ID. The
+post-submit evidence is
+`artifacts/registration-drafts/oathcast-weather-registration-confirmation-2026-08-13T1940Z.json`.
+
+A paid request remains a separate consumption/demand milestone, not a Miner-
+registration prerequisite. The
+Application is not demo-complete until it has made a
 paid request to at least one independent external Miner and its decision is
 still functional when OathCast is disabled. Do not count local, discovery, or
 fixture traffic as hackathon demand.
