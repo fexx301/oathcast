@@ -4,7 +4,9 @@
 
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
-publicly on release `2026-08-12-hardened-v6`. The separate public UI exposes a
+publicly on release `2026-08-16-route-v7`. The registered `GET /predict` route
+and canonical `GET /v1/forecast/point` route now share the same authenticated
+forecast and receipt path. The separate public UI exposes a
 truthful read-only status surface and client-only development fixture. Its live
 decision endpoint remains degraded and returns 503 because no reviewed paid
 Application runner is configured.
@@ -18,10 +20,12 @@ Application.
 The project deliberately separates two scoring paths:
 
 1. Telegraph's official scoring-module contract receives the question, ground
-   truth, and raw Miner response and calls an identity-blind WASM
-   `rank_answer` export that returns a score in `[0, 1]`. The earlier
-   cosine/BM25/length description came from pre-launch team guidance and is not
-   assumed to be the current Canonical Script implementation.
+   truth, and raw Miner response. The required identity-blind WASM interface is
+   `alloc`, `dealloc`, and `rank_answer`; the rank function receives six `i32`
+   pointer/byte-length values and returns an `f32` score in `[0, 1]`.
+   `breakdown_answer` has been deprecated and removed from the interface. The
+   earlier cosine/BM25/length description came from pre-launch team guidance and
+   is not assumed to be the current Canonical Script implementation.
 2. OathCast's local domain benchmark evaluates calibrated binary probabilities
    with Brier score, Brier skill against frozen climatology, and coverage.
 
@@ -131,9 +135,12 @@ To run the local Miner HTTP service:
 
     OATHCAST_REQUIRE_AUTH=false PYTHONPATH=src python3 -m oathcast.service
 
-It exposes /healthz and /v1/forecast/point. The service uses Open-Meteo by
-default. WeatherAPI/OpenWeather remain local adapter experiments and are
-blocked as production failovers until their event semantics are validated.
+It exposes `/healthz`, `/readyz`, the registered `/predict` route, and the
+canonical `/v1/forecast/point` route. The two forecast paths are exact aliases;
+near-miss paths return 404 and both aliases share authentication, rate limits,
+responses, and receipt identity. The service uses Open-Meteo by default.
+WeatherAPI/OpenWeather remain local adapter experiments and are blocked as
+production failovers until their event semantics are validated.
 The service rejects new forecasts at or after the declared cutoff, persists an
 immutable SQLite receipt keyed by `event_id`, and returns the receipt hash in
 `X-OathCast-Receipt-SHA256`. For local unauthenticated development, set
@@ -151,7 +158,7 @@ of an already-issued receipt always succeeds, even at capacity. Defaults are
 200,000 rows and 512 MiB, overridable with `OATHCAST_RECEIPT_MAX_ROWS` and
 `OATHCAST_RECEIPT_MAX_BYTES` (`none` disables a cap).
 
-The deployed v6 release makes replay compatibility deliberately fail-closed.
+The deployed v7 release retains v6's deliberately fail-closed replay contract.
 New receipts freeze the exact digest-covered `public_response`; replay serves
 those stored bytes rather than invoking a newer renderer. If a legacy receipt
 lacks `public_response`, v6 returns HTTP 503 `receipt_store_unavailable` instead
@@ -182,7 +189,7 @@ contains the no-cost scheduled path and expects the API key in a repository
 secret. See `docs/repository-and-canary.md` for the safe repository/secret
 setup. `backup_receipts.py` uses SQLite's online backup API, runs integrity
 checks on both copies, and verifies that the row count survives restoration.
-Because it initializes the current v6 store, use raw read-only `sqlite3.backup`
+Because it initializes the current receipt store, use raw read-only `sqlite3.backup`
 instead when taking a pre-migration backup of a legacy live database.
 
 `anchor_receipt_head.py` makes the receipt set tamper-**evident**. Immutability
@@ -257,32 +264,103 @@ request and print the 402 challenge. It never supplies a signer or
 `PAYMENT-SIGNATURE`; use it to verify a live target before requesting payment
 authorization.
 
-The reference evaluator remains a development proxy, but the official Track 2
-port now lives in `scoring-modules/oathcast-weather/`. It is a dependency-free
-Rust `no_std` module with exported memory and the published three-function ABI:
+The reference evaluator remains a development proxy, while the Track 2 source
+lives in `scoring-modules/oathcast-weather/`. It is a dependency-free Rust
+`no_std` module with exported memory and the current required interface:
 `alloc(i32) -> i32`, `dealloc(i32, i32)`, and
-`rank_answer(6 x i32) -> f32`. Inputs are UTF-8 pointer/byte-length pairs; blank
-answers return exactly `0`, every result is finite and clamped to `[0, 1]`, and
-the standalone artifact has no host imports or start section. The pinned release
-build passes the Rust tests, OathCast's wazero ABI/adversarial harness, and
-Telegraph's unmodified official tester (published example score `0.8500`). See the
+`rank_answer(6 x i32) -> f32`. The six inputs are UTF-8 pointer/byte-length
+pairs for question, ground truth, and Miner answer, in that order. Blank answers
+return exactly `0`, results are finite and clamped to `[0, 1]`, and the
+standalone artifact has no host imports or start section. The rank path passes
+the Rust tests, OathCast's wazero ABI/adversarial harness, and Telegraph's
+unmodified official tester (example score `0.8500`). See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
-build commands and safeguards. Two clean Rust `1.95.0` builds were
-byte-identical; the frozen artifact is 16,292 bytes with SHA-256
+build commands and safeguards. The current rank-only release build is 16,292
+bytes with SHA-256
 `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af` and
 raw-byte Keccak-256
 `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
-The machine-readable record is
-[`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json).
 
-One operational discrepancy remains: the portal helper text also names an
-undocumented `breakdown_answer` export, while the current guide, official
-example, and tester specify exactly the three functions above. OathCast does not
-invent a signature and treats that portal-only requirement as likely stale but
-unresolved. The portal also collects selected Intents but currently submits
-`registerWasm(..., [])`; validator/intent semantics must be confirmed before
-registration. No scorer upload, wallet signature, or on-chain WASM registration
-has been performed.
+An earlier frozen build also exported
+`breakdown_answer(6 x i32) -> f32` while the portal output and public guide
+appeared inconsistent. Telegraph's updated requirements now explicitly
+deprecate and remove that export. Telegraph later reported that the underlying
+August 14 node-log failure was `module[env] not instantiated`, not proof that
+the validator enforced `breakdown_answer`. The old rejection records,
+scalar-export test results, and hashes remain provenance for the historical
+discrepancy, not current ABI evidence. Two clean Rust `1.95.0`
+builds of that historical artifact were byte-identical; its retained metadata
+records 16,318 bytes with SHA-256
+`95895681d1e82bf01eab35f53af15cbfba8f459deba2b0dbc49e8dcbdeed9bf4` and
+raw-byte Keccak-256
+`0xa8cbc78d20b46b0aaba89002fdb585dc4f243dd192faff8e5ad271b4ef088b19`.
+The historical bytes are not present in this workspace.
+
+The machine-readable v4 record in
+[`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json)
+freezes the current rank-only candidate, its two byte-identical clean builds,
+the historical scalar-build metadata, and the remaining registration boundaries.
+The updated guide is authoritative for the candidate ABI. Telegraph reported
+that the breakdown-related validator rejection, Intent binding, and portal
+registry mismatch are fixed. Ahmed confirmed that re-registration is the
+intended path and reported that the candidate must score at least `0.60` on the
+Intent. The exact interpretation and aggregation of that threshold are not
+independently documented. The official tester example scores `0.8500`, while the
+weakest known valid local paraphrase scores `0.5875`; that creates hidden
+aggregate risk but does not prove that the candidate will pass or fail the live
+threshold. The exact candidate has no WASM import section or host imports and
+does not require an `env` module.
+
+The old compatibility export provisionally mirrored `rank_answer`. One portal
+record surfaced a missing-export message, but Telegraph's node logs attribute
+the underlying failure to `module[env] not instantiated`; another
+six-`i32`/`f32` module loaded far enough to run the structural self-match check.
+These records are superseded by the updated three-function guide and must not
+be presented as current requirements. Live portal build
+`D8HL6V9WUTFV9A7Ryk0W0`, page chunk
+`_next/static/chunks/app/page-abd375eb1c96558e.js`, now targets
+`0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8` and submits
+`registerWasm(bytes32,string,string)` with selector `0xfe1e40f7`. The arguments
+are the exact frozen WASM hash, the existing gateway URL, and
+`WEATHER_FORECAST`, so the visible UI/direct-simulation path encodes the
+canonical Intent. The two earlier delegated packets did not preserve that call;
+the later corrected packet did.
+
+Two earlier user-authorized transactions are retained as historical failed
+attempts. Transaction
+`0x82db3d5ade954cf4995cbc01ed4f2a0a3b24c352b0ce9efa15ceb1f18d7d7471`
+emitted old-registry ID `5`, while transaction
+`0xde08c7a66627b98cf1a55fc7a3b4d2e8065b08d9b20d09af5c015852faa140d1`
+emitted old-registry ID `7`; both delegated packets targeted the obsolete
+`0xac683...` registry and legacy `registerWasm(bytes32,string,string[])` ABI.
+
+After the portal bundle was corrected and the complete wallet wrapper was
+verified, transaction
+`0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e`
+confirmed on Base Sepolia. Its nested call targets the current registry
+`0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8` with selector `0xfe1e40f7`,
+the exact frozen hash/CID, and Intent `WEATHER_FORECAST`. The current registry
+emitted ID `7`, advanced `entityCount(2)` to `7`, and returns a non-empty
+`getWasm(7)` containing the wallet, exact hash, gateway URL, and Intent. This
+proves current-registry on-chain registration and Intent binding. It does not
+prove validator acceptance: the Dashboard/API still reports `wasm_count: 0`,
+and Stage 1, Stage 2, and the reported `0.60` threshold result remain
+unobserved. After merging an indexing PR, Telegraph asked the user to try
+re-registering because the dashboard remained empty. That is user-relayed
+guidance only; no additional transaction or decoded preflight exists, and no
+new retry is authorized. The evidence and exact Telegraph record are in
+[`docs/telegraph-track2-clarification-request.md`](docs/telegraph-track2-clarification-request.md).
+The exact candidate is pinned at
+`ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1`. The portal re-fetched
+the gateway bytes and reported the expected raw-byte Keccak-256, with only
+`WEATHER_FORECAST` selected. The complete postflight record is
+[`oathcast-weather-wasm-registration-postflight-2026-08-15T141838Z.json`](artifacts/registration-drafts/oathcast-weather-wasm-registration-postflight-2026-08-15T141838Z.json).
+The corrected, pre-broadcast simulation preflight is
+[`oathcast-weather-wasm-reregistration-preflight-2026-08-15T204924Z.json`](artifacts/registration-drafts/oathcast-weather-wasm-reregistration-preflight-2026-08-15T204924Z.json).
+The second transaction postflight is
+[`oathcast-weather-wasm-reregistration-postflight-2026-08-15T212134Z.json`](artifacts/registration-drafts/oathcast-weather-wasm-reregistration-postflight-2026-08-15T212134Z.json).
+The successful current-registry postflight is
+[`oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json`](artifacts/registration-drafts/oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json).
 
 `benchmark_script_author.py` compares that baseline proxy with a transparent
 development candidate across good, wrong-outcome, malformed, overlong,

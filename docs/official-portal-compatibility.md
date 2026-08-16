@@ -2,7 +2,9 @@
 
 Originally observed 2026-08-09 against the published Telegraph Miner Registry
 source; updated 2026-08-13 against the live Telegraph documentation and launch
-email.
+email, 2026-08-15 against the revised scoring-module guide and corrected WASM
+portal deployment, and 2026-08-16 against the confirmed current-registry
+registration and postflight reads.
 
 This began as a compatibility audit. On 2026-08-13 the exact canonical YAML was
 validated by the official portal with a dedicated Telegraph credential, pinned
@@ -56,14 +58,46 @@ The current registration guide identifies Base Sepolia (`84532`), Diamond
 contract `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8`, and
 `registerMiner(string,bytes32,address,uint256,string[])`. The older published
 integration-source address `0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3` is
-historical context, not an unresolved registration blocker.
+historical context for the completed Miner registration and the first failed-to-
+index Track 2 attempt. Telegraph reports that mismatch fixed. Live portal build
+`D8HL6V9WUTFV9A7Ryk0W0`, chunk
+`_next/static/chunks/app/page-abd375eb1c96558e.js`, now targets the current
+Diamond and encodes `registerWasm(bytes32,string,string)`, selector
+`0xfe1e40f7`, with the exact hash, existing gateway URL, and
+`WEATHER_FORECAST`.
 
 ## Remaining non-actions
 
 - Do not treat routing ID `64173` as on-chain registration ID `78`.
-- Use the now-published official WASM ABI and tester; do not claim the local
-  Python proxy is a compiled module or register a scoring module without
-  separate wallet authorization.
+- Use the current scoring-module contract: `alloc`, `dealloc`, and
+  `rank_answer(6 x i32) -> f32`. `breakdown_answer` is deprecated and removed.
+  The retained metadata and hashes for the historical 16,318-byte scalar-export
+  build document an earlier validator discrepancy only; the old bytes are not
+  present in this workspace. The portal/API surfaced a missing-export error, but
+  Telegraph later identified the node-log root cause as
+  `module[env] not instantiated` and reported the breakdown-related rejection
+  fixed. Do not present the historical extra export or parity tests as current
+  requirements. The current rank-only build is 16,292 bytes, has no import
+  section, and has a refreshed machine-readable release record with two
+  byte-identical clean builds. Telegraph reports that Intent binding and the
+  registry mismatch are fixed, and Ahmed confirmed re-registration is intended.
+  The exact bytes are pinned at
+  `ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1`, portal-verified, and
+  independently re-fetched byte-identically, with only `WEATHER_FORECAST`
+  selected. Two old-registry transactions remain historical: one emitted ID
+  `5`, and one emitted ID `7`, but neither created a current-registry record.
+  Corrected transaction
+  `0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e`
+  used target `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8`, selector
+  `0xfe1e40f7`, the exact hash/CID, and `WEATHER_FORECAST`. Current-registry
+  event ID `7`, `entityCount(2) == 7`, and matching non-empty `getWasm(7)` prove
+  registration and Intent binding. Ahmed's reported minimum is `0.60` on the
+  Intent, but its aggregation is undocumented. The official example is
+  `0.8500`; a valid local paraphrase at `0.5875` shows risk, not proven failure.
+  The Dashboard still reports `wasm_count: 0`, so validator acceptance and the
+  threshold result remain unobserved. Telegraph subsequently asked the user to
+  retry after its indexing PR merged. No new transaction is authorized; any
+  retry requires fresh authorization and exact wrapper/nested-call decoding.
 - Do not treat local fixtures, direct upstream weather calls, or the capped
   Solana devnet canary as qualifying Track 3 demand.
 - Do not claim paid requests, leaderboard performance, or Track 3 demand from
