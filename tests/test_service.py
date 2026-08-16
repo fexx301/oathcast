@@ -1,4 +1,5 @@
 import json
+import io
 from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
@@ -140,6 +141,20 @@ class ProviderBodyCapTests(unittest.TestCase):
 class ServiceTests(unittest.TestCase):
     def setUp(self):
         self.question = ForecastQuestion.from_dict(load_json("question.json"))
+
+    def _handler_request(self, service, path, *, headers=None):
+        class RecordingHandler(ForecastRequestHandler):
+            def _send_json(self, status, payload, *, headers=None):
+                self.responses.append((status, payload, headers or {}))
+
+        handler = object.__new__(RecordingHandler)
+        handler.service = service
+        handler.client_address = ("203.0.113.10", 0)
+        handler.path = path
+        handler.headers = headers or {}
+        handler.responses = []
+        handler.do_GET()
+        return handler.responses[0]
 
     def test_receipt_write_probe_interval_must_be_finite_and_non_negative(self):
         for invalid in (float("nan"), float("inf"), float("-inf"), -0.001):
@@ -286,33 +301,141 @@ class ServiceTests(unittest.TestCase):
     def test_get_query_validation_returns_clear_400_errors(self):
         service = ForecastService(provider_order=["open_meteo"])
 
-        class RecordingHandler(ForecastRequestHandler):
-            def _send_json(self, status, payload, *, headers=None):
-                self.responses.append((status, payload, headers or {}))
-
-        def request(path):
-            handler = object.__new__(RecordingHandler)
-            handler.service = service
-            handler.client_address = ("203.0.113.10", 0)
-            handler.path = path
-            handler.headers = {}
-            handler.responses = []
-            handler.do_GET()
-            return handler.responses[0]
-
         invalid_coordinate = valid_query_params()
         invalid_coordinate["lat"] = ["nan"]
-        status, payload, _ = request(
-            "/v1/forecast/point?" + urlencode(invalid_coordinate, doseq=True)
-        )
-        self.assertEqual(status, 400)
-        self.assertIn("latitude", payload["error"])
+        for path in ("/predict", "/v1/forecast/point"):
+            with self.subTest(path=path, case="invalid_coordinate"):
+                status, payload, _ = self._handler_request(
+                    service,
+                    path + "?" + urlencode(invalid_coordinate, doseq=True),
+                )
+                self.assertEqual(status, 400)
+                self.assertIn("latitude", payload["error"])
 
-        status, payload, _ = request(
-            "/v1/forecast/point?" + "x" * (MAX_QUERY_LENGTH + 1)
+            with self.subTest(path=path, case="oversized_query"):
+                status, payload, _ = self._handler_request(
+                    service,
+                    path + "?" + "x" * (MAX_QUERY_LENGTH + 1),
+                )
+                self.assertEqual(status, 400)
+                self.assertIn("query string", payload["error"])
+
+    def test_registered_predict_path_matches_canonical_path_and_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            service = ForecastService(
+                fetcher=lambda url: load_json("open_meteo.json"),
+                provider_order=["open_meteo"],
+                receipt_store=store,
+                require_auth=False,
+                clock=lambda: FIXED_NOW,
+            )
+            params = valid_query_params()
+            params["event_id"] = ["registered-path-parity"]
+            query = urlencode(params, doseq=True)
+
+            registered_status, registered_payload, registered_headers = (
+                self._handler_request(
+                    service,
+                    f"/predict?{query}",
+                    headers={"X-Request-ID": "registered-path"},
+                )
+            )
+            canonical_status, canonical_payload, canonical_headers = (
+                self._handler_request(
+                    service,
+                    f"/v1/forecast/point?{query}",
+                    headers={"X-Request-ID": "canonical-path"},
+                )
+            )
+
+            self.assertEqual(registered_status, 200)
+            self.assertEqual(canonical_status, 200)
+            self.assertEqual(canonical_payload, registered_payload)
+            self.assertEqual(
+                canonical_headers["X-OathCast-Receipt-SHA256"],
+                registered_headers["X-OathCast-Receipt-SHA256"],
+            )
+            self.assertEqual(store.capacity()["rows"], 1)
+            store.close()
+
+    def test_registered_and_canonical_paths_share_auth_failure_limit(self):
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            auth_token="correct-secret",
+            require_auth=True,
+            auth_failure_limit_per_minute=1,
         )
-        self.assertEqual(status, 400)
-        self.assertIn("query string", payload["error"])
+        first_status, _, _ = self._handler_request(
+            service,
+            "/predict?event_id=first",
+            headers={"Authorization": "Bearer invalid"},
+        )
+        second_status, _, _ = self._handler_request(
+            service,
+            "/v1/forecast/point?event_id=second",
+            headers={"Authorization": "Bearer invalid"},
+        )
+        self.assertEqual(first_status, 401)
+        self.assertEqual(second_status, 429)
+
+    def test_registered_and_canonical_paths_share_request_rate_limit(self):
+        service = ForecastService(
+            fetcher=lambda url: load_json("open_meteo.json"),
+            provider_order=["open_meteo"],
+            require_auth=False,
+            rate_limit_per_minute=1,
+            clock=lambda: FIXED_NOW,
+        )
+        query = urlencode(valid_query_params(), doseq=True)
+        first_status, _, _ = self._handler_request(service, f"/predict?{query}")
+        second_status, _, _ = self._handler_request(
+            service, f"/v1/forecast/point?{query}"
+        )
+        self.assertEqual(first_status, 200)
+        self.assertEqual(second_status, 429)
+
+    def test_forecast_aliases_reject_near_miss_paths(self):
+        service = ForecastService(provider_order=["open_meteo"], require_auth=False)
+        for path in (
+            "/predict/",
+            "/predict/extra",
+            "/prediction",
+            "/v1/forecast/point/",
+        ):
+            with self.subTest(path=path):
+                status, payload, _ = self._handler_request(service, path)
+                self.assertEqual(status, 404)
+                self.assertEqual(payload, {"error": "not_found"})
+
+    def test_access_log_omits_query_values_and_authorization(self):
+        handler = object.__new__(ForecastRequestHandler)
+        handler.command = "GET"
+        handler.path = "/predict?lat=6.5244&event_id=sensitive-event"
+        handler.headers = {
+            "Authorization": "Bearer must-not-be-logged",
+            "X-Request-ID": "untrusted-request-id",
+        }
+        handler.service = ForecastService(provider_order=["open_meteo"])
+        handler.wfile = io.BytesIO()
+        handler.send_response = lambda status: None
+        handler.send_header = lambda name, value: None
+        handler.end_headers = lambda: None
+        with self.assertLogs("oathcast.service", level="INFO") as captured:
+            handler._send_json(
+                404,
+                {"error": "not_found", "request_id": "effective-request-id"},
+            )
+
+        record = json.loads(captured.records[0].getMessage())
+        self.assertEqual(record["path"], "/predict")
+        self.assertEqual(record["status"], 404)
+        self.assertEqual(record["response_bytes"], len(handler.wfile.getvalue()))
+        self.assertEqual(record["request_id"], "effective-request-id")
+        self.assertNotIn("6.5244", captured.records[0].getMessage())
+        self.assertNotIn("sensitive-event", captured.records[0].getMessage())
+        self.assertNotIn("must-not-be-logged", captured.records[0].getMessage())
+        self.assertNotIn("untrusted-request-id", captured.records[0].getMessage())
 
     def test_rate_limiter_enforces_a_window_and_returns_retry_after(self):
         ticks = iter([0.0, 1.0, 2.0, 61.0])

@@ -58,6 +58,7 @@ MAX_QUERY_PARAMETERS = 32
 MAX_EVENT_ID_LENGTH = 128
 MAX_LOCATION_NAME_LENGTH = 256
 DEFAULT_TRUSTED_PROXY_NETWORKS = ("127.0.0.0/8", "::1/128")
+FORECAST_PATHS = frozenset({"/predict", "/v1/forecast/point"})
 
 
 def _log_request_failure(
@@ -839,14 +840,32 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
         headers: dict[str, str] | None = None,
     ) -> None:
         encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        response_headers = headers or {}
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("X-OathCast-Release-ID", self.service.release.release_id)
-        for name, value in (headers or {}).items():
+        for name, value in response_headers.items():
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(encoded)
+        record: dict[str, Any] = {
+            "event": "http_response",
+            "method": getattr(self, "command", "GET"),
+            "path": urlparse(getattr(self, "path", "")).path,
+            "response_bytes": len(encoded),
+            "status": status,
+        }
+        request_id = response_headers.get("X-OathCast-Request-ID")
+        if request_id is None and isinstance(payload.get("request_id"), str):
+            request_id = payload["request_id"]
+        if (
+            request_id
+            and len(request_id) <= 128
+            and all(ord(char) >= 32 for char in request_id)
+        ):
+            record["request_id"] = request_id
+        LOGGER.info(json.dumps(record, sort_keys=True, separators=(",", ":")))
 
     def _forwarded_for_header(self) -> str | None:
         get_all = getattr(self.headers, "get_all", None)
@@ -905,7 +924,7 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 payload["ready"] = ready
             self._send_json(200 if ready else 503, payload)
             return
-        if parsed.path != "/v1/forecast/point":
+        if parsed.path not in FORECAST_PATHS:
             self._send_json(404, {"error": "not_found"})
             return
 
@@ -1034,6 +1053,8 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
     def env_flag(name: str, default: bool) -> bool:
         raw = os.getenv(name)
         if raw is None:

@@ -3,9 +3,9 @@
 The project contains a no-state canary at
 `.github/workflows/oathcast-canary.yml`. It requests a run every 15 minutes
 (GitHub scheduling is best-effort), checks the public staging Miner, verifies the
-expected v6 release identity, rejects
-unauthenticated forecasting, and uses the API key only through the repository
-secret `OATHCAST_MINER_API_KEY`.
+expected v7 release identity, rejects unauthenticated `/predict` calls, verifies
+registered-path/canonical-path response and receipt parity, and uses the API key
+only through the repository secret `OATHCAST_MINER_API_KEY`.
 
 The workflow is intentionally fail-closed. The repository and secret are
 already configured; if the secret disappears, scheduled and manual runs fail
@@ -56,9 +56,11 @@ Actions tab. Confirm that the job reports:
 - `/healthz` = `200`;
 - `/readyz` = `200`;
 - `receipt_store_write` reports a successful transactional write and rollback
-  after the v6 cutover;
-- unauthenticated forecast = `401`; and
-- authenticated forecast = `200` with a receipt and request ID.
+  after the v7 cutover;
+- unauthenticated `/predict` = `401`;
+- authenticated `/predict` = `200` with a non-empty answer, receipt, and request
+  ID; and
+- `/v1/forecast/point` returns the identical response and receipt.
 
 This proves service availability only. Miner registration is established by
 separate on-chain/portal evidence; the canary itself does not prove paid

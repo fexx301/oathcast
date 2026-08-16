@@ -2,18 +2,19 @@
 
 Date: 2026-08-10
 Status: **local development evidence only.** Every number here comes from local
-proxy scorers. Telegraph has since published the scoring-module ABI and tester,
-but OathCast has not reproduced the platform's Canonical Script. Nothing in this
+proxy scorers. Telegraph has published the current `alloc`/`dealloc`/
+`rank_answer` ABI and tester; `breakdown_answer` is deprecated and removed.
+OathCast has not reproduced the platform's Canonical Script. Nothing in this
 document is a Telegraph score or a prediction of one.
 
 ## Why the renderer is the Track 1 lever
 
 Miner performance is 75% of the Track 1 score. At the time of this experiment,
 team guidance described a `0..1` cosine/BM25/length composite over response
-text. The finalized public contract now establishes only that an identity-blind
-WASM module receives question, ground truth, and Miner answer and returns a
-score in `[0, 1]`; it does not make this local proxy the Canonical Script. Brier
-remains a separate local domain metric.
+text. The finalized public `rank_answer` contract establishes that an
+identity-blind WASM module receives question, ground truth, and Miner answer and
+returns a score in `[0, 1]`; it does not make this local proxy the Canonical
+Script. Brier remains a separate local domain metric.
 
 That makes `src/oathcast/render.py` the scoring surface. A calibration layer
 improves a number that is not currently being scored; the sentence the Miner
@@ -142,8 +143,9 @@ Full suite: 126 tests passing.
 
 ## Limitations
 
-- Telegraph's scoring-module ABI/tester are public, but the Canonical Script's
-  exact scoring logic is not reproduced here; these remain local proxies.
+- Telegraph's published tester validates the current `rank_answer` interface,
+  but the Canonical Script's scoring logic is not reproduced here. These remain
+  local proxies.
 - The question and ground-truth wording approximate platform inputs rather than
   proving the production evaluation corpus.
 - A proxy gain is directional evidence only, not a predicted protocol score.

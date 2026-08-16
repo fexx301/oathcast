@@ -1,0 +1,11 @@
+{
+  "after_release_id": "2026-08-16-route-v7",
+  "before_release_id": "2026-08-12-hardened-v6",
+  "errors": [],
+  "fingerprints": {
+    "event_id": "release-v7-lagos-20260817T1500z",
+    "public_response_sha256": "7277b0414f801ab4c916de2578d44768c1436a482cc41c644d8bc76c992bb97a",
+    "receipt_sha256": "71bd645f36da46e8173d74001543edc832588343cb69f694ebd9f38419367dca"
+  },
+  "ok": true
+}

@@ -1,12 +1,20 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+from oathcast.service import FORECAST_PATHS
 from scripts.smoke_miner import (
+    CANONICAL_FORECAST_PATH,
+    REGISTERED_FORECAST_PATH,
     format_timestamp,
     receipt_capacity_check,
     receipt_write_check,
     rolling_horizon,
+    valid_forecast_response,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def readyz(**capacity) -> dict:
@@ -146,6 +154,28 @@ class ReceiptWriteCheckTests(unittest.TestCase):
         self.assertTrue(check["reported"])
 
 
+class ForecastResponseCheckTests(unittest.TestCase):
+    def test_nonempty_content_and_probability_pass(self):
+        self.assertTrue(
+            valid_forecast_response(
+                {"content": "Rain is unlikely. Probability: 20%.", "probability": 0.2}
+            )
+        )
+
+    def test_empty_or_invalid_answers_fail(self):
+        for response in (
+            {"content": "", "probability": 0.2},
+            {"content": "   ", "probability": 0.2},
+            {"content": "Rain is unlikely."},
+            {"content": "Rain is unlikely.", "probability": True},
+            {"content": "Rain is unlikely.", "probability": float("nan")},
+            {"content": "Rain is unlikely.", "probability": 10**10000},
+            {"content": "Rain is unlikely.", "probability": 1.1},
+        ):
+            with self.subTest(response=response):
+                self.assertFalse(valid_forecast_response(response))
+
+
 class RollingHorizonTests(unittest.TestCase):
     """The recurring canary must always pick a requestable horizon.
 
@@ -197,6 +227,22 @@ class RollingHorizonTests(unittest.TestCase):
         first = rolling_horizon(datetime(2026, 8, 10, 0, 5, tzinfo=timezone.utc))
         last = rolling_horizon(datetime(2026, 8, 10, 23, 55, tzinfo=timezone.utc))
         self.assertEqual(first, last)
+
+
+class RegisteredRouteConfigTests(unittest.TestCase):
+    def test_smoke_paths_match_the_service_aliases(self):
+        self.assertEqual(REGISTERED_FORECAST_PATH, "/predict")
+        self.assertEqual(CANONICAL_FORECAST_PATH, "/v1/forecast/point")
+        self.assertIn(REGISTERED_FORECAST_PATH, FORECAST_PATHS)
+        self.assertIn(CANONICAL_FORECAST_PATH, FORECAST_PATHS)
+
+    def test_caddy_routes_the_registered_path_to_the_miner(self):
+        matcher = next(
+            line.strip()
+            for line in (ROOT / "Caddyfile").read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("@miner path ")
+        )
+        self.assertIn(" /predict ", f" {matcher} ")
 
 
 if __name__ == "__main__":

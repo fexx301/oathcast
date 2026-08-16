@@ -2,7 +2,7 @@
 oathcastcourt.duckdns.org {
     encode gzip
 
-    @miner path /healthz /readyz /v1/*
+    @miner path /healthz /readyz /predict /v1/*
 
     handle @miner {
         reverse_proxy 127.0.0.1:8080 {

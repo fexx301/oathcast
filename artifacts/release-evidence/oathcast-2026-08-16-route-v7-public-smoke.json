@@ -1,0 +1,80 @@
+{
+  "base_url": "https://oathcastcourt.duckdns.org",
+  "checks": [
+    {
+      "name": "healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "readyz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "accepting_new_receipts": true,
+      "bytes_headroom_percent": 99.976,
+      "name": "receipt_capacity",
+      "ok": true,
+      "reported": true,
+      "rows_headroom_percent": 99.992
+    },
+    {
+      "cached": false,
+      "name": "receipt_store_write",
+      "ok": true,
+      "probe": "sqlite_transactional_write",
+      "reported": true,
+      "required": true,
+      "rolled_back": true
+    },
+    {
+      "name": "unauthorized_rejected",
+      "ok": true,
+      "path": "/predict",
+      "status": 401
+    },
+    {
+      "event_id": "release-v7-lagos-20260817T1500z",
+      "name": "authenticated_forecast",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "7277b0414f801ab4c916de2578d44768c1436a482cc41c644d8bc76c992bb97a",
+      "receipt_sha256": "71bd645f36da46e8173d74001543edc832588343cb69f694ebd9f38419367dca",
+      "request_id": "smoke-release",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "canonical_path_parity",
+      "ok": true,
+      "public_response_sha256": "7277b0414f801ab4c916de2578d44768c1436a482cc41c644d8bc76c992bb97a",
+      "receipt_sha256": "71bd645f36da46e8173d74001543edc832588343cb69f694ebd9f38419367dca",
+      "registered_path": "/predict",
+      "status": 200
+    }
+  ],
+  "ok": true,
+  "question": {
+    "event_id": "release-v7-lagos-20260817T1500z",
+    "forecast_cutoff": "2026-08-17T12:00:00Z",
+    "horizon_end": "2026-08-17T16:00:00Z",
+    "horizon_start": "2026-08-17T15:00:00Z",
+    "latitude": 6.524401,
+    "location_name": "Lagos",
+    "longitude": 3.3792,
+    "metric": "precipitation",
+    "operator": ">",
+    "precipitation_type": "measurable",
+    "spatial_semantics": "point",
+    "threshold_mm": 0.1,
+    "timezone": "UTC"
+  },
+  "release": {
+    "contract_version": "forecast_contract_v1",
+    "image_digest": "sha256:8bee7d497c0182b8899ad6ebbe162e89296d732311801edeaa26885665db4fac",
+    "release_id": "2026-08-16-route-v7",
+    "source_sha256": "3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557"
+  },
+  "release_id": "2026-08-16-route-v7"
+}

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -17,6 +18,8 @@ from oathcast.protocol import outbound_headers
 
 
 ROOT = Path(__file__).resolve().parents[1]
+REGISTERED_FORECAST_PATH = "/predict"
+CANONICAL_FORECAST_PATH = "/v1/forecast/point"
 
 
 def format_timestamp(moment: datetime) -> str:
@@ -72,6 +75,23 @@ def json_sha256(value: object) -> str:
 
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def valid_forecast_response(value: object) -> bool:
+    """Require the response fields the dispatcher needs to extract an answer."""
+
+    if not isinstance(value, dict):
+        return False
+    content = value.get("content")
+    probability = value.get("probability")
+    return (
+        isinstance(content, str)
+        and bool(content.strip())
+        and isinstance(probability, (int, float))
+        and not isinstance(probability, bool)
+        and 0 <= probability <= 1
+        and math.isfinite(probability)
+    )
 
 
 def request_json(url: str, *, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], object]:
@@ -288,14 +308,26 @@ def main() -> None:
         "location_name": question["location_name"],
         "lat": f"{question['latitude']:.6f}",
         "lon": f"{question['longitude']:.6f}",
-        "horizon_start": horizon_start,
-        "horizon_end": horizon_end,
-        "forecast_cutoff": forecast_cutoff,
+        "start": horizon_start,
+        "end": horizon_end,
+        "cutoff": forecast_cutoff,
         "threshold_mm": str(question["threshold_mm"]),
     }
-    forecast_url = f"{base_url}/v1/forecast/point?{urlencode(params)}"
-    unauthorized_status, _, _ = request_json(forecast_url)
-    checks.append({"name": "unauthorized_rejected", "status": unauthorized_status, "ok": unauthorized_status == 401})
+    registered_forecast_url = (
+        f"{base_url}{REGISTERED_FORECAST_PATH}?{urlencode(params)}"
+    )
+    canonical_forecast_url = (
+        f"{base_url}{CANONICAL_FORECAST_PATH}?{urlencode(params)}"
+    )
+    unauthorized_status, _, _ = request_json(registered_forecast_url)
+    checks.append(
+        {
+            "name": "unauthorized_rejected",
+            "path": REGISTERED_FORECAST_PATH,
+            "status": unauthorized_status,
+            "ok": unauthorized_status == 401,
+        }
+    )
 
     if not args.skip_authenticated:
         token = os.getenv(args.token_env)
@@ -303,7 +335,7 @@ def main() -> None:
             checks.append({"name": "authenticated_forecast", "ok": False, "error": f"{args.token_env} is not set"})
         else:
             forecast_status, forecast_headers, forecast = request_json(
-                forecast_url,
+                registered_forecast_url,
                 headers={"Authorization": f"Bearer {token}", "X-Request-ID": "smoke-release"},
             )
             receipt_sha256 = header_value(
@@ -314,13 +346,13 @@ def main() -> None:
             )
             response_ok = (
                 forecast_status == 200
-                and isinstance(forecast, dict)
-                and isinstance(forecast.get("content"), str)
+                and valid_forecast_response(forecast)
                 and bool(receipt_sha256)
                 and bool(response_request_id)
             )
             forecast_check: dict[str, object] = {
                 "name": "authenticated_forecast",
+                "path": REGISTERED_FORECAST_PATH,
                 "status": forecast_status,
                 "ok": response_ok,
                 "event_id": question["event_id"],
@@ -332,6 +364,38 @@ def main() -> None:
             if isinstance(forecast, dict):
                 forecast_check["public_response_sha256"] = json_sha256(forecast)
             checks.append(forecast_check)
+
+            canonical_status, canonical_headers, canonical_forecast = request_json(
+                canonical_forecast_url,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "X-Request-ID": "smoke-release-canonical",
+                },
+            )
+            canonical_receipt_sha256 = header_value(
+                canonical_headers, "X-OathCast-Receipt-SHA256"
+            )
+            checks.append(
+                {
+                    "name": "canonical_path_parity",
+                    "registered_path": REGISTERED_FORECAST_PATH,
+                    "canonical_path": CANONICAL_FORECAST_PATH,
+                    "status": canonical_status,
+                    "ok": (
+                        response_ok
+                        and canonical_status == 200
+                        and canonical_forecast == forecast
+                        and bool(canonical_receipt_sha256)
+                        and canonical_receipt_sha256 == receipt_sha256
+                    ),
+                    "receipt_sha256": canonical_receipt_sha256,
+                    "public_response_sha256": (
+                        json_sha256(canonical_forecast)
+                        if isinstance(canonical_forecast, dict)
+                        else None
+                    ),
+                }
+            )
 
     result = {
         "base_url": base_url,

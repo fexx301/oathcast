@@ -1,0 +1,81 @@
+{
+  "caddy": {
+    "configured_image": "caddy:2-alpine",
+    "image_id": "sha256:af555904a0961945f16bb323a501457b13a4f7e9bde969b145b97da80b38ecbe",
+    "new_config_sha256": "5273d4429b6a0aa58d374a49c55934e7b3e3931d17dbb9e5590a7850f1b5c970",
+    "old_config_sha256": "71447527c5195fab1ee164274e4583954f79324d8faebe9d58a470ec878233ef",
+    "production_image_validation_passed": true,
+    "reload_passed": true,
+    "registered_path": "/predict"
+  },
+  "database": {
+    "final_integrity_check": "ok",
+    "final_row_count": 17,
+    "initial_backup": {
+      "integrity_check": "ok",
+      "row_count": 16,
+      "sha256": "6600cf0f35722c9cf1a0733b5c1112bf9fdb964a7c2959208587114095ae0dae"
+    },
+    "precutover_backup": {
+      "integrity_check": "ok",
+      "row_count": 17,
+      "sha256": "f40c17ec6a85e0f2b3947f7a60f071216e73306813c43e045f5d458a18482dec"
+    }
+  },
+  "deployment_receipt": {
+    "event_id": "release-v7-lagos-20260817T1500z",
+    "note": "Synthetic deployment verification only; not Telegraph traffic, paid demand, or adoption.",
+    "public_response_sha256": "7277b0414f801ab4c916de2578d44768c1436a482cc41c644d8bc76c992bb97a",
+    "receipt_sha256": "71bd645f36da46e8173d74001543edc832588343cb69f694ebd9f38419367dca",
+    "row_count_after_first_v6_write": 17,
+    "row_count_after_v7_public_restart_replay": 17,
+    "v6_to_v7_replay_identical": true,
+    "comparison_scope": "Exact equality of event ID, receipt hash, and canonical public-response JSON hash.",
+    "precutover_v6_smoke_source_retained": false,
+    "evidence_limit": "The comparator output and v7 post-cutover smoke are retained, but the exact v6 pre-cutover source smoke JSON for this replay was not retained, so the comparison cannot be independently rerun from both source reports."
+  },
+  "image_id": "sha256:8bee7d497c0182b8899ad6ebbe162e89296d732311801edeaa26885665db4fac",
+  "local_verification": {
+    "go_wasm_suite_passed": true,
+    "miner_draft_validation_passed": true,
+    "python_tests_passed": 333,
+    "source_manifest_file_count": 67
+  },
+  "network": {
+    "durable_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "port_binding": "127.0.0.1:8080->8080/tcp",
+    "public_base_url": "https://oathcastcourt.duckdns.org",
+    "ssh_rule_state_at_recording": "closed after maintenance; external SSH connection failed while HTTPS remained healthy and port 8080 remained unreachable"
+  },
+  "payment_and_telegraph": {
+    "miner_registration_id": 78,
+    "paid_request_created": false,
+    "previous_zero_root_cause": "registered /predict returned 404, producing an empty miner_answer",
+    "fresh_epoch_result_observed": false,
+    "ui_decision_enabled": false
+  },
+  "recorded_at": "2026-08-16T21:41:57Z",
+  "release_id": "2026-08-16-route-v7",
+  "rollback": {
+    "caddy_backup_sha256": "71447527c5195fab1ee164274e4583954f79324d8faebe9d58a470ec878233ef",
+    "container": "oathcast-v6-rollback-20260816",
+    "image_id": "sha256:679b5dc3960757061e2a56d56cafc1b36176bb560e8dca78f3eb05308029e285",
+    "status": "exited"
+  },
+  "runtime_container": "oathcast",
+  "runtime_user": "1000:1000",
+  "source_sha256": "3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557",
+  "verification": {
+    "canonical_path_parity_passed": true,
+    "candidate_copy_restart_passed": true,
+    "external_https_healthy_after_ssh_closure": true,
+    "external_port_8080_closed": true,
+    "external_ssh_closed": true,
+    "live_log_sanitization_passed": true,
+    "public_authenticated_predict_nonempty": true,
+    "public_restart_replay_passed": true,
+    "public_unauthenticated_predict_status": 401,
+    "receipt_row_delta_after_public_replay": 0,
+    "receipt_row_delta_after_restart_replay": 0
+  }
+}
