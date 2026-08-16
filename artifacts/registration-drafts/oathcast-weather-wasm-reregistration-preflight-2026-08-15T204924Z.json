@@ -1,0 +1,97 @@
+{
+  "schema_version": "oathcast_weather_wasm_reregistration_preflight_v1",
+  "recorded_at": "2026-08-15T20:49:24Z",
+  "classification": "intent_bound_inner_call_simulated_fresh_authorization_pending",
+  "candidate": {
+    "byte_size": 16292,
+    "sha256": "97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af",
+    "keccak256_raw_bytes": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
+    "gateway_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "ipfs_uri": "ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "intent": "WEATHER_FORECAST",
+    "independent_gateway_refetch_verified": true,
+    "gateway_bytes_match_local_candidate": true
+  },
+  "telegraph_clarification": {
+    "provenance": "User-relayed response from Ahmed on 2026-08-15; permalink or screenshot not yet retained.",
+    "registry_mismatch_reported_fixed": true,
+    "intent_binding_reported_fixed": true,
+    "reregistration_invited": true,
+    "reported_minimum_intent_score": 0.6,
+    "score_aggregation_formula_documented": false,
+    "interpretation": "Treat 0.60 provisionally as an aggregate per-Intent validator result, not a minimum for every rank_answer invocation. Blank, unrelated, and deliberately wrong answers must legitimately score below 0.60."
+  },
+  "live_portal": {
+    "url": "https://integrate.telegraphprotocol.com/",
+    "checked_at": "2026-08-15T20:49:24Z",
+    "build_id": "D8HL6V9WUTFV9A7Ryk0W0",
+    "page_chunk": "_next/static/chunks/app/page-abd375eb1c96558e.js",
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "register_wasm_signature": "registerWasm(bytes32 wasmHash, string wasmUrl, string intent)",
+    "register_wasm_selector": "0xfe1e40f7",
+    "canonical_intent_transmitted_on_chain": true,
+    "dashboard_api_url": "https://integrate.telegraphprotocol.com/api/registrations/0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "dashboard_wasm_count_before_retry": 0
+  },
+  "historical_attempt_reconciliation": {
+    "transaction_hash": "0x82db3d5ade954cf4995cbc01ed4f2a0a3b24c352b0ce9efa15ceb1f18d7d7471",
+    "historical_target": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
+    "historical_event_registration_id": 5,
+    "historical_target_wasm_entity_count": 0,
+    "historical_target_registration_5_empty": true,
+    "current_registry_wasm_entity_count": 6,
+    "current_registry_registration_5_is_oathcast": false,
+    "current_registry_registration_6_is_oathcast": false,
+    "oathcast_candidate_migrated": false,
+    "disposition": "Treat the portal-emitted historical ID 5 as discarded for OathCast and use a fresh registration, per Telegraph's re-registration instruction."
+  },
+  "score_evidence": {
+    "official_example_score": 0.85,
+    "local_cases": [
+      {
+        "case": "generic_temperature_good",
+        "score": 0.75
+      },
+      {
+        "case": "unicode_valid",
+        "score": 0.9676
+      },
+      {
+        "case": "qualified_duration_negation",
+        "score": 0.67
+      },
+      {
+        "case": "qualified_uncertainty_negation",
+        "score": 0.5875
+      }
+    ],
+    "evidence_limit": "The validator replay corpus and aggregation formula are not public. These cases do not prove that the candidate will meet or miss the reported 0.60 per-Intent threshold."
+  },
+  "simulated_inner_call": {
+    "simulation_method": "eth_call through cast call; no transaction was generated or broadcast",
+    "chain": "Base Sepolia",
+    "chain_id": 84532,
+    "from": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "target": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "value_wei": "0",
+    "selector": "0xfe1e40f7",
+    "signature": "registerWasm(bytes32 wasmHash, string wasmUrl, string intent)",
+    "wasm_hash": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
+    "wasm_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "intent": "WEATHER_FORECAST",
+    "succeeded": true,
+    "prospective_registration_id": 7
+  },
+  "authorization_boundary": {
+    "previous_authorization_consumed": true,
+    "fresh_retry_authorized": false,
+    "outer_wallet_wrapper_decoded": false,
+    "transaction_broadcast": false,
+    "required_before_confirmation": [
+      "fresh explicit user authorization for one corrected re-registration attempt",
+      "portal wallet constructs the transaction",
+      "decode and verify the complete outer wrapper and nested call before confirmation",
+      "confirm chain 84532, zero value, target 0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8, selector 0xfe1e40f7, exact hash, exact existing gateway URL, and WEATHER_FORECAST"
+    ]
+  }
+}

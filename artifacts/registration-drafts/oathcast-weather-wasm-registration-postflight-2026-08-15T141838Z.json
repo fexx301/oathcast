@@ -1,0 +1,92 @@
+{
+  "schema_version": "oathcast_weather_wasm_registration_postflight_v1",
+  "recorded_at": "2026-08-15T14:40:51Z",
+  "classification": "confirmed_event_on_portal_configured_unindexed_registry",
+  "candidate": {
+    "byte_size": 16292,
+    "sha256": "97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af",
+    "keccak256_raw_bytes": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
+    "gateway_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "ipfs_uri": "ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "portal_hosted_bytes_verified": true,
+    "portal_selected_intents": ["WEATHER_FORECAST"]
+  },
+  "portal": {
+    "url": "https://integrate.telegraphprotocol.com/",
+    "repository": "https://github.com/telegraphprotocol/tg-miner-integration.git",
+    "source_commit": "ee3724eeddf25177c2d2135ae4c9a77e091cdf98",
+    "live_bundle_build_id": "7kFvKgAQXb64GgdEj3_fL",
+    "live_bundle_page_chunk": "_next/static/chunks/app/page-78a45c89cf93ee69.js",
+    "live_registry_address": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
+    "live_registry_address_source": "NEXT_PUBLIC_REGISTRY_CONTRACT compiled into the fetched live bundle",
+    "success_screen_registration_id": 5,
+    "success_screen_intent_id": "0x1821e010856eb733af536890e0a65e83f1253c39796c9b5ab73301000d6729b6",
+    "dashboard_wasm_count_after_confirmation": 0,
+    "dashboard_message": "No WASM registrations yet",
+    "dashboard_api_url": "https://integrate.telegraphprotocol.com/api/registrations/0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "dashboard_api_wasm_count": 0
+  },
+  "transaction": {
+    "chain": "Base Sepolia",
+    "chain_id": 84532,
+    "hash": "0x82db3d5ade954cf4995cbc01ed4f2a0a3b24c352b0ce9efa15ceb1f18d7d7471",
+    "explorer_url": "https://sepolia.basescan.org/tx/0x82db3d5ade954cf4995cbc01ed4f2a0a3b24c352b0ce9efa15ceb1f18d7d7471",
+    "block_number": 45517615,
+    "block_timestamp": "2026-08-15T14:18:38Z",
+    "status": 1,
+    "native_value_wei": "0",
+    "gas_used": 431377,
+    "outer_from": "0xb42f812a44c22cc6b861478900401ee759ebead6",
+    "outer_to": "0xdb9b1e94b5b69df7e401ddbede43491141047db3",
+    "outer_selector": "0xcef6d209",
+    "outer_signature": "redeemDelegations(bytes[],bytes32[],bytes[])",
+    "wallet_confirmation_timing": "The user confirmed in MetaMask before the outer delegation wrapper was decoded. All calldata checks below are postflight observations, not a completed pre-signature guardrail."
+  },
+  "decoded_inner_call": {
+    "delegated_wallet": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "target": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
+    "value_wei": "0",
+    "selector": "0x19238d1c",
+    "signature": "registerWasm(bytes32 wasmHash, string wasmUrl, string[] whitelistedUrls)",
+    "wasm_hash": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
+    "wasm_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "whitelisted_urls": []
+  },
+  "registration_event": {
+    "emitter": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
+    "event": "IntentRegistered(uint256,address,uint8,bytes32,string,bytes32)",
+    "registration_id": 5,
+    "registrant": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "entity_type": 2,
+    "intent_id": "0x1821e010856eb733af536890e0a65e83f1253c39796c9b5ab73301000d6729b6",
+    "content_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "content_hash": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8"
+  },
+  "registry_reconciliation": {
+    "validator_indexed_registry": {
+      "address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+      "register_wasm_facet": "0xde94dbe4a2171ed6f2c3e7e9507d52e5ca23439c",
+      "wasm_entity_count": 4,
+      "registrations_1_through_4_readable": true,
+      "registration_5_readable": false
+    },
+    "portal_target_registry": {
+      "address": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
+      "register_wasm_facet": "0xb71185428dd6932b9eaad6eaef696a822992b1bf",
+      "read_facet": "0x3acf7376258668db1e6523286c9fd5aa4f1e63e5",
+      "wasm_entity_count": 0,
+      "registration_5_readable": false
+    },
+    "authoritative_result": "No current-registry record or validator enrollment is proven. The successful transaction and event must not be presented as an active Telegraph WASM registration."
+  },
+  "next_gate": {
+    "telegraph_question": "Which Base Sepolia registry address is authoritative, and will portal-emitted registration ID 5 be indexed, migrated, or discarded?",
+    "retry_authorized": false,
+    "required_before_retry": [
+      "Telegraph resolves the registry-address split and registration-5 disposition",
+      "the hosted bytes are independently reverified",
+      "the complete wallet wrapper and nested call are decoded before confirmation",
+      "the user gives fresh explicit authorization"
+    ]
+  }
+}

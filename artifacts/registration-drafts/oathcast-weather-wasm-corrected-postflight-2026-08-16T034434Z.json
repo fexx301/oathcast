@@ -1,0 +1,73 @@
+{
+  "schema_version": "oathcast_weather_wasm_corrected_postflight_v1",
+  "recorded_at": "2026-08-16T03:59:29Z",
+  "classification": "correct_registry_registration_event_dashboard_unindexed_validator_unobserved",
+  "candidate": {
+    "byte_size": 16292,
+    "sha256": "97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af",
+    "keccak256_raw_bytes": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
+    "gateway_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "ipfs_uri": "ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "intent": "WEATHER_FORECAST"
+  },
+  "transaction": {
+    "chain": "Base Sepolia",
+    "chain_id": 84532,
+    "hash": "0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e",
+    "explorer_url": "https://sepolia.basescan.org/tx/0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e",
+    "block_number": 45541793,
+    "block_timestamp": "2026-08-16T03:44:34Z",
+    "status": 1,
+    "gas_used": 445007,
+    "native_value_wei": "0",
+    "outer_from": "0xc066ac5D385419B1A8c43a0E146fA439837a8B8",
+    "outer_to": "0xdb9b1e94b5b69df7e401ddbede43491141047db3",
+    "outer_selector": "0xcef6d209",
+    "outer_signature": "redeemDelegations(bytes[],bytes32[],bytes[])",
+    "raw_calldata_hex_length": 3850,
+    "raw_calldata_byte_length": 1924,
+    "raw_calldata_sha256": "1e393ce8fd779332c168fdec86e0535d34afc8a3fca31fd140957d53df1850ae",
+    "raw_calldata_hex_text_sha256": "6d718b7acf6166d57eb28ac20e0962bf8996d96efd345836598cf34e61aa47b1",
+    "receipt_json_sha256": "102b153da371595b66633649935900a95c99daf5a56abae005748f5a2fd5a183"
+  },
+  "decoded_wallet_packet": {
+    "delegated_wallet": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "outer_target": "0xdb9b1e94b5b69df7e401ddbede43491141047db3",
+    "outer_selector": "0xcef6d209",
+    "outer_signature": "redeemDelegations(bytes[],bytes32[],bytes[])",
+    "inner_target": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "inner_value_wei": "0",
+    "inner_selector": "0xfe1e40f7",
+    "inner_signature": "registerWasm(bytes32 wasmHash, string wasmUrl, string intent)",
+    "inner_wasm_hash": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
+    "inner_wasm_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "inner_intent": "WEATHER_FORECAST"
+  },
+  "registration_event": {
+    "emitter": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "event": "IntentRegistered(uint256,address,uint8,bytes32,string,bytes32)",
+    "registration_id": 7,
+    "registrant": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "entity_type": 2,
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "content_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
+    "content_hash": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8"
+  },
+  "registry_observation": {
+    "address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "entity_count_type_2": 7,
+    "get_wasm_7_raw_zero": false,
+    "get_wasm_7_contains_wallet": true,
+    "get_wasm_7_contains_hash": true,
+    "get_wasm_7_contains_gateway_url": true,
+    "get_wasm_7_contains_intent": true
+  },
+  "dashboard_observation": {
+    "api_url": "https://integrate.telegraphprotocol.com/api/registrations/0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
+    "http_status": 200,
+    "wasm_count": 0,
+    "wasm": [],
+    "cache_status": "DYNAMIC"
+  },
+  "evidence_limit": "The corrected registry now contains ID 7 with the exact candidate and Intent, proving on-chain registration in the current registry. The Dashboard/API still has no WASM entry, and authoritative validator Stage 1 acceptance, Stage 2 promotion, and the reported 0.60 threshold result remain unobserved. Do not infer validator acceptance from the receipt or registry event alone."
+}
