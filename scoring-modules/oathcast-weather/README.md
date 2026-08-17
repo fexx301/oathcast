@@ -73,17 +73,35 @@ URL, and canonical Intent `WEATHER_FORECAST`. The current registry emitted ID
 `7`, reports `entityCount(2) == 7`, and returns a non-empty `getWasm(7)` containing
 the OathCast wallet, candidate hash, URL, and Intent.
 
-The exact rank-only candidate remains pinned at
+The historical registered rank-only artifact remains pinned at
 `ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1`; an independent re-fetch
-confirmed byte identity. Current-registry enrollment and Intent binding are now
-proven on-chain, but the portal Dashboard/API still reports `wasm_count: 0` for
-the OathCast wallet. Validator Stage 1 processing, Ahmed's reported `0.60`
-per-Intent threshold result, and Stage 2 promotion remain unobserved. Telegraph
-reported an IPFS gateway timeout as the indexing cause and later suggested
-another re-registration after its indexing fix was merged; those are user-relayed
-operational statements, not proof of validator processing or authorization for
-another transaction. No additional registration has been executed or
-authorized.
+confirmed byte identity. Current-registry ID `7` remains valid historical proof
+of enrollment and Intent binding for those bytes. A later manual retry registered
+the same 16,292-byte artifact from wallet
+`0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278` as registration `19` through
+transaction
+`0xa6bc6f653eec4a5c79acac4a6e747222d48fd257367c325cd0e6c0090d321e73`,
+using the Dropbox URL
+`https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=sigr9vji&dl=1`.
+According to user-relayed Telegraph team confirmation, corroborated by reaching
+champion comparison, Stage 1 passed; no separate Stage 1 API field was retained.
+Stage 2 rejected the artifact because it ordered the good answer above the bad
+answer on `31/32` comparable cases while the live champion did so on `32/32`.
+The returned margins were `0.31248063` for
+the candidate and `0.37360683` for the champion, with `historical_rows: 0`.
+Those margins are diagnostics, not a direct candidate-versus-champion promotion
+test.
+
+The current 42,798-byte artifact was later manually hosted on Dropbox and
+registered for `WEATHER_FORECAST` as registration `41` in Base Sepolia
+transaction
+`0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
+Independent postflight verification reproduced the exact size, SHA-256, and
+raw-byte Keccak-256 listed below. Registration `41` reached champion comparison
+(Stage 1 passed) and Stage 2 rejected it at `31/32` candidate ordering wins
+versus the champion's `32/32`. Candidate margin/EvalScore was `0.37852418`,
+above the champion aggregate margin `0.37360683`; the higher aggregate did not
+override the per-case promotion rule.
 
 See
 [`../../docs/telegraph-track2-clarification-request.md`](../../docs/telegraph-track2-clarification-request.md)
@@ -132,15 +150,34 @@ The release artifact is produced at:
 
 `rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm`
 
-The Go harness uses wazero `v1.12.0` and checks the published ABI, deterministic
+The full Go harness uses wazero `v1.12.0` and checks the published ABI, deterministic
 fixture ordering, repeated-call behavior, malformed UTF-8, invalid pointers,
 bounded allocation traps, import/start-section absence, and score range.
+Rust tests pass `39/39`, the Go/wazero suite passes, and Python discovery passes
+`401/401`.
 Telegraph's unmodified official tester also ran successfully against the rank
-path (example case `0.8500`). Ahmed reported that a registered candidate must
-score at least `0.60` on its Intent, but the validator corpus and aggregation
-formula are not independently documented. The weakest known valid local
-paraphrase scores `0.5875`; that is hidden aggregate risk, not proof of live
-threshold failure. No validator acceptance or threshold pass has been observed.
+path (example case `0.8500`). According to user-relayed Telegraph guidance, its
+Stage 2 fixtures test
+factual paraphrase and lexical discrimination, not numeric, time-window, or JSON
+cases. Each near-miss pair has a fixed `0.15` margin floor, there are six
+near-miss cases, and promotion follows after all six pass. According to the same
+user-relayed guidance, the reported `0.60` metric is Spearman rank correlation against
+the live champion's historical scores, not a raw scorer threshold or a direct
+comparison of the two returned margins.
+
+The revised local build passes 87 synthetic factual-paraphrase pairs with a
+minimum local margin of `0.206250`. Its synthetic ordinal Spearman is `0.959623`
+for `exact > good > bad` ordering on handcrafted cases. These are development
+proxies constructed from the user-relayed fixture category and floor; the
+ordinal metric is not comparable to Telegraph's live candidate-versus-champion
+correlation. Predicate-family identity, inverse learned-from and lost-to
+phrasing, parenthetical commas, coordinated relation swaps, mixed explicit
+reversals, partial multi-relation omissions, mixed directed pairs, shared
+predicates, bounded anaphoric and passive ellipsis, suffix-bearing surname
+aliases, predicate-free completeness, comma and semicolon gapping, subordinate
+parenthetical predicates, and novel extra claims across punctuation now have
+both Rust and fixture regressions. These results do not prove a Stage 2 or
+`0.60` pass.
 
 The fixture corpus is `fixtures/wasm_scoring_cases.json`; Python tests validate
 its three-string shape and fatal-zero/order constraints. The CI job is
@@ -148,17 +185,39 @@ its three-string shape and fatal-zero/order constraints. The CI job is
 
 ## Evidence status
 
-The current rank-only release candidate was produced by two isolated clean
+The current frozen rank-only artifact was produced by two isolated clean
 builds with the pinned Rust `1.95.0` toolchain. Their bytes were identical, and
 the size, SHA-256, and raw-byte Keccak-256 were independently checked:
 
 | Measurement | Value |
 |---|---|
 | Reproducible clean-build comparison | Two clean builds were byte-identical |
-| WASM byte size | `16,292` bytes |
-| WASM SHA-256 | `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af` |
-| Raw-byte Keccak-256 (portal-compatible) | `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8` |
-| Fixture SHA-256 | `ceaa3d168b78f7eef1f95b70af940b3d117b181d7f55879c8e9e01c595f7303d` |
+| WASM byte size | `42,798` bytes |
+| WASM SHA-256 | `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` |
+| Raw-byte Keccak-256 (portal-compatible) | `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8` |
+| Fixture SHA-256 | `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0` |
+| Rust native tests | `39/39` passed |
+| Go/wazero suite | Full suite passed |
+| Python discovery | `401/401` passed |
+| Official unmodified Telegraph tester | Passed; example score `0.8500` |
+
+Registration `19` evaluated the earlier 16,292-byte artifact, SHA-256
+`97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`,
+raw-byte Keccak-256
+`0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
+That historical registered artifact is retained separately from the current
+42,798-byte artifact.
+
+Registration `41` evaluated the current 42,798-byte artifact. Its confirmed
+transaction is
+`0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`; the
+hosted-byte re-fetch matched SHA-256
+`4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` and
+raw-byte Keccak-256
+`0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+The result is a Stage 2 rejection at `31/32` versus the champion's `32/32`, not
+a promotion. The complete postflight is
+[`oathcast-weather-wasm-registration-41-postflight-2026-08-17T193636Z.json`](../../artifacts/registration-drafts/oathcast-weather-wasm-registration-41-postflight-2026-08-17T193636Z.json).
 
 Metadata for an earlier 16,318-byte compatibility build with a scalar
 `breakdown_answer` export remains historical provenance; the old bytes are not
@@ -171,22 +230,26 @@ The current guide was independently verified at
 `telegraphprotocol/telegraph-docs@cfe6fbda517f09d3097790778d2b9cbaa4d8f272`,
 path `scoring/build-a-scoring-module.md`.
 
-[`release-evidence.json`](release-evidence.json) records the current rank-only
-candidate, its clean-build hashes, local Stage 1 checks, and the historical
-artifact metadata separately. The wazero suite validates the current ABI and
-behavior.
+[`release-evidence.json`](release-evidence.json) v7 records the current build,
+registration `41` and its hosted-byte postflight, the clean-build hashes and
+synthetic proxies, registration `19`'s historical Stage 1 confirmation and
+Stage 2 rejection, and the registered and historical artifacts separately. The
+wazero suite validates the current ABI and local behavior.
 
 ## Registration boundary
 
-The two obsolete-registry confirmations remain historical failures. The later
-corrected transaction `0x3997...e51e` is a verified on-chain registration in the
-current registry at ID `7`, with the exact rank-only bytes and
-`WEATHER_FORECAST` binding. It does not by itself prove Dashboard indexing,
-validator Stage 1 acceptance, the reported `0.60` threshold result, or Stage 2
-promotion.
+The two obsolete-registry confirmations remain historical failures. Corrected
+transaction `0x3997...e51e` remains verified current-registry history at ID `7`
+for the 16,292-byte artifact. Registration `19` later evaluated those same bytes:
+user-relayed team confirmation says reaching champion comparison means Stage 1
+passed, and Stage 2 rejected them at `31/32` ordering wins versus the champion's
+`32/32`.
 
-The current action is to observe or obtain the authoritative Dashboard/validator
-record for ID `7`. No replacement registration is currently authorized. If
-Telegraph requires another transaction despite the
-non-empty current-registry record, first decode a new complete wallet wrapper and
-nested call, then obtain fresh explicit user authorization before confirmation.
+Registration `41` is the current 42,798-byte artifact's retained validator
+result: hosted bytes match the reproducible build, Stage 1 passed by reaching
+champion comparison, and Stage 2 rejected it at `31/32` versus the champion's
+`32/32`. No replacement registration is currently authorized. Before any future
+confirmation, decode a fresh complete wallet wrapper and nested call for the new
+hash, then obtain fresh explicit user authorization. Local pair margins and
+synthetic ordinal Spearman are proxies only and must not be presented as a live
+pass.

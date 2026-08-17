@@ -194,30 +194,23 @@ class SqliteReceiptStore:
         created_at = receipt.get("created_at")
         if not isinstance(created_at, str) or not created_at:
             raise ValueError("receipt must contain created_at")
+        candidate_bytes = sum(
+            len(value.encode("utf-8"))
+            for value in (event_id, question_json, receipt_json, created_at)
+        )
 
         with self._lock:
             connection = self._connect()
             try:
+                # The Python lock protects one store instance. BEGIN IMMEDIATE
+                # serializes this read-check-write sequence with every other
+                # process or store instance connected to the same database.
+                connection.execute("BEGIN IMMEDIATE")
                 # A replay of an existing receipt must always succeed, even at
                 # capacity: the store is full of evidence precisely so it can
                 # be re-read, and refusing a replay would break durable receipt
                 # replay for events already committed to. Only genuinely new
                 # rows are subject to the cap.
-                existing = connection.execute(
-                    "SELECT 1 FROM forecast_receipts WHERE event_id = ?",
-                    (event_id,),
-                ).fetchone()
-                if existing is None:
-                    self._assert_capacity_for_new_receipt(connection)
-                connection.execute(
-                    """
-                    INSERT OR IGNORE INTO forecast_receipts
-                        (event_id, question_json, receipt_json, created_at)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (event_id, question_json, receipt_json, created_at),
-                )
-                connection.commit()
                 row = connection.execute(
                     """
                     SELECT question_json, receipt_json
@@ -226,25 +219,65 @@ class SqliteReceiptStore:
                     """,
                     (event_id,),
                 ).fetchone()
+                if row is None:
+                    self._assert_capacity_for_new_receipt(
+                        connection,
+                        candidate_bytes=candidate_bytes,
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO forecast_receipts
+                            (event_id, question_json, receipt_json, created_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (event_id, question_json, receipt_json, created_at),
+                    )
+                    if (
+                        self.max_bytes is not None
+                        and self.used_bytes(connection) > self.max_bytes
+                    ):
+                        raise ReceiptStoreFull(
+                            f"receipt store would exceed its {self.max_bytes} byte cap; "
+                            "existing receipts remain readable and replayable"
+                        )
+                    row = connection.execute(
+                        """
+                        SELECT question_json, receipt_json
+                        FROM forecast_receipts
+                        WHERE event_id = ?
+                        """,
+                        (event_id,),
+                    ).fetchone()
+                if row is None:
+                    raise RuntimeError("forecast receipt could not be persisted")
+                if row["question_json"] != question_json:
+                    raise ReceiptConflict(
+                        f"event_id {event_id!r} is already bound to a different question"
+                    )
+                stored = json.loads(row["receipt_json"])
+                if not isinstance(stored, dict):
+                    raise RuntimeError("stored forecast receipt is not a JSON object")
+                connection.commit()
+            except BaseException:
+                if connection.in_transaction:
+                    connection.rollback()
+                raise
             finally:
                 if self._memory_connection is None:
                     connection.close()
-        if row is None:
-            raise RuntimeError("forecast receipt could not be persisted")
-        if row["question_json"] != question_json:
-            raise ReceiptConflict(
-                f"event_id {event_id!r} is already bound to a different question"
-            )
-        stored = json.loads(row["receipt_json"])
-        if not isinstance(stored, dict):
-            raise RuntimeError("stored forecast receipt is not a JSON object")
         return stored
 
-    def _assert_capacity_for_new_receipt(self, connection: sqlite3.Connection) -> None:
+    def _assert_capacity_for_new_receipt(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        candidate_bytes: int,
+    ) -> None:
         """Refuse a new receipt that would exceed a configured cap.
 
-        Called with the store lock held and only for rows that do not already
-        exist.
+        Called inside an immediate write transaction and only for rows that do
+        not already exist. The byte check includes the candidate's serialized
+        columns, then ``save`` verifies SQLite's actual page count after insert.
         """
 
         if self.max_rows is not None:
@@ -257,9 +290,10 @@ class SqliteReceiptStore:
                     "existing receipts remain readable and replayable"
                 )
         if self.max_bytes is not None:
-            if self.used_bytes(connection) >= self.max_bytes:
+            used = self.used_bytes(connection)
+            if used >= self.max_bytes or candidate_bytes > self.max_bytes - used:
                 raise ReceiptStoreFull(
-                    f"receipt store has reached its {self.max_bytes} byte cap; "
+                    f"receipt store would exceed its {self.max_bytes} byte cap; "
                     "existing receipts remain readable and replayable"
                 )
 

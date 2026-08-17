@@ -4,7 +4,8 @@ Originally observed 2026-08-09 against the published Telegraph Miner Registry
 source; updated 2026-08-13 against the live Telegraph documentation and launch
 email, 2026-08-15 against the revised scoring-module guide and corrected WASM
 portal deployment, and 2026-08-16 against the confirmed current-registry
-registration and postflight reads.
+registration and postflight reads, then 2026-08-17 against registration `19`'s
+historical validator result and registration `41`'s current artifact postflight.
 
 This began as a compatibility audit. On 2026-08-13 the exact canonical YAML was
 validated by the official portal with a dedicated Telegraph credential, pinned
@@ -77,11 +78,8 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   Telegraph later identified the node-log root cause as
   `module[env] not instantiated` and reported the breakdown-related rejection
   fixed. Do not present the historical extra export or parity tests as current
-  requirements. The current rank-only build is 16,292 bytes, has no import
-  section, and has a refreshed machine-readable release record with two
-  byte-identical clean builds. Telegraph reports that Intent binding and the
-  registry mismatch are fixed, and Ahmed confirmed re-registration is intended.
-  The exact bytes are pinned at
+  requirements. The historical registered rank-only artifact is 16,292 bytes and has no
+  import section. Its exact bytes are pinned at
   `ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1`, portal-verified, and
   independently re-fetched byte-identically, with only `WEATHER_FORECAST`
   selected. Two old-registry transactions remain historical: one emitted ID
@@ -91,13 +89,48 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   used target `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8`, selector
   `0xfe1e40f7`, the exact hash/CID, and `WEATHER_FORECAST`. Current-registry
   event ID `7`, `entityCount(2) == 7`, and matching non-empty `getWasm(7)` prove
-  registration and Intent binding. Ahmed's reported minimum is `0.60` on the
-  Intent, but its aggregation is undocumented. The official example is
-  `0.8500`; a valid local paraphrase at `0.5875` shows risk, not proven failure.
-  The Dashboard still reports `wasm_count: 0`, so validator acceptance and the
-  threshold result remain unobserved. Telegraph subsequently asked the user to
-  retry after its indexing PR merged. No new transaction is authorized; any
-  retry requires fresh authorization and exact wrapper/nested-call decoding.
+  registration and Intent binding. Registration `19` later registered the same
+  16,292-byte artifact from a fresh wallet and reached the live validator.
+  According to user-relayed Telegraph team confirmation, corroborated by
+  reaching champion comparison, Stage 1 passed; Stage 2 rejected it at `31/32` comparable ordering wins
+  versus the champion's `32/32`. According to user-relayed Telegraph guidance, the hidden cases are
+  factual paraphrase/lexical discrimination; each of six near-miss pairs uses a
+  fixed `0.15` margin floor, while `0.60` is a separate Spearman correlation
+  requirement against champion historical scores. Registration `19` evaluated
+  zero historical rows, so it did not observe that Spearman gate.
+
+  The current artifact is instead 42,798 bytes, SHA-256
+  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`,
+  and raw-byte Keccak-256
+  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+  Its fixture SHA-256 is
+  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
+  Two isolated clean builds are byte-identical. Rust tests pass `39/39`, the
+  full Go/wazero suite passes, and Python discovery passes `401/401`. It passes
+  87 synthetic factual pairs with minimum
+  margin `0.206250` and a synthetic ordinal Spearman proxy of `0.959623`;
+  predicate-family identity, inverse
+  learned-from and lost-to phrasing, parenthetical commas, coordinated relation
+  swaps, mixed explicit reversals, partial multi-relation omissions, mixed
+  directed pairs, shared predicates, bounded anaphoric and passive ellipsis,
+  suffix-bearing surname aliases, predicate-free completeness, comma and
+  semicolon gapping, subordinate parenthetical predicates, and extra claims
+  across punctuation have Rust and fixture regressions. These local
+  cases are not the hidden Telegraph fixtures
+  or champion history. The official unmodified Telegraph tester returns
+  `0.8500`. The user manually hosted the exact 42,798-byte build and registered
+  it for `WEATHER_FORECAST` as registration `41` in Base Sepolia transaction
+  `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
+  The hosted URL was
+  `https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=jwhbk80f&dl=1`.
+  An independent postflight fetch matched the byte size, SHA-256, and raw-byte
+  Keccak-256. The validator reached champion comparison, establishing Stage 1
+  passage, then rejected Stage 2 at `31/32` candidate wins versus the champion's
+  `32/32`. Candidate margin/EvalScore was `0.37852418`, above the champion
+  aggregate margin `0.37360683`; the higher aggregate did not override the
+  per-case promotion rule. No further transaction is authorized; any future
+  attempt requires a fresh complete wrapper/nested-call preflight followed by
+  fresh explicit authorization.
 - Do not treat local fixtures, direct upstream weather calls, or the capped
   Solana devnet canary as qualifying Track 3 demand.
 - Do not claim paid requests, leaderboard performance, or Track 3 demand from

@@ -25,11 +25,20 @@ relevant to that track.
   verified through public HTTPS. It shares authentication, rate limits,
   semantic JSON, and receipt identity with `/v1/forecast/point`; near-miss
   paths remain 404.
+- [~] Local, undeployed compatibility for the team-requested
+  `forecast_hours=1..24&hourly=2t` temperature request is implemented on
+  `/predict` and `/v1/forecast/point`, with next-complete-hour UTC alignment and
+  RFC3339/Kelvin output. The unregistered candidate schema is checked against a
+  real 24-hour service response. This is not live Track 1 evidence and does not
+  change the registered YAML; `/v1/forecast/window` retains its legacy
+  start/end contract.
 - [x] At least three active `WEATHER_FORECAST` Miners observed in the live catalog on 2026-08-13. Recheck at submission; this does not satisfy the separate 100-request condition.
-- [~] Telegraph confirmed the observed leaderboard zero came from `/predict`
-  returning 404, which produced `miner_answer=""` and a correct WASM score of
-  zero. The route is fixed, but the old epoch is not repaired and a fresh
-  evaluation result is still required.
+- [~] Telegraph confirmed the earlier leaderboard zero came from `/predict`
+  returning 404, which produced `miner_answer=""`. Release v7 fixed that route,
+  but an epoch-202 observation still scored OathCast `0`, rank `6/6`. The later
+  team diagnosis is that the scorer requests 24 hours while the live Miner
+  serves the registered one-hour contract. The local 24-hour fix is undeployed,
+  so no corrected live result exists.
 - [ ] Official Miner performance evidence from live evaluation.
 - [ ] X update evidence tagged `@Telegraphprotoc`.
 
@@ -42,26 +51,42 @@ relevant to that track.
   required functions are `alloc`, `dealloc`, and
   `rank_answer(6 x i32) -> f32`; `breakdown_answer` is deprecated and removed.
 - [x] OathCast `no_std` rank path compiled with pinned Rust and tested with
-  native Rust tests, a wazero ABI/adversarial harness, deterministic repeated
-  calls, and Telegraph's unmodified official tester (`0.8500` published example
-  score).
+  `39/39` native Rust tests, the full Go/wazero ABI and adversarial harness,
+  deterministic repeated calls, `401/401` Python discovery tests, and Telegraph's
+  unmodified official tester (`0.8500` published example score).
 - [x] Historical validator evidence retained: the August 14 portal/API response
   surfaced a missing `breakdown_answer` message, while Telegraph later reported
   the node-log root cause as `module[env] not instantiated`; a six-`i32`/`f32`
   probe loaded far enough for the self-match check. These observations are
   historical, and neither the export nor any five-field result is current.
-- [x] Current rank-only artifact reproduced and locally verified: two
-  byte-identical clean builds; 16,292 bytes;
+- [x] Current 42,798-byte rank-only revision reproduced and locally verified:
+  two byte-identical clean builds;
   SHA-256
-  `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`;
+  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`;
   raw-byte Keccak-256
-  `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
-  `scoring-modules/oathcast-weather/release-evidence.json` v4 records the current
-  candidate and the historical 16,318-byte scalar-export metadata separately;
-  the old bytes are not present in this workspace.
+  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`;
+  fixture SHA-256
+  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
+  `scoring-modules/oathcast-weather/release-evidence.json` v7 records the build,
+  registration `41`, local proxy evidence, the historical registered
+  16,292-byte artifact, and the 16,318-byte scalar-export metadata separately; the
+  scalar-export bytes are not present in this workspace.
+- [x] Local factual-paraphrase proxy passes 87 synthetic pairs with minimum
+  margin `0.206250` and synthetic ordinal Spearman `0.959623`.
+  Predicate-family identity, inverse learned-from and lost-to phrasing,
+  parenthetical commas, coordinated relation swaps, mixed explicit reversals,
+  partial multi-relation omissions, mixed directed pairs, shared predicates,
+  bounded anaphoric and passive ellipsis, suffix-bearing surname aliases,
+  predicate-free completeness, comma and semicolon gapping, subordinate
+  parenthetical predicates, and novel claims after punctuation have Rust and
+  fixture regressions. These cases model Telegraph's clarified
+  category and floor only; they are not hidden fixtures, champion historical
+  scores, or proof of a live pass.
 - [x] Telegraph reported that the breakdown-related validator rejection, Intent
-  binding, and registry mismatch are fixed. Ahmed confirmed that re-registration
-  is intended. Validator Stage 1 acceptance has not been observed.
+  binding, and registry mismatch are fixed. According to user-relayed team
+  confirmation, corroborated by reaching champion comparison, registration `19`
+  passed Stage 1 and then reached the Stage 2 rejection for the 16,292-byte
+  registered artifact; no separate Stage 1 API field was retained.
 - [x] Breakdown clarification closed by the revised authoritative guide. No
   pointer ownership, lifetime, struct layout, return encoding, or parity rule is
   required for the removed export.
@@ -83,8 +108,9 @@ relevant to that track.
   deployed-contract, portal-source, registration-ID, artifact-hash, and
   historical validator-error evidence:
   `docs/telegraph-track2-clarification-request.md`.
-- [x] Current three-function WASM uploaded to the portal's IPFS flow and
-  re-fetched by the portal and independently with matching bytes/hash. Gateway:
+- [x] Registered 16,292-byte three-function WASM uploaded to the portal's IPFS
+  flow and re-fetched by the portal and independently with matching bytes/hash.
+  Gateway:
   `https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1`.
   Only `WEATHER_FORECAST` is selected.
 - [~] Portal transaction
@@ -124,19 +150,40 @@ relevant to that track.
   `entityCount(2) == 7`, and matching non-empty `getWasm(7)`.
 - [x] Corrected postflight retained in
   `artifacts/registration-drafts/oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json`.
-- [~] Dashboard/API still reports `wasm_count: 0`; validator Stage 1, Stage 2,
-  and the reported `0.60` threshold result remain unobserved. Telegraph asked
-  the user to retry after its indexing PR merged, but no new transaction or
-  decoded preflight exists.
-- [x] All prior registration authorizations consumed.
-- [!] Any additional retry requires fresh explicit authorization and exact
-  wrapper/nested-call decoding before confirmation.
-- [!] Verify Ahmed's reported per-Intent threshold of `0.60` through a live
-  validator result. The official example is `0.8500`, and the weakest known
-  valid local paraphrase is `0.5875`; the undocumented corpus/aggregation
-  creates risk but proves neither threshold pass nor failure.
-- [~] Scoring module registered on-chain; indexing and active validator status
-  remain unobserved.
+- [x] Registration `19` retained for wallet
+  `0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278`, transaction
+  `0xa6bc6f653eec4a5c79acac4a6e747222d48fd257367c325cd0e6c0090d321e73`,
+  the registered 16,292-byte hash, and Dropbox URL
+  `https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=sigr9vji&dl=1`.
+- [x] Validator result retained: user-relayed team confirmation, corroborated by
+  reaching champion comparison, says Stage 1 passed; Stage 2 rejected
+  the registered artifact at `31/32` good-over-bad ordering wins versus the live
+  champion's `32/32`. Returned diagnostics are candidate margin `0.31248063`,
+  champion margin `0.37360683`, and `historical_rows: 0`.
+- [x] Telegraph fixture clarification retained: factual paraphrase and lexical
+  discrimination only, fixed `0.15` pair margin floor, six near-miss cases,
+  automatic promotion after all six pass, and no direct comparison between the
+  candidate and champion aggregate margins. The `0.60` metric is Spearman
+  correlation against the champion's historical scores.
+- [~] The live Spearman threshold is still unobserved because the retained result
+  reports zero historical rows. Synthetic ordinal Spearman `0.959623` is a proxy only.
+- [x] All registration authorizations used so far, including registrations `19`
+  and `41`, are consumed.
+- [x] Current 42,798-byte artifact manually hosted and registered as registration
+  `41` for `WEATHER_FORECAST` in Base Sepolia transaction
+  `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
+  Independent hosted-byte verification matched the size, SHA-256, and raw-byte
+  Keccak-256 above. Registration `41` reached champion comparison (Stage 1
+  passed) and failed Stage 2 at `31/32` candidate wins versus the champion's
+  `32/32`; candidate margin/EvalScore was `0.37852418` and champion margin was
+  `0.37360683`. The higher aggregate did not override the per-case rule.
+  Postflight:
+  `artifacts/registration-drafts/oathcast-weather-wasm-registration-41-postflight-2026-08-17T193636Z.json`.
+- [~] Registration `41` reached the validator but was not promoted. The hidden
+  failed pair, champion history, and live Spearman result remain unobserved;
+  local synthetic margins and ordinal Spearman remain proxies only. No further
+  registration is authorized without a fresh decoded wrapper/nested-call
+  preflight and fresh explicit user authorization.
 - [ ] Improvement measured against the official baseline.
 - [ ] Community/adoption evidence from independent users.
 - [ ] X updates tagged `@Telegraphprotoc`.

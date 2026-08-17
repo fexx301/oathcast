@@ -22,15 +22,19 @@ removed result. The ordinary `alloc`/`dealloc` input-buffer contract remains.
 The earlier ABI follow-up is closed and must not remain a release or
 registration blocker.
 
-The scorer has now been rebuilt and tested against the current three-function
-contract. Two clean builds are byte-identical, and the v4 machine-readable
-record freezes the exact candidate bytes, hashes, and local Stage 1-equivalent
-checks. Telegraph has since reported that the breakdown-related validator
-rejection, registry mismatch, and Intent binding are fixed. Ahmed confirmed that
-a corrected registration was allowed and reported a minimum score of `0.60` on
-the Intent. The exact candidate is now registered in the current registry at ID
-`7`, but the score interpretation and aggregation formula are not independently
-documented, so no threshold pass or validator acceptance is claimed.
+The scorer was rebuilt and tested against the current three-function contract.
+The 16,292-byte artifact is retained at current-registry ID `7` and was later
+submitted as registration `19`. According to user-relayed Telegraph team
+confirmation, corroborated by reaching champion comparison, it passed Stage 1;
+no separate Stage 1 API field was retained. Stage 2 rejected it at `31/32`
+ordering wins versus the champion's `32/32`. According to user-relayed Telegraph
+guidance, the fixtures are factual paraphrase and lexical-discrimination pairs,
+use a fixed
+`0.15` pair floor across six near-miss cases, and do not directly compare the
+candidate and champion aggregate margins. The reported `0.60` metric is Spearman
+correlation against the champion's historical scores. The current 42,798-byte
+revision was later manually hosted and evaluated as registration `41`; its
+postflight and Stage 2 result are recorded below.
 
 The earlier portal source at commit
 `ee3724eeddf25177c2d2135ae4c9a77e091cdf98` displays a stale hint saying that
@@ -76,14 +80,15 @@ proof that the validator enforced the removed export.
 > be fixed. Thanks
 
 This response was relayed directly by the user; retain a permalink or screenshot
-before using it as submission evidence. It closed the rollout-confirmation gate
-at the team-response level and invited a retry. The first two confirmed portal
-transactions did not reach the validator-indexed registry; corrected transaction
+before using it as submission evidence. At the 2026-08-15 snapshot, it closed the
+rollout-confirmation gate at the team-response level and invited a retry. The
+first two confirmed portal transactions did not reach the validator-indexed
+registry; corrected transaction
 `0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e`
-later did. Dashboard indexing and a live validator Stage 1 result nevertheless
-remain unobserved. The exact current candidate contains no WASM import section,
-imports no host functions or memory, and instantiates in a fresh wazero runtime
-without an `env` module. If the exact frozen SHA later receives the same error,
+later did. Dashboard indexing and a live validator Stage 1 result were still
+unobserved at that snapshot. The then-registered 16,292-byte artifact contains
+no WASM import section, imports no host functions or memory, and instantiates in
+a fresh wazero runtime without an `env` module. If the exact frozen SHA later receives the same error,
 verify the hosted bytes and Telegraph wrapper/validator path rather than adding
 an `env` import. Telegraph's subsequent binding and registry fixes are recorded
 below.
@@ -177,11 +182,11 @@ transaction and nothing was broadcast. The Dashboard/API remains at
 `0xac683...` registry still has `entityCount(2) == 0` and an empty `getWasm(5)`.
 This confirms that the earlier transaction's event ID `5` was not migrated.
 
-The official example scores `0.8500`. The weakest known valid local paraphrase
-scores `0.5875`, below Ahmed's reported `0.60` minimum. The validator replay
-corpus and aggregation formula are not public, so this is hidden aggregate risk,
-not proof that the candidate fails or passes the threshold. No validator
-acceptance is claimed.
+At this pre-clarification snapshot, the official example scored `0.8500` and the
+weakest known valid local paraphrase scored `0.5875`. The team had not yet
+clarified that `0.60` meant Spearman correlation against champion historical
+scores, so no threshold conclusion was valid. The later Stage 2 semantics and
+registration `19` result supersede this historical interpretation.
 
 The unbroadcast preflight record is
 `artifacts/registration-drafts/oathcast-weather-wasm-reregistration-preflight-2026-08-15T204924Z.json`.
@@ -234,23 +239,123 @@ The current registry emitted `IntentRegistered` ID `7` for wallet
 gateway URL, and Intent. This proves on-chain registration and canonical Intent
 binding in the current registry. It does not prove validator processing.
 
-The Dashboard/API still returned HTTP `200` with `wasm_count: 0` and an empty
-WASM list. Telegraph reported that an IPFS gateway timeout caused the indexing
+At the 2026-08-16 postflight snapshot, the Dashboard/API returned HTTP `200`
+with `wasm_count: 0` and an empty WASM list. Telegraph reported that an IPFS
+gateway timeout caused the indexing
 delay, that the issue was solved, and that its indexing PR would be merged. The
 user later reported that the PR was merged but the Dashboard remained empty, and
 that Telegraph suggested trying another re-registration. Those team statements
 are user-relayed operational guidance only. No new preflight or transaction is
-present, and no fresh explicit user authorization was received. Because the
-current registry already contains the exact candidate, no re-registration is
-currently authorized; any later replacement attempt requires a new
+present, and no fresh explicit user authorization had been received. Because the
+current registry already contained the exact candidate, no re-registration was
+authorized at that snapshot; any later replacement attempt required a new
 complete decoded preflight followed by fresh explicit authorization.
 
-Validator Stage 1 acceptance, Ahmed's reported `0.60` per-Intent threshold
-result, and Stage 2 promotion remain unobserved. Do not infer any of them from
-the successful receipt, registry event, or non-empty `getWasm(7)`.
+Validator Stage 1 acceptance, the reported `0.60` result, and Stage 2 promotion
+were unobserved at that snapshot. Registration `19`, recorded below, later
+superseded this state with a Stage 1 pass and Stage 2 rejection. None of those
+later results should be inferred from the earlier receipt, registry event, or
+non-empty `getWasm(7)` alone.
 
 The complete corrected postflight record is
 `artifacts/registration-drafts/oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json`.
+
+## Registration 19 validator result and fixture clarification 2026-08-17
+
+Registration `19` is the earlier retained authoritative validator result for the
+OathCast rank-only scorer. It belongs to wallet
+`0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278` and Base Sepolia transaction
+`0xa6bc6f653eec4a5c79acac4a6e747222d48fd257367c325cd0e6c0090d321e73`.
+The transaction registered the earlier 16,292-byte artifact, not the later local
+revision. Its SHA-256 is
+`97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`, its
+raw-byte Keccak-256 is
+`0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`, and
+its registration URL is
+`https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=sigr9vji&dl=1`.
+
+The retained validator result and user-relayed team confirmation establish:
+
+- Stage 1 passed according to the team response, corroborated by reaching
+  champion comparison; no separate Stage 1 API field was retained.
+- Stage 2 rejected the artifact because it ranked the good answer above the bad
+  answer on `31` of `32` comparable cases; the live champion did so on all `32`.
+- `candidate_margin: 0.31248063` and `champion_margin: 0.37360683`.
+- `historical_rows: 0`.
+
+According to a user-relayed Telegraph team response, the hidden fixtures test
+factual paraphrase and lexical discrimination only; numeric, time-window, and
+JSON cases are not part of this fixture set. Every near-miss pair must clear a
+fixed `0.15` ordering margin, and there are six near-miss cases. Promotion is
+automatic after all six pass. There is no direct comparison between the returned
+candidate and champion aggregate margins. The reported `0.60` requirement is
+Spearman rank correlation between the candidate and the live champion's
+historical scores. Because registration `19` reports zero historical rows, no
+live Spearman result can be inferred from the retained fields.
+
+At this pre-registration checkpoint, the revised local candidate was 42,798
+bytes, SHA-256
+`4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`, and
+raw-byte Keccak-256
+`0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+The fixture SHA-256 is
+`bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
+Two isolated clean builds are byte-identical. Rust tests pass `39/39`, the full
+Go/wazero suite passes, and Python discovery passes `401/401`; Telegraph's unmodified
+official tester returns `0.8500`. The candidate passes 87 synthetic factual
+pairs with minimum local margin `0.206250`. Synthetic ordinal Spearman is
+`0.959623` for `exact > good > bad` ordering on handcrafted cases.
+Predicate-family identity, inverse learned-from and lost-to phrasing,
+parenthetical commas, coordinated relation swaps, mixed explicit reversals,
+partial multi-relation omissions, mixed directed pairs, shared predicates,
+bounded anaphoric and passive ellipsis, suffix-bearing surname aliases,
+predicate-free completeness, comma and semicolon gapping, subordinate
+parenthetical predicates, and novel extra claims across punctuation have both
+Rust and fixture regressions. Those cases and scores
+are explicitly development proxies: Telegraph did not disclose the failed
+fixture text, per-pair scores, or champion historical-score series. They do not
+prove a live pass.
+
+At that checkpoint the revised candidate had not been uploaded, signed,
+registered, or authorized. The later registration `41` postflight below
+supersedes only that historical external-action status; the local proxy limits
+remain unchanged.
+
+## Registration 41 postflight and validator result 2026-08-17
+
+After the local freeze and review, the user manually hosted the exact
+42,798-byte artifact on Dropbox and manually registered it for
+`WEATHER_FORECAST` as registration `41`. The assistant did not upload, sign,
+register, or initiate wallet activity. The confirmed Base Sepolia transaction
+is
+`0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`,
+block `45613554`, timestamp `2026-08-17T19:36:36Z`, with zero native value.
+The delegated wallet was
+`0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278`. The inner call targeted current
+registry `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8` using
+`registerWasm(bytes32,string,string)` with Intent `WEATHER_FORECAST`.
+The hosted URL was
+`https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=jwhbk80f&dl=1`.
+
+An independent postflight download reproduced the registered artifact's exact
+42,798-byte size, SHA-256
+`4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`,
+and raw-byte Keccak-256
+`0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+Telegraph recorded registration `41` at `2026-08-17T19:37:35.066237Z` and
+updated it at `2026-08-17T19:38:20.299494Z`.
+
+The validator reached champion comparison, establishing Stage 1 passage, then
+rejected Stage 2 at `31/32` candidate ordering wins versus the champion's
+`32/32`. Candidate margin/EvalScore was `0.37852418`, champion aggregate margin
+was `0.37360683`, worst self-match was `1`, score standard deviation was
+`0.29563302`, and `historical_rows` was `0`. The higher candidate aggregate
+margin does not override the failed per-case promotion rule. Registration `19`
+and the 16,292-byte artifact remain separate historical evidence.
+
+No further registration or replacement transaction is authorized. Any future
+attempt requires a fresh complete decode of the wallet wrapper and nested call,
+followed by fresh explicit user authorization.
 
 ### Historical paste-ready report to Telegraph (superseded)
 
@@ -375,29 +480,36 @@ event and does not prove validator acceptance.
 
 The remaining documentation and evidence questions are:
 
-1. How is Ahmed's reported `0.60` per-Intent minimum aggregated across validator
-   cases?
-2. When will current-registry ID `7` appear in the Dashboard/validator API, and
-   what Stage 1 state will be exposed?
-3. Which replay corpus, sampling rule, and Stage 2 acceptance state will be
-   exposed for a submitted registration?
+1. Which hidden pair or pairs caused registrations `19` and `41` to finish at
+   `31/32`, and what were their per-pair margins?
+2. Which champion historical-score rows will be used for the live Spearman
+   calculation once historical rows exist?
+3. Will Telegraph expose the six near-miss outcomes or only the aggregate Stage
+   2 result?
 4. Does the current portal still display the historical `breakdown_answer` hint?
 
-The official `0.8500` example and local scores, including the valid `0.5875`
-paraphrase, cannot establish any validator result above. Actual Stage 1
-acceptance and the threshold result remain unobserved.
+The official `0.8500` example, the earlier local `0.5875` paraphrase, and the
+revised local margin/Spearman checks did not establish promotion. Registration
+`41` is the authoritative current validator result; the synthetic checks remain
+local evidence only.
 
 ## Current action boundary
 
-The exact rank-only candidate is registered in the current registry at ID `7`,
-and its `WEATHER_FORECAST` binding is proven on-chain. The immediate gate is
-Dashboard or validator indexing, followed by an authoritative Stage 1 and
-reported threshold result; Stage 2 remains after that. Do not claim validator
-acceptance or a `0.60` threshold pass from the receipt or registry state alone.
+Current-registry ID `7` and registration `19` remain historical evidence for the
+16,292-byte artifact. User-relayed team confirmation, corroborated by reaching
+champion comparison, establishes that those bytes passed Stage 1; the observed
+result rejected them in Stage 2. Do not describe either registered artifact as
+active or promoted, and do not treat either returned aggregate margin as a
+direct candidate-versus-champion promotion comparison.
 
-No further registration is currently authorized. Telegraph's later
-suggestion to try re-registering is retained as user-relayed guidance, not as a
-transaction instruction or user authorization. If Telegraph determines that ID
-`7` must be replaced despite the non-empty current-registry record, decode a new
-complete outer wrapper and nested call first, then obtain fresh explicit user
-authorization before confirmation.
+Registration `41` is the current 42,798-byte artifact result. It reached
+champion comparison (Stage 1 passed) and was rejected in Stage 2 at `31/32`
+versus the champion's `32/32`; the candidate margin `0.37852418` exceeded the
+champion aggregate margin `0.37360683`, but the per-case rule governs. The
+artifact's 87 local pairs, `0.206250` minimum margin, and `0.959623` synthetic
+ordinal Spearman remain development proxies rather than a live promotion pass.
+
+No further upload, signature, registration, replacement transaction, or wallet
+action is currently authorized. Before any future confirmation, decode a fresh
+complete outer wrapper and nested call carrying the new hash and URL, then
+obtain fresh explicit user authorization.

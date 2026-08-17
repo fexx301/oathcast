@@ -1,0 +1,89 @@
+{
+  "schema_version": "oathcast_weather_wasm_registration_41_postflight_v1",
+  "recorded_at": "2026-08-17T19:42:00Z",
+  "classification": "confirmed_current_registry_registration_41_stage_2_rejected",
+  "operator_boundary": {
+    "user_manually_hosted": true,
+    "user_manually_registered": true,
+    "assistant_uploaded": false,
+    "assistant_signed": false,
+    "assistant_registered": false,
+    "assistant_initiated_wallet_action": false,
+    "authorization_consumed": true,
+    "further_registration_authorized": false
+  },
+  "candidate": {
+    "byte_size": 42798,
+    "sha256": "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174",
+    "keccak256_raw_bytes": "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8",
+    "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "dropbox_url": "https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=jwhbk80f&dl=1"
+  },
+  "hosted_byte_verification": {
+    "verified": true,
+    "method": "Independent read-only Dropbox re-fetch followed by byte count, shasum SHA-256, and OpenSSL KECCAK-256",
+    "byte_size": 42798,
+    "sha256": "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174",
+    "keccak256_raw_bytes": "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8"
+  },
+  "transaction": {
+    "chain": "Base Sepolia",
+    "chain_id": 84532,
+    "hash": "0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8",
+    "explorer_url": "https://base-sepolia.blockscout.com/tx/0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8",
+    "block_number": 45613554,
+    "block_timestamp": "2026-08-17T19:36:36Z",
+    "status": 1,
+    "gas_used": 476373,
+    "native_value_wei": "0",
+    "outer_from": "0xB01caEa8c6C47bbf4F4b4c5080Ca642043359C2E",
+    "outer_to": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+    "outer_selector": "0xcef6d209",
+    "outer_signature": "redeemDelegations(bytes[],bytes32[],bytes[])"
+  },
+  "decoded_wallet_packet": {
+    "delegated_wallet": "0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278",
+    "inner_target": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "inner_value_wei": "0",
+    "inner_selector": "0xfe1e40f7",
+    "inner_signature": "registerWasm(bytes32 wasmHash, string wasmUrl, string intent)",
+    "inner_wasm_hash": "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8",
+    "inner_wasm_url": "https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=jwhbk80f&dl=1",
+    "inner_intent": "WEATHER_FORECAST"
+  },
+  "registration_event": {
+    "emitter": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "event": "IntentRegistered(uint256,address,uint8,bytes32,string,bytes32)",
+    "registration_id": 41,
+    "registrant": "0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278",
+    "entity_type": 2,
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "content_url": "https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=jwhbk80f&dl=1",
+    "content_hash": "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8"
+  },
+  "validator": {
+    "source_url": "https://integrate.telegraphprotocol.com/api/registrations/0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278",
+    "registration_id": 41,
+    "registered_at": "2026-08-17T19:37:35.066237Z",
+    "updated_at": "2026-08-17T19:38:20.299494Z",
+    "activation_status": "rejected",
+    "stage_1_passed": true,
+    "stage_1_confirmation": "Reached champion comparison; no separate Stage 1 API field was retained.",
+    "stage_2_promoted": false,
+    "candidate_wins": 31,
+    "champion_wins": 32,
+    "comparable_cases": 32,
+    "candidate_margin": 0.37852418,
+    "eval_score": 0.37852418,
+    "champion_margin": 0.37360683,
+    "worst_self_match": 1,
+    "score_stddev": 0.29563302,
+    "historical_rows_evaluated": 0,
+    "rejection_reason": "lost to the current champion on ordering: candidate won 31 of 32 comparable cases while the champion won 32 of 32.",
+    "aggregate_margin_note": "The candidate aggregate margin exceeded the champion aggregate margin, but promotion is determined by per-case ordering wins rather than direct aggregate-margin comparison.",
+    "hidden_pair_scores_disclosed": false
+  },
+  "evidence_limit": "The transaction, registration event, hosted-byte re-fetch, and validator record identify the exact 42,798-byte artifact evaluated by registration 41. Local synthetic metrics remain proxies; Telegraph did not disclose the hidden failed pair or per-pair scores. Registration 19 and its 16,292-byte artifact remain separate history."
+}

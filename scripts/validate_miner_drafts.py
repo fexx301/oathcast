@@ -10,8 +10,10 @@ OathCast/service contract locally, then reports official portal validation as
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any, Iterable
@@ -22,6 +24,10 @@ MINIMUM_PRICE_USDC = Decimal("0.01")
 VALIDATION_SCOPE = "draft_local"
 OFFICIAL_PORTAL_STATUS = "not_run"
 CANONICAL_INTENTS = ["WEATHER_FORECAST"]
+WINDOW_CANDIDATE_PATH = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-window-unregistered.yaml"
+)
+WINDOW_CANDIDATE_SLUG = "oathcast-weather-window-unregistered"
 
 EXPECTED_INPUT_PROPERTIES = {
     "event_id": "string",
@@ -54,6 +60,65 @@ EXPECTED_ENDPOINT_OPTIONAL_PARAMS = {
 EXPECTED_SIGNAL_MAPPING = {
     "label_field": "content",
     "confidence_field": "probability",
+    "reason_field": "content",
+}
+WINDOW_CANDIDATE_INPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "event_id": {"type": "string"},
+        "location_name": {"type": "string"},
+        "lat": {"type": "number", "minimum": "-90", "maximum": "90"},
+        "lon": {"type": "number", "minimum": "-180", "maximum": "180"},
+        "forecast_hours": {
+            "type": "integer",
+            "minimum": "1",
+            "maximum": "24",
+        },
+        "hourly": {"type": "string", "enum": ["2t"]},
+        "provider": {"type": "string", "enum": ["open_meteo"]},
+    },
+    "required": ["lat", "lon", "forecast_hours", "hourly"],
+}
+WINDOW_CANDIDATE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "content": {"type": "string"},
+        "reference_time": {"type": "string", "format": "date-time"},
+        "hourly": {
+            "type": "object",
+            "properties": {
+                "time": {
+                    "type": "array",
+                    "items": {"type": "string", "format": "date-time"},
+                },
+                "2t": {"type": "array", "items": {"type": "number"}},
+            },
+            "required": ["time", "2t"],
+        },
+        "hourly_units": {
+            "type": "object",
+            "properties": {
+                "time": {"type": "string", "enum": ["iso8601"]},
+                "2t": {"type": "string", "enum": ["K"]},
+            },
+            "required": ["time", "2t"],
+        },
+    },
+    "required": ["content", "reference_time", "hourly", "hourly_units"],
+}
+WINDOW_CANDIDATE_ENDPOINT_REQUIRED_PARAMS = {
+    "lat": "number",
+    "lon": "number",
+    "forecast_hours": "integer",
+    "hourly": "string",
+}
+WINDOW_CANDIDATE_ENDPOINT_OPTIONAL_PARAMS = {
+    "event_id": "string",
+    "location_name": "string",
+    "provider": "string",
+}
+WINDOW_CANDIDATE_SIGNAL_MAPPING = {
+    "label_field": "content",
     "reason_field": "content",
 }
 
@@ -206,82 +271,135 @@ def _nested_mapping(
     return None
 
 
-def _schema_contract(lines: list[str], section: str) -> dict[str, Any] | None:
-    header_index = _find_header(lines, section, indent=0)
-    if header_index is None:
-        return None
+def _schema_node(lines: list[str], header_index: int) -> dict[str, Any]:
     header_indent = _indent(lines[header_index])
-    contract: dict[str, Any] = {
-        "type": _direct_scalar(lines, header_index, header_indent, "type"),
-        "properties": {},
-        "required": [],
-    }
+    contract: dict[str, Any] = {}
+    scalar_fields = {"type", "format", "minimum", "maximum"}
 
-    properties_index = None
-    required_index = None
     for index in range(header_index + 1, len(lines)):
         line = lines[index]
         if line.strip() and _indent(line) <= header_indent:
             break
         if _indent(line) != header_indent + 2:
             continue
-        if line.strip() == "properties:":
-            properties_index = index
-        elif line.strip() == "required:":
-            required_index = index
-
-    if properties_index is not None:
-        properties_indent = _indent(lines[properties_index])
-        index = properties_index + 1
-        while index < len(lines):
-            line = lines[index]
-            if line.strip() and _indent(line) <= properties_indent:
-                break
-            if _indent(line) != properties_indent + 2:
-                index += 1
-                continue
-            pair = _split_key_value(line.strip())
-            if pair is None or pair[1] != "":
-                index += 1
-                continue
-            name = pair[0]
-            property_indent = _indent(line)
-            property_contract: dict[str, Any] = {
-                "type": _direct_scalar(lines, index, property_indent, "type"),
-            }
-            for field_name in ("format", "minimum", "maximum"):
-                value = _direct_scalar(lines, index, property_indent, field_name)
-                if value is not None:
-                    property_contract[field_name] = value
-            enum_index = _find_header(
-                lines, "enum", indent=property_indent + 2, start=index + 1
-            )
-            if enum_index is not None:
-                # A nested enum belongs to this property only while its parent
-                # property is still open.
-                if any(
-                    line_no > index
-                    and line_no < enum_index
-                    and lines[line_no].strip()
-                    and _indent(lines[line_no]) <= property_indent
-                    for line_no in range(index + 1, enum_index)
-                ):
-                    enum_index = None
-                else:
-                    property_contract["enum"] = _list_values(
-                        lines, enum_index, _indent(lines[enum_index])
-                    )
-            contract["properties"][name] = property_contract
-            index += 1
-
-    if required_index is not None:
-        required_indent = _indent(lines[required_index])
-        contract["required"] = [
-            value
-            for value in _list_values(lines, required_index, required_indent)
-            if isinstance(value, str)
-        ]
+        pair = _split_key_value(line.strip())
+        if pair is None:
+            continue
+        key, value = pair
+        if key in scalar_fields and value != "":
+            contract[key] = _clean_scalar(value)
+        elif key in {"required", "enum"} and value == "":
+            contract[key] = [
+                item
+                for item in _list_values(lines, index, _indent(line))
+                if isinstance(item, str)
+            ]
+        elif key == "items" and value == "":
+            contract["items"] = _schema_node(lines, index)
+        elif key == "properties" and value == "":
+            properties: dict[str, Any] = {}
+            properties_indent = _indent(line)
+            for property_index in range(index + 1, len(lines)):
+                property_line = lines[property_index]
+                if property_line.strip() and _indent(property_line) <= properties_indent:
+                    break
+                if _indent(property_line) != properties_indent + 2:
+                    continue
+                property_pair = _split_key_value(property_line.strip())
+                if property_pair is None or property_pair[1] != "":
+                    continue
+                properties[property_pair[0]] = _schema_node(lines, property_index)
+            contract["properties"] = properties
     return contract
+
+
+def _schema_contract(lines: list[str], section: str) -> dict[str, Any] | None:
+    header_index = _find_header(lines, section, indent=0)
+    if header_index is None:
+        return None
+    return _schema_node(lines, header_index)
+
+
+def load_schema_contract(path: Path, section: str = "output_schema") -> dict[str, Any]:
+    """Load the JSON-Schema subset declared by one local Miner manifest."""
+
+    lines = path.resolve().read_text(encoding="utf-8").splitlines()
+    schema = _schema_contract(lines, section)
+    if schema is None:
+        raise ValueError(f"{section} is missing from {_relative_path(path.resolve())}")
+    return schema
+
+
+def _date_time_valid(value: str) -> bool:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
+def schema_instance_errors(
+    instance: Any,
+    schema: dict[str, Any],
+    *,
+    path: str = "$",
+) -> list[str]:
+    """Validate the small schema subset used by the local Miner manifests."""
+
+    errors: list[str] = []
+    expected_type = schema.get("type")
+    type_valid = True
+    if expected_type == "object":
+        type_valid = isinstance(instance, dict)
+    elif expected_type == "array":
+        type_valid = isinstance(instance, list)
+    elif expected_type == "string":
+        type_valid = isinstance(instance, str)
+    elif expected_type == "integer":
+        type_valid = isinstance(instance, int) and not isinstance(instance, bool)
+    elif expected_type == "number":
+        type_valid = (
+            isinstance(instance, (int, float, Decimal))
+            and not isinstance(instance, bool)
+            and math.isfinite(float(instance))
+        )
+    if not type_valid:
+        return [f"{path} must be {expected_type}"]
+
+    if "enum" in schema and instance not in schema["enum"]:
+        errors.append(f"{path} must be one of {schema['enum']}")
+    if expected_type in {"number", "integer"}:
+        numeric = Decimal(str(instance))
+        if "minimum" in schema and numeric < Decimal(str(schema["minimum"])):
+            errors.append(f"{path} must be at least {schema['minimum']}")
+        if "maximum" in schema and numeric > Decimal(str(schema["maximum"])):
+            errors.append(f"{path} must be at most {schema['maximum']}")
+    if expected_type == "string" and schema.get("format") == "date-time":
+        if not _date_time_valid(instance):
+            errors.append(f"{path} must be a timezone-aware date-time")
+    if expected_type == "array":
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(instance):
+                errors.extend(
+                    schema_instance_errors(item, item_schema, path=f"{path}[{index}]")
+                )
+    if expected_type == "object":
+        required = schema.get("required", [])
+        for name in required:
+            if name not in instance:
+                errors.append(f"{path}.{name} is required")
+        properties = schema.get("properties", {})
+        for name, property_schema in properties.items():
+            if name in instance:
+                errors.extend(
+                    schema_instance_errors(
+                        instance[name],
+                        property_schema,
+                        path=f"{path}.{name}",
+                    )
+                )
+    return errors
 
 
 def _endpoint_contract(lines: list[str]) -> dict[str, Any] | None:
@@ -376,7 +494,11 @@ def _endpoint_contract(lines: list[str]) -> dict[str, Any] | None:
 
 
 def _endpoint_param_errors(
-    endpoint: dict[str, Any], group: str, expected: dict[str, str]
+    endpoint: dict[str, Any],
+    group: str,
+    expected: dict[str, str],
+    *,
+    profile: str = "canonical",
 ) -> list[str]:
     errors: list[str] = []
     params = endpoint.get("params", {}).get(group, [])
@@ -384,7 +506,7 @@ def _endpoint_param_errors(
     expected_names = list(expected)
     if len(names) != len(expected_names) or set(names) != set(expected_names):
         errors.append(
-            f"canonical endpoint {group} query params must be exactly "
+            f"{profile} endpoint {group} query params must be exactly "
             + ", ".join(expected_names)
         )
     for name, expected_type in expected.items():
@@ -394,11 +516,11 @@ def _endpoint_param_errors(
         param = matches[0]
         if param.get("type") != expected_type:
             errors.append(
-                f"canonical endpoint query param {name}.type must be {expected_type}"
+                f"{profile} endpoint query param {name}.type must be {expected_type}"
             )
         if param.get("intents") != CANONICAL_INTENTS:
             errors.append(
-                f"canonical endpoint query param {name} intents must be WEATHER_FORECAST"
+                f"{profile} endpoint query param {name} intents must be WEATHER_FORECAST"
             )
     return errors
 
@@ -525,6 +647,95 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
     return errors
 
 
+def _window_candidate_contract_errors(lines: list[str]) -> list[str]:
+    errors: list[str] = []
+    input_schema = _schema_contract(lines, "input_schema")
+    output_schema = _schema_contract(lines, "output_schema")
+
+    if input_schema != WINDOW_CANDIDATE_INPUT_SCHEMA:
+        errors.append(
+            "window candidate input_schema must match the 1-to-24-hour 2t request contract"
+        )
+    if output_schema != WINDOW_CANDIDATE_OUTPUT_SCHEMA:
+        errors.append(
+            "window candidate output_schema must contain only content, reference_time, hourly, and hourly_units"
+        )
+
+    endpoint = _endpoint_contract(lines)
+    if endpoint is None:
+        errors.append("window candidate endpoint contract is required")
+    else:
+        if endpoint.get("count") != 1:
+            errors.append("window candidate must define exactly one endpoint")
+        if endpoint.get("path") != "/predict":
+            errors.append("window candidate endpoint path must be /predict")
+        if endpoint.get("external_path") != "/v1/forecast/point":
+            errors.append(
+                "window candidate endpoint external_path must be /v1/forecast/point"
+            )
+        if endpoint.get("method") != "GET":
+            errors.append("window candidate endpoint method must be GET")
+        if endpoint.get("intents") != CANONICAL_INTENTS:
+            errors.append(
+                "window candidate endpoint intents must contain exactly WEATHER_FORECAST"
+            )
+        if endpoint.get("params_header_count") != 1:
+            errors.append("window candidate endpoint must define exactly one params mapping")
+        if endpoint.get("query_header_count") != 1:
+            errors.append(
+                "window candidate endpoint params must define exactly one query mapping"
+            )
+        for group in ("required", "optional"):
+            if endpoint.get("param_group_counts", {}).get(group) != 1:
+                errors.append(
+                    f"window candidate endpoint query must define exactly one {group} group"
+                )
+        errors.extend(
+            _endpoint_param_errors(
+                endpoint,
+                "required",
+                WINDOW_CANDIDATE_ENDPOINT_REQUIRED_PARAMS,
+                profile="window candidate",
+            )
+        )
+        errors.extend(
+            _endpoint_param_errors(
+                endpoint,
+                "optional",
+                WINDOW_CANDIDATE_ENDPOINT_OPTIONAL_PARAMS,
+                profile="window candidate",
+            )
+        )
+        if endpoint.get("param_map") != {
+            "lat": "latitude",
+            "lon": "longitude",
+        }:
+            errors.append(
+                "window candidate endpoint param_map must match the service coordinate aliases"
+            )
+
+    supported_intents = _nested_list_values(lines, "semantics", "supported_intents")
+    if supported_intents != CANONICAL_INTENTS:
+        errors.append(
+            "window candidate semantics.supported_intents must contain exactly WEATHER_FORECAST"
+        )
+
+    signal_mapping_items = _nested_mapping(lines, "semantics", "signal_mapping")
+    signal_mapping = (
+        dict(signal_mapping_items) if signal_mapping_items is not None else None
+    )
+    if (
+        signal_mapping_items is None
+        or len(signal_mapping_items) != len(WINDOW_CANDIDATE_SIGNAL_MAPPING)
+        or len({key for key, _ in signal_mapping_items}) != len(signal_mapping_items)
+        or signal_mapping != WINDOW_CANDIDATE_SIGNAL_MAPPING
+    ):
+        errors.append(
+            "window candidate semantics.signal_mapping must map label and reason to content without inventing confidence"
+        )
+    return errors
+
+
 def _relative_path(path: Path) -> str:
     try:
         return str(path.relative_to(ROOT))
@@ -532,7 +743,12 @@ def _relative_path(path: Path) -> str:
         return str(path)
 
 
-def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
+def validate_draft(
+    path: Path,
+    *,
+    canonical: bool = False,
+    window_candidate: bool = False,
+) -> dict[str, Any]:
     path = path.resolve()
     errors: list[str] = []
     warnings: list[str] = []
@@ -543,6 +759,11 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
     slug = _top_level_scalar(lines, "slug")
     base_url = _top_level_scalar(lines, "base_url")
     price_text = _nested_scalar(lines, "on_chain", "min_price_usdc")
+    is_window_candidate = not canonical and (
+        window_candidate
+        or path == WINDOW_CANDIDATE_PATH.resolve()
+        or slug == WINDOW_CANDIDATE_SLUG
+    )
 
     if version != "1":
         errors.append('version must be "1"')
@@ -593,6 +814,48 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
         if _nested_scalar(lines, "auth", "value_prefix") != "Bearer ":
             errors.append('canonical auth.value_prefix must be "Bearer "')
         errors.extend(_canonical_contract_errors(lines))
+    elif is_window_candidate:
+        if not lines or lines[0] != "# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.":
+            errors.append("window candidate must retain the unregistered compatibility marker")
+        comments = "\n".join(
+            line[1:].strip().lower() for line in lines if line.startswith("#")
+        )
+        if (
+            "additive 1-to-24-hour runtime contract" not in comments
+            or "registered oathcast miner contract" not in comments
+            or "uploaded, signed" not in comments
+            or "substituted for miners/oathcast-weather.yaml" not in comments
+        ):
+            errors.append(
+                "window candidate comments must preserve the additive, unregistered, and non-substitution boundary"
+            )
+        if integration_id != "0":
+            errors.append("window candidate id must remain 0 while unregistered")
+        if slug != WINDOW_CANDIDATE_SLUG:
+            errors.append(
+                f"window candidate draft must use slug {WINDOW_CANDIDATE_SLUG}"
+            )
+        if not base_url or not base_url.startswith("https://"):
+            errors.append("window candidate base_url must use HTTPS")
+        if base_url and "REPLACE" in base_url:
+            errors.append("window candidate base_url still contains a placeholder")
+        if _nested_scalar(lines, "auth", "type") != "bearer":
+            errors.append("window candidate auth.type must be bearer")
+        if _nested_scalar(lines, "auth", "header_name") != "Authorization":
+            errors.append("window candidate auth.header_name must be Authorization")
+        if _nested_scalar(lines, "auth", "value_prefix") != "Bearer ":
+            errors.append('window candidate auth.value_prefix must be "Bearer "')
+        description = _top_level_scalar(lines, "description") or ""
+        if "precipitation" in description.lower():
+            errors.append("window candidate description must be temperature-only")
+        if (
+            "unregistered compatibility manifest" not in description.lower()
+            or "served additively" not in description.lower()
+        ):
+            errors.append(
+                "window candidate description must state that it is an additive unregistered compatibility manifest"
+            )
+        errors.extend(_window_candidate_contract_errors(lines))
 
     official_pending = [
         "official tg-miner-integration portal validation was not run",
@@ -619,6 +882,7 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
         "base_url": base_url,
         "min_price_usdc": price_text,
         "canonical": canonical,
+        "window_candidate": is_window_candidate,
         "validation_scope": VALIDATION_SCOPE,
         "local_validation": local_validation,
         "official_portal_validation": official_portal_validation,
@@ -632,7 +896,11 @@ def validate_draft(path: Path, *, canonical: bool = False) -> dict[str, Any]:
 def validate_paths(paths: Iterable[Path], canonical: Path) -> dict[str, Any]:
     canonical = canonical.resolve()
     drafts = [
-        validate_draft(path, canonical=path.resolve() == canonical)
+        validate_draft(
+            path,
+            canonical=path.resolve() == canonical,
+            window_candidate=path.resolve() == WINDOW_CANDIDATE_PATH.resolve(),
+        )
         for path in paths
     ]
     errors: list[str] = []
@@ -663,6 +931,14 @@ def validate_paths(paths: Iterable[Path], canonical: Path) -> dict[str, Any]:
     }
 
 
+def default_draft_paths() -> list[Path]:
+    """Return registered drafts and explicitly local candidate manifests."""
+
+    paths = list((ROOT / "miners").glob("*.yaml"))
+    paths.extend((ROOT / "miners" / "candidates").glob("*.yaml"))
+    return sorted(paths)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -672,7 +948,7 @@ def main() -> None:
     )
     parser.add_argument("paths", nargs="*", type=Path)
     args = parser.parse_args()
-    paths = args.paths or sorted((ROOT / "miners").glob("*.yaml"))
+    paths = args.paths or default_draft_paths()
     result = validate_paths(paths, args.canonical)
     print(json.dumps(result, indent=2, sort_keys=True))
     if not result["valid"]:

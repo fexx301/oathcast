@@ -1,12 +1,12 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-17
 
 Current baseline: the public Miner runs `2026-08-16-route-v7`. The separate
 decision UI provides a read-only status shell and development fixture while its
 live API remains fail-closed without a runner. The v7 release adds the exact
 registered `/predict` route at both Caddy and application boundaries. It passed
-333 Python tests, the Go WASM suite, a disposable-container smoke, public
+the Python repository suite, the Go WASM suite, a disposable-container smoke, public
 identity/write-readiness checks, exact `/predict`/canonical receipt parity, and
 restart/replay persistence on the live receipt volume. OathCast is registered
 on Base Sepolia as on-chain registration ID `78` and active in the Telegraph
@@ -25,6 +25,13 @@ breakdown-layout blocker before a registration candidate can be frozen.
   canonical HTTPS, exact `WEATHER_FORECAST` semantics, endpoint query contracts,
   and signal mappings. Slug availability remains a live portal check; routing-ID
   collision inspection is conservative and is not the on-chain registration ID.
+- Local compatibility implementation for the team-requested temperature shape
+  `forecast_hours=1..24&hourly=2t` on `/predict` and
+  `/v1/forecast/point`. It starts at the next complete UTC hour and returns only
+  `content`, `reference_time`, `hourly`, and `hourly_units` with RFC3339/Kelvin
+  values. The path is unregistered and undeployed; the protected registered YAML
+  and its one-hour precipitation contract are unchanged. `/v1/forecast/window`
+  retains its separate legacy start/end contract.
 - Release provenance through a non-secret release ID, source-tree digest, and
   image digest fields exposed by `/healthz` and response headers.
 - `/readyz` readiness endpoint and a reproducible public Miner smoke script
@@ -50,13 +57,15 @@ breakdown-layout blocker before a registration candidate can be frozen.
 - An external-canary entry point plus a no-cost scheduled GitHub Actions
   workflow. The repository secret is configured, missing-secret runs fail
   visibly, and the workflow is pinned to the deployed v7 identity.
-- The live registered-path failure is fixed in release
-  `2026-08-16-route-v7`: Caddy routes exact `/predict`, the Miner accepts only
+- The historical registered-path 404 is fixed in release
+  `2026-08-16-route-v7`: Caddy routes exact `/predict`, the Miner accepts
   `/predict` and `/v1/forecast/point`, both paths share auth/rate limits and one
   receipt, and the smoke test rejects empty or invalid answers. Public HTTPS,
   exact v6-to-v7 replay, restart persistence, SQLite integrity, and sanitized
-  logs all passed. The previous leaderboard zero remains historical; only a
-  fresh Telegraph scoring epoch can establish the corrected live score.
+  logs all passed. A later epoch-202 observation still scored OathCast `0`, rank
+  `6/6`, because the scorer requests 24 hours while the live Miner serves the
+  registered one-hour contract. The local 24-hour fix is undeployed, so no
+  corrected live score exists.
 - A demo ablation mode that runs the Application with the owned Miner disabled
   and asserts that valid external responses still drive the decision.
 - Staging API-key rotation: the old/new overlap was exercised through public
@@ -105,25 +114,58 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `no_std` WASM, exported bounded memory, checked allocation/input validation,
   and the published `alloc`/`dealloc`/`rank_answer` ABI. It handles generic
   weather semantics, probability/polarity consistency, numeric facts, UTC time
-  windows, JSON envelopes, stuffing, and concision. Rust tests, the local wazero
-  ABI/adversarial suite, and deterministic repeated `rank_answer` calls pass.
+  windows, JSON envelopes, stuffing, and concision. Rust tests pass `39/39`, the
+  full Go/wazero ABI and adversarial suite passes, Python discovery passes
+  `401/401`, and
+  deterministic repeated `rank_answer` calls pass.
   Telegraph's unmodified tester example also returns `0.8500`. An earlier
   validator-observed scalar `breakdown_answer` export and its tests are now
   historical only: the updated guide deprecates and removes that function. The
-  current rank-only build is 16,292 bytes with SHA-256
+  historical registered rank-only artifact is 16,292 bytes with SHA-256
   `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`
   and raw-byte Keccak-256
   `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
-  Two isolated clean builds were byte-identical, and the v4 machine-readable
-  release record separates this candidate from the historical scalar-build
-  metadata. The exact candidate is uploaded and portal-verified. Two earlier
-  transactions remain historical because their delegated packets targeted the
-  obsolete registry. Corrected transaction
+  Two earlier transactions remain historical because their delegated packets
+  targeted the obsolete registry. Corrected transaction
   `0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e`
   registered the exact hash/CID and `WEATHER_FORECAST` on the current registry
   as ID `7`; entity count `7` and matching non-empty `getWasm(7)` prove on-chain
-  registration and Intent binding. Dashboard indexing, validator Stage 1, the
-  reported `0.60` result, and Stage 2 remain unobserved.
+  registration and Intent binding. Registration `19`, wallet
+  `0x7dc9C9D535B68C3c6273e3323f0e52E5851C3278`, transaction
+  `0xa6bc6f653eec4a5c79acac4a6e747222d48fd257367c325cd0e6c0090d321e73`,
+  later evaluated those same bytes from
+  `https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=sigr9vji&dl=1`. According to user-relayed Telegraph team confirmation, corroborated by reaching champion comparison, Stage 1 passed;
+  Stage 2 rejected the artifact at `31/32` ordering wins versus the champion's
+  `32/32`, with candidate margin `0.31248063`, champion margin `0.37360683`, and
+  zero historical rows. According to user-relayed Telegraph guidance, these margins are not directly
+  compared for promotion.
+- The current 42,798-byte factual-paraphrase artifact is reproducible and was
+  manually hosted and evaluated as registration `41`. Its SHA-256 is
+  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`
+  and raw-byte Keccak-256
+  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+  The fixture SHA-256 is
+  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
+  Two isolated clean builds are byte-identical. All 87 synthetic factual pairs
+  pass the reported `0.15` floor with minimum margin `0.206250`; synthetic
+  ordinal Spearman is `0.959623`. Predicate-family identity, inverse
+  learned-from and lost-to phrasing, parenthetical commas, coordinated relation
+  swaps, mixed explicit reversals, partial multi-relation omissions, and mixed
+  directed pairs have Rust and fixture regressions. Shared predicates, bounded
+  anaphoric and passive ellipsis, suffix-bearing surname aliases,
+  predicate-free completeness, comma and semicolon gapping, subordinate
+  parenthetical predicates, and novel claims after punctuation are also
+  covered. The `release-evidence.json` schema-v7 record labels these synthetic
+  results as local proxies. Registration `41` independently re-fetched the
+  hosted bytes and matched the size and both artifact hashes. The confirmed Base Sepolia
+  transaction is
+  `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
+  It reached champion comparison (Stage 1 passed) and failed Stage 2 at `31/32`
+  candidate ordering wins versus the champion's `32/32`; candidate
+  margin/EvalScore was `0.37852418` and the champion margin was `0.37360683`.
+  The higher aggregate margin did not override the per-case promotion rule. No
+  further registration or replacement is authorized. The complete postflight is
+  `artifacts/registration-drafts/oathcast-weather-wasm-registration-41-postflight-2026-08-17T193636Z.json`.
 - A leakage-safe chronological provider backtest with timestamped synthetic
   cases, a frozen warmup/holdout split, resolution-aware prior-only selection,
   simultaneous-timestamp batching, common-case Brier, coverage, and explicit
@@ -158,22 +200,14 @@ breakdown-layout blocker before a registration candidate can be frozen.
 - Preserve the superseded scalar artifact metadata and hashes as historical
   provenance only; the old bytes are not present in this workspace. Do not treat
   the historical scalar export or old `whitelistedUrls` ABI as a current
-  requirement. The 16,292-byte rank-only artifact and release record are frozen
-  at `ipfs://QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1`; the existing CID
-  was re-fetched byte-identically. Live portal build
-  `D8HL6V9WUTFV9A7Ryk0W0`, chunk
-  `_next/static/chunks/app/page-abd375eb1c96558e.js`, targets
-  `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8` and encodes
-  `registerWasm(bytes32,string,string)` with selector `0xfe1e40f7` and arguments
-  exact hash, existing gateway URL, and `WEATHER_FORECAST`. Corrected transaction
-  `0x3997dfd5b514cf56b434fb4a475e6cc015e5ae9d42064073ff044bc4f67be51e`
-  used that exact nested call and created current-registry ID `7`.
-  `entityCount(2) == 7`, and `getWasm(7)` contains the expected wallet, hash,
-  URL, and Intent. The immediate gate is Dashboard/validator indexing and an
-  observable Stage 1 result. Telegraph later asked the user to try
-  re-registering after its indexing PR merged but the dashboard remained empty;
-  no new transaction, decoded preflight, or authorization exists. Any retry
-  requires a fully decoded packet and fresh explicit authorization.
+  requirement. Preserve current-registry ID `7`, both obsolete-registry packets,
+  and registration `19` as the historical chronology for the 16,292-byte
+  artifact. Preserve registration `41` as the current 42,798-byte Stage 2
+  rejection. Do not infer either hidden failed pair from synthetic cases; keep
+  every local pair margin and Spearman result labeled as a proxy. No further
+  registration or replacement is authorized. Any future attempt requires a
+  fresh decoded wrapper/nested-call preflight for the new hash and fresh
+  explicit user authorization.
 - Write the payment-boundary ADR and threat model, then implement one private,
   authenticated, allowlisted, transactionally budgeted Solana request with a
   durable payment journal. Do not enable the public decision endpoint first.
@@ -184,9 +218,8 @@ breakdown-layout blocker before a registration candidate can be frozen.
   registry mismatch are fixed. The August 14 portal/API response remains
   historical surfaced output saying `missing required export
   "breakdown_answer"`, while Telegraph's node logs identify the underlying cause
-  as `module[env] not instantiated`. The current candidate has no import section.
-  Current-registry ID `7` is proven on-chain, but Stage 1 acceptance remains
-  unobserved.
+  as `module[env] not instantiated`. Both rank-only artifacts have no import
+  section.
 - Transactions `0x82db3d5ade954cf4995cbc01ed4f2a0a3b24c352b0ce9efa15ceb1f18d7d7471`
   and `0xde08c7a66627b98cf1a55fc7a3b4d2e8065b08d9b20d09af5c015852faa140d1`
   remain historical old-registry packets. The first emitted ID `5`; the second
@@ -197,20 +230,23 @@ breakdown-layout blocker before a registration candidate can be frozen.
   has receipt status `1`; its decoded nested call targets current registry
   `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8`, selector `0xfe1e40f7`, exact
   hash/CID, and `WEATHER_FORECAST`. The registry emitted ID `7`, now reports
-  `entityCount(2) == 7`, and returns matching non-empty `getWasm(7)`. The
-  Dashboard still reports `wasm_count: 0`, so indexing, Stage 1, Stage 2, and
-  the reported `0.60` result remain unobserved. Telegraph's subsequent request
-  to re-register is user-relayed guidance after its indexing PR merged, not a
-  new transaction authorization.
-- Ahmed confirmed that re-registration is intended and reported that the
-  candidate must score at least `0.60` on the Intent. The official example is
-  `0.8500`, while the weakest known valid local paraphrase is `0.5875`. Because
-  the validator replay corpus and aggregation formula are not independently
-  documented, this is hidden aggregate risk and does not prove threshold failure
-  or success. Do not infer validator activation from the simulation or local
-  scores. All prior authorizations are consumed. Any further attempt requires a
-  fresh complete wrapper/nested-call decode and fresh explicit authorization
-  before confirmation.
+  `entityCount(2) == 7`, and returns matching non-empty `getWasm(7)`. Preserve it
+  as historical proof for the registered 16,292-byte artifact.
+- According to user-relayed Telegraph team confirmation, corroborated by reaching
+  champion comparison, registration `19` passed Stage 1 and failed Stage 2 at `31/32` versus the
+  champion's `32/32`. According to user-relayed Telegraph guidance, there is a fixed `0.15` floor across six factual
+  paraphrase/lexical near-miss cases; promotion follows after all six pass, with
+  no direct aggregate-margin comparison. The `0.60` metric is Spearman against
+  champion historical scores, but the retained validator result has
+  `historical_rows: 0`. The hidden pair text, per-pair scores, and champion
+  history remain external evidence gaps.
+- Registration `41` is the current 42,798-byte artifact result: the hosted bytes
+  match the reproducible build, Stage 1 passed by reaching champion comparison,
+  and Stage 2 rejected it at `31/32` versus the champion's `32/32`. It was not
+  promoted, and the hidden failed pair and champion history remain unavailable.
+  All prior authorizations are consumed. Any further attempt requires a fresh
+  complete wrapper/nested-call decode and fresh explicit authorization before
+  confirmation.
 - Official ground-truth source, deadline/finality, revision, and extraction
   rules.
 - Ahmed clarified that Application agents may call Miners directly through

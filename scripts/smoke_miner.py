@@ -94,6 +94,97 @@ def valid_forecast_response(value: object) -> bool:
     )
 
 
+def valid_temperature_window_response(
+    value: object,
+    *,
+    expected_hours: int = 24,
+    expected_reference_times: set[datetime] | None = None,
+) -> bool:
+    """Validate the deployed additive ``forecast_hours/hourly=2t`` envelope."""
+
+    if not isinstance(value, dict) or set(value) != {
+        "content",
+        "reference_time",
+        "hourly",
+        "hourly_units",
+    }:
+        return False
+    if not isinstance(value["content"], str) or not value["content"].strip():
+        return False
+    reference_time = value["reference_time"]
+    if not isinstance(reference_time, str):
+        return False
+    try:
+        reference = datetime.fromisoformat(reference_time.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if reference.tzinfo is None or reference.utcoffset() != timedelta(0):
+        return False
+    if reference.minute or reference.second or reference.microsecond:
+        return False
+    if (
+        expected_reference_times is not None
+        and reference not in expected_reference_times
+    ):
+        return False
+
+    hourly = value["hourly"]
+    units = value["hourly_units"]
+    if not isinstance(hourly, dict) or set(hourly) != {"time", "2t"}:
+        return False
+    if units != {"time": "iso8601", "2t": "K"}:
+        return False
+    times = hourly["time"]
+    temperatures = hourly["2t"]
+    if (
+        not isinstance(times, list)
+        or not isinstance(temperatures, list)
+        or len(times) != expected_hours
+        or len(temperatures) != expected_hours
+    ):
+        return False
+    parsed_times: list[datetime] = []
+    for value_time in times:
+        if not isinstance(value_time, str):
+            return False
+        try:
+            parsed = datetime.fromisoformat(value_time.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+            return False
+        if parsed.minute or parsed.second or parsed.microsecond:
+            return False
+        parsed_times.append(parsed)
+    if not parsed_times or parsed_times[0] != reference + timedelta(hours=1):
+        return False
+    if any(
+        current != previous + timedelta(hours=1)
+        for previous, current in zip(parsed_times, parsed_times[1:])
+    ):
+        return False
+    return all(
+        isinstance(temperature, (int, float))
+        and not isinstance(temperature, bool)
+        and math.isfinite(temperature)
+        and temperature > 0
+        for temperature in temperatures
+    )
+
+
+def temperature_smoke_event_id(moment: datetime) -> str:
+    """Return one canary receipt identity per UTC hour."""
+
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError("temperature smoke time must be timezone-aware")
+    utc_hour = moment.astimezone(timezone.utc).replace(
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    return f"smoke-temperature-{utc_hour:%Y%m%dT%H}z"
+
+
 def request_json(url: str, *, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], object]:
     request = Request(url, headers=outbound_headers(headers))
     try:
@@ -235,6 +326,11 @@ def main() -> None:
         help="write the exact non-secret question used by this run for a later replay",
     )
     parser.add_argument("--skip-authenticated", action="store_true")
+    parser.add_argument(
+        "--require-temperature-window",
+        action="store_true",
+        help="also require the deployed 24-hour forecast_hours/hourly=2t response",
+    )
     args = parser.parse_args()
     base_url = args.base_url.rstrip("/")
     checks: list[dict[str, object]] = []
@@ -396,6 +492,113 @@ def main() -> None:
                     ),
                 }
             )
+
+            if args.require_temperature_window:
+                started_at = datetime.now(timezone.utc)
+                expected_reference_time = started_at.replace(
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
+                temperature_event_id = temperature_smoke_event_id(started_at)
+                temperature_params = {
+                    "event_id": temperature_event_id,
+                    "location_name": question["location_name"],
+                    "lat": f"{question['latitude']:.6f}",
+                    "lon": f"{question['longitude']:.6f}",
+                    "forecast_hours": "24",
+                    "hourly": "2t",
+                }
+                temperature_url = (
+                    f"{base_url}{REGISTERED_FORECAST_PATH}?"
+                    f"{urlencode(temperature_params)}"
+                )
+                temperature_status, temperature_headers, temperature = request_json(
+                    temperature_url,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "X-Request-ID": "smoke-release-temperature",
+                    },
+                )
+                temperature_receipt = header_value(
+                    temperature_headers,
+                    "X-OathCast-Receipt-SHA256",
+                )
+                temperature_request_id = header_value(
+                    temperature_headers,
+                    "X-OathCast-Request-ID",
+                )
+                temperature_ok = (
+                    temperature_status == 200
+                    and valid_temperature_window_response(
+                        temperature,
+                        expected_reference_times={expected_reference_time},
+                    )
+                    and bool(temperature_receipt)
+                    and bool(temperature_request_id)
+                )
+                temperature_check: dict[str, object] = {
+                    "name": "authenticated_temperature_window",
+                    "path": REGISTERED_FORECAST_PATH,
+                    "status": temperature_status,
+                    "ok": temperature_ok,
+                    "event_id": temperature_event_id,
+                    "expected_reference_time": format_timestamp(
+                        expected_reference_time
+                    ),
+                    "forecast_hours": 24,
+                    "hourly": "2t",
+                }
+                if temperature_receipt:
+                    temperature_check["receipt_sha256"] = temperature_receipt
+                if temperature_request_id:
+                    temperature_check["request_id"] = temperature_request_id
+                if isinstance(temperature, dict):
+                    temperature_check["public_response_sha256"] = json_sha256(
+                        temperature
+                    )
+                checks.append(temperature_check)
+
+                canonical_temperature_url = (
+                    f"{base_url}{CANONICAL_FORECAST_PATH}?"
+                    f"{urlencode(temperature_params)}"
+                )
+                canonical_temperature_status, canonical_temperature_headers, canonical_temperature = request_json(
+                    canonical_temperature_url,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "X-Request-ID": "smoke-release-temperature-canonical",
+                    },
+                )
+                canonical_temperature_receipt = header_value(
+                    canonical_temperature_headers,
+                    "X-OathCast-Receipt-SHA256",
+                )
+                checks.append(
+                    {
+                        "name": "temperature_path_parity",
+                        "registered_path": REGISTERED_FORECAST_PATH,
+                        "canonical_path": CANONICAL_FORECAST_PATH,
+                        "status": canonical_temperature_status,
+                        "ok": (
+                            temperature_ok
+                            and canonical_temperature_status == 200
+                            and canonical_temperature == temperature
+                            and bool(canonical_temperature_receipt)
+                            and canonical_temperature_receipt == temperature_receipt
+                            and valid_temperature_window_response(
+                                canonical_temperature,
+                                expected_reference_times={expected_reference_time},
+                            )
+                        ),
+                        "receipt_sha256": canonical_temperature_receipt,
+                        "public_response_sha256": (
+                            json_sha256(canonical_temperature)
+                            if isinstance(canonical_temperature, dict)
+                            else None
+                        ),
+                    }
+                )
 
     result = {
         "base_url": base_url,

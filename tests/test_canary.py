@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,7 +11,9 @@ from scripts.smoke_miner import (
     receipt_capacity_check,
     receipt_write_check,
     rolling_horizon,
+    temperature_smoke_event_id,
     valid_forecast_response,
+    valid_temperature_window_response,
 )
 
 
@@ -176,6 +179,76 @@ class ForecastResponseCheckTests(unittest.TestCase):
                 self.assertFalse(valid_forecast_response(response))
 
 
+class TemperatureWindowResponseCheckTests(unittest.TestCase):
+    def _response(self, *, hours=24):
+        reference = "2026-08-17T11:00:00Z"
+        times = [
+            (datetime(2026, 8, 17, 12, tzinfo=timezone.utc) + timedelta(hours=index)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            for index in range(hours)
+        ]
+        return {
+            "content": "Hourly 2 metre temperatures.",
+            "reference_time": reference,
+            "hourly": {"time": times, "2t": [298.15] * hours},
+            "hourly_units": {"time": "iso8601", "2t": "K"},
+        }
+
+    def test_valid_twenty_four_hour_temperature_response_passes(self):
+        self.assertTrue(valid_temperature_window_response(self._response()))
+
+    def test_temperature_response_rejects_wrong_shape_units_and_spacing(self):
+        response = self._response()
+        for mutate in (
+            lambda value: value["hourly"].pop("2t"),
+            lambda value: value["hourly_units"].update({"2t": "C"}),
+            lambda value: value["hourly"]["time"].__setitem__(1, value["hourly"]["time"][0]),
+            lambda value: value["hourly"]["2t"].__setitem__(0, 0),
+        ):
+            candidate = json.loads(json.dumps(response))
+            mutate(candidate)
+            with self.subTest(candidate=candidate):
+                self.assertFalse(valid_temperature_window_response(candidate))
+
+    def test_temperature_response_requires_exact_count(self):
+        self.assertFalse(valid_temperature_window_response(self._response(hours=23)))
+
+    def test_temperature_response_can_be_pinned_to_the_request_hour(self):
+        response = self._response()
+        expected = datetime(2026, 8, 17, 11, tzinfo=timezone.utc)
+        self.assertTrue(
+            valid_temperature_window_response(
+                response,
+                expected_reference_times={expected},
+            )
+        )
+        self.assertFalse(
+            valid_temperature_window_response(
+                response,
+                expected_reference_times={expected - timedelta(hours=1)},
+            )
+        )
+
+    def test_temperature_smoke_id_is_stable_only_within_one_utc_hour(self):
+        first = datetime(2026, 8, 17, 11, 1, tzinfo=timezone.utc)
+        same_hour = first + timedelta(minutes=58)
+        next_hour = first + timedelta(hours=1)
+
+        self.assertEqual(
+            temperature_smoke_event_id(first),
+            "smoke-temperature-20260817T11z",
+        )
+        self.assertEqual(
+            temperature_smoke_event_id(first),
+            temperature_smoke_event_id(same_hour),
+        )
+        self.assertNotEqual(
+            temperature_smoke_event_id(first),
+            temperature_smoke_event_id(next_hour),
+        )
+
+
 class RollingHorizonTests(unittest.TestCase):
     """The recurring canary must always pick a requestable horizon.
 
@@ -235,6 +308,7 @@ class RegisteredRouteConfigTests(unittest.TestCase):
         self.assertEqual(CANONICAL_FORECAST_PATH, "/v1/forecast/point")
         self.assertIn(REGISTERED_FORECAST_PATH, FORECAST_PATHS)
         self.assertIn(CANONICAL_FORECAST_PATH, FORECAST_PATHS)
+        self.assertNotIn("/v1/forecast/window", FORECAST_PATHS)
 
     def test_caddy_routes_the_registered_path_to_the_miner(self):
         matcher = next(

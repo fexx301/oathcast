@@ -11,13 +11,23 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INCLUDE = ("src", "miners", "scripts", "Dockerfile", "Caddyfile", "pyproject.toml", ".env.example")
+INCLUDE = (
+    "src",
+    "miners",
+    "scripts",
+    "Dockerfile",
+    ".dockerignore",
+    "Caddyfile",
+    "pyproject.toml",
+    ".env.example",
+)
 
 
 def _ignored(path: Path) -> bool:
     parts = set(path.relative_to(ROOT).parts)
     return (
         "__pycache__" in parts
+        or any(part.endswith(".egg-info") for part in parts)
         or path.suffix in {".pyc", ".pyo"}
         or path.name == ".env"
         or (path.name.startswith(".env.") and path.name != ".env.example")

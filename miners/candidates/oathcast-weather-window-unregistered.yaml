@@ -1,0 +1,153 @@
+# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.
+# This file documents the additive 1-to-24-hour runtime contract. It is not the
+# registered OathCast Miner contract and must not be uploaded, signed,
+# registered, or substituted for miners/oathcast-weather.yaml without a
+# separate review and explicit authorization.
+version: "1"
+kind: miner
+id: 0
+slug: oathcast-weather-window-unregistered
+protocol: generic
+name: OathCast Weather Window Candidate
+description: Unregistered compatibility manifest for Telegraph-compatible 1-to-24-hour UTC 2 metre temperature forecasts served additively behind the existing Miner endpoint.
+base_url: https://oathcastcourt.duckdns.org
+
+auth:
+  type: bearer
+  header_name: Authorization
+  value_prefix: "Bearer "
+  env_var: OATHCAST_MINER_API_KEY
+
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+endpoints:
+  - path: /predict
+    external_path: /v1/forecast/point
+    method: GET
+    description: Return hourly 2 metre temperatures for the next 1 through 24 complete UTC hours through the existing route while preserving the registered one-hour contract.
+    intents: [WEATHER_FORECAST]
+    params:
+      query:
+        required:
+          - name: lat
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point latitude in decimal degrees (-90 to 90).
+            example: 6.5244
+          - name: lon
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point longitude in decimal degrees (-180 to 180).
+            example: 3.3792
+          - name: forecast_hours
+            type: integer
+            intents: [WEATHER_FORECAST]
+            description: Number of complete UTC forecast hours to return, from 1 through 24.
+            example: 24
+          - name: hourly
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Telegraph weather field selector; this endpoint supports 2t only.
+            example: 2t
+        optional:
+          - name: event_id
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Stable event identifier.
+          - name: location_name
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Human-readable point name.
+          - name: provider
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Optional provider selector; window forecasts currently support open_meteo only.
+    param_map:
+      lat: latitude
+      lon: longitude
+
+input_schema:
+  type: object
+  properties:
+    event_id:
+      type: string
+    location_name:
+      type: string
+    lat:
+      type: number
+      minimum: -90
+      maximum: 90
+    lon:
+      type: number
+      minimum: -180
+      maximum: 180
+    forecast_hours:
+      type: integer
+      minimum: 1
+      maximum: 24
+    hourly:
+      type: string
+      enum:
+        - 2t
+    provider:
+      type: string
+      enum:
+        - open_meteo
+  required:
+    - lat
+    - lon
+    - forecast_hours
+    - hourly
+
+output_schema:
+  type: object
+  properties:
+    content:
+      type: string
+    reference_time:
+      type: string
+      format: date-time
+    hourly:
+      type: object
+      properties:
+        time:
+          type: array
+          items:
+            type: string
+            format: date-time
+        2t:
+          type: array
+          items:
+            type: number
+      required:
+        - time
+        - 2t
+    hourly_units:
+      type: object
+      properties:
+        time:
+          type: string
+          enum:
+            - iso8601
+        2t:
+          type: string
+          enum:
+            - K
+      required:
+        - time
+        - 2t
+  required:
+    - content
+    - reference_time
+    - hourly
+    - hourly_units
+
+semantics:
+  signal_mapping:
+    label_field: content
+    reason_field: content
+  supported_intents:
+    - WEATHER_FORECAST

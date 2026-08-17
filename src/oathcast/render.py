@@ -27,7 +27,15 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from oathcast.forecast import CanonicalForecast, ForecastQuestion, format_timestamp
+from oathcast.forecast import (
+    CanonicalForecast,
+    CanonicalTemperatureWindowForecast,
+    CanonicalWindowForecast,
+    ForecastQuestion,
+    ForecastWindowRequest,
+    TemperatureWindowRequest,
+    format_timestamp,
+)
 
 
 RENDERER_VERSION = "semantic_text_v2"
@@ -58,6 +66,14 @@ def _public_probability(probability: float) -> float:
 def _percentage(probability: float) -> str:
     percentage = f"{probability * 100:.2f}".rstrip("0").rstrip(".")
     return percentage
+
+
+def _measurement(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _temperature_kelvin(value_c: float) -> float:
+    return round(value_c + 273.15, 2)
 
 
 def _natural_time(moment) -> str:
@@ -176,3 +192,141 @@ def public_response(question: ForecastQuestion, forecast: CanonicalForecast) -> 
 
 def public_response_json(question: ForecastQuestion, forecast: CanonicalForecast) -> str:
     return json.dumps(public_response(question, forecast), separators=(",", ":"), sort_keys=True)
+
+
+def render_window_forecast_content(
+    request: ForecastWindowRequest,
+    forecast: CanonicalWindowForecast,
+    *,
+    probability: float | None = None,
+    minimum_temperature_c: float | None = None,
+    maximum_temperature_c: float | None = None,
+) -> str:
+    """Render explicit temperature range and peak one-hour precipitation semantics."""
+
+    if request.event_id != forecast.event_id:
+        raise ValueError("request and forecast event_id do not match")
+    if (
+        request.horizon_start != forecast.horizon_start
+        or request.horizon_end != forecast.horizon_end
+    ):
+        raise ValueError("request and forecast horizon do not match")
+    visible_probability = _public_probability(
+        forecast.probability if probability is None else probability
+    )
+    visible_minimum = round(
+        forecast.minimum_hourly_temperature_c
+        if minimum_temperature_c is None
+        else minimum_temperature_c,
+        2,
+    )
+    visible_maximum = round(
+        forecast.maximum_hourly_temperature_c
+        if maximum_temperature_c is None
+        else maximum_temperature_c,
+        2,
+    )
+    peak = forecast.peak_precipitation_hour
+    return (
+        f"For {request.location_name} from {_natural_time(request.horizon_start)} UTC on "
+        f"{_natural_date(request.horizon_start)} to {_natural_time(request.horizon_end)} UTC on "
+        f"{_natural_date(request.horizon_end)}, the minimum hourly temperature is "
+        f"{_measurement(visible_minimum)} C and the maximum hourly temperature is "
+        f"{_measurement(visible_maximum)} C. The highest one-hour precipitation probability "
+        f"is {_percentage(visible_probability)}% for the hour from "
+        f"{_natural_time(peak.interval_start)} to {_natural_time(peak.interval_end)} UTC on "
+        f"{_natural_date(peak.interval_start)}."
+    )
+
+
+def public_window_response(
+    request: ForecastWindowRequest,
+    forecast: CanonicalWindowForecast,
+) -> dict[str, Any]:
+    """Return a scored window response without claiming a whole-window event probability."""
+
+    visible_probability = _public_probability(forecast.probability)
+    visible_minimum = round(forecast.minimum_hourly_temperature_c, 2)
+    visible_maximum = round(forecast.maximum_hourly_temperature_c, 2)
+    peak = forecast.peak_precipitation_hour
+    return {
+        "content": render_window_forecast_content(
+            request,
+            forecast,
+            probability=visible_probability,
+            minimum_temperature_c=visible_minimum,
+            maximum_temperature_c=visible_maximum,
+        ),
+        "probability": visible_probability,
+        "probability_semantics": forecast.probability_semantics,
+        "minimum_hourly_temperature_c": visible_minimum,
+        "maximum_hourly_temperature_c": visible_maximum,
+        "max_hourly_precipitation_probability": visible_probability,
+        "max_hourly_precipitation_interval": {
+            "start": format_timestamp(peak.interval_start),
+            "end": format_timestamp(peak.interval_end),
+        },
+    }
+
+
+def public_window_response_json(
+    request: ForecastWindowRequest,
+    forecast: CanonicalWindowForecast,
+) -> str:
+    return json.dumps(
+        public_window_response(request, forecast),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def render_temperature_window_content(
+    request: TemperatureWindowRequest,
+    forecast: CanonicalTemperatureWindowForecast,
+) -> str:
+    """Enumerate every scored Telegraph temperature with its exact UTC timestamp."""
+
+    if request.event_id != forecast.event_id:
+        raise ValueError("request and forecast event_id do not match")
+    if request.reference_time != forecast.reference_time:
+        raise ValueError("request and forecast reference_time do not match")
+    if request.forecast_hours != len(forecast.hours):
+        raise ValueError("request and forecast hour counts do not match")
+
+    observations = "; ".join(
+        f"{format_timestamp(hour.interval_start)} = "
+        f"{_measurement(_temperature_kelvin(hour.temperature_2m_c))} K"
+        for hour in forecast.hours
+    )
+    return f"Hourly 2 metre temperatures for {request.location_name}: {observations}."
+
+
+def public_temperature_window_response(
+    request: TemperatureWindowRequest,
+    forecast: CanonicalTemperatureWindowForecast,
+) -> dict[str, Any]:
+    """Return Telegraph's aligned RFC3339/Kelvin hourly temperature contract."""
+
+    temperatures_k = [
+        _temperature_kelvin(hour.temperature_2m_c) for hour in forecast.hours
+    ]
+    return {
+        "content": render_temperature_window_content(request, forecast),
+        "reference_time": format_timestamp(forecast.reference_time),
+        "hourly": {
+            "time": [format_timestamp(hour.interval_start) for hour in forecast.hours],
+            "2t": temperatures_k,
+        },
+        "hourly_units": {"time": "iso8601", "2t": "K"},
+    }
+
+
+def public_temperature_window_response_json(
+    request: TemperatureWindowRequest,
+    forecast: CanonicalTemperatureWindowForecast,
+) -> str:
+    return json.dumps(
+        public_temperature_window_response(request, forecast),
+        separators=(",", ":"),
+        sort_keys=True,
+    )

@@ -82,10 +82,11 @@ docker run -d --name oathcast-decision-ui --restart unless-stopped \
 The image-level Docker health check targets the Miner on port 8080, so a UI
 container must override it as shown above. Bridge networking plus loopback-only
 publishing keeps the UI private to the host while preventing its health check
-from succeeding against the Miner or another host service. Caddy routes `/healthz`, `/readyz`,
-and `/v1/*` to the Miner on port 8080, and routes the public page, `/health`,
-`/status`, and `/api/decision` to this UI on port 8787. Because `/v1/*` belongs
-to the Miner at the edge, use `/api/decision` for public fail-closed checks.
+from succeeding against the Miner or another host service. Caddy routes
+`/healthz`, `/readyz`, exact registered `/predict`, and `/v1/*` to the Miner on
+port 8080, and routes the public page, `/health`, `/status`, and `/api/decision`
+to this UI on port 8787. Because `/predict` and `/v1/*` belong to the Miner at
+the edge, use `/api/decision` for public fail-closed checks.
 
 Publishing this shell is not Track-3 demand. Its status remains degraded and
 its decision endpoint returns 503 until the reviewed live Telegraph payment

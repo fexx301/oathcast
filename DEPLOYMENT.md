@@ -268,9 +268,11 @@ Miner through the same authenticated handler as `/v1/forecast/point`.
   `oathcast-2026-08-16-route-v7-replay.json`, and
   `oathcast-2026-08-16-route-v7-runtime-evidence.json`.
 
-This deployment does not retroactively change the old leaderboard epoch. Ask
-Telegraph for a fresh evaluation and retain the resulting non-empty extracted
-answer and score.
+This deployment did not retroactively change the old leaderboard epoch. A later
+epoch-202 observation still scored OathCast `0`, rank `6/6`, because the live
+one-hour Miner did not satisfy the scorer's 24-hour temperature request. The
+local 24-hour implementation is undeployed. Do not deploy it or request another
+external evaluation without separate review and explicit authorization.
 
 Deployment verification on 2026-08-03:
 

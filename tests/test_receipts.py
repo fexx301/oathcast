@@ -1,14 +1,18 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
 
 from oathcast.receipts import (
     DEFAULT_MAX_RECEIPT_BYTES,
     DEFAULT_MAX_RECEIPT_ROWS,
+    ReceiptConflict,
     ReceiptStoreFull,
     SqliteReceiptStore,
 )
+from scripts.backup_receipts import backup_read_only
 
 
 def _receipt(event_id: str) -> dict:
@@ -17,6 +21,20 @@ def _receipt(event_id: str) -> dict:
         "created_at": "2026-08-10T12:00:00Z",
         "forecast": {"probability": 0.7},
     }
+
+
+def _race(*operations):
+    barrier = threading.Barrier(len(operations))
+
+    def invoke(operation):
+        barrier.wait(timeout=5)
+        try:
+            return "saved", operation()
+        except Exception as exc:
+            return "error", exc
+
+    with ThreadPoolExecutor(max_workers=len(operations)) as executor:
+        return list(executor.map(invoke, operations))
 
 
 class ReceiptCapacityTests(unittest.TestCase):
@@ -61,6 +79,30 @@ class ReceiptCapacityTests(unittest.TestCase):
                 store.save(_receipt("bytes-1"))
         finally:
             store.close()
+
+    def test_candidate_bytes_are_counted_before_a_new_receipt_is_committed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            uncapped = SqliteReceiptStore(database, max_rows=None, max_bytes=None)
+            try:
+                baseline = uncapped.used_bytes()
+            finally:
+                uncapped.close()
+
+            store = SqliteReceiptStore(
+                database,
+                max_rows=None,
+                max_bytes=baseline + 256,
+            )
+            oversized = _receipt("candidate-bytes")
+            oversized["raw_payload"] = {"body": "x" * 4_096}
+            try:
+                self.assertTrue(store.capacity()["accepting_new_receipts"])
+                with self.assertRaises(ReceiptStoreFull):
+                    store.save(oversized)
+                self.assertEqual(store.row_count(), 0)
+            finally:
+                store.close()
 
     def test_capacity_reports_when_the_store_stops_accepting_new_receipts(self):
         store = SqliteReceiptStore(":memory:", max_rows=2)
@@ -131,6 +173,78 @@ class ReceiptCapacityTests(unittest.TestCase):
                 self.assertEqual(second.get("persist-1"), _receipt("persist-1"))
                 self.assertEqual(second.save(_receipt("persist-1")), _receipt("persist-1"))
             finally:
+                second.close()
+
+
+class ReceiptCrossInstanceConcurrencyTests(unittest.TestCase):
+    def test_distinct_ids_share_one_atomic_row_capacity_decision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            first = SqliteReceiptStore(database, max_rows=1, max_bytes=None)
+            second = SqliteReceiptStore(database, max_rows=1, max_bytes=None)
+            try:
+                outcomes = _race(
+                    lambda: first.save(_receipt("atomic-capacity-a")),
+                    lambda: second.save(_receipt("atomic-capacity-b")),
+                )
+                saved = [value for status, value in outcomes if status == "saved"]
+                errors = [value for status, value in outcomes if status == "error"]
+
+                self.assertEqual(len(saved), 1)
+                self.assertEqual(len(errors), 1)
+                self.assertIsInstance(errors[0], ReceiptStoreFull)
+                self.assertEqual(first.row_count(), 1)
+            finally:
+                first.close()
+                second.close()
+
+    def test_same_id_and_question_converge_on_the_first_committed_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            first = SqliteReceiptStore(database, max_rows=1, max_bytes=None)
+            second = SqliteReceiptStore(database, max_rows=1, max_bytes=None)
+            left = _receipt("atomic-replay")
+            left["forecast"] = {"probability": 0.1}
+            right = _receipt("atomic-replay")
+            right["forecast"] = {"probability": 0.9}
+            try:
+                outcomes = _race(
+                    lambda: first.save(left),
+                    lambda: second.save(right),
+                )
+
+                self.assertEqual([status for status, _ in outcomes], ["saved", "saved"])
+                self.assertEqual(outcomes[0][1], outcomes[1][1])
+                self.assertIn(outcomes[0][1], (left, right))
+                self.assertEqual(first.get("atomic-replay"), outcomes[0][1])
+                self.assertEqual(first.row_count(), 1)
+            finally:
+                first.close()
+                second.close()
+
+    def test_same_id_and_different_questions_produce_one_conflict(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            first = SqliteReceiptStore(database, max_rows=1, max_bytes=None)
+            second = SqliteReceiptStore(database, max_rows=1, max_bytes=None)
+            left = _receipt("atomic-conflict")
+            right = _receipt("atomic-conflict")
+            right["question"]["threshold_mm"] = 0.2
+            try:
+                outcomes = _race(
+                    lambda: first.save(left),
+                    lambda: second.save(right),
+                )
+                saved = [value for status, value in outcomes if status == "saved"]
+                errors = [value for status, value in outcomes if status == "error"]
+
+                self.assertEqual(len(saved), 1)
+                self.assertEqual(len(errors), 1)
+                self.assertIsInstance(errors[0], ReceiptConflict)
+                self.assertEqual(first.get("atomic-conflict"), saved[0])
+                self.assertEqual(first.row_count(), 1)
+            finally:
+                first.close()
                 second.close()
 
 
@@ -314,6 +428,49 @@ class ReceiptWriteReadinessTests(unittest.TestCase):
 
 
 class ReceiptBackupTests(unittest.TestCase):
+    def test_read_only_backup_uses_online_api_without_migrating_source(self):
+        receipt = {
+            "question": {"event_id": "read-only-backup"},
+            "created_at": "2026-08-04T12:00:00Z",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "receipts.sqlite3"
+            backup = Path(directory) / "backups" / "receipts.sqlite3"
+            store = SqliteReceiptStore(database)
+            try:
+                store.save(receipt)
+            finally:
+                store.close()
+
+            source_before = sqlite3.connect(database)
+            try:
+                schema_before = source_before.execute(
+                    "SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'trigger') "
+                    "ORDER BY name"
+                ).fetchall()
+            finally:
+                source_before.close()
+
+            evidence = backup_read_only(database, backup)
+
+            self.assertEqual(evidence["source_open_mode"], "ro")
+            self.assertEqual(evidence["source_row_count"], 1)
+            self.assertEqual(evidence["backup_row_count"], 1)
+            self.assertEqual(evidence["integrity_check"], "ok")
+            self.assertTrue(evidence["sha256"])
+
+            source = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+            try:
+                self.assertEqual(
+                    source.execute(
+                        "SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'trigger') "
+                        "ORDER BY name"
+                    ).fetchall(),
+                    schema_before,
+                )
+            finally:
+                source.close()
+
     def test_integrity_backup_and_restore_check_preserve_receipt_count(self):
         receipt = {
             "question": {"event_id": "backup-1", "threshold_mm": 0.1},
