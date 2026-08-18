@@ -298,7 +298,7 @@ func TestArtifactContract(t *testing.T) {
 		t.Fatalf("unexpected registration 19 fixture clarification: %+v", clarification)
 	}
 	if evidence.Verification.RustNativeTestsPassed != 40 ||
-		evidence.Verification.PythonRepositoryTestsPassed != 422 ||
+		evidence.Verification.PythonRepositoryTestsPassed != 498 ||
 		evidence.Verification.SyntheticFactualPairCount != 88 ||
 		evidence.Verification.SyntheticFactualMinimumMargin != 0.20625 ||
 		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.959566 {

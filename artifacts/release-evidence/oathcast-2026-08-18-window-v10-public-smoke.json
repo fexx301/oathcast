@@ -1,0 +1,123 @@
+{
+  "authenticated_checks_skipped": false,
+  "base_url": "https://oathcastcourt.duckdns.org",
+  "checks": [
+    {
+      "name": "healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "actual": "2026-08-18-window-v10",
+      "expected": "2026-08-18-window-v10",
+      "name": "release_id",
+      "ok": true
+    },
+    {
+      "actual": "6e7bc21954b6951e10bd78249143639fb151895faf4c0cd114b0ecfeb7b88795",
+      "expected": "6e7bc21954b6951e10bd78249143639fb151895faf4c0cd114b0ecfeb7b88795",
+      "name": "source_sha256",
+      "ok": true
+    },
+    {
+      "actual": "sha256:757fb40dc01b99420fb1753789a530ed589bdf06f5a2b0dbb17eecfef498fe13",
+      "expected": "sha256:757fb40dc01b99420fb1753789a530ed589bdf06f5a2b0dbb17eecfef498fe13",
+      "name": "image_digest",
+      "ok": true
+    },
+    {
+      "name": "readyz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "accepting_new_receipts": true,
+      "bytes_headroom_percent": 99.945,
+      "name": "receipt_capacity",
+      "ok": true,
+      "reported": true,
+      "required": true,
+      "rows_headroom_percent": 99.981
+    },
+    {
+      "cached": false,
+      "name": "receipt_store_write",
+      "ok": true,
+      "probe": "sqlite_transactional_write",
+      "reported": true,
+      "required": true,
+      "rolled_back": true
+    },
+    {
+      "name": "unauthorized_rejected",
+      "ok": true,
+      "path": "/predict",
+      "status": 401
+    },
+    {
+      "event_id": "canary-lagos-20260819T1200z",
+      "name": "authenticated_forecast",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "b85bf41ca4b9cbcfb7e07e85f466156efc80b18a5b9f1dd3b17008bf98d7f564",
+      "receipt_sha256": "4cd26d6075d95da1cf4b3c64aa0282b3f9a23906248cc991487c16b12f47a6b0",
+      "request_id": "smoke-release",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "canonical_path_parity",
+      "ok": true,
+      "public_response_sha256": "b85bf41ca4b9cbcfb7e07e85f466156efc80b18a5b9f1dd3b17008bf98d7f564",
+      "receipt_sha256": "4cd26d6075d95da1cf4b3c64aa0282b3f9a23906248cc991487c16b12f47a6b0",
+      "registered_path": "/predict",
+      "status": 200
+    },
+    {
+      "event_id": "smoke-temperature-20260818T18z",
+      "expected_reference_time": "2026-08-18T18:00:00Z",
+      "forecast_hours": 24,
+      "hourly": "2t",
+      "name": "authenticated_temperature_window",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "a421ef15ae1cd1e0af7a007bf1d1461877eb31da655c5da3eb40dd725ae0b574",
+      "receipt_sha256": "f2f63ddc9cdef72bf069fb59f792f1ac4231e63c15e3c77c170ff016252e50df",
+      "request_id": "smoke-release-temperature",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "temperature_path_parity",
+      "ok": true,
+      "public_response_sha256": "a421ef15ae1cd1e0af7a007bf1d1461877eb31da655c5da3eb40dd725ae0b574",
+      "receipt_sha256": "f2f63ddc9cdef72bf069fb59f792f1ac4231e63c15e3c77c170ff016252e50df",
+      "registered_path": "/predict",
+      "status": 200
+    }
+  ],
+  "ok": true,
+  "partial": false,
+  "question": {
+    "event_id": "canary-lagos-20260819T1200z",
+    "forecast_cutoff": "2026-08-19T11:00:00Z",
+    "horizon_end": "2026-08-19T13:00:00Z",
+    "horizon_start": "2026-08-19T12:00:00Z",
+    "latitude": 6.5244,
+    "location_name": "Lagos",
+    "longitude": 3.3792,
+    "metric": "precipitation",
+    "operator": ">",
+    "precipitation_type": "measurable",
+    "spatial_semantics": "point",
+    "threshold_mm": 0.1,
+    "timezone": "UTC"
+  },
+  "release": {
+    "contract_version": "forecast_contract_v1",
+    "image_digest": "sha256:757fb40dc01b99420fb1753789a530ed589bdf06f5a2b0dbb17eecfef498fe13",
+    "release_id": "2026-08-18-window-v10",
+    "source_sha256": "6e7bc21954b6951e10bd78249143639fb151895faf4c0cd114b0ecfeb7b88795"
+  },
+  "release_id": "2026-08-18-window-v10"
+}

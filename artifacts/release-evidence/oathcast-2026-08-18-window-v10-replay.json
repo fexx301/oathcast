@@ -1,0 +1,11 @@
+{
+  "after_release_id": "2026-08-18-window-v10",
+  "before_release_id": "2026-08-17-temperature-v8",
+  "errors": [],
+  "fingerprints": {
+    "event_id": "canary-lagos-20260819T1200z",
+    "public_response_sha256": "b85bf41ca4b9cbcfb7e07e85f466156efc80b18a5b9f1dd3b17008bf98d7f564",
+    "receipt_sha256": "4cd26d6075d95da1cf4b3c64aa0282b3f9a23906248cc991487c16b12f47a6b0"
+  },
+  "ok": true
+}

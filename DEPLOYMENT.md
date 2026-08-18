@@ -12,7 +12,7 @@ public smoke output, and runtime details are archived under
 
 ## Current deployment status
 
-The deployed Miner is v8; stopped `oathcast-v7-rollback-20260817` is the
+The deployed Miner is v10; stopped `oathcast-v8-rollback-20260818` is the
 immediate Miner rollback target. Caddy configuration did not change for v8 and
 remains pinned by its retained hash. The v7, v6, v5, and v4 sections below are
 historical release records. The public decision UI is deployed separately. Its
@@ -261,7 +261,60 @@ security group exposes only ports 80 and 443. DuckDNS currently maps
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-08-17 - additive temperature compatibility (CURRENT)
+## Release 2026-08-18 - 1-to-24-hour window on the registered route (CURRENT)
+
+Release v10 answers Telegraph's 24-hour `WEATHER_FORECAST` requests. The handler
+previously called `question_from_query` directly, which enforces a one-hour
+  span,
+so a multi-hour `start`/`end` request was refused with 400 "only accepts one-
+  hour
+windows": no temperature was returned and the Miner scored `0`.
+
+- Release ID: `2026-08-18-window-v10`
+- Source manifest digest:
+  `6e7bc21954b6951e10bd78249143639fb151895faf4c0cd114b0ecfeb7b88795`
+- Runtime image ID:
+  `sha256:757fb40dc01b99420fb1753789a530ed589bdf06f5a2b0dbb17eecfef498fe13`
+- Commit `6d2ad28`; runtime flag `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`.
+- The protected registered YAML remains exactly 4,960 bytes with SHA-256
+  `9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e`.
+- All twelve strict public smoke checks passed: health, release ID, source
+  digest, image digest, readiness, receipt capacity, transactional write
+  rollback, unauthenticated `/predict` rejection, authenticated registered and
+  canonical forecast parity, and the temperature response and parity.
+- Verified live over public HTTPS: a 24-hour `start`/`end` span returns `200`
+  carrying `minimum_hourly_temperature_c`, `maximum_hourly_temperature_c` and
+  `probability`; 6-hour and 12-hour spans likewise; the registered one-hour
+  contract still returns `content` and `probability` only; and the `hourly=2t`
+  path is unchanged.
+- The frozen v8 question replayed byte-identically through v10
+  (`compare_release_replay.py` reported `ok: true`). The live receipt database
+  returned `PRAGMA integrity_check` `ok`.
+- Stopped `oathcast-v8-rollback-20260818` is the immediate rollback target.
+  Revert with `docker rm -f oathcast`, then `docker start` and `docker rename`
+  that container back to `oathcast`.
+- Caddy was not reconfigured.
+- Evidence:
+  `artifacts/release-evidence/oathcast-2026-08-18-window-v10-manifest.json`,
+  `oathcast-2026-08-18-window-v10-public-smoke.json`, and
+  `oathcast-2026-08-18-window-v10-replay.json`.
+
+Two limits are recorded rather than claimed away. In a multi-hour response
+`probability` is the maximum one-hour precipitation probability inside the span,
+reported with an explicit `probability_semantics` field, whereas the registered
+YAML describes a one-hour event probability; the multi-hour branch is therefore
+structurally compliant but semantically undeclared, and is provisional until the
+window semantics are declared and re-registered. A window whose first hour has
+already begun is still refused with 410, and `forecast_hours` shapes other than
+exactly `hourly=2t` are still refused with 400 and now logged.
+
+An intermediate `2026-08-18-window-v9` was built and started, then replaced
+within minutes: it also relaxed the one-hour point contract's implicit cutoff,
+which is hashed into the derived `event_id`, so an unchanged request stopped
+replaying its stored receipt and an explicit `event_id` raised `ReceiptConflict`
+as HTTP 409. V10 restricts the relaxed cutoff to window requests.
+
+## Release 2026-08-17 - additive temperature compatibility (HISTORICAL; SUPERSEDED BY V10)
 
 Release v8 enables the additive temperature request shape on the existing
 public Miner while leaving the protected registered one-hour precipitation YAML

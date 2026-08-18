@@ -2,14 +2,16 @@
 
 Last reviewed: 2026-08-18
 
-Current baseline: the public Miner runs `2026-08-17-temperature-v8`. The separate
+Current baseline: the public Miner runs `2026-08-18-window-v10`. The separate
 decision UI provides a read-only status shell and development fixture while its
-live API remains fail-closed without a runner. V8 retains the exact registered
-`/predict` route and enables the additive 1-to-24-hour `hourly=2t` compatibility
-path with `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. It passed a disposable
-candidate run, strict public identity/write-readiness checks, exact
-`/predict`/canonical parity for both forecast contracts, v7-to-v8 receipt replay,
-and restart persistence on the live receipt volume. OathCast is registered
+live API remains fail-closed without a runner. V10 retains the exact registered
+`/predict` route and its one-hour precipitation contract, adds multi-hour
+`start`/`end` spans of 1 to 24 hours on that route so Telegraph's 24-hour
+requests are answered rather than refused, and keeps the additive
+`hourly=2t` compatibility path with `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`.
+It passed all twelve strict public identity, readiness, write-probe, parity and
+temperature checks, replayed the v8 receipt and public response byte-identically,
+and left the live receipt database with integrity `ok`. OathCast is registered
 on Base Sepolia as on-chain registration ID `78` and active in the Telegraph
 dispatcher as routing ID `64173`, slug `oathcast-weather`.
 
@@ -236,6 +238,29 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Blocked on authorization, external evidence, or remaining documentation
 
+- Release `2026-08-18-window-v10` serves multi-hour `start`/`end` spans on the
+  registered `/predict` route so Telegraph's 24-hour `WEATHER_FORECAST` requests
+  are answered instead of refused with 400. The response is structurally
+  compliant, carrying both `content` and the `probability` the registered
+  `output_schema` requires, and the YAML's `input_schema` constrains `start` and
+  `end` only to `format: date-time`. It is not semantically declared: in a
+  multi-hour response `probability` is the maximum one-hour precipitation
+  probability inside the span, reported alongside an explicit
+  `probability_semantics` field, whereas the registered YAML describes a
+  one-hour event probability. Treat the multi-hour branch as provisional until
+  the window semantics are declared and re-registered, or isolated from the
+  registered route. This is the same class of recorded deviation as the additive
+  `hourly=2t` shape above, and it was accepted for the same reason: refusing the
+  request returned no temperature and scored zero.
+- Two prose descriptions in the pinned registered YAML are now stale against the
+  deployed service: `start`/`end` are described as "the one-hour forecast
+  window", and `cutoff` as "defaults to one hour before start", which remains
+  true for the one-hour point contract but not for a window request, where the
+  default is the window opening. Both are prose only, so the machine-readable
+  schema still validates and no re-registration is forced. They are debt for
+  whenever `miners/oathcast-weather.yaml` is next re-registered, since the file
+  is content-addressed at raw-byte SHA-256
+  `9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e`.
 - The deployed `2026-08-17-temperature-v8` service answers the additive
   `forecast_hours`/`hourly=2t` shape on the registered `/predict` route with
   `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`, but the registered YAML does not

@@ -296,8 +296,10 @@ lives in `scoring-modules/oathcast-weather/`. It is a dependency-free Rust
 pairs for question, ground truth, and Miner answer, in that order. Blank answers
 return exactly `0`, results are finite and clamped to `[0, 1]`, and the
 standalone artifact has no host imports or start section. The rank path passes
-the Rust tests (`40/40`), OathCast's full Go/wazero ABI and adversarial suite,
-and Telegraph's unmodified official tester (example score `0.8500`). See the
+the Rust tests (`40/40`) and OathCast's full Go/wazero ABI and adversarial
+suite. Telegraph's unmodified official tester returned example score `0.8500`
+for the earlier 42,798-byte registration `41` artifact; it is not vendored here
+and has not been re-run against the current candidate. See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
 build commands and safeguards. The current frozen rank-only artifact is 42,790
 bytes with SHA-256
