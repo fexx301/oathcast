@@ -30,6 +30,7 @@ from oathcast.service import (
     ReceiptStoreUnavailable,
     RequestRateLimiter,
     authorization_valid,
+    default_event_id,
     fetch_json,
     question_from_query,
     run_server,
@@ -323,26 +324,31 @@ class ServiceTests(unittest.TestCase):
             }
         )
         self.assertEqual(question.event_id, "q-1")
-        # An omitted cutoff defaults to the hour's opening, not an hour before
-        # it. The earlier hour of implied lead time made a request for the very
-        # next hour impossible to satisfy: a call at 14:30 for the 15:00 hour was
-        # refused with 410 because the derived 14:00 cutoff had already passed.
-        self.assertEqual(question.forecast_cutoff.isoformat(), "2026-08-17T15:00:00+00:00")
-        self.assertEqual(question.forecast_cutoff, question.horizon_start)
-
-    def test_explicit_cutoff_still_imposes_lead_time_when_a_caller_wants_it(self):
-        question = question_from_query(
-            {
-                "location_name": ["Lagos"],
-                "lat": ["6.5244"],
-                "lon": ["3.3792"],
-                "start": ["2026-08-17T15:00:00Z"],
-                "end": ["2026-08-17T16:00:00Z"],
-                "cutoff": ["2026-08-17T14:00:00Z"],
-            }
-        )
+        # The registered default is one hour before start, and it must stay that
+        # way: this value is hashed into the derived event_id, so changing it
+        # changes the identity of an unchanged request and breaks receipt replay.
         self.assertEqual(question.forecast_cutoff.isoformat(), "2026-08-17T14:00:00+00:00")
         self.assertLess(question.forecast_cutoff, question.horizon_start)
+
+    def test_point_contract_event_identity_is_stable_for_an_implicit_cutoff(self):
+        """A request with no cutoff must keep deriving the same event_id.
+
+        Relaxing the implicit cutoff once changed this hash, so an unchanged
+        request stopped replaying its stored receipt and an explicit event_id
+        raised ReceiptConflict against the receipt already on disk.
+        """
+
+        params = {
+            "location_name": ["Lagos"],
+            "lat": ["6.5244"],
+            "lon": ["3.3792"],
+            "start": ["2026-08-17T15:00:00Z"],
+            "end": ["2026-08-17T16:00:00Z"],
+        }
+        implicit = question_from_query(dict(params))
+        explicit = question_from_query({**params, "cutoff": ["2026-08-17T14:00:00Z"]})
+        self.assertEqual(implicit.forecast_cutoff, explicit.forecast_cutoff)
+        self.assertEqual(implicit.event_id, default_event_id(explicit))
 
     def test_default_event_id_is_stable_and_bound_to_the_canonical_question(self):
         first = question_from_query(valid_query_params())

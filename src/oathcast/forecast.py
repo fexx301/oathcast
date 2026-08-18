@@ -107,14 +107,14 @@ class ForecastQuestion:
                 "the preparation spike only accepts one-hour windows; "
                 "broader windows need provider-native probability semantics"
             )
-        # A forecast is honestly ahead of its event when it is issued before the
-        # hour opens, so an equal cutoff is permitted. The integrity property the
-        # receipts exist to prove is "issued before the event", not "issued an
-        # hour early": defaulting to an hour of lead made a request for the very
-        # next hour impossible to satisfy. A caller that wants lead time still
-        # gets it by declaring an earlier cutoff explicitly.
-        if cutoff > start:
-            raise ValueError("forecast_cutoff must not be after horizon_start")
+        # Strict lead time is retained here on purpose. `default_event_id` hashes
+        # the whole question, forecast_cutoff included, so relaxing this default
+        # changed the derived identity of an unchanged request: an implicit-cutoff
+        # request stopped replaying its existing receipt, and an explicit event_id
+        # whose stored question carried the old cutoff raised ReceiptConflict.
+        # Only ForecastWindowRequest permits a cutoff at the horizon.
+        if cutoff >= start:
+            raise ValueError("forecast_cutoff must be before horizon_start")
 
         object.__setattr__(self, "horizon_start", start)
         object.__setattr__(self, "horizon_end", end)

@@ -1,0 +1,348 @@
+{
+  "files": [
+    {
+      "bytes": 82,
+      "path": ".dockerignore",
+      "sha256": "91ce5163c83e1933f0c3d3d47e78b85433e0a2c3ee837f57c39808b8a02aa3e5"
+    },
+    {
+      "bytes": 2190,
+      "path": ".env.example",
+      "sha256": "48da3b67e1fa0f77a58c4956e021a41895e190e0bebc2b39c5563ed4f38f7888"
+    },
+    {
+      "bytes": 1060,
+      "path": "Caddyfile",
+      "sha256": "410bd500d7955a5efaa43772137b9bbf05d812a889a0461cd6f2a0198c74ef59"
+    },
+    {
+      "bytes": 1978,
+      "path": "Dockerfile",
+      "sha256": "d53053d8b53ed6a7ab9495844c1584917c788b3102868222c824cff17f221057"
+    },
+    {
+      "bytes": 3933,
+      "path": "miners/candidates/oathcast-weather-window-unregistered.yaml",
+      "sha256": "dc1762bd6ea672438bcf205d50eed9b4620f99f931d14b9b1b0353caf46b399b"
+    },
+    {
+      "bytes": 1414,
+      "path": "miners/oathcast-open-meteo.yaml",
+      "sha256": "9eedffe4a7037aa8fd42aa3660d23962aaaa5e3750bd69abce88d178fe82a523"
+    },
+    {
+      "bytes": 1417,
+      "path": "miners/oathcast-openweather.yaml",
+      "sha256": "b7c2f3716e6743a74c1d34f279f0118c617bbab078de1540c05e7ebeb2f8bfb8"
+    },
+    {
+      "bytes": 4960,
+      "path": "miners/oathcast-weather.yaml",
+      "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+    },
+    {
+      "bytes": 1404,
+      "path": "miners/oathcast-weatherapi.yaml",
+      "sha256": "3fe15849c015e81c64b2e3fe44efa327fbae81b4668e97908fe077e0b2d9528c"
+    },
+    {
+      "bytes": 551,
+      "path": "pyproject.toml",
+      "sha256": "fec5fa8eda942936c79598d84812b2e3cfda26a4e58d2ed7f54e67578f723bb1"
+    },
+    {
+      "bytes": 8046,
+      "path": "scripts/anchor_receipt_head.py",
+      "sha256": "65ff90bf51f189630caf556ec5665e16facbfb43d02d5f6180598e263965a0d6"
+    },
+    {
+      "bytes": 681,
+      "path": "scripts/application_pilot.py",
+      "sha256": "0617b67cfb078d8d5e0a3e7bdb5b83cca65bd407cbb427c96b555d8ef681243d"
+    },
+    {
+      "bytes": 2208,
+      "path": "scripts/backtest_providers.py",
+      "sha256": "1fdbd557276f4124ce6c7e1605d76c4513323430c62fda00b16a01eca5e088f8"
+    },
+    {
+      "bytes": 4286,
+      "path": "scripts/backup_receipts.py",
+      "sha256": "b7ce1d84d56d2e62ffe369671f059a4e252e46bbc77e07ddd091945244f6f759"
+    },
+    {
+      "bytes": 20721,
+      "path": "scripts/benchmark_renderer.py",
+      "sha256": "8e2dc3c1aeacb309840587d3890cff5ffb337c6ec7794c073b6741bb225f7046"
+    },
+    {
+      "bytes": 2025,
+      "path": "scripts/benchmark_script_author.py",
+      "sha256": "e05b1fa33fa4c2a337ad2012774718acebd874d4adcd868c03ff28f3463b87d4"
+    },
+    {
+      "bytes": 9570,
+      "path": "scripts/check_provider_freshness.py",
+      "sha256": "0e73f96f3a13237f77818a1399d68c5fcd941e3e94cc68c07d0eabc29dc999c1"
+    },
+    {
+      "bytes": 16554,
+      "path": "scripts/collect_provider_pairs.py",
+      "sha256": "77c586f66281daf24489e1c2b812fc327a8020b3a211fb83793077832b9ca088"
+    },
+    {
+      "bytes": 3754,
+      "path": "scripts/compare_release_replay.py",
+      "sha256": "75ab2a7b00f17dd6a2be253a00c537315f57a930499c24c990fc0d298b320d7d"
+    },
+    {
+      "bytes": 9850,
+      "path": "scripts/create_registration_draft.py",
+      "sha256": "84e091360f417a57d3d20da9e9876fd13e61778ea2435202dc406d7c8bd9db11"
+    },
+    {
+      "bytes": 2568,
+      "path": "scripts/create_release_manifest.py",
+      "sha256": "6e3883b53c0b57de0607a9be17e74bf3075793d4736f22d5963fc57a5b876017"
+    },
+    {
+      "bytes": 6426,
+      "path": "scripts/demo_application.py",
+      "sha256": "d7897011c1778e7268fcc69f37477f15b477bc7766ef50235f77af161b4b020c"
+    },
+    {
+      "bytes": 2381,
+      "path": "scripts/discover_live_miners.py",
+      "sha256": "807ccfd12f3af7cb3b6fe5f224c8fc26bbcccbbc9b1ea4b325c6fbfc0933618f"
+    },
+    {
+      "bytes": 980,
+      "path": "scripts/evaluate_fixtures.py",
+      "sha256": "fa9ab1c06528714216b665ea9cf08f4669a992a2e93b87b120772bf8c12c0bbf"
+    },
+    {
+      "bytes": 1131,
+      "path": "scripts/inspect_demand.py",
+      "sha256": "8d7b00842f5b644280727daa051487e02643b3217e69e5333fffa68123deb887"
+    },
+    {
+      "bytes": 3876,
+      "path": "scripts/preflight_miner.py",
+      "sha256": "c6ce064fe5447b65e999f742ec74a2f5ca73ceddc3ac5e2c3319da99d28503cd"
+    },
+    {
+      "bytes": 2833,
+      "path": "scripts/prepare_logo_asset.py",
+      "sha256": "f6db4127806b32dac77a43425a3bdbf75a42f7dfcb3a2a0291713277a3b3faf1"
+    },
+    {
+      "bytes": 407,
+      "path": "scripts/public_canary.py",
+      "sha256": "d4f9b4b2a1d03458aac583bd574acf54af254856fdb7304d3140f0ceef515799"
+    },
+    {
+      "bytes": 7302,
+      "path": "scripts/read_leaderboard.py",
+      "sha256": "b462bc0b8edcdef814f6a87d7964328abfaf71fbd2ff6e2d3309aba6e9c83ad7"
+    },
+    {
+      "bytes": 1765,
+      "path": "scripts/run_decision_ui.py",
+      "sha256": "2ba1ddb894e3fa3b47451343ec7d87c79f379bac4397fce857327a7aafd85b1a"
+    },
+    {
+      "bytes": 1329,
+      "path": "scripts/score_fixtures.py",
+      "sha256": "8b9097d0822e6df3271da57f1ad129c9740cd698df3b4e2eb790650e24c666a1"
+    },
+    {
+      "bytes": 34208,
+      "path": "scripts/smoke_miner.py",
+      "sha256": "02f1f5c23d620840214f7044fc45a731aa252c150620cb1f465f24c55ab5fbbe"
+    },
+    {
+      "bytes": 33528,
+      "path": "scripts/validate_miner_drafts.py",
+      "sha256": "a57ff9bd6b63569eb679c8dc63a07309ef2510604f8c1cce60fdc7636745c0b5"
+    },
+    {
+      "bytes": 644,
+      "path": "scripts/validate_observations.py",
+      "sha256": "60b0951e3e048a75da98e2f45164b11196337eaa031c968a18df0c62313efd2a"
+    },
+    {
+      "bytes": 176,
+      "path": "src/oathcast/__init__.py",
+      "sha256": "745ae6efacb20e7cab1acc3e621892bc11530ab0177ec5ea10babe2f8d9e998f"
+    },
+    {
+      "bytes": 455,
+      "path": "src/oathcast/adapters/__init__.py",
+      "sha256": "c2ee17443a63fe46fd14a641b71770b3808ab6dd34168e299908dc2715fa003d"
+    },
+    {
+      "bytes": 3207,
+      "path": "src/oathcast/adapters/base.py",
+      "sha256": "7d996f58b8eedcd279346b5dcfaeb2ce6bee50c214be93cf18c739f1f97dd04f"
+    },
+    {
+      "bytes": 2702,
+      "path": "src/oathcast/adapters/open_meteo.py",
+      "sha256": "35b2e4ac1412f246065bd593666f8c9c714beda3ee7fa72cdf4c34d41e2d1458"
+    },
+    {
+      "bytes": 5007,
+      "path": "src/oathcast/adapters/open_meteo_temperature.py",
+      "sha256": "810ab5fae94205b1bf09646624da94e51753b5b1d50a529c8c56728674853ad7"
+    },
+    {
+      "bytes": 7025,
+      "path": "src/oathcast/adapters/open_meteo_window.py",
+      "sha256": "402068b9f263a94a0eb1feb48ceb00df2ac0790958d31a445db3151402eb98d5"
+    },
+    {
+      "bytes": 2699,
+      "path": "src/oathcast/adapters/openweather.py",
+      "sha256": "3c7143ae9e53cd5d6032ecce4ac4a5dcd5bcc23d335928e38fe936a2f381d9e9"
+    },
+    {
+      "bytes": 3913,
+      "path": "src/oathcast/adapters/weatherapi.py",
+      "sha256": "27d03d1ca16f397cc47ad47163551a44419c3be84f551d57871b749d14c87ccd"
+    },
+    {
+      "bytes": 17044,
+      "path": "src/oathcast/application.py",
+      "sha256": "c75ddcfca67d5beb4ae43048b14cebbced2568f253df340633cb2ec5635d270d"
+    },
+    {
+      "bytes": 2464,
+      "path": "src/oathcast/artifacts.py",
+      "sha256": "026ed3ddd7274e4e88dd9481736a35f10afaa44fe106e5c6a4dade8db8ab7c6f"
+    },
+    {
+      "bytes": 18454,
+      "path": "src/oathcast/assets/oathcast-mark.webp",
+      "sha256": "16fae356c71fe6ed83d7594feb780477455c2868ac5409763099c8d66305a80a"
+    },
+    {
+      "bytes": 19331,
+      "path": "src/oathcast/backtest.py",
+      "sha256": "da5c4b0d1f63855e5b8d682dd16b9a186430f81b517617bd9ae35390c867ce6d"
+    },
+    {
+      "bytes": 23047,
+      "path": "src/oathcast/cases.py",
+      "sha256": "775c720123dca7fa0ea916bca5c8b6b9244ed9b5611a5353ea584f3303cb84c4"
+    },
+    {
+      "bytes": 53449,
+      "path": "src/oathcast/decision_ui.py",
+      "sha256": "5bbd4f8aa9a2e179e72e92e9959011dd03a014356576d1a843d33fd4bb62dfdf"
+    },
+    {
+      "bytes": 16778,
+      "path": "src/oathcast/demand.py",
+      "sha256": "6b6c579945420249fcd468cd6786934d0bc495090ee6e8b8d1bf324feee2da53"
+    },
+    {
+      "bytes": 8051,
+      "path": "src/oathcast/discovery.py",
+      "sha256": "0e940e904b8deff5e94e3542bf76e9ec7e813f017983ab5805296289b12bd18b"
+    },
+    {
+      "bytes": 28144,
+      "path": "src/oathcast/forecast.py",
+      "sha256": "ae3f7687d390226951aa5db39530ef5d2c1e0567a72b379a4d71cb2bb1fb5afd"
+    },
+    {
+      "bytes": 12297,
+      "path": "src/oathcast/ground_truth.py",
+      "sha256": "9659a304f28e2306712057d6800b4f607fb818b97b59c8c2113d74652f45670f"
+    },
+    {
+      "bytes": 13593,
+      "path": "src/oathcast/leaderboard.py",
+      "sha256": "d446a1c2963957663b60eccfe72f9dd572537d4d37eee87c8c81f9a08c78909b"
+    },
+    {
+      "bytes": 16948,
+      "path": "src/oathcast/miner_adapters.py",
+      "sha256": "389a356a960d402cc5c2e5e3558b240132006be6ff91996a4545c180e22e8bb4"
+    },
+    {
+      "bytes": 42044,
+      "path": "src/oathcast/payment.py",
+      "sha256": "bd56abbd0e76733ebb41c7901124a071b4e24765de1de2eb5df6d6605241cb1f"
+    },
+    {
+      "bytes": 18390,
+      "path": "src/oathcast/pilot.py",
+      "sha256": "8f671be4bbfc0e0315200db8d534ee51da9287827402ccbb6ee835b332eca748"
+    },
+    {
+      "bytes": 8688,
+      "path": "src/oathcast/presentation.py",
+      "sha256": "e72677d52c21d1cb23cd6351c794f1bc27c2a5d186fa88aa4c737caebd5d1d3b"
+    },
+    {
+      "bytes": 3442,
+      "path": "src/oathcast/probability.py",
+      "sha256": "1db3000f85288e9f26a8b42242f3e2d6376f42ef29e04c9e05daf96380e2cc8a"
+    },
+    {
+      "bytes": 7996,
+      "path": "src/oathcast/protocol.py",
+      "sha256": "5d2133d60988bd95c888ce33980c397bac21d224251f8380c0f86548dfdcdd3e"
+    },
+    {
+      "bytes": 26146,
+      "path": "src/oathcast/receipts.py",
+      "sha256": "99bfc30da70471d5a4abd5a5c965b252015406dcbd608dc050b609535153099e"
+    },
+    {
+      "bytes": 3374,
+      "path": "src/oathcast/reference_evaluator.py",
+      "sha256": "322e1d462e71f06057996cfc318c5f32ede5dac88a1d0dc1d577ea53d20bc129"
+    },
+    {
+      "bytes": 7728,
+      "path": "src/oathcast/registration.py",
+      "sha256": "c3fa4508dabf8089fa15c1b8ad6363705fd3b5ebdc5d980476afcca49f345481"
+    },
+    {
+      "bytes": 1037,
+      "path": "src/oathcast/release.py",
+      "sha256": "fc7bf3f78a85e4f2890d045a4ef1a45dc011ef2e4d95c42d6ac8f1350003b063"
+    },
+    {
+      "bytes": 11886,
+      "path": "src/oathcast/render.py",
+      "sha256": "6359e2c98466912e945f946587c4031684e49d2488f4c8baa9b596b4876ad8fe"
+    },
+    {
+      "bytes": 4895,
+      "path": "src/oathcast/scoring.py",
+      "sha256": "380830b5da025818ce180855eec1ed01093e1bc8d3cb42d65630b2e82b82aca8"
+    },
+    {
+      "bytes": 16098,
+      "path": "src/oathcast/script_benchmark.py",
+      "sha256": "090384fa1bdeb7a9c0f6a6299b2be56c6a322b8772721a42bd4641a77e9668df"
+    },
+    {
+      "bytes": 77729,
+      "path": "src/oathcast/service.py",
+      "sha256": "ba6eb5541d1c0cc6503499ec68c29448b9283e12eba704504678d6ef9dd7ee0c"
+    },
+    {
+      "bytes": 2240,
+      "path": "src/oathcast/workflow.py",
+      "sha256": "d5a9f0eead492af5a2fcb5d656abc583c2410718029e7617811abf37f9def5c2"
+    }
+  ],
+  "generated_at": "2026-08-18T15:32:55.220955Z",
+  "release_id": "2026-08-18-window-v9",
+  "schema_version": 1,
+  "source_sha256": "0dafb5ba608c3b40e08778c2aee4143cd2ca1a565b62868c80b65cf81b3d1cbd"
+}

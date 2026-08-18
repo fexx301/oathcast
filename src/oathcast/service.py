@@ -1481,11 +1481,11 @@ def question_from_query(params: dict[str, list[str]]) -> ForecastQuestion:
     cutoff = (
         _parse_query_timestamp("forecast_cutoff", cutoff_value)
         if cutoff_value is not None
-        # Default to the hour's opening, not an hour before it. An implied hour
-        # of lead time made a request for the very next hour impossible: a call
-        # at 12:30 for the 13:00 hour was refused with 410 because the derived
-        # cutoff of 12:00 had already passed.
-        else start
+        # Keep the registered YAML's documented default of one hour before start.
+        # This value is hashed into the derived event_id, so changing it changes
+        # the identity of an unchanged request and breaks receipt replay. The
+        # relaxed "cutoff at the horizon" default applies to window requests only.
+        else start - timedelta(hours=1)
     )
     event_id_value = _first_query_value(params, ("event_id",), default=None)
     event_id = (
