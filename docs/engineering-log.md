@@ -6,10 +6,10 @@ took to find out.
 
 One failure mode dominates this list: **a check that passes without verifying
 anything.** It appeared in a CI canary, a filesystem permission probe, a port
-scan, a digest comparison, and a file transfer. Each time it looked like a green
-result. That pattern is why this project stores forecasts as receipts rather than
-claims — a system built to hold itself to its record has to distinguish "verified"
-from "did not fail."
+scan, a digest comparison, a file transfer, and a config reload. Each time it
+looked like a green result. That pattern is why this project stores forecasts as
+receipts rather than claims — a system built to hold itself to its record has to
+distinguish "verified" from "did not fail."
 
 Dates are UTC. Numbers are measured on this repository and this host, not
 estimated.
@@ -244,13 +244,48 @@ is not a reason to do it first.
 
 ---
 
+## `caddy reload` said it worked. It had changed nothing.
+
+**2026-08-18.** Adding access logging to the public edge needed a Caddyfile
+change. The host file was updated with `mv`, `caddy validate` returned `Valid
+configuration`, and `caddy reload` logged `adapted config to JSON` with no
+error.
+Every signal said the change was live. HTTPS stayed healthy. No new header
+appeared, no access log line was written, and the admin API reported no `logs`
+block at all.
+
+The Caddyfile is bind-mounted as a **file**, not a directory:
+`-v /home/ec2-user/oathcast/Caddyfile:/etc/caddy/Caddyfile:ro`. A file bind
+mount
+resolves to an inode at container creation. `mv` replaces the path with a *new*
+inode, so the host had the new config while the container kept serving the
+original one. Host `inode=10035304 size=2183`, container `inode=9730509
+size=751`, same path.
+
+Writing in place afterwards did not recover it, because the mount was already
+pinned to the inode `mv` had displaced. Only recreating the container
+re-resolved the path. That cost a few seconds of HTTPS, which is the real price
+of the mistake: the safe operation was `cat new > Caddyfile`, which truncates
+and
+writes the same inode and needs no restart.
+
+Two things made this convincing rather than obvious. `caddy validate` reads the
+file you point it at, so it validated the *host* file and said yes about a
+config the server would never load. And `caddy reload` adapts the mounted file,
+so with an unchanged file it correctly reports success for a no-op. Neither tool
+was wrong; both were answering a narrower question than the one being asked.
+
+Never `mv` over a bind-mounted file. Verify a config change from inside the
+container that serves it, not from the host that wrote it.
+
 ## What this list has in common
 
-Six of these are the same failure: a probe that returned a reassuring answer
+Seven of these are the same failure: a probe that returned a reassuring answer
 without testing the thing. A skipped CI step reported as success. `test -w` on a
 file that could not be written. A missing binary printing "closed". A `tail`
 exit code mistaken for `rsync`'s. A digest that validates a forgery. An empty
-log file read as zero intrusion attempts.
+log file read as zero intrusion attempts. A config validator and a reloader that
+both said yes about a file the server never loaded.
 
 None were caught by the check that was supposed to catch them — each needed a
 second, differently-shaped observation: the step conclusion rather than the run

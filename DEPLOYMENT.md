@@ -293,7 +293,30 @@ windows": no temperature was returned and the Miner scored `0`.
 - Stopped `oathcast-v8-rollback-20260818` is the immediate rollback target.
   Revert with `docker rm -f oathcast`, then `docker start` and `docker rename`
   that container back to `oathcast`.
-- Caddy was not reconfigured.
+- Caddy was reconfigured after the Miner cutover to add access logging and the
+  security headers that were present in the repository but had never been
+  deployed. It now sends `Strict-Transport-Security`, `X-Content-Type-Options`
+  and `Referrer-Policy`, caps request bodies at 64KB on both handles, and logs
+  one JSON line per request to stdout. The Caddyfile digest is now
+  `29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1`;
+  `Caddyfile.pre-access-log-20260818` and stopped container
+  `oathcast-caddy-pre-access-log-20260818` are the rollback pair.
+- The access log deliberately drops `request>headers`, which would otherwise
+  write the Miner's `Authorization` bearer key to disk, and strips the query
+  string from the URI, which carries coordinates, location names and event ids.
+  Caddy therefore records the caller and the status while the Miner's own
+  `forecast_request_refused` record reports the request shape; neither log holds
+  the caller's subject. Verified with a sentinel request: the token, the
+  coordinates and the location name are all absent from the log.
+- **Never `mv` over the bind-mounted Caddyfile.** It is mounted as a file, so the
+  mount resolves to an inode at container creation and `mv` orphans it: the host
+  gets the new config while the container keeps serving the old one, and both
+  `caddy validate` and `caddy reload` report success because they are reading
+  the host file and adapting an unchanged mount. Use `cat new > Caddyfile`, which
+  truncates in place and preserves the inode, then confirm from inside the
+  container with `docker exec oathcast-caddy grep ... /etc/caddy/Caddyfile`. If
+  the mount is already orphaned, only recreating the container recovers it. See
+  `docs/engineering-log.md`.
 - Evidence:
   `artifacts/release-evidence/oathcast-2026-08-18-window-v10-manifest.json`,
   `oathcast-2026-08-18-window-v10-public-smoke.json`, and

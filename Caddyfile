@@ -2,6 +2,31 @@
 oathcastcourt.duckdns.org {
     encode gzip
 
+    # Access logging exists to answer one question the Miner cannot: who called.
+    # The Miner deliberately logs only the path, so a refused request recorded
+    # nothing identifying the caller, and attributing Telegraph's hourly probe
+    # had to be inferred from parameter shape and timing.
+    #
+    # Two redactions are load-bearing, not cosmetic:
+    #   * request>headers is dropped entirely. Caddy's JSON log would otherwise
+    #     record Authorization, writing the Miner's Bearer key to disk.
+    #   * the query string is stripped from the URI, because it carries
+    #     coordinates, location names and event ids. The Miner's own
+    #     forecast_request_refused record already reports the request *shape*
+    #     with an allow-listed set of values, so between the two logs we get
+    #     caller and shape while neither holds the caller's subject.
+    log {
+        output stdout
+        format filter {
+            wrap json
+            fields {
+                request>headers delete
+                resp_headers delete
+                request>uri regexp "\?.*" ""
+            }
+        }
+    }
+
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
