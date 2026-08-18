@@ -88,7 +88,9 @@ func exportNames(wasm []byte) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		names := make([]string, 0, count)
+        // The count is attacker-controlled ULEB128 data. Bounds checks below
+        // constrain parsing, so do not also trust it as an allocation size.
+        names := make([]string, 0)
 		for index := uint64(0); index < count; index++ {
 			name, err := readName(section.payload, &cursor)
 			if err != nil {

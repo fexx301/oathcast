@@ -525,7 +525,7 @@ class UrllibFetchTranslationTests(unittest.TestCase):
 
     def test_default_agent_is_not_the_blocked_prefix(self):
         self.assertFalse(module.USER_AGENT.startswith("Python-urllib/"))
-        self.assertIn("read-only", module.USER_AGENT)
+        self.assertIn("github.com/fexx301/oathcast", module.USER_AGENT)
 
 
 class SubstitutedFetcherTests(unittest.TestCase):

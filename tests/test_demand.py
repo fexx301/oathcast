@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -24,6 +26,10 @@ class DemandLedgerTests(unittest.TestCase):
         }
         values.update(overrides)
         return DemandEvent.create(**values)
+
+    def test_naive_occurrence_time_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "timezone-aware"):
+            self.event(occurred_at=datetime(2026, 8, 18, 12, 0))
 
     def test_only_settled_application_telegraph_response_is_a_local_candidate(self):
         self.assertTrue(self.event().local_candidate)
@@ -70,6 +76,63 @@ class DemandLedgerTests(unittest.TestCase):
             self.assertEqual(summary["local_candidate_events"], 2)
             self.assertIsNone(summary["official_telegraph_count"])
             self.assertEqual(ledger.integrity_check(), "ok")
+
+    def test_events_are_listed_in_append_order_not_wall_clock_order(self):
+        ledger = DemandLedger(":memory:")
+        first = ledger.append(
+            self.event(
+                application_request_id="app-later",
+                occurred_at=datetime(2026, 8, 18, 13, tzinfo=timezone.utc),
+            )
+        )
+        second = ledger.append(
+            self.event(
+                application_request_id="app-earlier",
+                occurred_at=datetime(2026, 8, 18, 12, tzinfo=timezone.utc),
+            )
+        )
+
+        self.assertEqual(
+            [event["demand_id"] for event in ledger.list_events()],
+            [first.demand_id, second.demand_id],
+        )
+
+    def test_integrity_check_hashes_exact_stored_event_bytes(self):
+        ledger = DemandLedger(":memory:")
+        event = ledger.append(self.event())
+        connection = ledger._connection()
+        stored = connection.execute(
+            "SELECT event_json FROM demand_events WHERE demand_id = ?",
+            (event.demand_id,),
+        ).fetchone()[0]
+        connection.execute("DROP TRIGGER demand_events_no_update")
+        connection.execute(
+            "UPDATE demand_events SET event_json = ? WHERE demand_id = ?",
+            (json.dumps(json.loads(stored), indent=2, sort_keys=True), event.demand_id),
+        )
+        connection.commit()
+
+        with self.assertRaisesRegex(RuntimeError, "hash verification failed"):
+            ledger.integrity_check()
+
+    def test_append_begins_write_transaction_before_conflict_check(self):
+        ledger = DemandLedger(":memory:")
+        statements = []
+        ledger._connection().set_trace_callback(statements.append)
+
+        ledger.append(self.event())
+
+        begin = next(
+            index
+            for index, statement in enumerate(statements)
+            if statement.strip().upper().startswith("BEGIN IMMEDIATE")
+        )
+        conflict_check = next(
+            index
+            for index, statement in enumerate(statements)
+            if statement.strip().upper().startswith("SELECT EVENT_JSON")
+        )
+        self.assertLess(begin, conflict_check)
 
     def test_unverified_settlement_artifact_is_retained_but_not_qualifying(self):
         event = self.event(

@@ -14,8 +14,9 @@ not rely on query filters that the server may silently ignore.
 
 The scores printed here are other Miners' Telegraph scores. They are NOT
 comparable to the local renderer proxy in `benchmark_renderer.py`, which is an
-overlap/length stand-in rather than Telegraph's cosine + BM25 + length
-composite. Both land in the same 0.4-0.7 range, which is exactly why the
+overlap/length stand-in rather than the cosine + BM25 + length behavior
+described in pre-launch guidance, which has not been verified as the current
+Canonical Script. Both land in the same 0.4-0.7 range, which is exactly why the
 comparison is tempting and wrong.
 """
 
@@ -27,10 +28,14 @@ import json
 from pathlib import Path
 import sys
 
+from oathcast.artifacts import atomic_write_text
+from oathcast.discovery import WEATHER_INTENTS
 from oathcast.leaderboard import (
     LeaderboardError,
-    fetch_weather_leaderboards,
+    leaderboard_url,
+    parse_leaderboards,
     renderer_target,
+    urllib_fetch,
 )
 
 
@@ -38,9 +43,56 @@ from oathcast.leaderboard import (
 DECLARED_INTENTS = ("WEATHER_FORECAST",)
 
 PROXY_WARNING = (
-    "Not comparable to the local renderer proxy (overlap/length stand-in, not "
-    "cosine + BM25). Do not read a proxy score against these numbers."
+    "Not comparable to the local renderer proxy (an overlap/length stand-in). "
+    "Do not read a proxy score against these numbers."
 )
+
+
+def select_boards(
+    available: dict[str, object],
+    requested: tuple[str, ...] | None,
+) -> tuple[dict[str, object], tuple[str, ...]]:
+    """Choose which Intents to report, and say what was left out.
+
+    An explicit ``--intent`` is honoured exactly: a missing one is an error,
+    because the caller named it. Without one, a declared Intent going missing is
+    still a hard failure -- that is a real signal about our own registration --
+    while the other weather Intents are context and are skipped when the
+    endpoint no longer serves them. Requiring all of ``WEATHER_INTENTS`` made
+    the whole read abort once the live endpoint dropped
+    ``WEATHER_RISK_ASSESSMENT``, which is a report about somebody else's Intent
+    list, not about ours.
+    """
+
+    if requested is not None:
+        missing = [name for name in requested if name not in available]
+        if missing:
+            raise LeaderboardError(
+                "requested intent(s) not present in the response: "
+                f"{', '.join(sorted(missing))}; available: "
+                f"{', '.join(sorted(available)) or 'none'}"
+            )
+        return {name: available[name] for name in requested}, ()
+
+    missing_declared = [name for name in DECLARED_INTENTS if name not in available]
+    if missing_declared:
+        raise LeaderboardError(
+            "declared intent(s) missing from the response: "
+            f"{', '.join(sorted(missing_declared))}; available: "
+            f"{', '.join(sorted(available)) or 'none'}"
+        )
+    context = tuple(
+        name
+        for name in sorted(WEATHER_INTENTS)
+        if name in available and name not in DECLARED_INTENTS
+    )
+    omitted = tuple(
+        name
+        for name in sorted(WEATHER_INTENTS)
+        if name not in available and name not in DECLARED_INTENTS
+    )
+    selected = tuple(DECLARED_INTENTS) + context
+    return {name: available[name] for name in selected}, omitted
 
 
 def main() -> int:
@@ -48,20 +100,28 @@ def main() -> int:
     parser.add_argument(
         "--intent",
         action="append",
-        help="Intent to read; repeatable. Defaults to all weather Intents.",
+        help=(
+            "Intent to read; repeatable. A named Intent must be present or the "
+            "read fails. Defaults to the declared Intents plus any other weather "
+            "Intents the endpoint still serves."
+        ),
     )
     parser.add_argument("--output", help="write a timestamped JSON snapshot here")
     args = parser.parse_args()
 
-    intents = tuple(args.intent) if args.intent else None
+    requested = tuple(args.intent) if args.intent else None
     try:
-        boards = fetch_weather_leaderboards(intents)
+        payload = urllib_fetch(leaderboard_url())
+        available = parse_leaderboards(payload)
+        boards, omitted = select_boards(available, requested)
     except LeaderboardError as error:
         print(f"leaderboard read refused: {error}", file=sys.stderr)
         return 2
 
     observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     print(f"observed_at {observed_at}   (intents selected locally)")
+    if omitted:
+        print(f"not served by this endpoint, skipped: {', '.join(omitted)}")
     print()
 
     snapshot: dict[str, object] = {
@@ -69,6 +129,8 @@ def main() -> int:
         "source": "telegraph_explorer_leaderboard_read_only",
         "selection": "exact_local_intent_key",
         "declared_intents": list(DECLARED_INTENTS),
+        "reported_intents": list(boards),
+        "weather_intents_not_served": list(omitted),
         "comparability_warning": PROXY_WARNING,
         "intents": {},
     }
@@ -120,8 +182,7 @@ def main() -> int:
 
     if args.output:
         path = Path(args.output)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        atomic_write_text(path, json.dumps(snapshot, indent=2, sort_keys=True) + "\n")
         print(f"\nsnapshot written to {path}")
 
     return 0

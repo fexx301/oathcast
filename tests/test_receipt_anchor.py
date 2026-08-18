@@ -1,9 +1,15 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from oathcast.receipts import SqliteReceiptStore, receipt_digest
-from scripts.anchor_receipt_head import build_anchor, verify_anchor
+from scripts.anchor_receipt_head import (
+    MAX_ANCHOR_NOTE_LENGTH,
+    build_anchor,
+    verify_anchor,
+    write_anchor,
+)
 
 
 def _receipt(event_id: str) -> dict:
@@ -86,12 +92,27 @@ class AnchorTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("missing", result["error"])
 
+    def test_algorithm_mismatch_is_not_reported_as_receipt_tampering(self):
+        store = self._store()
+        store.save(_receipt("algorithm-0"))
+        anchor = build_anchor(store)
+        anchor["algorithm"] = "oathcast-receipt-chain-v2"
+
+        result = verify_anchor(store, anchor)
+
+        self.assertFalse(result["ok"])
+        self.assertIn("does not match", result["error"])
+        self.assertIn("construction", result["error"])
+        self.assertNotIn("altered", result["error"])
+
     def test_verification_rejects_a_malformed_anchor(self):
         store = self._store()
         with self.assertRaises(ValueError):
             verify_anchor(store, {"head_sha256": "abc"})
         with self.assertRaises(ValueError):
             verify_anchor(store, {"receipt_count": 1})
+        with self.assertRaises(ValueError):
+            verify_anchor(store, {"receipt_count": 1, "head_sha256": "abc"})
 
     def test_an_anchor_contains_no_receipt_content(self):
         store = self._store()
@@ -101,6 +122,26 @@ class AnchorTests(unittest.TestCase):
         self.assertNotIn("privacy-0", serialized)
         self.assertNotIn("probability", serialized)
         self.assertNotIn("threshold_mm", serialized)
+
+    def test_anchor_note_is_bounded_and_rejects_control_characters(self):
+        store = self._store()
+        for note in ("x" * (MAX_ANCHOR_NOTE_LENGTH + 1), "line one\nline two", "tab\there"):
+            with self.subTest(note=repr(note)), self.assertRaises(ValueError):
+                build_anchor(store, note=note)
+
+    def test_failed_atomic_install_preserves_existing_anchor(self):
+        output = Path(self._directory.name) / "anchor.json"
+        output.write_text("original anchor\n", encoding="utf-8")
+
+        with patch(
+            "oathcast.artifacts.os.replace",
+            side_effect=OSError("simulated install failure"),
+        ):
+            with self.assertRaises(OSError):
+                write_anchor(output, {"schema_version": 1})
+
+        self.assertEqual(output.read_text(encoding="utf-8"), "original anchor\n")
+        self.assertEqual(list(output.parent.glob(f".{output.name}.*.tmp")), [])
 
 
 if __name__ == "__main__":

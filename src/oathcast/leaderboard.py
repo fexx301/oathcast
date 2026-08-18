@@ -13,9 +13,10 @@ Ranks in the live response can have gaps, so ``Leaderboard.population`` is only
 the number of entries returned for an Intent; it is not necessarily the rank's
 denominator.  The target remains the highest score among active Miners.
 
-These are other Miners' Telegraph scores.  They are not comparable to the local
+These are other Miners' Telegraph scores. They are not comparable to the local
 renderer proxy in ``reference_evaluator`` (an overlap/length stand-in rather
-than Telegraph's cosine + BM25 + length composite).
+than the cosine + BM25 + length behavior described in pre-launch guidance,
+which has not been verified as the current Canonical Script).
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .discovery import WEATHER_INTENTS
+from .protocol import USER_AGENT, outbound_headers
 
 
 EXPLORER_ORIGIN = "https://explorer.telegraphprotocol.com"
@@ -48,9 +50,6 @@ LEGACY_ENTRY_FIELDS = frozenset(
     }
 )
 
-# The Explorer rejects the default ``Python-urllib/*`` agent with HTTP 403, so
-# use a descriptive project agent without impersonating a browser.
-USER_AGENT = "OathCast-Leaderboard-Reader/1.0 (read-only; +https://github.com/fexx301/oathcast)"
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
 Fetcher = Callable[[str], Any]
@@ -277,7 +276,7 @@ def urllib_fetch(url: str) -> Any:
     request = Request(
         url,
         method="GET",
-        headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+        headers=outbound_headers(),
     )
     try:
         with urlopen(request, timeout=25) as response:  # noqa: S310 - pinned origin

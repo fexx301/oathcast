@@ -17,14 +17,20 @@ from pathlib import Path
 import re
 from typing import Any
 
-from oathcast.reference_evaluator import ReferenceEvaluation, evaluate_reference, normalize_response
+from oathcast.probability import extract_probability
+from oathcast.reference_evaluator import (
+    DEFAULT_MAX_RESPONSE_CHARS,
+    TOKEN_PATTERN,
+    ReferenceEvaluation,
+    evaluate_reference,
+    normalize_response,
+)
 
 
 BENCHMARK_VERSION = "script_author_adversarial_benchmark_v1"
 ROBUST_EVALUATOR_VERSION = "development_robust_semantic_proxy_v1"
 DEFAULT_GOOD_SCORE_THRESHOLD = 0.55
-DEFAULT_MAX_RESPONSE_CHARS = 4096
-TOKEN_PATTERN = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?", re.IGNORECASE)
+MAX_MATERIALIZED_FIXTURE_CHARS = DEFAULT_MAX_RESPONSE_CHARS * 256
 TIME_PATTERN = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
 STOPWORDS = frozenset(
     {
@@ -70,29 +76,6 @@ def _tokens(text: str) -> list[str]:
 
 def _semantic_tokens(text: str) -> set[str]:
     return {token for token in _tokens(text) if token not in STOPWORDS}
-
-
-def _probability(raw_response: Any, text: str) -> float | None:
-    if isinstance(raw_response, Mapping):
-        for key in (
-            "probability",
-            "precipitation_probability",
-            "probability_of_precipitation",
-            "rain_probability",
-            "pop",
-        ):
-            value = raw_response.get(key)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                number = float(value)
-                if 0 <= number <= 1:
-                    return number
-                if 1 < number <= 100:
-                    return number / 100
-    match = re.search(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*%", text)
-    if match is None:
-        return None
-    number = float(match.group(1))
-    return number / 100 if 0 <= number <= 100 else None
 
 
 def _explicit_polarity(text: str) -> int | None | str:
@@ -143,6 +126,8 @@ def _materialize_fixture_response(raw_response: Any) -> Any:
         raise ValueError("_fixture_repeat requires string value and integer count")
     if count < 0 or count > 100_000:
         raise ValueError("_fixture_repeat count is outside the safe fixture bound")
+    if len(value) * count > MAX_MATERIALIZED_FIXTURE_CHARS:
+        raise ValueError("_fixture_repeat expanded response exceeds the safe fixture bound")
     return value * count
 
 
@@ -241,7 +226,7 @@ def evaluate_robust_reference(
 
     truth_polarity = _explicit_polarity(ground_truth)
     response_polarity = _explicit_polarity(response_text)
-    probability = _probability(response_value, response_text)
+    probability = extract_probability(response_value, text=response_text)
     if response_polarity == "contradictory_polarity":
         issues.append("contradictory_polarity")
         response_polarity = None

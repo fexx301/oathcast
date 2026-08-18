@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 
@@ -183,6 +184,39 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(revised["ground_truth"]["outcome"], 1)
             self.assertEqual(len(revised["observations"]), 2)
             self.assertEqual(len(revised["resolutions"]), 2)
+
+    def test_file_case_store_enforces_foreign_keys_on_fresh_connections(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteCaseStore(Path(directory) / "cases.sqlite3")
+            connection = store._connection()
+            try:
+                self.assertEqual(
+                    connection.execute("PRAGMA foreign_keys").fetchone()[0],
+                    1,
+                )
+                with self.assertRaises(sqlite3.IntegrityError):
+                    connection.execute(
+                        """
+                        INSERT INTO miner_replies (
+                            reply_id, event_id, miner_id, slug, owned,
+                            raw_response_json, raw_response_sha256,
+                            parser_version
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            "orphan-reply",
+                            "missing-case",
+                            "external-1",
+                            "external-weather",
+                            0,
+                            "{}",
+                            "0" * 64,
+                            "probability_extractor_v1",
+                        ),
+                    )
+            finally:
+                connection.rollback()
+                connection.close()
 
     def test_case_conflicts_and_ordering_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

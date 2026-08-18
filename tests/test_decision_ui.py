@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
 from datetime import timezone
+import hashlib
 import http.client
 import json
 import os
+import re
 import threading
 import unittest
 from unittest.mock import patch
@@ -181,6 +184,21 @@ class DecisionUITests(unittest.TestCase):
         self.assertNotIn("<script>alert", rendered)
         self.assertNotIn("<miner>", rendered)
 
+    def test_result_redaction_preserves_noncredential_prose_after_keywords(self):
+        result = DecisionResult.from_value(
+            {
+                "action": "go",
+                "summary": "Keep the wallet ready for the trip.",
+                "rationale": "The secret garden has covered seating.",
+            }
+        )
+
+        self.assertEqual(result.summary, "Keep the [redacted] ready for the trip.")
+        self.assertEqual(
+            result.rationale,
+            "The [redacted] garden has covered seating.",
+        )
+
     def test_capability_bearing_runner_returns_clear_decision_and_miner_evidence(self):
         seen = []
 
@@ -249,6 +267,7 @@ class DecisionUITests(unittest.TestCase):
     def test_public_page_is_truthful_and_has_no_live_submit_path(self):
         rendered = render_page()
 
+        self.assertIs(rendered, render_page())
         self.assertIn("Live decisions are not", rendered)
         self.assertIn(f'src="{LOGO_PATH}?v={LOGO_VERSION}"', rendered)
         self.assertIn('class="brand-mark"', rendered)
@@ -273,6 +292,25 @@ class DecisionUITests(unittest.TestCase):
         self.assertIn("Example outcome: CONTINGENCY", rendered)
         self.assertNotIn("—", rendered)
         self.assertNotIn("–", rendered)
+
+    def test_csp_uses_exact_hashes_for_static_inline_assets(self):
+        with running_server() as address:
+            connection = http.client.HTTPConnection(*address, timeout=2)
+            connection.request("GET", "/")
+            response = connection.getresponse()
+            body = response.read().decode("utf-8")
+            policy = response.getheader("Content-Security-Policy")
+            connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertNotIn("unsafe-inline", policy)
+        for tag in ("style", "script"):
+            match = re.search(rf"<{tag}>(.*?)</{tag}>", body, flags=re.DOTALL)
+            self.assertIsNotNone(match)
+            digest = base64.b64encode(
+                hashlib.sha256(match.group(1).encode("utf-8")).digest()
+            ).decode("ascii")
+            self.assertIn(f"'sha256-{digest}'", policy)
 
     def test_logo_asset_is_served_as_cacheable_webp(self):
         with running_server() as address:

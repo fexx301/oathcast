@@ -1301,6 +1301,17 @@
       "bad_answer": "Hamlet was written by Shakespeare; Pride and Prejudice by Shakespeare.",
       "minimum_margin": 0.15,
       "maximum_bad_score": 0.49
+    },
+    {
+      "pair_id": "stray_percent_sign_before_probability",
+      "split": "secondary_synthetic",
+      "category": "probability_scan_non_regression",
+      "question": "What is the probability of measurable rain in Lagos tomorrow afternoon?",
+      "ground_truth": "Measurable rain is likely, with a 70% probability.",
+      "good_answer": "Setting humidity (%) aside, measurable rain is likely at a 70% probability.",
+      "bad_answer": "Setting humidity (%) aside, measurable rain is unlikely at a 20% probability.",
+      "minimum_margin": 0.15,
+      "maximum_bad_score": 0.5
     }
   ]
 }

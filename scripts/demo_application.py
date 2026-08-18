@@ -15,6 +15,7 @@ import tempfile
 from typing import Any
 
 from oathcast.application import CrossMinerRouter
+from oathcast.artifacts import atomic_write_text
 from oathcast.cases import SqliteCaseStore
 from oathcast.discovery import MinerCapability, discover_weather_miners, load_registry_snapshot
 from oathcast.forecast import ForecastQuestion
@@ -158,10 +159,9 @@ def main() -> None:
     if args.output is None:
         print(output)
     else:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
+        atomic_write_text(
+            args.output,
             output if output.endswith("\n") else output + "\n",
-            encoding="utf-8",
         )
         print(f"wrote {args.output}")
 

@@ -13,27 +13,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import json
 import math
-import re
 from typing import Any, Protocol
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from oathcast.forecast import ForecastQuestion, UTC, ensure_utc, format_timestamp, parse_timestamp
-from oathcast.protocol import ProtocolResultEnvelope
-
-
-PROBABILITY_PATTERN = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*%")
-PROBABILITY_KEYS = (
-    "probability",
-    "precipitation_probability",
-    "probability_of_precipitation",
-    "rain_probability",
-    "probability_of_rain",
-    "pop",
+from oathcast.probability import (
+    PERCENT_PROBABILITY_KEYS,
+    PROBABILITY_KEYS,
+    PROBABILITY_PATTERN,
+    extract_probability as extract_generic_probability,
+    normalize_probability_value,
 )
-PERCENT_PROBABILITY_KEYS = ("chance_of_rain", "rain_chance", "precipitation_chance")
+from oathcast.protocol import ProtocolResultEnvelope
 
 
 @dataclass(frozen=True)
@@ -82,60 +75,6 @@ def _body(raw_response: Any) -> Any:
     return raw_response
 
 
-def _content(raw_response: Any) -> str:
-    raw_response = _body(raw_response)
-    if isinstance(raw_response, str):
-        return raw_response.strip()
-    if isinstance(raw_response, dict):
-        content = raw_response.get("content")
-        if isinstance(content, str):
-            return content.strip()
-        choices = raw_response.get("choices")
-        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
-            message = choices[0].get("message")
-            if isinstance(message, dict) and isinstance(message.get("content"), str):
-                return message["content"].strip()
-        return json.dumps(raw_response, sort_keys=True, separators=(",", ":"))
-    return str(raw_response).strip()
-
-
-def extract_generic_probability(raw_response: Any) -> float | None:
-    """Retain the old schema-agnostic extractor for unknown Miners."""
-
-    raw_response = _body(raw_response)
-    if isinstance(raw_response, dict):
-        for key in PROBABILITY_KEYS:
-            probability = raw_response.get(key)
-            if isinstance(probability, (int, float)) and not isinstance(probability, bool):
-                probability = float(probability)
-                if 0 <= probability <= 1:
-                    return probability
-                if 1 < probability <= 100 and key != "probability":
-                    return probability / 100
-        for key in PERCENT_PROBABILITY_KEYS:
-            probability = raw_response.get(key)
-            if isinstance(probability, (int, float)) and not isinstance(probability, bool):
-                probability = float(probability)
-                if 0 <= probability <= 100:
-                    return probability / 100
-        for key in ("data", "result", "forecast", "prediction", "output"):
-            nested = raw_response.get(key)
-            probability = extract_generic_probability(nested)
-            if probability is not None:
-                return probability
-        choices = raw_response.get("choices")
-        if isinstance(choices, list):
-            for choice in choices:
-                probability = extract_generic_probability(choice)
-                if probability is not None:
-                    return probability
-    match = PROBABILITY_PATTERN.search(_content(raw_response))
-    if match is None:
-        return None
-    percentage = float(match.group(1))
-    return percentage / 100 if 0 <= percentage <= 100 else None
-
-
 def _generic_params(question: ForecastQuestion) -> dict[str, Any]:
     """Build the legacy query shape used when no schema is known."""
 
@@ -175,14 +114,6 @@ class GenericMinerAdapter:
             validity_reason=reason,
             parser_version=self.parser_version,
         )
-
-    def build_url(
-        self,
-        base_url: str,
-        endpoint: str,
-        question: ForecastQuestion,
-    ) -> str:
-        return _build_url(base_url, endpoint, self.build_params(question))
 
 
 def _build_url(base_url: str, endpoint: str, params: dict[str, Any]) -> str:
@@ -318,25 +249,41 @@ class WeatherApiMinerAdapter:
         )
 
 
-_PRECIPITATION_PROBABILITY_KEYS = {
-    "chance_of_rain",
-    "rain_chance",
-    "precipitation_chance",
-    "rain_probability",
-    "probability_of_rain",
-    "precipitation_probability",
-    "probability_of_precipitation",
-    "precipitation_probability_percent",
-    "rain_probability_percent",
-    "pop",
-}
+_PRECIPITATION_PROBABILITY_KEYS = (
+    frozenset(PROBABILITY_KEYS)
+    .difference({"probability"})
+    .union(PERCENT_PROBABILITY_KEYS)
+)
+# Keep schema preference independent of the upstream object's JSON key order.
+_PRECIPITATION_PROBABILITY_PRECEDENCE = tuple(
+    key
+    for key in (*PROBABILITY_KEYS, *PERCENT_PROBABILITY_KEYS)
+    if key != "probability"
+)
 _PRECIPITATION_CONTEXT_KEYS = {"precipitation", "precip", "rain", "rainfall"}
-_PROBABILITY_IN_CONTEXT_KEYS = {"probability", "prob", "chance"}
-_TIME_KEYS = {"time", "times", "timestamp", "timestamps", "valid_time", "valid_times"}
+_PROBABILITY_IN_CONTEXT_PRECEDENCE = ("probability", "prob", "chance")
+_TIME_KEY_PRECEDENCE = (
+    "time",
+    "times",
+    "timestamp",
+    "timestamps",
+    "valid_time",
+    "valid_times",
+)
 
 
 def _normalized_key(key: Any) -> str:
     return str(key).strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _normalized_items(payload: dict[str, Any]) -> dict[str, Any]:
+    items: dict[str, Any] = {}
+    for raw_key, value in sorted(
+        payload.items(),
+        key=lambda item: (_normalized_key(item[0]), str(item[0])),
+    ):
+        items.setdefault(_normalized_key(raw_key), value)
+    return items
 
 
 def _parse_time(value: Any) -> datetime | None:
@@ -359,8 +306,10 @@ def _parse_time(value: Any) -> datetime | None:
 
 
 def _local_times(payload: dict[str, Any]) -> list[Any] | None:
-    for key, value in payload.items():
-        if _normalized_key(key) in _TIME_KEYS:
+    normalized_items = _normalized_items(payload)
+    for key in _TIME_KEY_PRECEDENCE:
+        if key in normalized_items:
+            value = normalized_items[key]
             if isinstance(value, list):
                 return value
             return [value]
@@ -376,13 +325,8 @@ def _probability_from_value(value: Any, key: str) -> float | None:
         return None
     if not math.isfinite(numeric):
         return None
-    is_percent = key.endswith("_percent") or key in {
-        "chance_of_rain",
-        "rain_chance",
-        "precipitation_chance",
-    }
-    if is_percent:
-        return numeric / 100 if 0 <= numeric <= 100 else None
+    if key in _PRECIPITATION_PROBABILITY_KEYS:
+        return normalize_probability_value(numeric, key)
     return numeric if 0 <= numeric <= 1 else None
 
 
@@ -423,18 +367,24 @@ def _find_precipitation_probability(
 ) -> float | None:
     if isinstance(value, dict):
         times = _local_times(value) or inherited_times
-        for raw_key, child in value.items():
-            key = _normalized_key(raw_key)
-            if key in _PRECIPITATION_PROBABILITY_KEYS:
-                probability = _value_for_target(child, key, times, target)
+        normalized_items = _normalized_items(value)
+        for key in _PRECIPITATION_PROBABILITY_PRECEDENCE:
+            if key in normalized_items:
+                probability = _value_for_target(normalized_items[key], key, times, target)
                 if probability is not None:
                     return probability
-            elif precipitation_context and key in _PROBABILITY_IN_CONTEXT_KEYS:
-                probability = _value_for_target(child, key, times, target)
+        if precipitation_context:
+            for key in _PROBABILITY_IN_CONTEXT_PRECEDENCE:
+                if key not in normalized_items:
+                    continue
+                probability = _value_for_target(normalized_items[key], key, times, target)
                 if probability is not None:
                     return probability
 
-        for raw_key, child in value.items():
+        for raw_key, child in sorted(
+            value.items(),
+            key=lambda item: (_normalized_key(item[0]), str(item[0])),
+        ):
             key = _normalized_key(raw_key)
             if isinstance(child, (dict, list, tuple)):
                 probability = _find_precipitation_probability(
@@ -473,6 +423,8 @@ class ZeusMinerAdapter:
         forecast_hours = math.ceil(
             (question.horizon_end - question.forecast_cutoff).total_seconds() / 3600
         )
+        if not 1 <= forecast_hours <= 24:
+            raise ValueError("Zeus forecast_hours must be between 1 and 24")
         return {
             "lat": f"{question.latitude:.6f}",
             "lon": f"{question.longitude:.6f}",
@@ -480,7 +432,7 @@ class ZeusMinerAdapter:
             # Telegraph documents this as hours ahead from the forecast run,
             # not a count of event-boundary points. Using the decision cutoff
             # as the issuance anchor ensures the requested window is covered.
-            "forecast_hours": str(max(1, forecast_hours)),
+            "forecast_hours": str(forecast_hours),
         }
 
     def build_url(

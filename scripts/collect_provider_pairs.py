@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from oathcast.adapters import OpenMeteoAdapter, WeatherApiAdapter
+from oathcast.artifacts import atomic_write_text
 from oathcast.backtest import load_chronological_cases
 from oathcast.forecast import ForecastQuestion, format_timestamp, parse_timestamp
 from oathcast.ground_truth import FileObservationSource, resolve_precipitation
@@ -314,15 +315,14 @@ def write_dataset(path: Path, cases: list[dict[str, Any]]) -> None:
     a file the backtest cannot load is worse than no file at all.
     """
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(json.dumps(cases, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     try:
-        load_chronological_cases(str(temporary))
+        atomic_write_text(
+            path,
+            json.dumps(cases, indent=2, sort_keys=True) + "\n",
+            validate=lambda candidate: load_chronological_cases(str(candidate)),
+        )
     except Exception as exc:  # noqa: BLE001 - never install an unloadable dataset
-        temporary.unlink(missing_ok=True)
         raise CollectionError(f"refusing to write an invalid dataset: {exc}") from exc
-    os.replace(temporary, path)
 
 
 def _utc_hour(moment: datetime) -> datetime:
@@ -362,7 +362,17 @@ def main(argv: list[str] | None = None) -> int:
             updated, counts = resolve_cases(cases, source, now=now)
             if not args.dry_run:
                 write_dataset(args.dataset, updated)
-            print(json.dumps({"mode": "resolve", "counts": counts}, indent=2, sort_keys=True))
+            print(
+                json.dumps(
+                    {
+                        "mode": "resolve",
+                        "counts": counts,
+                        "dry_run": args.dry_run,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
             return 0
 
         if args.lead_hours < 1:

@@ -27,8 +27,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from typing import Any
 
+from oathcast.artifacts import atomic_write_text
 from oathcast.forecast import CanonicalForecast, ForecastQuestion
 from oathcast.reference_evaluator import evaluate_reference
 from oathcast.script_benchmark import evaluate_robust_reference
@@ -462,8 +464,7 @@ def main() -> int:
     report = run_benchmark(args.probabilities)
     text = json.dumps(report, indent=2, sort_keys=True)
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as handle:
-            handle.write(text + "\n")
+        atomic_write_text(Path(args.output), text + "\n")
 
     print(f"harness: {report['harness_version']} ({report['official_status']})")
     print(f"proxy question: {report['proxy_question']}")

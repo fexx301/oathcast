@@ -125,9 +125,9 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `no_std` WASM, exported bounded memory, checked allocation/input validation,
   and the published `alloc`/`dealloc`/`rank_answer` ABI. It handles generic
   weather semantics, probability/polarity consistency, numeric facts, UTC time
-  windows, JSON envelopes, stuffing, and concision. Rust tests pass `39/39`, the
+  windows, JSON envelopes, stuffing, and concision. Rust tests pass `40/40`, the
   full Go/wazero ABI and adversarial suite passes, Python discovery passes
-  `401/401`, and
+  `422/422`, and
   deterministic repeated `rank_answer` calls pass.
   Telegraph's unmodified tester example also returns `0.8500`. An earlier
   validator-observed scalar `breakdown_answer` export and its tests are now
@@ -150,16 +150,20 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `32/32`, with candidate margin `0.31248063`, champion margin `0.37360683`, and
   zero historical rows. According to user-relayed Telegraph guidance, these margins are not directly
   compared for promotion.
-- The current 42,798-byte factual-paraphrase artifact is reproducible and was
-  manually hosted and evaluated as registration `41`. Its SHA-256 is
-  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`
+- The current 42,790-byte factual-paraphrase artifact is reproducible and is an
+  unregistered local candidate: it has not been uploaded, hosted, signed, or
+  registered. Its single change over the registration `41` bytes is a
+  probability-scan fix in `percent_probability`, which previously abandoned the
+  scan on the first `%` carrying no parseable number and so discarded a real
+  percentage later in the same answer. Its SHA-256 is
+  `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774`
   and raw-byte Keccak-256
-  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+  `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`.
   The fixture SHA-256 is
-  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
-  Two isolated clean builds are byte-identical. All 87 synthetic factual pairs
+  `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
+  Two isolated clean builds are byte-identical. All 88 synthetic factual pairs
   pass the reported `0.15` floor with minimum margin `0.206250`; synthetic
-  ordinal Spearman is `0.959623`. Predicate-family identity, inverse
+  ordinal Spearman is `0.959566`. Predicate-family identity, inverse
   learned-from and lost-to phrasing, parenthetical commas, coordinated relation
   swaps, mixed explicit reversals, partial multi-relation omissions, and mixed
   directed pairs have Rust and fixture regressions. Shared predicates, bounded
@@ -167,9 +171,16 @@ breakdown-layout blocker before a registration candidate can be frozen.
   predicate-free completeness, comma and semicolon gapping, subordinate
   parenthetical predicates, and novel claims after punctuation are also
   covered. The `release-evidence.json` schema-v7 record labels these synthetic
-  results as local proxies. Registration `41` independently re-fetched the
-  hosted bytes and matched the size and both artifact hashes. The confirmed Base Sepolia
-  transaction is
+  results as local proxies.
+- Registration `41` evaluated the earlier 42,798-byte artifact, which the
+  current local candidate has since superseded. Its SHA-256 is
+  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`
+  and raw-byte Keccak-256
+  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`,
+  against fixture SHA-256
+  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
+  Registration `41` independently re-fetched the hosted bytes and matched the
+  size and both artifact hashes. The confirmed Base Sepolia transaction is
   `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
   It reached champion comparison (Stage 1 passed) and failed Stage 2 at `31/32`
   candidate ordering wins versus the champion's `32/32`; candidate
@@ -213,7 +224,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   the historical scalar export or old `whitelistedUrls` ABI as a current
   requirement. Preserve current-registry ID `7`, both obsolete-registry packets,
   and registration `19` as the historical chronology for the 16,292-byte
-  artifact. Preserve registration `41` as the current 42,798-byte Stage 2
+  artifact. Preserve registration `41` as the 42,798-byte Stage 2
   rejection. Do not infer either hidden failed pair from synthetic cases; keep
   every local pair margin and Spearman result labeled as a proxy. No further
   registration or replacement is authorized. Any future attempt requires a
@@ -225,6 +236,30 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Blocked on authorization, external evidence, or remaining documentation
 
+- The deployed `2026-08-17-temperature-v8` service answers the additive
+  `forecast_hours`/`hourly=2t` shape on the registered `/predict` route with
+  `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`, but the registered YAML does not
+  declare that response. `output_schema.required` is `[content, probability]`
+  and `signal_mapping.confidence_field` is `probability`, while the temperature
+  response returns `content`, `reference_time`, `hourly`, and `hourly_units`
+  only. `probability` is omitted by design: a 2 metre temperature series has no
+  event probability, so there is no honest value for that field. This is a
+  deliberate, recorded deviation, not an accepted permanent state.
+- Reconciling it requires re-registering the Miner, so it is authorization-gated
+  rather than a documentation edit. The registered YAML is content-addressed at
+  `ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F` with raw-byte SHA-256
+  `9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e`, which
+  still matches the file on disk. Declaring the new shape changes that digest
+  and breaks the on-chain pin under registration ID `78`. That authorization is
+  separate from any Track 2 scoring-module authorization.
+- The deviation is latent rather than active. The registered YAML declares
+  `start` and `end` as required and never mentions `forecast_hours`, `hourly`,
+  or `2t`, so a dispatcher building requests from it does not send the
+  triggering shape. Disabling the flag does not remove the exposure: it converts
+  an undeclared `200` into a certain `400 temperature compatibility window is
+  disabled` for the same request. The flag therefore stays enabled until the
+  YAML catches up. Miner scoring is unaffected because `content` is present, and
+  schema-v3 receipts persist and replay normally.
 - Telegraph reported that the breakdown-related rejection, Intent binding, and
   registry mismatch are fixed. The August 14 portal/API response remains
   historical surfaced output saying `missing required export
@@ -244,15 +279,37 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `entityCount(2) == 7`, and returns matching non-empty `getWasm(7)`. Preserve it
   as historical proof for the registered 16,292-byte artifact.
 - According to user-relayed Telegraph team confirmation, corroborated by reaching
-  champion comparison, registration `19` passed Stage 1 and failed Stage 2 at `31/32` versus the
-  champion's `32/32`. According to user-relayed Telegraph guidance, there is a fixed `0.15` floor across six factual
-  paraphrase/lexical near-miss cases; promotion follows after all six pass, with
-  no direct aggregate-margin comparison. The `0.60` metric is Spearman against
-  champion historical scores, but the retained validator result has
-  `historical_rows: 0`. The hidden pair text, per-pair scores, and champion
-  history remain external evidence gaps.
-- Registration `41` is the current 42,798-byte artifact result: the hosted bytes
-  match the reproducible build, Stage 1 passed by reaching champion comparison,
+  champion comparison, registration `19` passed Stage 1 and failed Stage 2 at
+  `31/32` versus the champion's `32/32`. According to user-relayed Telegraph
+  guidance, there is a fixed `0.15` floor across six factual paraphrase/lexical
+  near-miss cases; promotion follows after all six pass, with no direct
+  aggregate-margin comparison. The `0.60` metric is Spearman against champion
+  historical scores, but the retained validator result has `historical_rows: 0`.
+  The hidden pair text, per-pair scores, and champion history remain external
+  evidence gaps.
+- The six-case guidance and the API's `comparable_cases: 32` were previously
+  recorded without reconciliation. Further user-relayed Telegraph guidance on
+  2026-08-17 resolves them as one model rather than two: 32 comparable ordering
+  cases are tallied and reported for diagnosis, while the six near-miss cases
+  carry promotion, so `31/32` is diagnostic output and the six are the gate.
+  Both registrations lost exactly one of 32 and neither was promoted, which
+  implies the lost case was among the six, though Telegraph has not confirmed
+  that directly. One tension survives: the same guidance states there is no
+  direct candidate-versus-champion comparison, while the retained rejection text
+  does compare `31` against `32`. Read that as win counts being reported but not
+  being the promotion rule. Telegraph also confirmed Stage 1 is only a load and
+  export check, so passing it is not evidence of scoring quality.
+- Telegraph confirmed every Stage 2 case is paraphrase/lexical discrimination in
+  the factual Q&A domain, with no numeric, time-window, or JSON cases. Twenty
+  local probes in that shape, covering entity swaps inside an identical sentence
+  frame, reversed relations, synonym-only rewrites, terse answers against
+  verbose ground truth, and on-topic distractors that answer nothing, all clear
+  the `0.15` floor by `0.24` to `0.55`. The failing case is therefore not
+  reproduced locally, and the per-pair scores Telegraph holds in its node logs
+  remain the only way to identify it without guessing.
+- Registration `41` is the 42,798-byte artifact result: the hosted bytes
+  match the recorded registration `41` build rather than the current local
+  candidate, Stage 1 passed by reaching champion comparison,
   and Stage 2 rejected it at `31/32` versus the champion's `32/32`. It was not
   promoted, and the hidden failed pair and champion history remain unavailable.
   All prior authorizations are consumed. Any further attempt requires a fresh

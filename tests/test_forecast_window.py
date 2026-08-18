@@ -112,11 +112,26 @@ class ForecastWindowModelTests(unittest.TestCase):
             "unaligned end": {
                 "horizon_end": START + timedelta(hours=2, minutes=30)
             },
-            "cutoff at start": {"forecast_cutoff": START},
+            "cutoff after start": {
+                "forecast_cutoff": START + timedelta(seconds=1)
+            },
         }
         for label, changes in invalid.items():
             with self.subTest(label=label), self.assertRaises(ValueError):
                 _request(hours=1, **changes)
+
+    def test_request_allows_a_cutoff_at_the_window_opening(self):
+        """A window forecast may be committed right up to the window opening.
+
+        The one-hour point contract still demands strict lead time. A window
+        already reaches up to 24 hours forward, so requiring an extra hour of
+        lead rejected Telegraph's "next 24 hours" request without protecting
+        anything, and the service default now uses the opening itself.
+        """
+
+        request = _request(hours=24, forecast_cutoff=START)
+        self.assertEqual(request.forecast_cutoff, START)
+        self.assertEqual(request.horizon_start, START)
 
     def test_request_rejects_non_finite_coordinates_and_unsupported_semantics(self):
         invalid = {

@@ -38,6 +38,7 @@ try:
     )
 except ValueError:
     DEFAULT_MAX_PAYMENT_MICRO_USDC = MINIMUM_USDC_MICROUNITS
+DEFAULT_MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -377,7 +378,42 @@ SettlementVerifier = Callable[[PaymentResponse, ValidatedPaymentAuthorization], 
 Transport = Callable[[str, str, dict[str, str]], HttpResult]
 
 
-def urllib_transport(method: str, url: str, headers: dict[str, str]) -> HttpResult:
+def _read_bounded_response(
+    response: Any,
+    *,
+    max_body_bytes: int,
+    source: str,
+) -> bytes:
+    """Read one dispatcher body with a hard byte cap and overflow detection."""
+
+    if max_body_bytes <= 0:
+        raise ValueError("max_body_bytes must be positive")
+    response_headers = getattr(response, "headers", None)
+    declared = (
+        response_headers.get("Content-Length")
+        if response_headers is not None
+        else None
+    )
+    if declared is not None:
+        try:
+            declared_bytes = int(declared)
+        except (TypeError, ValueError):
+            declared_bytes = None
+        if declared_bytes is not None and declared_bytes > max_body_bytes:
+            raise ValueError(f"{source} response exceeds {max_body_bytes} byte cap")
+    body = response.read(max_body_bytes + 1)
+    if len(body) > max_body_bytes:
+        raise ValueError(f"{source} response exceeds {max_body_bytes} byte cap")
+    return body
+
+
+def urllib_transport(
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    *,
+    max_response_body_bytes: int = DEFAULT_MAX_RESPONSE_BODY_BYTES,
+) -> HttpResult:
     """Transport for the x402 flow.
 
     A non-2xx response is *returned* rather than raised, deliberately: the 402
@@ -389,12 +425,30 @@ def urllib_transport(method: str, url: str, headers: dict[str, str]) -> HttpResu
     planned HTTPS switch could put it behind the same edge as the Explorer.
     """
 
+    if max_response_body_bytes <= 0:
+        raise ValueError("max_response_body_bytes must be positive")
     request = Request(url, method=method, headers=outbound_headers(headers))
     try:
         with urlopen(request, timeout=20) as response:
-            return HttpResult(response.status, dict(response.headers.items()), response.read())
+            return HttpResult(
+                response.status,
+                dict(response.headers.items()),
+                _read_bounded_response(
+                    response,
+                    max_body_bytes=max_response_body_bytes,
+                    source="dispatcher",
+                ),
+            )
     except HTTPError as error:
-        return HttpResult(error.code, dict(error.headers.items()), error.read())
+        return HttpResult(
+            error.code,
+            dict(error.headers.items()),
+            _read_bounded_response(
+                error,
+                max_body_bytes=max_response_body_bytes,
+                source="dispatcher",
+            ),
+        )
 
 
 class PaymentRequiredError(RuntimeError):
@@ -757,6 +811,14 @@ class TelegraphX402Client:
         }
         self.max_payment_micro_usdc = max_payment_micro_usdc
         self.max_paid_requests = max_paid_requests
+        configured_total = os.getenv("OATHCAST_MAX_TOTAL_PAYMENT_MICRO_USDC", "")
+        if max_total_payment_micro_usdc is None and configured_total.strip():
+            try:
+                max_total_payment_micro_usdc = int(configured_total)
+            except ValueError as exc:
+                raise ValueError(
+                    "OATHCAST_MAX_TOTAL_PAYMENT_MICRO_USDC must be an integer"
+                ) from exc
         self.max_total_payment_micro_usdc = (
             max_total_payment_micro_usdc
             if max_total_payment_micro_usdc is not None
@@ -782,6 +844,10 @@ class TelegraphX402Client:
         if self.signer is not None and not self.require_settlement:
             raise PaymentPolicyError(
                 "signed requests cannot disable settlement confirmation"
+            )
+        if self.signer is not None and self.settlement_verifier is None:
+            raise PaymentPolicyError(
+                "an independent settlement verifier is required before signing"
             )
 
     def _validate_target(self, miner_id: str | int, endpoint: str) -> tuple[str, str]:
@@ -972,6 +1038,8 @@ class TelegraphX402Client:
                 url,
                 expected_pay_to=self.expected_pay_to,
                 max_amount_micro_usdc=self.max_payment_micro_usdc,
+                now=self.clock(),
+                require_deadline=self.require_challenge_deadline,
             )
         return PaymentPreflight(
             request_url=url,

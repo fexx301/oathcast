@@ -99,16 +99,16 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   requirement against champion historical scores. Registration `19` evaluated
   zero historical rows, so it did not observe that Spearman gate.
 
-  The current artifact is instead 42,798 bytes, SHA-256
-  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`,
+  The current artifact is instead 42,790 bytes, SHA-256
+  `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774`,
   and raw-byte Keccak-256
-  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+  `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`.
   Its fixture SHA-256 is
-  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
-  Two isolated clean builds are byte-identical. Rust tests pass `39/39`, the
-  full Go/wazero suite passes, and Python discovery passes `401/401`. It passes
-  87 synthetic factual pairs with minimum
-  margin `0.206250` and a synthetic ordinal Spearman proxy of `0.959623`;
+  `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
+  Two isolated clean builds are byte-identical. Rust tests pass `40/40`, the
+  full Go/wazero suite passes, and Python discovery passes `422/422`. It passes
+  88 synthetic factual pairs with minimum
+  margin `0.206250` and a synthetic ordinal Spearman proxy of `0.959566`;
   predicate-family identity, inverse
   learned-from and lost-to phrasing, parenthetical commas, coordinated relation
   swaps, mixed explicit reversals, partial multi-relation omissions, mixed
@@ -118,7 +118,12 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   across punctuation have Rust and fixture regressions. These local
   cases are not the hidden Telegraph fixtures
   or champion history. The official unmodified Telegraph tester returns
-  `0.8500`. The user manually hosted the exact 42,798-byte build and registered
+  `0.8500`. The registered artifact is the earlier 42,798-byte build, SHA-256
+  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` and
+  raw-byte Keccak-256
+  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`; the
+  42,790-byte artifact above has not been uploaded, hosted, or registered. The
+  user manually hosted that exact 42,798-byte registration `41` build and registered
   it for `WEATHER_FORECAST` as registration `41` in Base Sepolia transaction
   `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
   The hosted URL was

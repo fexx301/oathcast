@@ -80,8 +80,22 @@ def backup_read_only(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--database", type=Path, required=True)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Back up an initialized OathCast receipt database through SQLite's "
+            "online backup API and verify the restored copy."
+        ),
+        epilog=(
+            "The source is opened read-only. For a legacy pre-migration database, "
+            "make a raw sqlite3 backup before opening it with newer OathCast code."
+        ),
+    )
+    parser.add_argument(
+        "--database",
+        type=Path,
+        required=True,
+        help="existing initialized receipt database; this command never creates it",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()

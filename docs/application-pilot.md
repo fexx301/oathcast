@@ -12,16 +12,20 @@ From the OathCast directory:
 ```sh
 PYTHONPATH=src python3 scripts/application_pilot.py \
   --host 127.0.0.1 \
-  --port 8787 \
+  --port 8788 \
   --database state/pilot.sqlite3
 ```
 
-Open `http://127.0.0.1:8787/` in a browser. The queue can be inspected with:
+Open `http://127.0.0.1:8788/` in a browser. The queue can be inspected with:
 
 ```sh
-curl http://127.0.0.1:8787/api/healthz
-curl http://127.0.0.1:8787/api/pilot-requests
+curl http://127.0.0.1:8788/api/healthz
+curl http://127.0.0.1:8788/api/pilot-requests
 ```
+
+Port `8787` belongs to the public decision/status UI at the Caddy edge. The
+planning-only intake uses `8788` so starting it locally cannot replace that
+fail-closed public surface.
 
 The intake contract is deliberately narrow: one location, one exact UTC hour,
 one cutoff before that hour, and the fixed event `measurable precipitation >

@@ -1,9 +1,11 @@
 import base64
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from oathcast.payment import (
     BASE_SEPOLIA_NETWORK,
@@ -46,6 +48,37 @@ class PaymentTests(unittest.TestCase):
         kwargs.setdefault("settlement_verifier", lambda response, authorization: True)
         return TelegraphX402Client(**kwargs)
 
+    def test_documented_cumulative_payment_cap_is_read_from_environment(self):
+        with patch.dict(
+            os.environ,
+            {"OATHCAST_MAX_TOTAL_PAYMENT_MICRO_USDC": "25000"},
+        ):
+            client = TelegraphX402Client(
+                max_payment_micro_usdc=10000,
+                max_paid_requests=3,
+            )
+        self.assertEqual(client.max_total_payment_micro_usdc, 25000)
+
+    def test_explicit_cumulative_payment_cap_overrides_environment(self):
+        with patch.dict(
+            os.environ,
+            {"OATHCAST_MAX_TOTAL_PAYMENT_MICRO_USDC": "25000"},
+        ):
+            client = TelegraphX402Client(
+                max_payment_micro_usdc=10000,
+                max_paid_requests=3,
+                max_total_payment_micro_usdc=20000,
+            )
+        self.assertEqual(client.max_total_payment_micro_usdc, 20000)
+
+    def test_malformed_cumulative_payment_cap_environment_is_rejected(self):
+        with patch.dict(
+            os.environ,
+            {"OATHCAST_MAX_TOTAL_PAYMENT_MICRO_USDC": "not-an-integer"},
+        ):
+            with self.assertRaisesRegex(ValueError, "must be an integer"):
+                TelegraphX402Client()
+
     def test_challenge_decodes_and_detects_base_sepolia_usdc(self):
         challenge = PaymentChallenge.decode(encoded_challenge())
         self.assertTrue(challenge.supports_base_sepolia_usdc())
@@ -85,6 +118,28 @@ class PaymentTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertNotIn("PAYMENT-SIGNATURE", calls[0][2])
 
+    def test_preflight_deadline_uses_the_injected_clock(self):
+        payload = json.loads(base64.b64decode(encoded_challenge()).decode())
+        payload["deadline"] = "2000-01-02T00:00:00Z"
+        challenge = base64.b64encode(json.dumps(payload).encode()).decode()
+        client = self.signed_client(
+            dispatcher_url="https://dispatcher.test",
+            transport=lambda method, url, headers: HttpResult(
+                402, {"Payment-Required": challenge}, b""
+            ),
+            signer=lambda authorization: "must-not-run",
+            expected_pay_to="0xabc",
+            allowed_miner_ids={"18"},
+            allowed_endpoints={"predict"},
+            require_challenge_deadline=True,
+            clock=lambda: datetime(2000, 1, 1, tzinfo=timezone.utc),
+        )
+
+        result = client.preflight_miner(18, "predict", {"lat": 1})
+
+        self.assertEqual(result.status, 402)
+        self.assertIsNotNone(result.challenge)
+
     def test_client_stops_at_402_without_a_real_signer(self):
         def transport(method, url, headers):
             return HttpResult(402, {"Payment-Required": encoded_challenge()}, b"payment required")
@@ -119,26 +174,26 @@ class PaymentTests(unittest.TestCase):
         self.assertEqual(response.settlement_verification, "verified")
         self.assertEqual(len(calls), 2)
 
-    def test_settlement_header_without_verifier_is_not_treated_as_settled(self):
+    def test_signing_requires_a_settlement_verifier_before_spending(self):
         calls = []
+        signed = []
 
         def transport(method, url, headers):
             calls.append(headers)
-            if len(calls) == 1:
-                return HttpResult(402, {"Payment-Required": encoded_challenge()}, b"")
-            return HttpResult(200, {"x-payment-settle-response": "looks-real"}, b"{}")
+            return HttpResult(402, {"Payment-Required": encoded_challenge()}, b"")
 
-        client = TelegraphX402Client(
-            dispatcher_url="https://dispatcher.test",
-            transport=transport,
-            signer=lambda authorization: "proof",
-            expected_pay_to="0xabc",
-            allowed_miner_ids={"18"},
-            allowed_endpoints={"predict"},
-            journal=SqlitePaymentJournal(":memory:"),
-        )
-        with self.assertRaises(PaymentOutcomeUnknown):
-            client.request_miner(18, "predict", {"lat": 1})
+        with self.assertRaisesRegex(PaymentPolicyError, "settlement verifier"):
+            TelegraphX402Client(
+                dispatcher_url="https://dispatcher.test",
+                transport=transport,
+                signer=lambda authorization: signed.append(True) or "proof",
+                expected_pay_to="0xabc",
+                allowed_miner_ids={"18"},
+                allowed_endpoints={"predict"},
+                journal=SqlitePaymentJournal(":memory:"),
+            )
+        self.assertEqual(calls, [])
+        self.assertEqual(signed, [])
 
     def test_decimal_amount_is_not_guessed_as_micro_usdc(self):
         payload = json.loads(base64.b64decode(encoded_challenge()).decode())
@@ -344,6 +399,7 @@ class PaymentTests(unittest.TestCase):
             expected_pay_to="0xabc",
             allowed_miner_ids={"18"},
             allowed_endpoints={"predict"},
+            settlement_verifier=lambda response, authorization: True,
             journal=journal,
         )
         result = client.preflight_miner(18, "predict", {"lat": 1})
@@ -380,6 +436,7 @@ class PaymentTests(unittest.TestCase):
                 expected_pay_to="0xabc",
                 allowed_miner_ids={"18"},
                 allowed_endpoints={"predict"},
+                settlement_verifier=lambda response, authorization: True,
                 journal=SqlitePaymentJournal(path),
             )
             with self.assertRaises(DuplicatePaymentError):

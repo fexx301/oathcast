@@ -9,7 +9,7 @@ authorized August 9 rehearsal:
 
 - network: `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
 - asset: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
-- default maximum: `10000` base units (0.01 USDC)
+- fixed safety ceiling: `10000` base units (0.01 USDC)
 - recipient: `G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix`
 - fee payer: `2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4`
 
@@ -31,6 +31,11 @@ Preflight is the default. It makes one unpaid request, decodes the
 `PAYMENT-REQUIRED` header, and validates x402 v2, the exact Solana network and
 USDC mint, the amount cap, recipient, fee payer, and exact target Miner/path.
 It does not read `SOLANA_PRIVATE_KEY` or initialize a signer.
+
+`--max-amount` can only lower the fixed `10000`-unit safety ceiling; it cannot
+raise or override it. The value must be a positive integer at or below that
+ceiling. Zero, negative, fractional, unsafe numeric, and above-ceiling values
+fail with `MAX_AMOUNT_INVALID` before any HTTP request is made.
 
 ```bash
 export TELEGRAPH_DISPATCHER_URL='https://your-telegraph-dispatcher.example/miner-dispatcher'
@@ -109,11 +114,21 @@ ID for a new attempt; do not automate retries around this command.
 After the retry, the canary records only a hash of the settlement header and
 the public transaction signature. It queries Solana devnet with
 `getSignatureStatuses` and `getTransaction` (`confirmed`, `jsonParsed`) and
-requires a confirmed, error-free transaction. When token-balance metadata is
-available, it independently checks the exact USDC decrease for the signer and
-increase for the approved recipient. Missing metadata or a mismatch produces
-sanitized evidence and a non-zero exit status; the canary never treats a
-settlement header alone as proof.
+requires a confirmed, error-free transaction. The two RPC queries share one
+30-second deadline and one abort signal, so post-settlement verification cannot
+hang indefinitely. A timeout returns `RPC_QUERY_FAILED` while retaining the
+settlement and initialized verification evidence. When token-balance metadata
+is available, the canary independently checks the exact USDC decrease for the
+signer and increase for the approved recipient. Missing metadata or a mismatch
+produces sanitized evidence and a non-zero exit status; the canary never treats
+a settlement header alone as proof.
+
+The pinned x402 2.11 SVM client cannot reliably expose the final transaction
+signature before the paid request is sent. It creates a partially signed
+transaction, then the facilitator adds the fee-payer signature that determines
+the Solana transaction ID. The canary therefore does not label a client-side
+partial signature as the intended final signature. It records the facilitator's
+settlement signature and independently verifies that signature on chain.
 
 ## Evidence and safety
 

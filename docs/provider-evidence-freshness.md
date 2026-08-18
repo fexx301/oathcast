@@ -29,6 +29,9 @@ selected condition, and `2` when it cannot establish a trustworthy status
 (missing file, invalid dataset, timestamp, or threshold). A stale matrix job
 does not cancel the other job.
 
+When `--check` is omitted, the checker defaults to `all` and both collection
+age and resolution lag must be healthy for exit `0`.
+
 For a deterministic local check against a downloaded branch copy:
 
     PYTHONPATH=src python3 scripts/check_provider_freshness.py \

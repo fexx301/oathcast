@@ -106,6 +106,81 @@ def _log_request_failure(
     )
 
 
+#: Query parameters whose values describe the *shape* of a request rather than
+#: what it is about, so they are safe to record when a request is refused.
+#: Coordinates, event ids, location names, and timestamps are deliberately not
+#: here: a rejected-request log must not become a log of who asked about where.
+SHAPE_SAFE_QUERY_PARAMETERS = frozenset(
+    {"hourly", "forecast_hours", "operator", "threshold_mm", "provider"}
+)
+
+
+def _rejected_request_shape(query: str) -> dict[str, Any]:
+    """Describe a refused request without recording its subject.
+
+    A 4xx or 410 is the one failure the caller can see and the operator cannot:
+    ``_send_json`` logs ``urlparse(path).path`` only, so a rejection recorded
+    nothing about what was actually asked for. That made a live shape mismatch
+    undiagnosable from our side while the caller held the error text.
+
+    Parameter *names* are always recorded. Values are recorded only for the
+    shape allow-list above. A ``start``/``end`` pair contributes its duration in
+    whole hours, which is the diagnostic signal the pair carries without
+    exposing either instant. Never raises: it runs inside an exception handler.
+    """
+
+    shape: dict[str, Any] = {}
+    try:
+        params = parse_qs(query, keep_blank_values=True)
+        shape["parameters"] = sorted(str(name) for name in params)
+        values = {
+            name: params[name][0]
+            for name in sorted(params)
+            if name in SHAPE_SAFE_QUERY_PARAMETERS
+            and params[name]
+            and isinstance(params[name][0], str)
+            and len(params[name][0]) <= 32
+        }
+        if values:
+            shape["shape_values"] = values
+        start_raw = next((params[k][0] for k in ("start", "horizon_start") if k in params), None)
+        end_raw = next((params[k][0] for k in ("end", "horizon_end") if k in params), None)
+        if start_raw and end_raw:
+            span = parse_timestamp(end_raw) - parse_timestamp(start_raw)
+            seconds = span.total_seconds()
+            shape["requested_span_hours"] = (
+                seconds / 3600 if seconds % 3600 else int(seconds // 3600)
+            )
+        shape["cutoff_supplied"] = any(
+            key in params for key in ("cutoff", "forecast_cutoff")
+        )
+    except Exception:  # noqa: BLE001 - diagnostics must never break a response
+        shape.setdefault("parameters", [])
+        shape["shape_unavailable"] = True
+    return shape
+
+
+def _log_request_refused(
+    *,
+    request_id: str,
+    path: str,
+    status: int,
+    reason: str,
+    query: str,
+) -> None:
+    """Record a refused forecast request's shape, never its subject."""
+
+    record: dict[str, Any] = {
+        "event": "forecast_request_refused",
+        "request_id": request_id,
+        "path": path,
+        "status": status,
+        "reason": reason[:200],
+        **_rejected_request_shape(query),
+    }
+    LOGGER.warning(json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+
 class ProviderUnavailable(RuntimeError):
     """Raised when every configured provider failed for the same request."""
 
@@ -204,6 +279,7 @@ class RequestRateLimiter:
         *,
         window_seconds: float = 60.0,
         max_keys: int = 4096,
+        sweep_interval: int = 64,
         clock: Callable[[], float] | None = None,
     ) -> None:
         if limit_per_minute < 0:
@@ -212,12 +288,28 @@ class RequestRateLimiter:
             raise ValueError("window_seconds must be positive")
         if max_keys <= 0:
             raise ValueError("max_keys must be positive")
+        if sweep_interval <= 0:
+            raise ValueError("sweep_interval must be positive")
         self.limit_per_minute = limit_per_minute
         self.window_seconds = window_seconds
         self.max_keys = max_keys
+        self.sweep_interval = sweep_interval
         self.clock = clock or time.monotonic
         self._events: OrderedDict[str, deque[float]] = OrderedDict()
+        self._checks_since_sweep = 0
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _expire_bucket(events: deque[float], cutoff: float) -> None:
+        while events and events[0] <= cutoff:
+            events.popleft()
+
+    def _sweep_expired(self, cutoff: float) -> None:
+        for existing_key, existing_events in list(self._events.items()):
+            self._expire_bucket(existing_events, cutoff)
+            if not existing_events:
+                del self._events[existing_key]
+        self._checks_since_sweep = 0
 
     def check(self, key: str) -> tuple[bool, int]:
         """Return ``(allowed, retry_after_seconds)`` for one request."""
@@ -227,14 +319,21 @@ class RequestRateLimiter:
         now = self.clock()
         cutoff = now - self.window_seconds
         with self._lock:
-            # Expire idle buckets before admitting a new identity. This keeps
-            # invalid-header/IP churn from growing the in-memory map forever.
-            for existing_key, existing_events in list(self._events.items()):
-                while existing_events and existing_events[0] <= cutoff:
-                    existing_events.popleft()
-                if not existing_events:
-                    del self._events[existing_key]
             events = self._events.get(key)
+            if events is not None:
+                self._expire_bucket(events, cutoff)
+                if not events:
+                    del self._events[key]
+                    events = None
+
+            self._checks_since_sweep += 1
+            if (
+                self._checks_since_sweep >= self.sweep_interval
+                or (events is None and len(self._events) >= self.max_keys)
+            ):
+                self._sweep_expired(cutoff)
+                events = self._events.get(key)
+
             if events is None:
                 if len(self._events) >= self.max_keys:
                     self._events.popitem(last=False)
@@ -1382,7 +1481,11 @@ def question_from_query(params: dict[str, list[str]]) -> ForecastQuestion:
     cutoff = (
         _parse_query_timestamp("forecast_cutoff", cutoff_value)
         if cutoff_value is not None
-        else start - timedelta(hours=1)
+        # Default to the hour's opening, not an hour before it. An implied hour
+        # of lead time made a request for the very next hour impossible: a call
+        # at 12:30 for the 13:00 hour was refused with 410 because the derived
+        # cutoff of 12:00 had already passed.
+        else start
     )
     event_id_value = _first_query_value(params, ("event_id",), default=None)
     event_id = (
@@ -1446,7 +1549,10 @@ def window_request_from_query(
     cutoff = (
         _parse_query_timestamp("forecast_cutoff", cutoff_value)
         if cutoff_value is not None
-        else start - timedelta(hours=1)
+        # Default a window to the moment it opens, not an hour earlier. Telegraph
+        # sends no cutoff, so an hour of implied lead time rejected every
+        # "next 24 hours" request with 410 before this call was even routed.
+        else start
     )
     event_id_value = _first_query_value(params, ("event_id",), default=None)
     event_id = (
@@ -1602,8 +1708,6 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                     "service": "oathcast-miner",
                     "providers": self.service.provider_order,
                     "auth_required": self.service.require_auth,
-                    "rate_limit_per_minute": self.service.rate_limiter.limit_per_minute,
-                    "auth_failure_limit_per_minute": self.service.auth_failure_limiter.limit_per_minute,
                     "temperature_window_enabled": self.service.temperature_window_enabled,
                     "release": self.service.release.to_dict(),
                 },
@@ -1672,7 +1776,7 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(
                 401,
-                {"error": "unauthorized"},
+                {"error": "unauthorized", "request_id": request_id},
                 headers={"WWW-Authenticate": "Bearer", "X-OathCast-Request-ID": request_id},
             )
             return
@@ -1707,13 +1811,28 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                     reference_time=accepted_at,
                 )
             else:
-                request = question_from_query(params)
+                # Dispatch on the requested span rather than assuming one hour.
+                # A 24-hour start/end request is a real Telegraph shape: calling
+                # question_from_query directly here rejected it with "only
+                # accepts one-hour windows", which returned no temperature and
+                # scored zero. forecast_request_from_query routes a one-hour
+                # span to the registered point contract and a longer span to the
+                # window contract, whose response carries the temperature range
+                # alongside the probability the registered output_schema
+                # requires.
+                request = forecast_request_from_query(params)
             if isinstance(request, TemperatureWindowRequest):
                 result = self.service.forecast_temperature_window(
                     request,
                     request_id=request_id,
                     requested_provider=requested_provider,
                     accepted_at=accepted_at,
+                )
+            elif isinstance(request, ForecastWindowRequest):
+                result = self.service.forecast_window(
+                    request,
+                    request_id=request_id,
+                    requested_provider=requested_provider,
                 )
             else:
                 result = self.service.forecast(
@@ -1731,6 +1850,13 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
             )
             self._send_json(200, result.to_public_response(), headers=headers)
         except ForecastCutoffPassed as exc:
+            _log_request_refused(
+                request_id=request_id,
+                path=parsed.path,
+                status=410,
+                reason=str(exc),
+                query=parsed.query,
+            )
             self._send_json(410, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except ReceiptConflict as exc:
             self._send_json(409, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
@@ -1770,6 +1896,13 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
         except ProviderUnavailable:
             self._send_json(502, {"error": "provider_unavailable", "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except ValueError as exc:
+            _log_request_refused(
+                request_id=request_id,
+                path=parsed.path,
+                status=400,
+                reason=str(exc),
+                query=parsed.query,
+            )
             self._send_json(400, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
         except Exception as exc:  # noqa: BLE001 - final HTTP safety boundary
             _log_request_failure(

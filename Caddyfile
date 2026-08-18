@@ -2,9 +2,18 @@
 oathcastcourt.duckdns.org {
     encode gzip
 
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
     @miner path /healthz /readyz /predict /v1/*
 
     handle @miner {
+        request_body {
+            max_size 64KB
+        }
         reverse_proxy 127.0.0.1:8080 {
             transport http {
                 dial_timeout 5s
@@ -16,6 +25,9 @@ oathcastcourt.duckdns.org {
     }
 
     handle {
+        request_body {
+            max_size 64KB
+        }
         reverse_proxy 127.0.0.1:8787 {
             transport http {
                 dial_timeout 5s

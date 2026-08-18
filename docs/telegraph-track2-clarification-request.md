@@ -32,7 +32,7 @@ guidance, the fixtures are factual paraphrase and lexical-discrimination pairs,
 use a fixed
 `0.15` pair floor across six near-miss cases, and do not directly compare the
 candidate and champion aggregate margins. The reported `0.60` metric is Spearman
-correlation against the champion's historical scores. The current 42,798-byte
+correlation against the champion's historical scores. The 42,798-byte
 revision was later manually hosted and evaluated as registration `41`; its
 postflight and Stage 2 result are recorded below.
 
@@ -502,10 +502,10 @@ result rejected them in Stage 2. Do not describe either registered artifact as
 active or promoted, and do not treat either returned aggregate margin as a
 direct candidate-versus-champion promotion comparison.
 
-Registration `41` is the current 42,798-byte artifact result. It reached
+Registration `41` is the 42,798-byte artifact result. It reached
 champion comparison (Stage 1 passed) and was rejected in Stage 2 at `31/32`
 versus the champion's `32/32`; the candidate margin `0.37852418` exceeded the
-champion aggregate margin `0.37360683`, but the per-case rule governs. The
+champion aggregate margin `0.37360683`, but the per-case rule governs. That
 artifact's 87 local pairs, `0.206250` minimum margin, and `0.959623` synthetic
 ordinal Spearman remain development proxies rather than a live promotion pass.
 

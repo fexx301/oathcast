@@ -9,7 +9,9 @@ Telegraph traffic or official demand evidence.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from html import escape
 import json
+import re
 from typing import Any
 
 
@@ -19,6 +21,12 @@ PRESENTATION_VERSION = "application_evidence_markdown_v1"
 def _cell(value: Any) -> str:
     text = "—" if value is None else str(value)
     return text.replace("|", "\\|").replace("\n", " ").strip()
+
+
+def _markdown_text(value: Any) -> str:
+    text = "—" if value is None else str(value)
+    text = escape(text.replace("\n", " ").strip(), quote=False)
+    return re.sub(r"([\\`*_{}\[\]()|])", r"\\\1", text)
 
 
 def _probability(value: Any) -> str:
@@ -180,7 +188,7 @@ def render_application_demo_markdown(payload: Mapping[str, Any]) -> str:
             [
                 f"### `{_cell(reply.get('slug'))}`",
                 "",
-                f"- **Normalized content:** {_cell(reply.get('content'))}",
+                f"- **Normalized content:** {_markdown_text(reply.get('content'))}",
                 "- **Raw response:**",
                 "",
                 "```json",

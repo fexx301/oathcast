@@ -584,7 +584,14 @@ fn percent_probability(text: &str) -> Option<f32> {
         while start > 0 && (bytes[start - 1].is_ascii_digit() || bytes[start - 1] == b'.') {
             start -= 1;
         }
-        let value = parse_decimal(&bytes[start..end])?;
+        // Keep scanning past a '%' that carries no parseable number, exactly as
+        // the out-of-range branch below already does. Abandoning the whole
+        // function here instead let a bare "Humidity (%)" earlier in an answer
+        // hide a real "70%" later in it, which drops a correct answer to the
+        // 0.49 missing-probability ceiling in `scorer::evaluate`.
+        let Some(value) = parse_decimal(&bytes[start..end]) else {
+            continue;
+        };
         if (0.0..=100.0).contains(&value) {
             return Some(value / 100.0);
         }
@@ -709,6 +716,23 @@ mod tests {
             Some(0.7)
         );
         assert_eq!(probability("There is a 65% chance."), Some(0.65));
+    }
+
+    #[test]
+    fn a_percent_sign_without_a_number_does_not_hide_a_later_probability() {
+        // A '%' with nothing parseable before it must not abandon the scan. When
+        // it did, `scorer::evaluate` saw no probability in the answer and capped
+        // a materially correct response at 0.49.
+        assert_eq!(
+            probability("Humidity (%). Rain probability: 70%."),
+            Some(0.7)
+        );
+        assert_eq!(probability("% chance. Rain probability: 70%"), Some(0.7));
+        assert_eq!(probability("20.5.5% noise, rain 70%"), Some(0.7));
+        // An out-of-range value already fell through to the next '%'; keep that.
+        assert_eq!(probability("150% impossible, rain 70%"), Some(0.7));
+        // A '%' that genuinely carries no probability anywhere still yields None.
+        assert_eq!(probability("Humidity (%) was not recorded."), None);
     }
 
     #[test]

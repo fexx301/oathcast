@@ -17,6 +17,8 @@ from pathlib import Path
 import re
 from typing import Any, Mapping
 
+from oathcast.discovery import WEATHER_INTENTS
+
 
 BASE_SEPOLIA_NETWORK = "eip155:84532"
 MINIMUM_PRICE_MICRO_USDC = 10_000
@@ -24,6 +26,8 @@ REGISTRATION_STATUSES = frozenset(
     {"draft", "portal_validated", "submitted", "registered", "superseded"}
 )
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+EVM_ADDRESS_PATTERN = re.compile(r"^0x[0-9a-fA-F]{40}$")
+ZERO_EVM_ADDRESS = "0x" + ("0" * 40)
 
 
 def _canonical_json(value: Any) -> str:
@@ -81,8 +85,20 @@ class MinerRegistrationDeclaration:
             raise ValueError("generation must be an integer")
         if self.generation < 1:
             raise ValueError("generation must be positive")
-        if not self.supported_intents or any(not item.strip() for item in self.supported_intents):
+        if not self.supported_intents or any(
+            not isinstance(item, str) or not item.strip()
+            for item in self.supported_intents
+        ):
             raise ValueError("at least one supported Intent is required")
+        unsupported_intents = sorted(
+            set(self.supported_intents).difference(WEATHER_INTENTS)
+        )
+        if unsupported_intents:
+            raise ValueError(
+                f"unsupported weather Intent(s): {', '.join(unsupported_intents)}"
+            )
+        if len(set(self.supported_intents)) != len(self.supported_intents):
+            raise ValueError("supported Intents must not contain duplicates")
         if isinstance(self.min_price_micro_usdc, bool) or not isinstance(
             self.min_price_micro_usdc, int
         ):
@@ -95,6 +111,12 @@ class MinerRegistrationDeclaration:
             self.output_mapping_sha256
         ):
             raise ValueError("output_mapping_sha256 must be a lowercase SHA-256 digest")
+        if self.fee_address is not None:
+            if not isinstance(self.fee_address, str) or (
+                not EVM_ADDRESS_PATTERN.fullmatch(self.fee_address)
+                or self.fee_address.lower() == ZERO_EVM_ADDRESS
+            ):
+                raise ValueError("fee_address must be a nonzero EVM address")
         if self.confirmation_status not in REGISTRATION_STATUSES:
             raise ValueError(f"unsupported registration status: {self.confirmation_status}")
         if not self.chain.strip():
@@ -142,8 +164,10 @@ class MinerRegistrationDeclaration:
     def next_generation(self, **changes: Any) -> "MinerRegistrationDeclaration":
         """Return a new declaration; a submitted generation is never mutated."""
 
-        if self.confirmation_status in {"submitted", "registered", "superseded"}:
-            changes.setdefault("confirmation_status", "draft")
+        # Portal validation is bound to the exact YAML digest.  Any new
+        # generation, including one created from a portal-validated draft,
+        # must therefore begin unvalidated.
+        changes["confirmation_status"] = "draft"
         changes["generation"] = self.generation + 1
         return replace(self, **changes)
 

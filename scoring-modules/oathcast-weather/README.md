@@ -92,12 +92,17 @@ the candidate and `0.37360683` for the champion, with `historical_rows: 0`.
 Those margins are diagnostics, not a direct candidate-versus-champion promotion
 test.
 
-The current 42,798-byte artifact was later manually hosted on Dropbox and
+The 42,798-byte artifact was later manually hosted on Dropbox and
 registered for `WEATHER_FORECAST` as registration `41` in Base Sepolia
 transaction
 `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
-Independent postflight verification reproduced the exact size, SHA-256, and
-raw-byte Keccak-256 listed below. Registration `41` reached champion comparison
+Independent postflight verification reproduced that artifact's exact 42,798-byte
+size, SHA-256
+`4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`, and raw-byte
+Keccak-256
+`0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`. Those are
+registration `41`'s frozen bytes, not the current local candidate recorded under
+Evidence status below. Registration `41` reached champion comparison
 (Stage 1 passed) and Stage 2 rejected it at `31/32` candidate ordering wins
 versus the champion's `32/32`. Candidate margin/EvalScore was `0.37852418`,
 above the champion aggregate margin `0.37360683`; the higher aggregate did not
@@ -153,8 +158,8 @@ The release artifact is produced at:
 The full Go harness uses wazero `v1.12.0` and checks the published ABI, deterministic
 fixture ordering, repeated-call behavior, malformed UTF-8, invalid pointers,
 bounded allocation traps, import/start-section absence, and score range.
-Rust tests pass `39/39`, the Go/wazero suite passes, and Python discovery passes
-`401/401`.
+Rust tests pass `40/40`, the Go/wazero suite passes, and Python discovery passes
+`422/422`.
 Telegraph's unmodified official tester also ran successfully against the rank
 path (example case `0.8500`). According to user-relayed Telegraph guidance, its
 Stage 2 fixtures test
@@ -165,8 +170,8 @@ user-relayed guidance, the reported `0.60` metric is Spearman rank correlation a
 the live champion's historical scores, not a raw scorer threshold or a direct
 comparison of the two returned margins.
 
-The revised local build passes 87 synthetic factual-paraphrase pairs with a
-minimum local margin of `0.206250`. Its synthetic ordinal Spearman is `0.959623`
+The revised local build passes 88 synthetic factual-paraphrase pairs with a
+minimum local margin of `0.206250`. Its synthetic ordinal Spearman is `0.959566`
 for `exact > good > bad` ordering on handcrafted cases. These are development
 proxies constructed from the user-relayed fixture category and floor; the
 ordinal metric is not comparable to Telegraph's live candidate-versus-champion
@@ -185,30 +190,38 @@ its three-string shape and fatal-zero/order constraints. The CI job is
 
 ## Evidence status
 
-The current frozen rank-only artifact was produced by two isolated clean
+The current frozen rank-only artifact is a 42,790-byte local candidate. Its
+single change from the registered 42,798-byte registration `41` build is a
+probability-scan fix in `percent_probability`, which previously abandoned the
+scan on the first `%` that carried no parseable number and so discarded a real
+percentage later in the same answer. The fix is behaviour-preserving on the
+pre-existing corpus: the weakest synthetic margin and the prior fixture results
+are unchanged. These bytes have not been uploaded, hosted, signed, registered, or
+evaluated by Telegraph. The artifact was produced by two isolated clean
 builds with the pinned Rust `1.95.0` toolchain. Their bytes were identical, and
 the size, SHA-256, and raw-byte Keccak-256 were independently checked:
 
 | Measurement | Value |
 |---|---|
 | Reproducible clean-build comparison | Two clean builds were byte-identical |
-| WASM byte size | `42,798` bytes |
-| WASM SHA-256 | `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` |
-| Raw-byte Keccak-256 (portal-compatible) | `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8` |
-| Fixture SHA-256 | `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0` |
-| Rust native tests | `39/39` passed |
+| WASM byte size | `42,790` bytes |
+| WASM SHA-256 | `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774` |
+| Raw-byte Keccak-256 (portal-compatible) | `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a` |
+| Fixture SHA-256 | `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f` |
+| Rust native tests | `40/40` passed |
 | Go/wazero suite | Full suite passed |
-| Python discovery | `401/401` passed |
+| Python discovery | `422/422` passed |
 | Official unmodified Telegraph tester | Passed; example score `0.8500` |
 
 Registration `19` evaluated the earlier 16,292-byte artifact, SHA-256
 `97d481b724bd79fa78d32218f20be9c1b85468109a8ff2a0da2d2574c775f3af`,
 raw-byte Keccak-256
 `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
-That historical registered artifact is retained separately from the current
-42,798-byte artifact.
+That historical registered artifact is retained separately from both
+registration `41`'s 42,798-byte artifact and the current 42,790-byte local
+candidate.
 
-Registration `41` evaluated the current 42,798-byte artifact. Its confirmed
+Registration `41` evaluated the 42,798-byte artifact. Its confirmed
 transaction is
 `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`; the
 hosted-byte re-fetch matched SHA-256
@@ -245,8 +258,9 @@ user-relayed team confirmation says reaching champion comparison means Stage 1
 passed, and Stage 2 rejected them at `31/32` ordering wins versus the champion's
 `32/32`.
 
-Registration `41` is the current 42,798-byte artifact's retained validator
-result: hosted bytes match the reproducible build, Stage 1 passed by reaching
+Registration `41` is the 42,798-byte artifact's retained validator
+result: hosted bytes match that recorded registration `41` build rather than the
+current 42,790-byte candidate, Stage 1 passed by reaching
 champion comparison, and Stage 2 rejected it at `31/32` versus the champion's
 `32/32`. No replacement registration is currently authorized. Before any future
 confirmation, decode a fresh complete wallet wrapper and nested call for the new

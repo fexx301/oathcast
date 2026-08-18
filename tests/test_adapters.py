@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 from oathcast.adapters import OpenMeteoAdapter, OpenWeatherAdapter, WeatherApiAdapter
-from oathcast.adapters.base import AdapterError
+from oathcast.adapters.base import AdapterError, probability_from_percent
 from oathcast.forecast import ForecastQuestion
 
 
@@ -57,6 +57,11 @@ class AdapterTests(unittest.TestCase):
         payload["hourly"] = [payload["hourly"][1]]
         with self.assertRaises(AdapterError):
             OpenWeatherAdapter().parse(payload, self.question, issued_at=ISSUED_AT)
+
+    def test_percentage_probability_rejects_boolean_values(self):
+        for value in (True, False):
+            with self.subTest(value=value), self.assertRaises(AdapterError):
+                probability_from_percent(value, "fixture")
 
     def test_urls_keep_provider_credentials_at_adapter_boundary(self):
         self.assertIn("api.open-meteo.com", OpenMeteoAdapter().build_url(self.question))

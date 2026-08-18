@@ -51,28 +51,30 @@ relevant to that track.
   required functions are `alloc`, `dealloc`, and
   `rank_answer(6 x i32) -> f32`; `breakdown_answer` is deprecated and removed.
 - [x] OathCast `no_std` rank path compiled with pinned Rust and tested with
-  `39/39` native Rust tests, the full Go/wazero ABI and adversarial harness,
-  deterministic repeated calls, `401/401` Python discovery tests, and Telegraph's
+  `40/40` native Rust tests, the full Go/wazero ABI and adversarial harness,
+  deterministic repeated calls, `422/422` Python discovery tests, and Telegraph's
   unmodified official tester (`0.8500` published example score).
 - [x] Historical validator evidence retained: the August 14 portal/API response
   surfaced a missing `breakdown_answer` message, while Telegraph later reported
   the node-log root cause as `module[env] not instantiated`; a six-`i32`/`f32`
   probe loaded far enough for the self-match check. These observations are
   historical, and neither the export nor any five-field result is current.
-- [x] Current 42,798-byte rank-only revision reproduced and locally verified:
+- [x] Current 42,790-byte rank-only revision reproduced and locally verified:
   two byte-identical clean builds;
   SHA-256
-  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`;
+  `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774`;
   raw-byte Keccak-256
-  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`;
+  `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`;
   fixture SHA-256
-  `bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
+  `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
+  It remains an unregistered local candidate: not uploaded, hosted, signed, or
+  registered.
   `scoring-modules/oathcast-weather/release-evidence.json` v7 records the build,
   registration `41`, local proxy evidence, the historical registered
   16,292-byte artifact, and the 16,318-byte scalar-export metadata separately; the
   scalar-export bytes are not present in this workspace.
-- [x] Local factual-paraphrase proxy passes 87 synthetic pairs with minimum
-  margin `0.206250` and synthetic ordinal Spearman `0.959623`.
+- [x] Local factual-paraphrase proxy passes 88 synthetic pairs with minimum
+  margin `0.206250` and synthetic ordinal Spearman `0.959566`.
   Predicate-family identity, inverse learned-from and lost-to phrasing,
   parenthetical commas, coordinated relation swaps, mixed explicit reversals,
   partial multi-relation omissions, mixed directed pairs, shared predicates,
@@ -166,15 +168,18 @@ relevant to that track.
   candidate and champion aggregate margins. The `0.60` metric is Spearman
   correlation against the champion's historical scores.
 - [~] The live Spearman threshold is still unobserved because the retained result
-  reports zero historical rows. Synthetic ordinal Spearman `0.959623` is a proxy only.
+  reports zero historical rows. Synthetic ordinal Spearman `0.959566` is a proxy only.
 - [x] All registration authorizations used so far, including registrations `19`
   and `41`, are consumed.
-- [x] Current 42,798-byte artifact manually hosted and registered as registration
+- [x] The 42,798-byte artifact manually hosted and registered as registration
   `41` for `WEATHER_FORECAST` in Base Sepolia transaction
   `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.
-  Independent hosted-byte verification matched the size, SHA-256, and raw-byte
-  Keccak-256 above. Registration `41` reached champion comparison (Stage 1
-  passed) and failed Stage 2 at `31/32` candidate wins versus the champion's
+  Independent hosted-byte verification matched that 42,798-byte size, SHA-256
+  `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174`, and
+  raw-byte Keccak-256
+  `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
+  Registration `41` reached champion comparison (Stage 1 passed) and failed
+  Stage 2 at `31/32` candidate wins versus the champion's
   `32/32`; candidate margin/EvalScore was `0.37852418` and champion margin was
   `0.37360683`. The higher aggregate did not override the per-case rule.
   Postflight:

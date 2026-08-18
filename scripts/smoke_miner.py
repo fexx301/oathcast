@@ -14,17 +14,15 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from oathcast.artifacts import atomic_write_text
+from oathcast.forecast import format_timestamp
 from oathcast.protocol import outbound_headers
 
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTERED_FORECAST_PATH = "/predict"
 CANONICAL_FORECAST_PATH = "/v1/forecast/point"
-
-
-def format_timestamp(moment: datetime) -> str:
-    return f"{moment:%Y-%m-%dT%H:%M:%SZ}"
-
+MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024
 
 def rolling_horizon(now: datetime) -> tuple[datetime, datetime, datetime]:
     """Pick a horizon that is inside every provider's window, at any run time.
@@ -75,6 +73,112 @@ def json_sha256(value: object) -> str:
 
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def release_identity_from_evidence(path: Path) -> dict[str, str]:
+    """Load a deployment identity and verify its checked-in evidence agrees."""
+
+    try:
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read release evidence {path}: {exc}") from exc
+    if not isinstance(evidence, dict):
+        raise ValueError("release evidence must be a JSON object")
+
+    release_id = evidence.get("release_id")
+    source_sha256 = evidence.get("source_sha256")
+    image = evidence.get("image")
+    image_digest = image.get("image_digest") if isinstance(image, dict) else None
+    identity = {
+        "release_id": release_id,
+        "source_sha256": source_sha256,
+        "image_digest": image_digest,
+    }
+    if not all(isinstance(value, str) and value for value in identity.values()):
+        raise ValueError(
+            "release evidence must contain release_id, source_sha256, and "
+            "image.image_digest"
+        )
+
+    source_verification = evidence.get("source_verification")
+    labels = image.get("labels") if isinstance(image, dict) else None
+    if not isinstance(source_verification, dict) or not isinstance(labels, dict):
+        raise ValueError("release evidence is missing source verification or image labels")
+    consistency_checks = {
+        "source_verification.expected_source_sha256": source_verification.get(
+            "expected_source_sha256"
+        ),
+        "source_verification.host_recomputed_source_sha256": source_verification.get(
+            "host_recomputed_source_sha256"
+        ),
+        "image.image_id": image.get("image_id"),
+        "image.labels.org.opencontainers.image.version": labels.get(
+            "org.opencontainers.image.version"
+        ),
+        "image.labels.org.opencontainers.image.revision": labels.get(
+            "org.opencontainers.image.revision"
+        ),
+    }
+    expected_values = {
+        "source_verification.expected_source_sha256": source_sha256,
+        "source_verification.host_recomputed_source_sha256": source_sha256,
+        "image.image_id": image_digest,
+        "image.labels.org.opencontainers.image.version": release_id,
+        "image.labels.org.opencontainers.image.revision": source_sha256,
+    }
+    for field, actual in consistency_checks.items():
+        if actual != expected_values[field]:
+            raise ValueError(f"release evidence identity mismatch at {field}")
+    if source_verification.get("verified") is not True:
+        raise ValueError("release evidence source verification is not marked verified")
+
+    linked_evidence = evidence.get("evidence")
+    if not isinstance(linked_evidence, dict):
+        raise ValueError("release evidence does not link its manifest and public smoke")
+    manifest_ref = source_verification.get("manifest_path")
+    if manifest_ref != linked_evidence.get("manifest"):
+        raise ValueError("release evidence manifest references disagree")
+    linked_identities: tuple[tuple[object, tuple[str, ...]], ...] = (
+        (manifest_ref, ("release_id", "source_sha256")),
+        (
+            linked_evidence.get("public_smoke"),
+            (
+                "release.release_id",
+                "release.source_sha256",
+                "release.image_digest",
+            ),
+        ),
+    )
+    for reference, fields in linked_identities:
+        if not isinstance(reference, str) or not reference:
+            raise ValueError("release evidence contains an invalid linked evidence path")
+        linked_path = Path(reference)
+        if not linked_path.is_absolute():
+            linked_path = ROOT / linked_path
+        linked_path = linked_path.resolve()
+        try:
+            linked_path.relative_to(ROOT.resolve())
+        except ValueError as exc:
+            raise ValueError(
+                f"linked release evidence escapes the repository: {reference}"
+            ) from exc
+        try:
+            linked = json.loads(linked_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"cannot read linked release evidence {reference}: {exc}") from exc
+        if not isinstance(linked, dict):
+            raise ValueError(f"linked release evidence {reference} must be an object")
+        for field in fields:
+            actual: object = linked
+            for part in field.split("."):
+                actual = actual.get(part) if isinstance(actual, dict) else None
+            expected = identity[field.rsplit(".", 1)[-1]]
+            if actual != expected:
+                raise ValueError(
+                    f"linked release evidence identity mismatch at {reference}:{field}"
+                )
+
+    return identity
 
 
 def valid_forecast_response(value: object) -> bool:
@@ -185,14 +289,43 @@ def temperature_smoke_event_id(moment: datetime) -> str:
     return f"smoke-temperature-{utc_hour:%Y%m%dT%H}z"
 
 
-def request_json(url: str, *, headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], object]:
+def _read_response_body(response: object, *, max_body_bytes: int) -> bytes:
+    """Read an HTTP body with the same bounded-read invariant as the service."""
+
+    if max_body_bytes <= 0:
+        raise ValueError("max_body_bytes must be positive")
+    response_headers = getattr(response, "headers", {})
+    declared = response_headers.get("Content-Length") if response_headers else None
+    if declared is not None:
+        try:
+            declared_bytes = int(declared)
+        except (TypeError, ValueError):
+            declared_bytes = None
+        if declared_bytes is not None and declared_bytes > max_body_bytes:
+            raise ValueError(f"response exceeds {max_body_bytes} byte cap")
+    body = response.read(max_body_bytes + 1)
+    if len(body) > max_body_bytes:
+        raise ValueError(f"response exceeds {max_body_bytes} byte cap")
+    return body
+
+
+def request_json(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    max_body_bytes: int = MAX_RESPONSE_BODY_BYTES,
+) -> tuple[int, dict[str, str], object]:
     request = Request(url, headers=outbound_headers(headers))
     try:
         with urlopen(request, timeout=20) as response:
-            body = response.read().decode("utf-8")
+            body = _read_response_body(response, max_body_bytes=max_body_bytes).decode(
+                "utf-8"
+            )
             return response.status, dict(response.headers.items()), json.loads(body)
     except HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
+        body = _read_response_body(exc, max_body_bytes=max_body_bytes).decode(
+            "utf-8", errors="replace"
+        )
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
@@ -202,29 +335,105 @@ def request_json(url: str, *, headers: dict[str, str] | None = None) -> tuple[in
         raise RuntimeError(f"request failed: {exc.reason}") from exc
 
 
-def receipt_capacity_check(ready: object, *, min_headroom_percent: float) -> dict[str, object]:
+def release_identity_checks(
+    release: object,
+    expected_identity: dict[str, str | None],
+) -> list[dict[str, object]]:
+    """Return explicit pass/fail records for every configured release pin."""
+
+    release_fields = release if isinstance(release, dict) else {}
+    actual_identity = {
+        "release_id": release_fields.get("release_id"),
+        "source_sha256": release_fields.get("source_sha256"),
+        "image_digest": release_fields.get("image_digest"),
+    }
+    return [
+        {
+            "name": name,
+            "expected": expected,
+            "actual": actual_identity[name],
+            "ok": actual_identity[name] == expected,
+        }
+        for name, expected in expected_identity.items()
+        if expected is not None
+    ]
+
+
+def skipped_authenticated_checks(
+    *,
+    require_temperature_window: bool,
+) -> list[dict[str, object]]:
+    """Make a public-only smoke visibly partial instead of silently incomplete."""
+
+    names = ["authenticated_forecast", "canonical_path_parity"]
+    if require_temperature_window:
+        names.extend(
+            ["authenticated_temperature_window", "temperature_path_parity"]
+        )
+    return [
+        {
+            "name": name,
+            "ok": True,
+            "skipped": True,
+            "reason": "--skip-authenticated",
+        }
+        for name in names
+    ]
+
+
+def receipt_capacity_check(
+    ready: object,
+    *,
+    min_headroom_percent: float,
+    required: bool = False,
+) -> dict[str, object]:
     """Alert on a filling receipt store *before* it starts refusing forecasts.
 
     A full store makes every new forecast return 507, so the useful signal is
     headroom, not the cliff itself. Whichever caps are configured are checked;
     an uncapped store trivially passes.
 
-    A deployed release older than the capacity change does not report the
-    field at all. That is recorded as ``reported: False`` rather than failed --
-    the canary runs against a live host that can legitimately lag the repo
-    between a merge and a redeploy -- but it stays visible in the output so the
-    absence is never mistaken for a healthy reading.
+    A general-purpose smoke can still inspect an older release without failing
+    on an absent field. Production canaries opt into ``required=True`` so a
+    missing or malformed capacity report cannot be recorded as healthy.
     """
 
-    check: dict[str, object] = {"name": "receipt_capacity", "ok": True, "reported": False}
+    check: dict[str, object] = {
+        "name": "receipt_capacity",
+        "ok": not required,
+        "required": required,
+        "reported": False,
+    }
     if not isinstance(ready, dict):
+        check["error"] = "readyz payload is not an object"
         return check
     capacity = ready.get("receipt_store")
     if not isinstance(capacity, dict):
+        check["error"] = "readyz does not report receipt_store capacity"
         return check
 
     check["reported"] = True
-    check["accepting_new_receipts"] = capacity.get("accepting_new_receipts")
+    required_fields = {
+        "rows",
+        "max_rows",
+        "used_bytes",
+        "max_bytes",
+        "accepting_new_receipts",
+    }
+    missing_fields = sorted(required_fields - set(capacity))
+    if missing_fields:
+        check["ok"] = False
+        check["error"] = (
+            "receipt_store capacity report is missing: " + ", ".join(missing_fields)
+        )
+        return check
+
+    accepting = capacity.get("accepting_new_receipts")
+    if not isinstance(accepting, bool):
+        check["ok"] = False
+        check["error"] = "receipt_store accepting_new_receipts must be boolean"
+        return check
+    check["accepting_new_receipts"] = accepting
     headrooms: list[float] = []
     for used_key, max_key, label in (
         ("rows", "max_rows", "rows"),
@@ -232,15 +441,36 @@ def receipt_capacity_check(ready: object, *, min_headroom_percent: float) -> dic
     ):
         limit = capacity.get(max_key)
         used = capacity.get(used_key)
-        if not isinstance(limit, (int, float)) or not isinstance(used, (int, float)):
+        if (
+            not isinstance(used, int)
+            or isinstance(used, bool)
+            or used < 0
+            or used > 2**63 - 1
+        ):
+            check["ok"] = False
+            check["error"] = (
+                f"receipt_store {used_key} must be a non-negative 64-bit integer"
+            )
+            return check
+        if limit is None:
             continue
-        if limit <= 0:
-            continue
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or limit <= 0
+            or limit > 2**63 - 1
+        ):
+            check["ok"] = False
+            check["error"] = (
+                f"receipt_store {max_key} must be a positive 64-bit integer or null"
+            )
+            return check
         headroom = max(0.0, (limit - used) / limit) * 100.0
         check[f"{label}_headroom_percent"] = round(headroom, 3)
         headrooms.append(headroom)
 
-    if capacity.get("accepting_new_receipts") is False:
+    check["ok"] = True
+    if accepting is False:
         check["ok"] = False
         check["error"] = "receipt store is full; new forecasts will return 507"
         return check
@@ -300,6 +530,19 @@ def main() -> None:
     parser.add_argument("--expected-source-sha256")
     parser.add_argument("--expected-image-digest")
     parser.add_argument(
+        "--release-evidence",
+        type=Path,
+        help=(
+            "load the expected release ID, source SHA-256, and image digest from "
+            "a checked-in runtime evidence file"
+        ),
+    )
+    parser.add_argument(
+        "--require-receipt-capacity",
+        action="store_true",
+        help="fail unless /readyz reports a valid receipt-store capacity envelope",
+    )
+    parser.add_argument(
         "--require-receipt-write-probe",
         action="store_true",
         help="fail unless /readyz proves the transactional SQLite write probe",
@@ -332,6 +575,24 @@ def main() -> None:
         help="also require the deployed 24-hour forecast_hours/hourly=2t response",
     )
     args = parser.parse_args()
+    expected_identity = {
+        "release_id": args.expected_release_id,
+        "source_sha256": args.expected_source_sha256,
+        "image_digest": args.expected_image_digest,
+    }
+    if args.release_evidence is not None:
+        try:
+            evidence_identity = release_identity_from_evidence(args.release_evidence)
+        except ValueError as exc:
+            parser.error(str(exc))
+        for field, evidence_value in evidence_identity.items():
+            explicit_value = expected_identity[field]
+            if explicit_value is not None and explicit_value != evidence_value:
+                parser.error(
+                    f"--expected-{field.replace('_', '-')} conflicts with "
+                    f"--release-evidence"
+                )
+            expected_identity[field] = evidence_value
     base_url = args.base_url.rstrip("/")
     checks: list[dict[str, object]] = []
 
@@ -340,32 +601,16 @@ def main() -> None:
     checks.append({"name": "healthz", "status": health_status, "ok": health_ok})
     release_id = health.get("release", {}).get("release_id") if isinstance(health, dict) else None
     release = health.get("release", {}) if isinstance(health, dict) else {}
-    if args.expected_release_id is not None and release_id != args.expected_release_id:
-        checks.append({
-            "name": "release_id",
-            "expected": args.expected_release_id,
-            "actual": release_id,
-            "ok": False,
-        })
-    if args.expected_source_sha256 is not None and release.get("source_sha256") != args.expected_source_sha256:
-        checks.append({
-            "name": "source_sha256",
-            "expected": args.expected_source_sha256,
-            "actual": release.get("source_sha256"),
-            "ok": False,
-        })
-    if args.expected_image_digest is not None and release.get("image_digest") != args.expected_image_digest:
-        checks.append({
-            "name": "image_digest",
-            "expected": args.expected_image_digest,
-            "actual": release.get("image_digest"),
-            "ok": False,
-        })
+    checks.extend(release_identity_checks(release, expected_identity))
 
     ready_status, _, ready = request_json(f"{base_url}/readyz")
     checks.append({"name": "readyz", "status": ready_status, "ok": ready_status == 200 and isinstance(ready, dict) and ready.get("ready") is True})
     checks.append(
-        receipt_capacity_check(ready, min_headroom_percent=args.min_receipt_headroom_percent)
+        receipt_capacity_check(
+            ready,
+            min_headroom_percent=args.min_receipt_headroom_percent,
+            required=args.require_receipt_capacity,
+        )
     )
     checks.append(receipt_write_check(ready, required=args.require_receipt_write_probe))
 
@@ -393,10 +638,9 @@ def main() -> None:
     question["horizon_end"] = horizon_end
     question["forecast_cutoff"] = forecast_cutoff
     if args.question_output is not None:
-        args.question_output.parent.mkdir(parents=True, exist_ok=True)
-        args.question_output.write_text(
+        atomic_write_text(
+            args.question_output,
             json.dumps(question, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
         )
 
     params = {
@@ -599,6 +843,14 @@ def main() -> None:
                         ),
                     }
                 )
+    else:
+        # Keep a green public-only run visibly partial; omitted checks must not
+        # be mistaken for checks that passed.
+        checks.extend(
+            skipped_authenticated_checks(
+                require_temperature_window=args.require_temperature_window,
+            )
+        )
 
     result = {
         "base_url": base_url,
@@ -606,6 +858,8 @@ def main() -> None:
         "release": release,
         "question": question,
         "checks": checks,
+        "authenticated_checks_skipped": args.skip_authenticated,
+        "partial": args.skip_authenticated,
     }
     result["ok"] = all(bool(check.get("ok")) for check in checks)
     print(json.dumps(result, indent=2, sort_keys=True))

@@ -11,6 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
+from oathcast.artifacts import atomic_write_text
 from oathcast.script_benchmark import load_script_benchmark_cases, run_script_benchmark
 
 
@@ -43,8 +44,7 @@ def main() -> None:
     if args.output is None:
         print(encoded, end="")
     else:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(encoded, encoding="utf-8")
+        atomic_write_text(args.output, encoded)
         summary = report["summary"]
         print(
             json.dumps(

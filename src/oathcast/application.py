@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
-import re
+import logging
 import time
 import uuid
 from typing import Any, Callable, Iterable, Protocol
@@ -20,20 +20,19 @@ from urllib.request import Request, urlopen
 from oathcast.discovery import MinerCapability
 from oathcast.forecast import ForecastQuestion, format_timestamp
 from oathcast.miner_adapters import AdaptedMinerResponse, adapter_for_miner
+from oathcast.probability import (
+    PERCENT_PROBABILITY_KEYS,
+    PROBABILITY_KEYS,
+    PROBABILITY_PATTERN,
+    extract_probability,
+)
 from oathcast.protocol import ProtocolResultEnvelope, outbound_headers
 
 
 UTC = timezone.utc
-PROBABILITY_PATTERN = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*%")
-PROBABILITY_KEYS = (
-    "probability",
-    "precipitation_probability",
-    "probability_of_precipitation",
-    "rain_probability",
-    "probability_of_rain",
-    "pop",
-)
-PERCENT_PROBABILITY_KEYS = ("chance_of_rain", "rain_chance", "precipitation_chance")
+DEFAULT_MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024
+MINER_REQUEST_FAILED_REASON = "miner request failed"
+LOGGER = logging.getLogger("oathcast.application")
 
 
 class MinerClient(Protocol):
@@ -43,6 +42,56 @@ class MinerClient(Protocol):
 
 class RoutingError(RuntimeError):
     """Raised when the Application cannot satisfy its cross-Miner policy."""
+
+
+def _read_bounded_response(
+    response: Any,
+    *,
+    max_body_bytes: int,
+    source: str,
+) -> bytes:
+    """Read one HTTP body without allowing an upstream to exhaust memory."""
+
+    if max_body_bytes <= 0:
+        raise ValueError("max_body_bytes must be positive")
+    headers = getattr(response, "headers", None)
+    declared = headers.get("Content-Length") if headers is not None else None
+    if declared is not None:
+        try:
+            declared_bytes = int(declared)
+        except (TypeError, ValueError):
+            declared_bytes = None
+        if declared_bytes is not None and declared_bytes > max_body_bytes:
+            raise ValueError(f"{source} response exceeds {max_body_bytes} byte cap")
+    body = response.read(max_body_bytes + 1)
+    if len(body) > max_body_bytes:
+        raise ValueError(f"{source} response exceeds {max_body_bytes} byte cap")
+    return body
+
+
+def _log_router_failure(
+    capability: MinerCapability,
+    *,
+    request_id: str,
+    error: BaseException,
+) -> None:
+    """Keep correlation and exception-type diagnostics out of evidence text."""
+
+    cause = error.__cause__ or error
+    LOGGER.error(
+        json.dumps(
+            {
+                "event": "miner_request_failed",
+                "request_id": request_id,
+                "miner_id": capability.miner_id,
+                "slug": capability.slug,
+                "error_type": type(error).__name__,
+                "cause_type": type(cause).__name__,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
 
 
 def extract_content(raw_response: Any) -> str:
@@ -61,43 +110,6 @@ def extract_content(raw_response: Any) -> str:
                 return message["content"].strip()
         return json.dumps(raw_response, sort_keys=True, separators=(",", ":"))
     return str(raw_response).strip()
-
-
-def extract_probability(raw_response: Any) -> float | None:
-    if isinstance(raw_response, ProtocolResultEnvelope):
-        raw_response = raw_response.body
-    if isinstance(raw_response, dict):
-        for key in PROBABILITY_KEYS:
-            probability = raw_response.get(key)
-            if isinstance(probability, (int, float)) and not isinstance(probability, bool):
-                probability = float(probability)
-                if 0 <= probability <= 1:
-                    return probability
-                if 1 < probability <= 100 and key != "probability":
-                    return probability / 100
-        for key in PERCENT_PROBABILITY_KEYS:
-            probability = raw_response.get(key)
-            if isinstance(probability, (int, float)) and not isinstance(probability, bool):
-                probability = float(probability)
-                if 0 <= probability <= 100:
-                    return probability / 100
-        for key in ("data", "result", "forecast", "prediction", "output"):
-            nested = raw_response.get(key)
-            probability = extract_probability(nested)
-            if probability is not None:
-                return probability
-        choices = raw_response.get("choices")
-        if isinstance(choices, list):
-            for choice in choices:
-                probability = extract_probability(choice)
-                if probability is not None:
-                    return probability
-    content = extract_content(raw_response)
-    match = PROBABILITY_PATTERN.search(content)
-    if match is None:
-        return None
-    percentage = float(match.group(1))
-    return percentage / 100 if 0 <= percentage <= 100 else None
 
 
 @dataclass(frozen=True)
@@ -197,10 +209,14 @@ class HttpMinerClient:
         *,
         headers: dict[str, str] | None = None,
         timeout_seconds: float = 12.0,
+        max_response_body_bytes: int = DEFAULT_MAX_RESPONSE_BODY_BYTES,
     ) -> None:
         self.capability = capability
         self.headers = headers or {}
         self.timeout_seconds = timeout_seconds
+        if max_response_body_bytes <= 0:
+            raise ValueError("max_response_body_bytes must be positive")
+        self.max_response_body_bytes = max_response_body_bytes
 
     def __call__(self, question: ForecastQuestion) -> Any:
         return self.request_with_id(question, request_id=None)
@@ -223,7 +239,12 @@ class HttpMinerClient:
             headers["X-OathCast-Application-Request-ID"] = request_id
         request = Request(url, headers=headers)
         with urlopen(request, timeout=self.timeout_seconds) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            body = _read_bounded_response(
+                response,
+                max_body_bytes=self.max_response_body_bytes,
+                source="Miner",
+            )
+            payload = json.loads(body.decode("utf-8"))
         return payload
 
 
@@ -255,22 +276,21 @@ class TelegraphMinerClient:
                 "X-Request-ID": request_id,
                 "X-OathCast-Application-Request-ID": request_id,
             }
+        request_kwargs = (
+            {} if request_headers is None else {"request_headers": request_headers}
+        )
         response = self.payment_client.request_miner(
             self.capability.miner_id,
             self.endpoint,
             params,
-            request_headers=request_headers,
-        ) if request_headers is not None else self.payment_client.request_miner(
-            self.capability.miner_id,
-            self.endpoint,
-            params,
+            **request_kwargs,
+        )
+        protocol_result = ProtocolResultEnvelope.from_payment_response(
+            response,
+            route_mode="telegraph",
+            registry_snapshot_sha256=self.capability.registry_snapshot_sha256,
         )
         if self.demand_ledger is not None:
-            protocol_result = ProtocolResultEnvelope.from_payment_response(
-                response,
-                route_mode="telegraph",
-                registry_snapshot_sha256=self.capability.registry_snapshot_sha256,
-            )
             settlement_verified = protocol_result.receipt.settlement_verified
             self.demand_ledger.record(
                 question_event_id=question.event_id,
@@ -292,11 +312,7 @@ class TelegraphMinerClient:
                 settlement_verification=protocol_result.receipt.settlement_verification,
                 protocol_receipt_sha256=protocol_result.receipt.receipt_sha256,
             )
-        return ProtocolResultEnvelope.from_payment_response(
-            response,
-            route_mode="telegraph",
-            registry_snapshot_sha256=self.capability.registry_snapshot_sha256,
-        )
+        return protocol_result
 
 
 class CrossMinerRouter:
@@ -353,6 +369,8 @@ class CrossMinerRouter:
                 protocol_result=protocol_result,
             )
         except Exception as exc:
+            _log_router_failure(capability, request_id=request_id, error=exc)
+            failure_reason = f"{MINER_REQUEST_FAILED_REASON} ({type(exc).__name__})"
             return MinerReply(
                 miner_id=capability.miner_id,
                 slug=capability.slug,
@@ -363,9 +381,9 @@ class CrossMinerRouter:
                 latency_ms=(time.perf_counter() - started) * 1000,
                 transport="development_http_or_injected",
                 probability_comparable=False,
-                error=str(exc),
+                error=failure_reason,
                 received_at=self.clock().astimezone(UTC),
-                validity_reason=str(exc),
+                validity_reason=failure_reason,
                 request_id=request_id,
             )
 

@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hashlib
 import json
+import logging
 import os
-import re
 import sqlite3
 import threading
 from typing import Any, Callable
@@ -26,7 +26,7 @@ from oathcast.forecast import ForecastQuestion, format_timestamp, parse_timestam
 UTC = timezone.utc
 PILOT_VERSION = "planning_pilot_intake_v1"
 PILOT_STATUS = "local_intake_only_no_telegraph_calls"
-EVENT_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{2,63}$")
+LOGGER = logging.getLogger(__name__)
 
 
 class PilotValidationError(ValueError):
@@ -180,6 +180,12 @@ class PilotIntakeStore:
             if self._memory_connection is not None:
                 self._memory_connection.close()
                 self._memory_connection = None
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def save(self, plan: PilotPlan) -> dict[str, Any]:
         payload = plan.to_dict()
@@ -369,7 +375,12 @@ def make_pilot_handler(store: PilotIntakeStore) -> type[BaseHTTPRequestHandler]:
                 _json_response(self, 404, {"error": "not_found"})
                 return
             try:
-                length = int(self.headers.get("Content-Length", "0"))
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except (TypeError, ValueError) as exc:
+                    raise PilotValidationError(
+                        "Content-Length must be a base-10 integer"
+                    ) from exc
                 if length <= 0 or length > 16_384:
                     raise PilotValidationError("request body must be between 1 and 16384 bytes")
                 raw = self.rfile.read(length)
@@ -377,11 +388,16 @@ def make_pilot_handler(store: PilotIntakeStore) -> type[BaseHTTPRequestHandler]:
                 if "application/json" in content_type:
                     payload = json.loads(raw.decode("utf-8"))
                 else:
-                    payload = {
-                        key: values[-1]
-                        for key, values in parse_qs(raw.decode("utf-8")).items()
-                        if values
-                    }
+                    form = parse_qs(raw.decode("utf-8"), keep_blank_values=True)
+                    duplicate_fields = sorted(
+                        key for key, values in form.items() if len(values) != 1
+                    )
+                    if duplicate_fields:
+                        raise PilotValidationError(
+                            "form fields must not be repeated: "
+                            + ", ".join(duplicate_fields)
+                        )
+                    payload = {key: values[0] for key, values in form.items()}
                 if not isinstance(payload, dict):
                     raise PilotValidationError("request body must be an object")
                 plan = build_pilot_plan(payload)
@@ -400,8 +416,9 @@ def make_pilot_handler(store: PilotIntakeStore) -> type[BaseHTTPRequestHandler]:
                 )
             except (PilotValidationError, json.JSONDecodeError, UnicodeDecodeError) as exc:
                 _json_response(self, 400, {"error": str(exc)})
-            except Exception as exc:
-                _json_response(self, 500, {"error": f"pilot_store_error: {exc}"})
+            except Exception:
+                LOGGER.exception("pilot request storage failed")
+                _json_response(self, 500, {"error": "pilot_store_error"})
 
     return PilotHandler
 
@@ -409,7 +426,7 @@ def make_pilot_handler(store: PilotIntakeStore) -> type[BaseHTTPRequestHandler]:
 def serve_pilot(
     *,
     host: str = "127.0.0.1",
-    port: int = 8787,
+    port: int = 8788,
     database: str | os.PathLike[str] = "state/pilot.sqlite3",
     server_factory: Callable[..., ThreadingHTTPServer] = ThreadingHTTPServer,
 ) -> None:

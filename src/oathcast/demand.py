@@ -51,7 +51,10 @@ def _sha256_json(value: Any) -> str:
 
 
 def _timestamp(value: datetime | None = None) -> str:
-    current = (value or datetime.now(tz=UTC)).astimezone(UTC)
+    current = value or datetime.now(tz=UTC)
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("demand timestamps must be timezone-aware")
+    current = current.astimezone(UTC)
     return format_timestamp(current)
 
 
@@ -287,6 +290,7 @@ class DemandLedger:
         with self._lock:
             connection = self._connection()
             try:
+                connection.execute("BEGIN IMMEDIATE")
                 existing = connection.execute(
                     "SELECT event_json FROM demand_events WHERE demand_id = ?",
                     (event.demand_id,),
@@ -345,7 +349,7 @@ class DemandLedger:
             connection = self._connection()
             try:
                 rows = connection.execute(
-                    "SELECT event_json, event_sha256 FROM demand_events ORDER BY occurred_at, demand_id"
+                    "SELECT event_json, event_sha256 FROM demand_events ORDER BY rowid"
                 ).fetchall()
                 return [
                     {**json.loads(row[0]), "event_sha256": row[1]}
@@ -369,7 +373,8 @@ class DemandLedger:
                     "SELECT event_json, event_sha256 FROM demand_events"
                 ).fetchall()
                 for event_json, event_sha256 in rows:
-                    if _sha256_json(json.loads(event_json)) != event_sha256:
+                    stored_sha256 = hashlib.sha256(event_json.encode("utf-8")).hexdigest()
+                    if stored_sha256 != event_sha256:
                         raise RuntimeError("demand event hash verification failed")
                 return result
             finally:

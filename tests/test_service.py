@@ -1,9 +1,13 @@
-import json
+import http.client
 import io
+import json
+import os
 from datetime import datetime, timezone
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
 import unittest.mock
 from urllib.parse import urlencode
@@ -28,6 +32,7 @@ from oathcast.service import (
     authorization_valid,
     fetch_json,
     question_from_query,
+    run_server,
 )
 
 
@@ -49,6 +54,52 @@ def valid_query_params():
         "end": ["2026-08-17T16:00:00Z"],
         "cutoff": ["2026-08-17T12:00:00Z"],
     }
+
+
+class RunningForecastServer:
+    def __init__(self, service):
+        self.service = service
+        self.server = None
+        self.thread = None
+
+    def __enter__(self):
+        service = self.service
+
+        class BoundHandler(ForecastRequestHandler):
+            pass
+
+        BoundHandler.service = service
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), BoundHandler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        return self.server.server_address
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        assert self.server is not None
+        self.server.shutdown()
+        self.server.server_close()
+        assert self.thread is not None
+        self.thread.join(timeout=2)
+        if self.thread.is_alive():
+            raise AssertionError("forecast test server did not stop")
+
+
+def socket_get(address, path, headers):
+    connection = http.client.HTTPConnection(*address, timeout=2)
+    try:
+        connection.putrequest("GET", path)
+        for name, value in headers:
+            connection.putheader(name, value)
+        connection.endheaders()
+        response = connection.getresponse()
+        body = response.read()
+        status = response.status
+        response_headers = {
+            name.lower(): value for name, value in response.getheaders()
+        }
+        return status, body, response_headers
+    finally:
+        connection.close()
 
 
 class _FakeResponse:
@@ -156,6 +207,67 @@ class ServiceTests(unittest.TestCase):
         handler.do_GET()
         return handler.responses[0]
 
+    def test_run_server_applies_capacity_and_feature_environment(self):
+        for disabled in ("none", "off", "0", ""):
+            with self.subTest(disabled=disabled), tempfile.TemporaryDirectory() as directory:
+                captured = []
+
+                class FakeServer:
+                    def __init__(self, address, handler):
+                        self.address = address
+                        self.handler = handler
+                        self.served = False
+                        captured.append(self)
+
+                    def serve_forever(self):
+                        self.served = True
+
+                environment = {
+                    "OATHCAST_RECEIPT_DB": str(Path(directory) / "receipts.sqlite3"),
+                    "OATHCAST_RECEIPT_MAX_ROWS": disabled,
+                    "OATHCAST_RECEIPT_MAX_BYTES": "2048",
+                    "OATHCAST_REQUIRE_AUTH": "off",
+                    "OATHCAST_ENABLE_TEMPERATURE_WINDOW": "yes",
+                }
+                with (
+                    unittest.mock.patch.dict(os.environ, environment, clear=True),
+                    unittest.mock.patch(
+                        "oathcast.service.ThreadingHTTPServer",
+                        FakeServer,
+                    ),
+                    unittest.mock.patch("builtins.print"),
+                ):
+                    run_server(host="127.0.0.2", port=9090)
+
+                self.assertEqual(len(captured), 1)
+                server = captured[0]
+                self.assertEqual(server.address, ("127.0.0.2", 9090))
+                self.assertTrue(server.served)
+                service = server.handler.service
+                try:
+                    self.assertFalse(service.require_auth)
+                    self.assertTrue(service.temperature_window_enabled)
+                    self.assertIsNone(service.receipt_store.max_rows)
+                    self.assertEqual(service.receipt_store.max_bytes, 2048)
+                finally:
+                    service.receipt_store.close()
+
+    def test_run_server_rejects_a_malformed_capacity_before_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            environment = {
+                "OATHCAST_RECEIPT_DB": str(Path(directory) / "receipts.sqlite3"),
+                "OATHCAST_RECEIPT_MAX_ROWS": "12x",
+            }
+            with (
+                unittest.mock.patch.dict(os.environ, environment, clear=True),
+                unittest.mock.patch(
+                    "oathcast.service.ThreadingHTTPServer",
+                ) as server_constructor,
+            ):
+                with self.assertRaises(ValueError):
+                    run_server()
+            server_constructor.assert_not_called()
+
     def test_receipt_write_probe_interval_must_be_finite_and_non_negative(self):
         for invalid in (float("nan"), float("inf"), float("-inf"), -0.001):
             with self.subTest(invalid=invalid):
@@ -211,7 +323,26 @@ class ServiceTests(unittest.TestCase):
             }
         )
         self.assertEqual(question.event_id, "q-1")
+        # An omitted cutoff defaults to the hour's opening, not an hour before
+        # it. The earlier hour of implied lead time made a request for the very
+        # next hour impossible to satisfy: a call at 14:30 for the 15:00 hour was
+        # refused with 410 because the derived 14:00 cutoff had already passed.
+        self.assertEqual(question.forecast_cutoff.isoformat(), "2026-08-17T15:00:00+00:00")
+        self.assertEqual(question.forecast_cutoff, question.horizon_start)
+
+    def test_explicit_cutoff_still_imposes_lead_time_when_a_caller_wants_it(self):
+        question = question_from_query(
+            {
+                "location_name": ["Lagos"],
+                "lat": ["6.5244"],
+                "lon": ["3.3792"],
+                "start": ["2026-08-17T15:00:00Z"],
+                "end": ["2026-08-17T16:00:00Z"],
+                "cutoff": ["2026-08-17T14:00:00Z"],
+            }
+        )
         self.assertEqual(question.forecast_cutoff.isoformat(), "2026-08-17T14:00:00+00:00")
+        self.assertLess(question.forecast_cutoff, question.horizon_start)
 
     def test_default_event_id_is_stable_and_bound_to_the_canonical_question(self):
         first = question_from_query(valid_query_params())
@@ -366,7 +497,7 @@ class ServiceTests(unittest.TestCase):
             require_auth=True,
             auth_failure_limit_per_minute=1,
         )
-        first_status, _, _ = self._handler_request(
+        first_status, first_payload, first_headers = self._handler_request(
             service,
             "/predict?event_id=first",
             headers={"Authorization": "Bearer invalid"},
@@ -377,6 +508,10 @@ class ServiceTests(unittest.TestCase):
             headers={"Authorization": "Bearer invalid"},
         )
         self.assertEqual(first_status, 401)
+        self.assertEqual(
+            first_payload["request_id"],
+            first_headers["X-OathCast-Request-ID"],
+        )
         self.assertEqual(second_status, 429)
 
     def test_registered_and_canonical_paths_share_request_rate_limit(self):
@@ -457,6 +592,26 @@ class ServiceTests(unittest.TestCase):
         limiter.check("fourth")
         self.assertEqual(limiter.tracked_key_count, 1)
 
+    def test_rate_limiter_amortizes_global_expiration_sweeps(self):
+        ticks = iter([0.0, 61.0, 61.0, 61.0])
+        limiter = RequestRateLimiter(
+            20,
+            max_keys=10,
+            sweep_interval=4,
+            clock=lambda: next(ticks),
+        )
+        limiter.check("stale")
+        limiter.check("second")
+        self.assertEqual(limiter.tracked_key_count, 2)
+        limiter.check("third")
+        self.assertEqual(limiter.tracked_key_count, 3)
+        limiter.check("fourth")
+        self.assertEqual(limiter.tracked_key_count, 3)
+
+    def test_rate_limiter_rejects_a_non_positive_sweep_interval(self):
+        with self.assertRaises(ValueError):
+            RequestRateLimiter(sweep_interval=0)
+
     def test_rate_limit_key_does_not_depend_on_authorization_value(self):
         service = ForecastService(provider_order=["open_meteo"])
         self.assertEqual(
@@ -529,6 +684,53 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(request("203.0.113.10"), 401)
         self.assertEqual(request("203.0.113.11"), 401)
         self.assertEqual(request("203.0.113.10"), 429)
+
+    def test_duplicate_forwarded_headers_use_socket_identity_over_real_http(self):
+        service = ForecastService(
+            provider_order=["open_meteo"],
+            auth_token="correct-secret",
+            require_auth=True,
+            auth_failure_limit_per_minute=1,
+        )
+        path = "/predict?event_id=auth-test"
+        with RunningForecastServer(service) as address:
+            first_status, first_body, first_headers = socket_get(
+                address,
+                path,
+                [
+                    ("Authorization", "Bearer invalid"),
+                    ("X-Forwarded-For", "203.0.113.10"),
+                    ("X-Forwarded-For", "203.0.113.11"),
+                ],
+            )
+            second_status, second_body, second_headers = socket_get(
+                address,
+                path,
+                [
+                    ("Authorization", "Bearer invalid"),
+                    ("X-Forwarded-For", "198.51.100.10"),
+                    ("X-Forwarded-For", "198.51.100.11"),
+                ],
+            )
+
+        self.assertEqual(first_status, 401)
+        self.assertEqual(json.loads(first_body)["error"], "unauthorized")
+        self.assertEqual(
+            json.loads(first_body)["request_id"],
+            first_headers["x-oathcast-request-id"],
+        )
+        self.assertEqual(second_status, 429)
+        self.assertEqual(json.loads(second_body)["error"], "rate_limited")
+        self.assertEqual(first_headers["content-length"], str(len(first_body)))
+        self.assertEqual(second_headers["content-length"], str(len(second_body)))
+        self.assertEqual(
+            first_headers["x-oathcast-release-id"],
+            service.release.release_id,
+        )
+        self.assertEqual(
+            second_headers["x-oathcast-release-id"],
+            service.release.release_id,
+        )
 
     def test_rotating_invalid_authorization_headers_share_one_failure_bucket(self):
         service = ForecastService(
@@ -848,6 +1050,8 @@ class ReceiptCapacityHandlerTests(unittest.TestCase):
             status, payload, _ = self._handler(service, "/healthz")
             self.assertEqual(status, 200)
             self.assertTrue(payload["ok"])
+            self.assertNotIn("rate_limit_per_minute", payload)
+            self.assertNotIn("auth_failure_limit_per_minute", payload)
             store.close()
 
     def test_readyz_is_unready_when_capacity_cannot_be_read(self):

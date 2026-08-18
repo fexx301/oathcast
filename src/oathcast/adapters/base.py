@@ -50,6 +50,8 @@ def select_exact_point(points: list[HourPoint], target: datetime, provider: str)
 
 
 def probability_from_percent(value: Any, provider: str) -> float:
+    if isinstance(value, bool):
+        raise AdapterError(f"{provider} returned a non-numeric percentage")
     try:
         numeric = float(value)
     except (TypeError, ValueError) as exc:

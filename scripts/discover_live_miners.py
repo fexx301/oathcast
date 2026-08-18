@@ -13,6 +13,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from oathcast.artifacts import atomic_write_text
 from oathcast.discovery import discover_weather_miners, integration_records
 from oathcast.payment import TelegraphX402Client
 
@@ -64,8 +65,7 @@ def main() -> None:
     }
     encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(encoded, encoding="utf-8")
+        atomic_write_text(args.output, encoded)
     print(encoded, end="")
 
 

@@ -34,6 +34,10 @@ Open <http://127.0.0.1:8787/>. The page and health endpoints are available, but
 `POST /api/decision` intentionally returns `503` until a real Telegraph-backed
 decision runner is injected.
 
+Port `8787` is reserved for this public edge service. The separate local
+Planning Desk pilot defaults to `8788` and must not be placed behind Caddy's
+catch-all route.
+
 The launcher never reads a wallet, manufactures x402 headers, creates payment
 traffic, or uses a fixture as if it were live demand. A deployment that has a
 reviewed real integration can construct the server in Python:

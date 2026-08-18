@@ -22,7 +22,7 @@ from oathcast.forecast import ForecastQuestion, ensure_utc, format_timestamp, pa
 
 UTC = timezone.utc
 GROUND_TRUTH_STATUSES = frozenset({"resolved", "missing", "invalid"})
-PRECIPITATION_THRESHOLD_MICROMETRES = 100
+MICROMETRES_PER_MM = 1000
 
 
 class ObservationSource(Protocol):
@@ -241,10 +241,19 @@ def resolve_precipitation(
         )
 
     precipitation_micrometres = observation.precipitation_micrometres
+    threshold_micrometres_exact = question.threshold_mm * MICROMETRES_PER_MM
+    threshold_micrometres = int(round(threshold_micrometres_exact))
+    if not math.isclose(
+        threshold_micrometres_exact,
+        threshold_micrometres,
+        rel_tol=0.0,
+        abs_tol=1e-9,
+    ):
+        raise ValueError("question.threshold_mm must be representable at micrometre precision")
     return _result(
         question,
         status="resolved",
-        outcome=int(precipitation_micrometres > PRECIPITATION_THRESHOLD_MICROMETRES),
+        outcome=int(precipitation_micrometres > threshold_micrometres),
         source=observation.source,
         observation_id=observation.observation_id,
         precipitation_mm=observation.precipitation_mm,

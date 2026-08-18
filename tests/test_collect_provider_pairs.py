@@ -1,8 +1,12 @@
+from contextlib import redirect_stdout
+import io
+import os
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from oathcast.backtest import load_chronological_cases
 from oathcast.ground_truth import FileObservationSource
@@ -14,6 +18,7 @@ from scripts.collect_provider_pairs import (
     build_question,
     collect_once,
     load_locations,
+    main as collect_main,
     merge_cases,
     resolve_cases,
     write_dataset,
@@ -231,6 +236,20 @@ class CollectAndWriteTests(unittest.TestCase):
         loaded, _ = load_chronological_cases(str(self.dataset))
         self.assertEqual(len(loaded), 2)
 
+    def test_dataset_temp_file_is_unique_fsynced_and_cleaned_up(self):
+        case = MergeTests()._case("lagos-a", ISSUED)
+        with patch(
+            "oathcast.artifacts.os.fsync",
+            wraps=os.fsync,
+        ) as fsync:
+            write_dataset(self.dataset, [case])
+
+        self.assertGreaterEqual(fsync.call_count, 1)
+        self.assertEqual(
+            list(self.dataset.parent.glob(f".{self.dataset.name}.*.tmp")),
+            [],
+        )
+
 
 class ResolveTests(unittest.TestCase):
     def setUp(self):
@@ -316,6 +335,32 @@ class ResolveTests(unittest.TestCase):
         twice, counts = resolve_cases(once, source, now=now)
         self.assertEqual(counts["already_resolved"], 1)
         self.assertEqual(once[0]["outcome"], twice[0]["outcome"])
+
+    def test_resolve_mode_reports_when_it_is_a_dry_run(self):
+        case = self._case()
+        dataset = Path(self._directory.name) / "paired.json"
+        write_dataset(dataset, [case])
+        self._observations(case, 0.8)
+        observations = Path(self._directory.name) / f"obs-{case['case_id']}.json"
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            status = collect_main(
+                [
+                    "--mode",
+                    "resolve",
+                    "--dataset",
+                    str(dataset),
+                    "--observations",
+                    str(observations),
+                    "--dry-run",
+                ]
+            )
+
+        self.assertEqual(status, 0)
+        self.assertTrue(json.loads(output.getvalue())["dry_run"])
+        cases, _ = load_chronological_cases(str(dataset))
+        self.assertIsNone(cases[0].outcome)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from oathcast.artifacts import atomic_write_text
 
 
 FINGERPRINT_FIELDS = (
@@ -93,8 +99,7 @@ def main() -> None:
     if args.output is None:
         print(encoded, end="")
     else:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(encoded, encoding="utf-8")
+        atomic_write_text(args.output, encoded)
         print(json.dumps({"output": str(args.output), "ok": result["ok"]}))
     if not result["ok"]:
         raise SystemExit(1)

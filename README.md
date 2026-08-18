@@ -296,18 +296,29 @@ lives in `scoring-modules/oathcast-weather/`. It is a dependency-free Rust
 pairs for question, ground truth, and Miner answer, in that order. Blank answers
 return exactly `0`, results are finite and clamped to `[0, 1]`, and the
 standalone artifact has no host imports or start section. The rank path passes
-the Rust tests (`39/39`), OathCast's full Go/wazero ABI and adversarial suite,
+the Rust tests (`40/40`), OathCast's full Go/wazero ABI and adversarial suite,
 and Telegraph's unmodified official tester (example score `0.8500`). See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
-build commands and safeguards. The current frozen rank-only artifact is 42,798
+build commands and safeguards. The current frozen rank-only artifact is 42,790
 bytes with SHA-256
+`2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774` and
+raw-byte Keccak-256
+`0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`.
+Its fixture SHA-256 is
+`c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
+Two isolated clean builds are byte-identical, and Python discovery passes
+`422/422`. Its only change from the previously registered build is a
+probability-scan fix in `percent_probability`, which abandoned the scan at the
+first `%` carrying no parseable number and so discarded a stated probability
+later in the same answer; the fix is behaviour-preserving on the pre-existing
+corpus, whose weakest synthetic margin is unchanged at `0.206250`. This
+candidate is not the registered artifact, and it has not been uploaded, hosted,
+signed, or evaluated by Telegraph. Registration `41` froze the earlier
+42,798-byte build with SHA-256
 `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` and
 raw-byte Keccak-256
 `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`.
-Its fixture SHA-256 is
-`bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0`.
-Two isolated clean builds are byte-identical, and Python discovery passes
-`401/401`. The user manually hosted these exact bytes on Dropbox and registered
+The user manually hosted those bytes on Dropbox and registered
 them for `WEATHER_FORECAST` as registration `41`; an independent postflight
 fetch reproduced the byte size and both artifact hashes. Registration `41`
 reached champion comparison, establishing Stage 1 passage, then failed Stage 2
@@ -330,16 +341,17 @@ The historical bytes are not present in this workspace.
 
 The machine-readable v7 record in
 [`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json)
-records the 42,798-byte artifact and registration `41`, its local proxy
-evidence, the historical 16,292-byte registration `19` artifact, and the
-scalar-build metadata separately. According to user-relayed Telegraph guidance,
+records the 42,790-byte local candidate artifact, the registered 42,798-byte
+registration `41` artifact, their local proxy evidence, the historical
+16,292-byte registration `19` artifact, and the scalar-build metadata
+separately. According to user-relayed Telegraph guidance,
 the Stage 2 fixtures
 cover factual paraphrase and lexical discrimination only, use a fixed `0.15`
 margin floor for each of six near-miss cases, and do not compare the candidate's
 aggregate margin directly with the champion's. The reported `0.60` metric is
 Spearman rank correlation against the live champion's historical scores. The
-artifact passes 87 synthetic factual pairs with minimum margin `0.206250`.
-Its synthetic ordinal Spearman is `0.959623`; that metric measures
+candidate artifact passes 88 synthetic factual pairs with minimum margin
+`0.206250`. Its synthetic ordinal Spearman is `0.959566`; that metric measures
 `exact > good > bad` ordering on handcrafted cases and is not comparable to the
 live candidate-versus-champion correlation. Predicate-family identity,
 inverse `learned from` and `lost to` phrasing, parenthetical commas,
@@ -413,7 +425,7 @@ The second transaction postflight is
 [`oathcast-weather-wasm-reregistration-postflight-2026-08-15T212134Z.json`](artifacts/registration-drafts/oathcast-weather-wasm-reregistration-postflight-2026-08-15T212134Z.json).
 The successful current-registry postflight is
 [`oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json`](artifacts/registration-drafts/oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json).
-The current 42,798-byte artifact was later registered manually as registration
+The 42,798-byte artifact was later registered manually as registration
 `41` in Base Sepolia transaction
 `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`
 at block `45613554` (`2026-08-17T19:36:36Z`). The delegated wallet was

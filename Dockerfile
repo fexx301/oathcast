@@ -38,7 +38,7 @@ RUN groupadd --gid 1000 oathcast \
 
 USER 1000:1000
 
-EXPOSE 8080 8787
+EXPOSE 8080 8787 8788
 
 # /healthz is served before the auth check, so the probe needs no credentials
 # and never carries a token. urllib is already present; this avoids installing

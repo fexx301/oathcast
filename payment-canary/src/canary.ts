@@ -24,6 +24,8 @@ export const EXPECTED_PAY_TO =
 export const EXPECTED_FEE_PAYER =
   "2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4" as const;
 export const DEFAULT_MAX_AMOUNT = 10_000n;
+export const FETCH_TIMEOUT_MS = 30_000;
+export const RPC_TIMEOUT_MS = 30_000;
 export const DEFAULT_RPC_URL = "https://api.devnet.solana.com";
 export const DEFAULT_MINER_ID = "18";
 export const DEFAULT_ENDPOINT_PATH = "predict";
@@ -43,7 +45,7 @@ export type FetchLike = (
 ) => Promise<Response>;
 
 export interface RpcRequestLike<T = unknown> {
-  send(): Promise<T>;
+  send(options?: { abortSignal?: AbortSignal }): Promise<T>;
 }
 
 /** The narrow RPC surface used by the independent post-settlement verifier. */
@@ -176,6 +178,7 @@ export type CanaryErrorCode =
   | "CHALLENGE_SCHEME_MISMATCH"
   | "CHALLENGE_NETWORK_MISMATCH"
   | "CHALLENGE_ASSET_MISMATCH"
+  | "MAX_AMOUNT_INVALID"
   | "CHALLENGE_AMOUNT_INVALID"
   | "CHALLENGE_AMOUNT_EXCEEDS_CAP"
   | "CHALLENGE_PAY_TO_MISMATCH"
@@ -218,6 +221,7 @@ const ERROR_MESSAGES: Record<CanaryErrorCode, string> = {
   CHALLENGE_SCHEME_MISMATCH: "the challenge does not offer exactly one approved exact payment option",
   CHALLENGE_NETWORK_MISMATCH: "the challenge network is not the approved Solana devnet network",
   CHALLENGE_ASSET_MISMATCH: "the challenge asset is not the approved Solana devnet USDC mint",
+  MAX_AMOUNT_INVALID: "the configured one-shot cap must be a positive integer at or below the fixed safety ceiling",
   CHALLENGE_AMOUNT_INVALID: "the challenge amount is not a canonical positive integer amount",
   CHALLENGE_AMOUNT_EXCEEDS_CAP: "the challenge amount exceeds the configured one-shot cap",
   CHALLENGE_PAY_TO_MISMATCH: "the challenge recipient is not the approved recipient",
@@ -301,16 +305,24 @@ function parseAmount(value: unknown, code: CanaryErrorCode): bigint {
 
 function parseCap(value: string | number | bigint | undefined): bigint {
   if (value === undefined) return DEFAULT_MAX_AMOUNT;
-  if (typeof value === "bigint") return value;
-  const text = String(value);
-  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
-    throw new CanaryError("CHALLENGE_AMOUNT_INVALID");
-  }
+  let cap: bigint;
   try {
-    return BigInt(text);
+    if (typeof value === "bigint") {
+      cap = value;
+    } else if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+      cap = BigInt(value);
+    } else if (typeof value === "number" && Number.isSafeInteger(value)) {
+      cap = BigInt(value);
+    } else {
+      throw new Error("invalid cap");
+    }
   } catch {
-    throw new CanaryError("CHALLENGE_AMOUNT_INVALID");
+    throw new CanaryError("MAX_AMOUNT_INVALID");
   }
+  if (cap <= 0n || cap > DEFAULT_MAX_AMOUNT) {
+    throw new CanaryError("MAX_AMOUNT_INVALID");
+  }
+  return cap;
 }
 
 function assertSolanaAddress(value: unknown, code: CanaryErrorCode): asserts value is string {
@@ -394,7 +406,7 @@ export function buildTarget(options: Pick<CanaryOptions, "dispatcherUrl" | "targ
       options.allowInsecureHttpDevnet,
     );
     const expectedSuffix = `/v1/${options.minerId}/${normalizedEndpointPath}`;
-    if (!target.pathname.endsWith(expectedSuffix)) {
+    if (target.pathname !== expectedSuffix) {
       throw new CanaryError("TARGET_PATH_MISMATCH");
     }
   } else {
@@ -675,10 +687,11 @@ async function verifyOnChain(
   transactionSignature: string,
   signerAddress: string,
   amount: bigint,
+  abortSignal: AbortSignal,
 ): Promise<VerificationEvidence> {
   const statusResponse = await rpc
     .getSignatureStatuses([transactionSignature])
-    .send();
+    .send({ abortSignal });
   const statusValue = isRecord(statusResponse) ? statusResponse.value : undefined;
   const status = Array.isArray(statusValue) && isRecord(statusValue[0])
     ? statusValue[0]
@@ -691,7 +704,7 @@ async function verifyOnChain(
       encoding: "jsonParsed",
       maxSupportedTransactionVersion: 0,
     })
-    .send();
+    .send({ abortSignal });
   const transaction = isRecord(transactionResponse) ? transactionResponse : undefined;
   const meta = transaction && isRecord(transaction.meta) ? transaction.meta : undefined;
   const statusError = status && "err" in status ? status.err !== null : null;
@@ -719,7 +732,11 @@ async function verifyOnChain(
   const movementAvailable =
     preBalances.available &&
     postBalances.available &&
-    (preBalances.sawExpectedMint || postBalances.sawExpectedMint);
+    (preBalances.sawExpectedMint || postBalances.sawExpectedMint) &&
+    preBalances.byOwner.has(signerAddress) &&
+    preBalances.byOwner.has(EXPECTED_PAY_TO) &&
+    postBalances.byOwner.has(signerAddress) &&
+    postBalances.byOwner.has(EXPECTED_PAY_TO);
   const payerBefore = preBalances.byOwner.get(signerAddress) ?? 0n;
   const payerAfter = postBalances.byOwner.get(signerAddress) ?? 0n;
   const recipientBefore = preBalances.byOwner.get(EXPECTED_PAY_TO) ?? 0n;
@@ -754,6 +771,27 @@ async function verifyOnChain(
   };
 }
 
+async function withAbortTimeout<T>(
+  timeoutMs: number,
+  operation: (abortSignal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error("operation timed out");
+      controller.abort(error);
+      reject(error);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation(controller.signal), timeout]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
 function extractSettlementHeader(response: Response): string | null {
   return firstHeader(response.headers, [
     "PAYMENT-RESPONSE",
@@ -769,6 +807,26 @@ function decodeSettlement(header: string): JsonRecord {
     return decoded;
   } catch {
     throw new CanaryError("SETTLEMENT_HEADER_INVALID");
+  }
+}
+
+function settlementAmountMatches(value: unknown, expected: string): boolean {
+  let parsed: bigint;
+  try {
+    if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+      parsed = BigInt(value);
+    } else if (
+      typeof value === "number" &&
+      Number.isSafeInteger(value) &&
+      value >= 0
+    ) {
+      parsed = BigInt(value);
+    } else {
+      return false;
+    }
+    return parsed === BigInt(expected);
+  } catch {
+    return false;
   }
 }
 
@@ -809,6 +867,7 @@ export async function runCanary(
       endpoint_path: target.endpointPath,
       request_url_sha256: sha256Text(target.requestUrl),
     };
+    const maxAmount = parseCap(options.maxAmount);
 
     const fetchFn = dependencies.fetch ?? globalThis.fetch;
     if (typeof fetchFn !== "function") throw new CanaryError("PREFLIGHT_FETCH_FAILED");
@@ -823,12 +882,14 @@ export async function runCanary(
         method: "GET",
         headers: operationHeaders,
         redirect: "error",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
     } catch {
       throw new CanaryError("PREFLIGHT_FETCH_FAILED");
     }
     evidence.preflight.status = preflightResponse.status;
-    evidence.preflight.response_body_sha256 = await responseBodyDigest(preflightResponse);
+    const preflightBody = await preflightResponse.text();
+    evidence.preflight.response_body_sha256 = sha256Text(preflightBody);
 
     const encodedChallenge = getHeader(preflightResponse.headers, "PAYMENT-REQUIRED");
     if (encodedChallenge) {
@@ -837,11 +898,10 @@ export async function runCanary(
     if (preflightResponse.status !== 402) {
       throw new CanaryError("PREFLIGHT_NOT_PAYMENT_REQUIRED");
     }
-    if (!encodedChallenge) throw new CanaryError("INVALID_CHALLENGE");
 
     let paymentRequired: PaymentRequired;
     try {
-      const challengeBody = decodeBodyIfJson("");
+      const challengeBody = decodeBodyIfJson(preflightBody);
       const challengeParser = new x402HTTPClient(new x402Client());
       paymentRequired = challengeParser.getPaymentRequiredResponse(
         (name) => getHeader(preflightResponse.headers, name),
@@ -851,7 +911,6 @@ export async function runCanary(
       throw new CanaryError("INVALID_CHALLENGE");
     }
     evidence.preflight.challenge_sha256 = sha256Json(paymentRequired);
-    const maxAmount = parseCap(options.maxAmount);
     selected = validateChallenge(paymentRequired, target, maxAmount);
     evidence.preflight.challenge_validated = true;
     evidence.preflight.selected = selectedEvidence(selected);
@@ -921,6 +980,7 @@ export async function runCanary(
       paidResponse = await fetchFn(target.requestUrl, {
         method: "GET",
         redirect: "error",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         headers: {
           ...operationHeaders,
           ...paymentHeaders,
@@ -948,10 +1008,16 @@ export async function runCanary(
     if (settlement.network !== SOLANA_DEVNET_NETWORK) {
       throw new CanaryError("SETTLEMENT_NETWORK_MISMATCH");
     }
-    if (settlement.amount !== undefined && settlement.amount !== selected.amount) {
+    if (
+      settlement.amount !== undefined &&
+      !settlementAmountMatches(settlement.amount, selected.amount)
+    ) {
       throw new CanaryError("SETTLEMENT_AMOUNT_MISMATCH");
     }
-    if (settlement.payer !== undefined && settlement.payer !== signerAddress) {
+    if (
+      settlement.payer !== undefined &&
+      (typeof settlement.payer !== "string" || settlement.payer !== signerAddress)
+    ) {
       throw new CanaryError("SETTLEMENT_PAYER_MISMATCH");
     }
     const transactionSignature = validateTransactionSignature(settlement.transaction);
@@ -962,13 +1028,18 @@ export async function runCanary(
       network: SOLANA_DEVNET_NETWORK,
     };
 
+    const verifiedAmount = BigInt(selected.amount);
     let verification: VerificationEvidence;
     try {
-      verification = await verifyOnChain(
-        rpc,
-        transactionSignature,
-        signerAddress,
-        BigInt(selected.amount),
+      verification = await withAbortTimeout(
+        RPC_TIMEOUT_MS,
+        (abortSignal) => verifyOnChain(
+          rpc,
+          transactionSignature,
+          signerAddress,
+          verifiedAmount,
+          abortSignal,
+        ),
       );
     } catch {
       throw new CanaryError("RPC_QUERY_FAILED");

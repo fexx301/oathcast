@@ -1,10 +1,11 @@
-"""Deterministic, minimal text presentation for Telegraph's current scorer.
+"""Deterministic, minimal text presentation for a future scored surface.
 
-Telegraph's Miner performance score (75% of Track 1) is computed from the
-*response text*, not from probabilistic calibration: the published scoring
-model is a 0..1 composite over cosine similarity, BM25 word overlap, and
-response-length quality. The rendering in this module is therefore a scored
-surface, not cosmetic formatting.
+Pre-launch team guidance described a possible Telegraph Miner score (75% of
+Track 1) based on *response text*, with a 0..1 composite over cosine
+similarity, BM25 word overlap, and response-length quality. That description
+has not been verified against the current Canonical Script, so rendering here
+is an intentionally documented candidate surface rather than an official
+scoring contract.
 
 Two renderers are kept deliberately:
 
@@ -69,7 +70,8 @@ def _percentage(probability: float) -> str:
 
 
 def _measurement(value: float) -> str:
-    return f"{value:.2f}".rstrip("0").rstrip(".")
+    rendered = f"{value:.2f}".rstrip("0").rstrip(".")
+    return "0" if rendered == "-0" else rendered
 
 
 def _temperature_kelvin(value_c: float) -> float:

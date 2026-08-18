@@ -127,8 +127,21 @@ class SqliteCaseStore:
 
     def _connection(self) -> sqlite3.Connection:
         if self._memory_connection is not None:
-            return self._memory_connection
-        return sqlite3.connect(self.path, timeout=10)
+            connection = self._memory_connection
+            close_on_error = False
+        else:
+            connection = sqlite3.connect(self.path, timeout=10)
+            close_on_error = True
+        try:
+            connection.execute("PRAGMA foreign_keys = ON")
+            enabled = connection.execute("PRAGMA foreign_keys").fetchone()
+            if enabled is None or enabled[0] != 1:
+                raise RuntimeError("SQLite foreign-key enforcement could not be enabled")
+            return connection
+        except Exception:
+            if close_on_error:
+                connection.close()
+            raise
 
     def close(self) -> None:
         with self._lock:
@@ -365,10 +378,6 @@ class SqliteCaseStore:
                         """,
                         (decision_json, _timestamp(sealed_at), _timestamp(sealed_at), event_id),
                     )
-                row = connection.execute(
-                    "SELECT * FROM application_cases WHERE event_id = ?",
-                    (event_id,),
-                ).fetchone()
                 connection.commit()
                 return self.get(event_id) or {}
             except Exception:
@@ -472,10 +481,7 @@ class SqliteCaseStore:
                             "ground-truth observation_id does not match retained observation"
                         )
                     self._insert_observation_in_transaction(connection, event_id, observation)
-                if row["ground_truth_json"] is not None:
-                    if row["ground_truth_json"] == ground_truth_json:
-                        pass
-                else:
+                if row["ground_truth_json"] is None:
                     connection.execute(
                         """
                         UPDATE application_cases
@@ -484,6 +490,9 @@ class SqliteCaseStore:
                         """,
                         (ground_truth_json, payload["resolved_at"], event_id),
                     )
+                # The first resolution remains canonical on the case row. Later
+                # resolutions, including divergent ones, are retained below as
+                # append-only history for audit without rewriting that snapshot.
                 resolution_id = _sha256_json(
                     {
                         "event_id": event_id,
@@ -509,10 +518,6 @@ class SqliteCaseStore:
                         payload["resolved_at"],
                     ),
                 )
-                row = connection.execute(
-                    "SELECT * FROM application_cases WHERE event_id = ?",
-                    (event_id,),
-                ).fetchone()
                 connection.commit()
                 return self.get(event_id) or {}
             except Exception:

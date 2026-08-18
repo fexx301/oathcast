@@ -192,7 +192,17 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "temperature compatibility window is disabled")
 
-    def test_predict_rejects_legacy_multi_hour_shape_without_fetching(self):
+    def test_predict_serves_the_legacy_multi_hour_shape(self):
+        """A multi-hour start/end span is answered, not refused.
+
+        Telegraph dispatches 24-hour WEATHER_FORECAST requests to the registered
+        route. Refusing them with "only accepts one-hour windows" returned no
+        temperature and scored zero on the leaderboard. The window response is
+        the right vehicle for them: it carries the temperature range *and* the
+        ``probability`` the registered ``output_schema`` lists as required, which
+        the ``hourly=2t`` compatibility response does not.
+        """
+
         calls = []
         service = _service(
             fetcher=lambda url: calls.append(url) or _window_payload(),
@@ -202,9 +212,28 @@ class ForecastWindowHttpTests(unittest.TestCase):
             "/predict?" + urlencode(_query_params(), doseq=True),
         )
 
-        self.assertEqual(status, 400)
+        self.assertEqual(status, 200)
         self.assertEqual(headers["X-OathCast-Request-ID"], "window-http-test")
-        self.assertIn("only accepts one-hour windows", payload["error"])
+        self.assertIn("content", payload)
+        self.assertIn("probability", payload)
+        self.assertIn("minimum_hourly_temperature_c", payload)
+        self.assertIn("maximum_hourly_temperature_c", payload)
+        self.assertEqual(len(calls), 1)
+
+    def test_predict_still_refuses_a_span_longer_than_twenty_four_hours(self):
+        """The 1-to-24-hour bound is the limit, and it fails before fetching."""
+
+        calls = []
+        service = _service(
+            fetcher=lambda url: calls.append(url) or _window_payload(),
+        )
+        status, payload, _, _ = _handler_request(
+            service,
+            "/predict?" + urlencode(_query_params(hours=25), doseq=True),
+        )
+
+        self.assertEqual(status, 400)
+        self.assertIn("between 1 and 24 hours", payload["error"])
         self.assertEqual(calls, [])
 
     def test_legacy_window_path_is_not_publicly_reachable_for_one_hour(self):
@@ -233,7 +262,9 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertEqual(payload, {"error": "not_found"})
         self.assertEqual(calls, [])
 
-    def test_registered_point_path_rejects_legacy_multi_hour_shape_without_fetching(self):
+    def test_registered_point_path_serves_the_legacy_multi_hour_shape(self):
+        """The canonical alias behaves identically to /predict on a 24h span."""
+
         calls = []
         service = _service(fetcher=lambda url: calls.append(url) or _window_payload())
         status, payload, _, _ = _handler_request(
@@ -241,8 +272,57 @@ class ForecastWindowHttpTests(unittest.TestCase):
             "/v1/forecast/point?" + urlencode(_query_params(), doseq=True),
         )
 
-        self.assertEqual(status, 400)
-        self.assertIn("only accepts one-hour windows", payload["error"])
+        self.assertEqual(status, 200)
+        self.assertIn("content", payload)
+        self.assertIn("probability", payload)
+        self.assertIn("minimum_hourly_temperature_c", payload)
+        self.assertEqual(len(calls), 1)
+
+    def test_multi_hour_window_defaults_its_cutoff_to_the_window_opening(self):
+        """Telegraph sends no cutoff, so the default must not reject the request.
+
+        An implied hour of lead time made every "next 24 hours" request fail with
+        410 before it reached a provider. A window forecast is still committed
+        ahead of the window it describes when it is issued as the window opens,
+        so the default is now the opening itself.
+        """
+
+        calls = []
+        service = _service(fetcher=lambda url: calls.append(url) or _window_payload())
+        params = _query_params()
+        del params["cutoff"]
+        status, payload, _, _ = _handler_request(
+            service, "/predict?" + urlencode(params, doseq=True)
+        )
+
+        self.assertEqual(status, 200, payload)
+        self.assertIn("minimum_hourly_temperature_c", payload)
+        self.assertEqual(len(calls), 1)
+
+    def test_multi_hour_window_is_refused_once_it_has_already_opened(self):
+        """The commitment boundary is retained: a started window is 410, not 200.
+
+        This is the deliberate limit of the relaxed default. A window whose first
+        hour is already elapsing cannot be forecast ahead of itself, so a request
+        naming the current hour is refused rather than answered.
+        """
+
+        calls = []
+        service = _service(fetcher=lambda url: calls.append(url) or _window_payload())
+        params = _query_params()
+        del params["cutoff"]
+        params["start"] = [
+            (FIXED_NOW - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+        ]
+        params["end"] = [
+            (FIXED_NOW + timedelta(hours=23)).isoformat().replace("+00:00", "Z")
+        ]
+        status, payload, _, _ = _handler_request(
+            service, "/predict?" + urlencode(params, doseq=True)
+        )
+
+        self.assertEqual(status, 410)
+        self.assertIn("forecast_cutoff_passed", payload["error"])
         self.assertEqual(calls, [])
 
     def test_registered_paths_accept_telegraph_twenty_four_hour_2t_query(self):

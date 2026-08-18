@@ -77,6 +77,57 @@ class RegistrationDeclarationTests(unittest.TestCase):
         self.assertTrue(any("input_schema" in error for error in result["errors"]))
         self.assertEqual(result["official_portal_validation"]["status"], "not_run")
 
+    def test_validator_accepts_equivalent_yaml_syntax(self):
+        result = self._mutated_canonical(
+            "    intents: [WEATHER_FORECAST]\n",
+            "    intents: [WEATHER_FORECAST]  # routing intent\n",
+        )
+        self.assertTrue(result["valid"], result["errors"])
+
+        result = self._mutated_canonical(
+            "  required:\n    - lat\n    - lon\n    - start\n    - end\n",
+            "  required: [lat, lon, start, end]\n",
+        )
+        self.assertTrue(result["valid"], result["errors"])
+
+    def test_validator_parses_inline_comments_on_numeric_scalars(self):
+        yaml_text = """\
+version: "1"
+kind: miner
+id: 0
+slug: comment-price
+base_url: https://example.invalid
+auth: {}
+endpoints: []
+on_chain:
+  min_price_usdc: 0.01  # minimum
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "miner.yaml"
+            path.write_text(yaml_text, encoding="utf-8")
+            result = validate_draft(path)
+
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertEqual(result["min_price_usdc"], "0.01")
+
+    def test_validator_uses_yaml_scalar_types_for_schema_bounds(self):
+        result = self._mutated_canonical(
+            "      minimum: -90\n",
+            '      minimum: "-90"\n',
+        )
+        self.assertFalse(result["valid"])
+        self.assertIn(
+            "canonical input_schema.lat.minimum must be -90", result["errors"]
+        )
+
+    def test_validator_rejects_unsafe_yaml_tags(self):
+        result = self._mutated_canonical(
+            "name: OathCast Weather Forecast Miner\n",
+            "name: !!python/name:builtins.str\n",
+        )
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("invalid YAML" in error for error in result["errors"]))
+
     def test_canonical_requires_positive_numeric_candidate_id(self):
         result = self._mutated_canonical("id: 64173", "id: 0")
         self.assertFalse(result["valid"])
@@ -157,6 +208,16 @@ class RegistrationDeclarationTests(unittest.TestCase):
         )
         self.assertFalse(result["valid"])
         self.assertTrue(any("signal_mapping" in error for error in result["errors"]))
+
+    def test_validator_rejects_duplicate_keys_outside_contract_subsections(self):
+        result = self._mutated_canonical(
+            "slug: oathcast-weather\n",
+            "slug: oathcast-weather\nslug: oathcast-weather-shadow\n",
+        )
+        self.assertFalse(result["valid"])
+        self.assertTrue(
+            any("duplicate YAML key 'slug'" in error for error in result["errors"])
+        )
 
     def test_registration_draft_uses_live_contract_inputs_without_on_chain_yaml(self):
         artifact = build_registration_draft(CANONICAL_MINER)

@@ -1,7 +1,9 @@
 """Leakage-safe local Brier benchmark.
 
 This module is a domain-quality benchmark, not a claim about Telegraph's
-current cosine/BM25/length semantic scorer.
+current scorer. It remains separate from the cosine/BM25/length behavior
+described in pre-launch guidance, which has not been verified as the current
+Canonical Script.
 """
 
 from __future__ import annotations

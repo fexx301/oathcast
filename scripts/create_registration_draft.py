@@ -18,10 +18,13 @@ from oathcast.registration import (
     MINIMUM_PRICE_MICRO_USDC,
     MinerRegistrationDeclaration,
 )
+from oathcast.artifacts import atomic_write_text
 
 try:
     from scripts.validate_miner_drafts import validate_draft
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    if exc.name not in {"scripts", "scripts.validate_miner_drafts"}:
+        raise
     from validate_miner_drafts import validate_draft
 
 
@@ -247,9 +250,9 @@ def main() -> None:
         yaml_uri=args.yaml_uri,
         fee_address=args.fee_address,
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    atomic_write_text(
+        args.output,
+        json.dumps(artifact, indent=2, sort_keys=True) + "\n",
     )
     print(
         json.dumps(

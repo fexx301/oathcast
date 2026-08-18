@@ -15,8 +15,11 @@ from decimal import Decimal, InvalidOperation
 import json
 import math
 from pathlib import Path
-import re
 from typing import Any, Iterable
+
+import yaml
+from yaml.constructor import ConstructorError
+from yaml.nodes import MappingNode
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,12 +70,12 @@ WINDOW_CANDIDATE_INPUT_SCHEMA = {
     "properties": {
         "event_id": {"type": "string"},
         "location_name": {"type": "string"},
-        "lat": {"type": "number", "minimum": "-90", "maximum": "90"},
-        "lon": {"type": "number", "minimum": "-180", "maximum": "180"},
+        "lat": {"type": "number", "minimum": -90, "maximum": 90},
+        "lon": {"type": "number", "minimum": -180, "maximum": 180},
         "forecast_hours": {
             "type": "integer",
-            "minimum": "1",
-            "maximum": "24",
+            "minimum": 1,
+            "maximum": 24,
         },
         "hourly": {"type": "string", "enum": ["2t"]},
         "provider": {"type": "string", "enum": ["open_meteo"]},
@@ -123,210 +126,148 @@ WINDOW_CANDIDATE_SIGNAL_MAPPING = {
 }
 
 
-def _unquote(value: str) -> str:
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-        return value[1:-1]
-    return value
+class _DuplicateKeySafeLoader(yaml.SafeLoader):
+    """SafeLoader variant that records duplicate mapping keys."""
+
+    def __init__(self, stream: Any) -> None:
+        super().__init__(stream)
+        self.duplicate_keys: list[tuple[Any, int, int]] = []
+
+    def construct_mapping(
+        self,
+        node: MappingNode,
+        deep: bool = False,
+    ) -> dict[Any, Any]:
+        if not isinstance(node, MappingNode):
+            raise ConstructorError(
+                None,
+                None,
+                f"expected a mapping node, but found {node.id}",
+                node.start_mark,
+            )
+        self.flatten_mapping(node)
+        mapping: dict[Any, Any] = {}
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in mapping
+            except TypeError as exc:
+                raise ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    "found an unhashable key",
+                    key_node.start_mark,
+                ) from exc
+            if duplicate:
+                self.duplicate_keys.append(
+                    (key, key_node.start_mark.line + 1, key_node.start_mark.column + 1)
+                )
+                self.construct_object(value_node, deep=deep)
+                continue
+            mapping[key] = self.construct_object(value_node, deep=deep)
+        return mapping
 
 
-def _clean_scalar(value: str) -> Any:
-    value = value.strip()
-    if value.startswith("#"):
-        return ""
-    if value in {"true", "True", "TRUE"}:
-        return True
-    if value in {"false", "False", "FALSE"}:
-        return False
-    if value in {"null", "Null", "NULL", "~"}:
+def _load_yaml_document(source: str) -> tuple[Any, list[tuple[Any, int, int]]]:
+    loader = _DuplicateKeySafeLoader(source)
+    try:
+        document = loader.get_single_data()
+        duplicates = list(loader.duplicate_keys)
+    finally:
+        loader.dispose()
+    return document, duplicates
+
+
+def _yaml_error(error: yaml.YAMLError) -> str:
+    problem = getattr(error, "problem", None)
+    mark = getattr(error, "problem_mark", None)
+    if problem and mark is not None:
+        return f"invalid YAML at line {mark.line + 1}, column {mark.column + 1}: {problem}"
+    return f"invalid YAML: {str(error).splitlines()[0]}"
+
+
+def _duplicate_key_error(key: Any, line: int, column: int) -> str:
+    context = ""
+    if key in EXPECTED_SIGNAL_MAPPING or key in WINDOW_CANDIDATE_SIGNAL_MAPPING:
+        context = " in semantics.signal_mapping"
+    elif key in {"required", "optional"}:
+        context = f" in endpoint query {key} group or schema mapping"
+    return f"duplicate YAML key {key!r}{context} at line {line}, column {column}"
+
+
+def _mapping(value: Any) -> dict[Any, Any] | None:
+    return value if isinstance(value, dict) else None
+
+
+def _scalar_text(value: Any) -> str | None:
+    if value is None or isinstance(value, (dict, list)):
         return None
-    return _unquote(value)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
-def _indent(line: str) -> int:
-    return len(line) - len(line.lstrip(" "))
+def _top_level_scalar(document: dict[Any, Any], key: str) -> str | None:
+    return _scalar_text(document.get(key))
 
 
-def _split_key_value(text: str) -> tuple[str, str] | None:
-    if ":" not in text:
-        return None
-    key, value = text.split(":", 1)
-    key = key.strip()
-    if not key or key.startswith("-"):
-        return None
-    return key, value.strip()
+def _nested_scalar(
+    document: dict[Any, Any], section: str, key: str
+) -> str | None:
+    nested = _mapping(document.get(section))
+    return _scalar_text(nested.get(key)) if nested is not None else None
 
 
-def _top_level_scalar(lines: list[str], key: str) -> str | None:
-    pattern = re.compile(rf"^{re.escape(key)}:\s*(.*?)\s*$")
-    for line in lines:
-        match = pattern.match(line)
-        if match:
-            return _unquote(match.group(1))
-    return None
-
-
-def _nested_scalar(lines: list[str], section: str, key: str) -> str | None:
-    in_section = False
-    section_indent = 0
-    for line in lines:
-        if re.match(rf"^{re.escape(section)}:\s*$", line):
-            in_section = True
-            section_indent = _indent(line)
-            continue
-        if in_section and line.strip() and _indent(line) <= section_indent:
-            in_section = False
-        if in_section:
-            match = re.match(rf"^\s+{re.escape(key)}:\s*(.*?)\s*$", line)
-            if match:
-                return _unquote(match.group(1))
-    return None
-
-
-def _find_header(
-    lines: list[str], key: str, *, indent: int | None = None, start: int = 0
-) -> int | None:
-    target = f"{key}:"
-    for index in range(start, len(lines)):
-        line = lines[index]
-        if line.strip() != target:
-            continue
-        if indent is None or _indent(line) == indent:
-            return index
-    return None
-
-
-def _direct_scalar(
-    lines: list[str], header_index: int, header_indent: int, key: str
-) -> Any:
-    for line in lines[header_index + 1 :]:
-        if line.strip() and _indent(line) <= header_indent:
-            break
-        if _indent(line) != header_indent + 2:
-            continue
-        pair = _split_key_value(line.strip())
-        if pair and pair[0] == key:
-            return _clean_scalar(pair[1])
-    return None
-
-
-def _list_values(lines: list[str], header_index: int, header_indent: int) -> list[Any]:
-    values: list[Any] = []
-    for line in lines[header_index + 1 :]:
-        if line.strip() and _indent(line) <= header_indent:
-            break
-        stripped = line.strip()
-        if _indent(line) == header_indent + 2 and stripped.startswith("-"):
-            values.append(_clean_scalar(stripped[1:].strip()))
-    return values
-
-
-def _parse_flow_sequence(value: str) -> list[Any]:
-    value = value.strip()
-    if not (value.startswith("[") and value.endswith("]")):
-        return []
-    inner = value[1:-1].strip()
-    if not inner:
-        return []
-    return [_clean_scalar(item) for item in inner.split(",")]
-
-
-def _nested_list_values(lines: list[str], section: str, key: str) -> list[Any] | None:
-    section_index = _find_header(lines, section, indent=0)
-    if section_index is None:
-        return None
-    section_indent = _indent(lines[section_index])
-    for index in range(section_index + 1, len(lines)):
-        line = lines[index]
-        if line.strip() and _indent(line) <= section_indent:
-            break
-        if line.strip() == f"{key}:" and _indent(line) == section_indent + 2:
-            return _list_values(lines, index, _indent(line))
-    return None
-
-
-def _nested_mapping(
-    lines: list[str], section: str, key: str
-) -> list[tuple[str, Any]] | None:
-    section_index = _find_header(lines, section, indent=0)
-    if section_index is None:
-        return None
-    section_indent = _indent(lines[section_index])
-    for index in range(section_index + 1, len(lines)):
-        line = lines[index]
-        if line.strip() and _indent(line) <= section_indent:
-            break
-        if line.strip() == f"{key}:" and _indent(line) == section_indent + 2:
-            mapping_indent = _indent(line)
-            items: list[tuple[str, Any]] = []
-            for nested_line in lines[index + 1 :]:
-                if nested_line.strip() and _indent(nested_line) <= mapping_indent:
-                    break
-                if _indent(nested_line) != mapping_indent + 2:
-                    continue
-                pair = _split_key_value(nested_line.strip())
-                if pair:
-                    items.append((pair[0], _clean_scalar(pair[1])))
-            return items
-    return None
-
-
-def _schema_node(lines: list[str], header_index: int) -> dict[str, Any]:
-    header_indent = _indent(lines[header_index])
+def _schema_node(node: Any, *, seen: set[int] | None = None) -> dict[str, Any]:
+    if not isinstance(node, dict):
+        return {}
+    if seen is None:
+        seen = set()
+    if id(node) in seen:
+        return {}
+    seen.add(id(node))
     contract: dict[str, Any] = {}
-    scalar_fields = {"type", "format", "minimum", "maximum"}
-
-    for index in range(header_index + 1, len(lines)):
-        line = lines[index]
-        if line.strip() and _indent(line) <= header_indent:
-            break
-        if _indent(line) != header_indent + 2:
-            continue
-        pair = _split_key_value(line.strip())
-        if pair is None:
-            continue
-        key, value = pair
-        if key in scalar_fields and value != "":
-            contract[key] = _clean_scalar(value)
-        elif key in {"required", "enum"} and value == "":
-            contract[key] = [
-                item
-                for item in _list_values(lines, index, _indent(line))
-                if isinstance(item, str)
-            ]
-        elif key == "items" and value == "":
-            contract["items"] = _schema_node(lines, index)
-        elif key == "properties" and value == "":
-            properties: dict[str, Any] = {}
-            properties_indent = _indent(line)
-            for property_index in range(index + 1, len(lines)):
-                property_line = lines[property_index]
-                if property_line.strip() and _indent(property_line) <= properties_indent:
-                    break
-                if _indent(property_line) != properties_indent + 2:
-                    continue
-                property_pair = _split_key_value(property_line.strip())
-                if property_pair is None or property_pair[1] != "":
-                    continue
-                properties[property_pair[0]] = _schema_node(lines, property_index)
-            contract["properties"] = properties
+    for key in ("type", "format", "minimum", "maximum", "required", "enum"):
+        if key in node:
+            contract[key] = node[key]
+    if "items" in node:
+        contract["items"] = _schema_node(node["items"], seen=seen)
+    properties = _mapping(node.get("properties"))
+    if properties is not None:
+        contract["properties"] = {
+            name: _schema_node(property_node, seen=seen)
+            for name, property_node in properties.items()
+        }
+    seen.remove(id(node))
     return contract
 
 
-def _schema_contract(lines: list[str], section: str) -> dict[str, Any] | None:
-    header_index = _find_header(lines, section, indent=0)
-    if header_index is None:
-        return None
-    return _schema_node(lines, header_index)
+def _schema_contract(
+    document: dict[Any, Any], section: str
+) -> dict[str, Any] | None:
+    node = _mapping(document.get(section))
+    return _schema_node(node) if node is not None else None
 
 
 def load_schema_contract(path: Path, section: str = "output_schema") -> dict[str, Any]:
     """Load the JSON-Schema subset declared by one local Miner manifest."""
 
-    lines = path.resolve().read_text(encoding="utf-8").splitlines()
-    schema = _schema_contract(lines, section)
+    path = path.resolve()
+    try:
+        loaded, duplicates = _load_yaml_document(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{_yaml_error(exc)} in {_relative_path(path)}") from exc
+    if duplicates:
+        key, line, column = duplicates[0]
+        raise ValueError(
+            f"{_duplicate_key_error(key, line, column)} in {_relative_path(path)}"
+        )
+    document = _mapping(loaded)
+    if document is None:
+        raise ValueError(f"YAML document root must be a mapping in {_relative_path(path)}")
+    schema = _schema_contract(document, section)
     if schema is None:
-        raise ValueError(f"{section} is missing from {_relative_path(path.resolve())}")
+        raise ValueError(f"{section} is missing from {_relative_path(path)}")
     return schema
 
 
@@ -402,12 +343,12 @@ def schema_instance_errors(
     return errors
 
 
-def _endpoint_contract(lines: list[str]) -> dict[str, Any] | None:
-    header_index = _find_header(lines, "endpoints", indent=0)
-    if header_index is None:
+def _endpoint_contract(document: dict[Any, Any]) -> dict[str, Any] | None:
+    endpoints = document.get("endpoints")
+    if not isinstance(endpoints, list):
         return None
     endpoint: dict[str, Any] = {
-        "count": 0,
+        "count": len(endpoints),
         "intents": [],
         "params_header_count": 0,
         "query_header_count": 0,
@@ -415,81 +356,34 @@ def _endpoint_contract(lines: list[str]) -> dict[str, Any] | None:
         "params": {"required": [], "optional": []},
         "param_map": {},
     }
-    endpoint_indent = _indent(lines[header_index]) + 2
-    active_param_group: str | None = None
-    current_param: dict[str, Any] | None = None
-    in_param_map = False
+    if not endpoints:
+        return endpoint
+    declared = _mapping(endpoints[0])
+    if declared is None:
+        return endpoint
+    for key in ("path", "external_path", "method", "description"):
+        if key in declared:
+            endpoint[key] = declared[key]
+    intents = declared.get("intents")
+    if isinstance(intents, list):
+        endpoint["intents"] = intents
 
-    def flush_param() -> None:
-        nonlocal current_param
-        if active_param_group is not None and current_param is not None:
-            endpoint["params"][active_param_group].append(current_param)
-        current_param = None
-
-    for index in range(header_index + 1, len(lines)):
-        line = lines[index]
-        if line.strip() and _indent(line) <= _indent(lines[header_index]):
-            break
-        line_indent = _indent(line)
-        stripped = line.strip()
-        if line_indent == endpoint_indent and stripped.startswith("-"):
-            flush_param()
-            endpoint["count"] += 1
-            pair = _split_key_value(line.strip()[1:].strip())
-            if pair and endpoint["count"] == 1:
-                endpoint[pair[0]] = _clean_scalar(pair[1])
-            continue
-        if endpoint["count"] != 1:
-            continue
-        if line_indent <= endpoint_indent + 2:
-            in_param_map = False
-        if line_indent == endpoint_indent + 2:
-            flush_param()
-            active_param_group = None
-            pair = _split_key_value(stripped)
-            if pair and pair[0] == "params" and pair[1] == "":
-                endpoint["params_header_count"] += 1
-            elif pair and pair[0] == "param_map" and pair[1] == "":
-                in_param_map = True
-            elif pair and pair[0] == "intents":
-                endpoint["intents"] = _parse_flow_sequence(pair[1])
-            elif pair and pair[0] != "params":
-                endpoint[pair[0]] = _clean_scalar(pair[1])
-        elif line_indent == endpoint_indent + 4 and stripped == "query:":
-            endpoint["query_header_count"] += 1
-        elif in_param_map and line_indent == endpoint_indent + 4:
-            pair = _split_key_value(stripped)
-            if pair is not None:
-                endpoint["param_map"][pair[0]] = _clean_scalar(pair[1])
-        elif line_indent == endpoint_indent + 6 and stripped in {
-            "required:",
-            "optional:",
-        }:
-            flush_param()
-            active_param_group = stripped[:-1]
-            endpoint["param_group_counts"][active_param_group] += 1
-        elif (
-            active_param_group is not None
-            and line_indent == endpoint_indent + 8
-            and stripped.startswith("-")
-        ):
-            flush_param()
-            current_param = {}
-            pair = _split_key_value(stripped[1:].strip())
-            if pair:
-                current_param[pair[0]] = _clean_scalar(pair[1])
-        elif (
-            active_param_group is not None
-            and current_param is not None
-            and line_indent == endpoint_indent + 10
-        ):
-            pair = _split_key_value(stripped)
-            if pair:
-                if pair[0] == "intents":
-                    current_param[pair[0]] = _parse_flow_sequence(pair[1])
-                else:
-                    current_param[pair[0]] = _clean_scalar(pair[1])
-    flush_param()
+    params = _mapping(declared.get("params"))
+    if params is not None:
+        endpoint["params_header_count"] = 1
+        query = _mapping(params.get("query"))
+        if query is not None:
+            endpoint["query_header_count"] = 1
+            for group in ("required", "optional"):
+                declared_params = query.get(group)
+                if isinstance(declared_params, list):
+                    endpoint["param_group_counts"][group] = 1
+                    endpoint["params"][group] = [
+                        item for item in declared_params if isinstance(item, dict)
+                    ]
+    param_map = _mapping(declared.get("param_map"))
+    if param_map is not None:
+        endpoint["param_map"] = param_map
     return endpoint
 
 
@@ -504,7 +398,11 @@ def _endpoint_param_errors(
     params = endpoint.get("params", {}).get(group, [])
     names = [param.get("name") for param in params]
     expected_names = list(expected)
-    if len(names) != len(expected_names) or set(names) != set(expected_names):
+    if (
+        len(names) != len(expected_names)
+        or not all(isinstance(name, str) for name in names)
+        or set(names) != set(expected_names)
+    ):
         errors.append(
             f"{profile} endpoint {group} query params must be exactly "
             + ", ".join(expected_names)
@@ -525,17 +423,17 @@ def _endpoint_param_errors(
     return errors
 
 
-def _canonical_contract_errors(lines: list[str]) -> list[str]:
+def _canonical_contract_errors(document: dict[Any, Any]) -> list[str]:
     errors: list[str] = []
-    input_schema = _schema_contract(lines, "input_schema")
-    output_schema = _schema_contract(lines, "output_schema")
+    input_schema = _schema_contract(document, "input_schema")
+    output_schema = _schema_contract(document, "output_schema")
 
     if input_schema is None:
         errors.append("canonical input_schema is required")
     else:
-        if input_schema["type"] != "object":
+        if input_schema.get("type") != "object":
             errors.append("canonical input_schema.type must be object")
-        properties = input_schema["properties"]
+        properties = _mapping(input_schema.get("properties")) or {}
         if set(properties) != set(EXPECTED_INPUT_PROPERTIES):
             errors.append(
                 "canonical input_schema properties must match the GET service contract"
@@ -543,22 +441,27 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
         for name, expected_type in EXPECTED_INPUT_PROPERTIES.items():
             if properties.get(name, {}).get("type") != expected_type:
                 errors.append(f"canonical input_schema.{name}.type must be {expected_type}")
-        if set(input_schema["required"]) != EXPECTED_INPUT_REQUIRED:
+        required = input_schema.get("required")
+        if (
+            not isinstance(required, list)
+            or not all(isinstance(name, str) for name in required)
+            or set(required) != EXPECTED_INPUT_REQUIRED
+        ):
             errors.append(
                 "canonical input_schema.required must be lat, lon, start, and end"
             )
         for name in ("start", "end", "cutoff"):
             if properties.get(name, {}).get("format") != "date-time":
                 errors.append(f"canonical input_schema.{name} must use date-time format")
-        if properties.get("lat", {}).get("minimum") != "-90":
+        if properties.get("lat", {}).get("minimum") != -90:
             errors.append("canonical input_schema.lat.minimum must be -90")
-        if properties.get("lat", {}).get("maximum") != "90":
+        if properties.get("lat", {}).get("maximum") != 90:
             errors.append("canonical input_schema.lat.maximum must be 90")
-        if properties.get("lon", {}).get("minimum") != "-180":
+        if properties.get("lon", {}).get("minimum") != -180:
             errors.append("canonical input_schema.lon.minimum must be -180")
-        if properties.get("lon", {}).get("maximum") != "180":
+        if properties.get("lon", {}).get("maximum") != 180:
             errors.append("canonical input_schema.lon.maximum must be 180")
-        if properties.get("threshold_mm", {}).get("enum") != ["0.1"]:
+        if properties.get("threshold_mm", {}).get("enum") != [0.1]:
             errors.append("canonical input_schema.threshold_mm must be fixed at 0.1")
         if properties.get("operator", {}).get("enum") != [">"]:
             errors.append('canonical input_schema.operator must be fixed at ">"')
@@ -566,21 +469,26 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
     if output_schema is None:
         errors.append("canonical output_schema is required")
     else:
-        if output_schema["type"] != "object":
+        if output_schema.get("type") != "object":
             errors.append("canonical output_schema.type must be object")
-        if output_schema["properties"] != {
+        if output_schema.get("properties") != {
             "content": {"type": "string"},
             "probability": {
                 "type": "number",
-                "minimum": "0",
-                "maximum": "1",
+                "minimum": 0,
+                "maximum": 1,
             },
         }:
             errors.append("canonical output_schema must match the public content/probability response")
-        if set(output_schema["required"]) != EXPECTED_OUTPUT_REQUIRED:
+        required = output_schema.get("required")
+        if (
+            not isinstance(required, list)
+            or not all(isinstance(name, str) for name in required)
+            or set(required) != EXPECTED_OUTPUT_REQUIRED
+        ):
             errors.append("canonical output_schema.required must contain content and probability")
 
-    endpoint = _endpoint_contract(lines)
+    endpoint = _endpoint_contract(document)
     if endpoint is None:
         errors.append("canonical endpoint contract is required")
     else:
@@ -624,22 +532,19 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
         }:
             errors.append("canonical endpoint param_map must match the service aliases")
 
-    supported_intents = _nested_list_values(lines, "semantics", "supported_intents")
+    semantics = _mapping(document.get("semantics"))
+    supported_intents = (
+        semantics.get("supported_intents") if semantics is not None else None
+    )
     if supported_intents != CANONICAL_INTENTS:
         errors.append(
             "canonical semantics.supported_intents must contain exactly WEATHER_FORECAST"
         )
 
-    signal_mapping_items = _nested_mapping(lines, "semantics", "signal_mapping")
     signal_mapping = (
-        dict(signal_mapping_items) if signal_mapping_items is not None else None
+        _mapping(semantics.get("signal_mapping")) if semantics is not None else None
     )
-    if (
-        signal_mapping_items is None
-        or len(signal_mapping_items) != len(EXPECTED_SIGNAL_MAPPING)
-        or len({key for key, _ in signal_mapping_items}) != len(signal_mapping_items)
-        or signal_mapping != EXPECTED_SIGNAL_MAPPING
-    ):
+    if signal_mapping != EXPECTED_SIGNAL_MAPPING:
         errors.append(
             "canonical semantics.signal_mapping must map label=content, "
             "confidence=probability, and reason=content"
@@ -647,10 +552,10 @@ def _canonical_contract_errors(lines: list[str]) -> list[str]:
     return errors
 
 
-def _window_candidate_contract_errors(lines: list[str]) -> list[str]:
+def _window_candidate_contract_errors(document: dict[Any, Any]) -> list[str]:
     errors: list[str] = []
-    input_schema = _schema_contract(lines, "input_schema")
-    output_schema = _schema_contract(lines, "output_schema")
+    input_schema = _schema_contract(document, "input_schema")
+    output_schema = _schema_contract(document, "output_schema")
 
     if input_schema != WINDOW_CANDIDATE_INPUT_SCHEMA:
         errors.append(
@@ -661,7 +566,7 @@ def _window_candidate_contract_errors(lines: list[str]) -> list[str]:
             "window candidate output_schema must contain only content, reference_time, hourly, and hourly_units"
         )
 
-    endpoint = _endpoint_contract(lines)
+    endpoint = _endpoint_contract(document)
     if endpoint is None:
         errors.append("window candidate endpoint contract is required")
     else:
@@ -714,22 +619,19 @@ def _window_candidate_contract_errors(lines: list[str]) -> list[str]:
                 "window candidate endpoint param_map must match the service coordinate aliases"
             )
 
-    supported_intents = _nested_list_values(lines, "semantics", "supported_intents")
+    semantics = _mapping(document.get("semantics"))
+    supported_intents = (
+        semantics.get("supported_intents") if semantics is not None else None
+    )
     if supported_intents != CANONICAL_INTENTS:
         errors.append(
             "window candidate semantics.supported_intents must contain exactly WEATHER_FORECAST"
         )
 
-    signal_mapping_items = _nested_mapping(lines, "semantics", "signal_mapping")
     signal_mapping = (
-        dict(signal_mapping_items) if signal_mapping_items is not None else None
+        _mapping(semantics.get("signal_mapping")) if semantics is not None else None
     )
-    if (
-        signal_mapping_items is None
-        or len(signal_mapping_items) != len(WINDOW_CANDIDATE_SIGNAL_MAPPING)
-        or len({key for key, _ in signal_mapping_items}) != len(signal_mapping_items)
-        or signal_mapping != WINDOW_CANDIDATE_SIGNAL_MAPPING
-    ):
+    if signal_mapping != WINDOW_CANDIDATE_SIGNAL_MAPPING:
         errors.append(
             "window candidate semantics.signal_mapping must map label and reason to content without inventing confidence"
         )
@@ -752,13 +654,31 @@ def validate_draft(
     path = path.resolve()
     errors: list[str] = []
     warnings: list[str] = []
-    lines = path.read_text(encoding="utf-8").splitlines()
-    version = _top_level_scalar(lines, "version")
-    kind = _top_level_scalar(lines, "kind")
-    integration_id = _top_level_scalar(lines, "id")
-    slug = _top_level_scalar(lines, "slug")
-    base_url = _top_level_scalar(lines, "base_url")
-    price_text = _nested_scalar(lines, "on_chain", "min_price_usdc")
+    source = path.read_text(encoding="utf-8")
+    lines = source.splitlines()
+    document: dict[Any, Any] = {}
+    try:
+        loaded, duplicates = _load_yaml_document(source)
+    except yaml.YAMLError as exc:
+        errors.append(_yaml_error(exc))
+        duplicates = []
+    else:
+        mapped = _mapping(loaded)
+        if mapped is None:
+            errors.append("YAML document root must be a mapping")
+        else:
+            document = mapped
+        errors.extend(
+            _duplicate_key_error(key, line, column)
+            for key, line, column in duplicates
+        )
+
+    version = _top_level_scalar(document, "version")
+    kind = _top_level_scalar(document, "kind")
+    integration_id = _top_level_scalar(document, "id")
+    slug = _top_level_scalar(document, "slug")
+    base_url = _top_level_scalar(document, "base_url")
+    price_text = _nested_scalar(document, "on_chain", "min_price_usdc")
     is_window_candidate = not canonical and (
         window_candidate
         or path == WINDOW_CANDIDATE_PATH.resolve()
@@ -777,9 +697,9 @@ def validate_draft(
         errors.append("slug is required")
     if not base_url:
         errors.append("base_url is required")
-    if "auth:" not in lines:
+    if _mapping(document.get("auth")) is None:
         errors.append("auth block is required")
-    if "endpoints:" not in lines:
+    if not isinstance(document.get("endpoints"), list):
         errors.append("endpoints block is required")
     if price_text is not None:
         try:
@@ -807,13 +727,13 @@ def validate_draft(
             warnings.append(
                 "official portal validation and endpoint sandbox testing were not run"
             )
-        if _nested_scalar(lines, "auth", "type") != "bearer":
+        if _nested_scalar(document, "auth", "type") != "bearer":
             errors.append("canonical auth.type must be bearer")
-        if _nested_scalar(lines, "auth", "header_name") != "Authorization":
+        if _nested_scalar(document, "auth", "header_name") != "Authorization":
             errors.append("canonical auth.header_name must be Authorization")
-        if _nested_scalar(lines, "auth", "value_prefix") != "Bearer ":
+        if _nested_scalar(document, "auth", "value_prefix") != "Bearer ":
             errors.append('canonical auth.value_prefix must be "Bearer "')
-        errors.extend(_canonical_contract_errors(lines))
+        errors.extend(_canonical_contract_errors(document))
     elif is_window_candidate:
         if not lines or lines[0] != "# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.":
             errors.append("window candidate must retain the unregistered compatibility marker")
@@ -839,13 +759,13 @@ def validate_draft(
             errors.append("window candidate base_url must use HTTPS")
         if base_url and "REPLACE" in base_url:
             errors.append("window candidate base_url still contains a placeholder")
-        if _nested_scalar(lines, "auth", "type") != "bearer":
+        if _nested_scalar(document, "auth", "type") != "bearer":
             errors.append("window candidate auth.type must be bearer")
-        if _nested_scalar(lines, "auth", "header_name") != "Authorization":
+        if _nested_scalar(document, "auth", "header_name") != "Authorization":
             errors.append("window candidate auth.header_name must be Authorization")
-        if _nested_scalar(lines, "auth", "value_prefix") != "Bearer ":
+        if _nested_scalar(document, "auth", "value_prefix") != "Bearer ":
             errors.append('window candidate auth.value_prefix must be "Bearer "')
-        description = _top_level_scalar(lines, "description") or ""
+        description = _top_level_scalar(document, "description") or ""
         if "precipitation" in description.lower():
             errors.append("window candidate description must be temperature-only")
         if (
@@ -855,7 +775,7 @@ def validate_draft(
             errors.append(
                 "window candidate description must state that it is an additive unregistered compatibility manifest"
             )
-        errors.extend(_window_candidate_contract_errors(lines))
+        errors.extend(_window_candidate_contract_errors(document))
 
     official_pending = [
         "official tg-miner-integration portal validation was not run",

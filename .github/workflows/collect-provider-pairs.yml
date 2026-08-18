@@ -34,6 +34,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -46,6 +48,7 @@ jobs:
             echo "::error::WEATHERAPI_KEY is not configured; paired collection cannot run."
             exit 1
           fi
+          echo "::add-mask::$WEATHERAPI_KEY"
 
       - name: Collect one paired case
         env:
@@ -53,6 +56,22 @@ jobs:
           DATA_BRANCH: data/provider-pairs
         run: |
           set -euo pipefail
+          # urllib can render the query value encoded in connection errors;
+          # register those forms before any collector stderr is surfaced.
+          python3 - <<'PY'
+          import os
+          from urllib.parse import quote, quote_plus
+
+          key = os.environ["WEATHERAPI_KEY"]
+          variants = (key, quote(key, safe=""), quote_plus(key, safe=""))
+          for variant in dict.fromkeys(variants):
+              escaped = (
+                  variant.replace("%", "%25")
+                  .replace("\r", "%0D")
+                  .replace("\n", "%0A")
+              )
+              print(f"::add-mask::{escaped}")
+          PY
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 

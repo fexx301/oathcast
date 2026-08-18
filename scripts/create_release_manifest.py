@@ -8,9 +8,14 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from oathcast.artifacts import atomic_write_text
+
+
 INCLUDE = (
     "src",
     "miners",
@@ -77,8 +82,7 @@ def main() -> None:
     if args.output is None:
         print(encoded, end="")
         return
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(encoded, encoding="utf-8")
+    atomic_write_text(args.output, encoded)
     print(json.dumps({"output": str(args.output), "source_sha256": manifest["source_sha256"]}))
 
 

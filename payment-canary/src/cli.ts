@@ -18,7 +18,7 @@ Optional:
   --miner-id <id>           Miner id (default: 18)
   --path <path>             Miner endpoint path (default: predict)
   --param key=value         Query parameter; may be repeated
-  --max-amount <integer>    Maximum USDC base units (default: 10000)
+  --max-amount <integer>    Lower the fixed 10000-unit ceiling (no override)
   --rpc-url <https-url>     Solana devnet RPC (default: api.devnet.solana.com)
   --allow-insecure-http-devnet
                             Permit only the pinned live devnet HTTP dispatcher

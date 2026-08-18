@@ -54,15 +54,30 @@ class ProviderForecast:
     def __post_init__(self) -> None:
         if self.status not in {VALID_STATUS, *NON_VALID_STATUSES}:
             raise ValueError(f"unsupported provider forecast status: {self.status}")
+        probability = None
+        if self.probability is not None:
+            if isinstance(self.probability, bool) or not isinstance(
+                self.probability, (int, float)
+            ):
+                raise ValueError("provider forecast probability must be numeric or None")
+            try:
+                probability = float(self.probability)
+            except OverflowError as exc:
+                raise ValueError("provider forecast probability must be finite") from exc
+            if not math.isfinite(probability):
+                raise ValueError("provider forecast probability must be finite")
+            object.__setattr__(self, "probability", probability)
+        if self.status == VALID_STATUS:
+            if probability is None or not 0 <= probability <= 1:
+                raise ValueError(
+                    "valid provider forecast probability must be finite and in [0, 1]"
+                )
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ProviderForecast":
+        raw_probability = data.get("probability")
         return cls(
-            probability=(
-                None
-                if data.get("probability") is None
-                else float(data["probability"])
-            ),
+            probability=raw_probability,
             status=str(data.get("status", VALID_STATUS)),
         )
 
@@ -129,13 +144,18 @@ class ChronologicalCase:
         raw_forecasts = data.get("forecasts")
         if not isinstance(raw_forecasts, Mapping):
             raise ValueError(f"{data.get('case_id', '<unknown>')} forecasts must be an object")
+        raw_outcome = data.get("outcome")
+        if raw_outcome is not None and (
+            type(raw_outcome) is not int or raw_outcome not in (0, 1)
+        ):
+            raise ValueError("outcome must be the integer 0 or 1 or None")
         return cls(
             case_id=str(data["case_id"]),
             issued_at=parse_timestamp(data["issued_at"]),
             forecast_cutoff=parse_timestamp(data["forecast_cutoff"]),
             horizon_start=parse_timestamp(data["horizon_start"]),
             horizon_end=parse_timestamp(data["horizon_end"]),
-            outcome=(None if data.get("outcome") is None else int(data["outcome"])),
+            outcome=raw_outcome,
             resolved_at=(
                 None
                 if data.get("resolved_at") is None
@@ -150,15 +170,12 @@ class ChronologicalCase:
 
     def to_brier_case(self, provider: str) -> BrierCase:
         attempt = self.forecasts.get(provider, ProviderForecast(None, status="missing"))
-        status = attempt.status
-        if self.outcome is None and status == VALID_STATUS:
-            status = "missing"
         return BrierCase(
             case_id=self.case_id,
             probability=attempt.probability,
             outcome=self.outcome,
             climatology_probability=self.climatology_probability,
-            status=status,
+            status=attempt.status,
         )
 
 
@@ -323,12 +340,12 @@ def run_chronological_backtest(
             provider: [prior.to_brier_case(provider) for prior in available_prior]
             for provider in provider_names
         }
+        selected, profiles = _choose_provider(
+            histories,
+            min_history_valid_cases=min_history_valid_cases,
+        )
         for case_index in range(index, batch_end):
             case = cases[case_index]
-            selected, profiles = _choose_provider(
-                histories,
-                min_history_valid_cases=min_history_valid_cases,
-            )
             selected_attempt = None if selected is None else case.to_brier_case(selected)
             is_holdout = case_index >= warmup_cases
             if is_holdout and selected is not None:

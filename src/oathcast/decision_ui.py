@@ -21,6 +21,8 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Protocol
+import base64
+import hashlib
 import json
 import math
 import re
@@ -37,6 +39,10 @@ STATUS_PATH = "/status"
 LOGO_PATH = "/assets/oathcast-mark.webp"
 LOGO_FILE = Path(__file__).with_name("assets") / "oathcast-mark.webp"
 LOGO_VERSION = "16fae356"
+try:
+    _LOGO_BYTES = LOGO_FILE.read_bytes()
+except OSError:
+    _LOGO_BYTES = None
 
 # The cap is intentionally small: the request contains a few human-entered
 # scalar values, not a forecast payload or an upstream response.
@@ -107,8 +113,9 @@ def _clean_result_text(value: Any, *, field: str, maximum: int) -> str:
     # treated as untrusted.  These patterns cover common accidental credential
     # disclosures without logging or returning the original fragment.
     sensitive_patterns = (
-        r"(?i)\b(?:private[ _-]?key|secret|mnemonic|seed[ _-]?phrase|xpriv|access[ _-]?token|authorization|bearer)\b[^\n]*",
-        r"(?i)\bwallet(?:[ _-]?(?:key|secret|address|credential|material))?\b[^\n]*",
+        r"(?i)\b(?:private[ _-]?key|mnemonic|seed[ _-]?phrase|xpriv|access[ _-]?token|authorization|bearer)\b[^\n]*",
+        r"(?i)\bsecret\b(?:\s*[:=]\s*[^\s,;]+)?",
+        r"(?i)\bwallet(?:[ _-]?(?:key|secret|address|credential|material))?\b(?:\s*[:=]\s*[^\s,;]+)?",
         r"\b0x[0-9a-fA-F]{40,}\b",
     )
     for pattern in sensitive_patterns:
@@ -668,7 +675,7 @@ def render_decision_result(result: DecisionResult) -> str:
     )
 
 
-def render_page(*, result: DecisionResult | None = None, error: str | None = None) -> str:
+def _render_page(*, result: DecisionResult | None = None, error: str | None = None) -> str:
     """Return the accessible, dependency-free public status and fixture page."""
 
     feedback = ""
@@ -924,6 +931,32 @@ def render_page(*, result: DecisionResult | None = None, error: str | None = Non
 </html>'''
 
 
+def _inline_source_hash(page: str, tag: str) -> str:
+    match = re.search(rf"<{tag}>(.*?)</{tag}>", page, flags=re.DOTALL)
+    if match is None:
+        raise RuntimeError(f"static page is missing its inline {tag}")
+    digest = hashlib.sha256(match.group(1).encode("utf-8")).digest()
+    return "'sha256-" + base64.b64encode(digest).decode("ascii") + "'"
+
+
+_STATIC_PAGE = _render_page()
+_STYLE_SOURCE_HASH = _inline_source_hash(_STATIC_PAGE, "style")
+_SCRIPT_SOURCE_HASH = _inline_source_hash(_STATIC_PAGE, "script")
+CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; img-src 'self'; "
+    f"style-src {_STYLE_SOURCE_HASH}; script-src {_SCRIPT_SOURCE_HASH}; "
+    "connect-src 'none'; base-uri 'none'; form-action 'none'"
+)
+
+
+def render_page(*, result: DecisionResult | None = None, error: str | None = None) -> str:
+    """Return the cached static page or a dynamic result/error variant."""
+
+    if result is None and error is None:
+        return _STATIC_PAGE
+    return _render_page(result=result, error=error)
+
+
 class DecisionRequestHandler(BaseHTTPRequestHandler):
     """HTTP handler for the page, health/status endpoints, and JSON API."""
 
@@ -957,16 +990,15 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
         self._headers(content_type="text/html; charset=utf-8")
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'",
+            CONTENT_SECURITY_POLICY,
         )
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
 
     def _send_logo(self) -> None:
-        try:
-            body = LOGO_FILE.read_bytes()
-        except OSError:
+        body = _LOGO_BYTES
+        if body is None:
             self._error(404, "Not found.", error="not_found")
             return
         self.close_connection = True

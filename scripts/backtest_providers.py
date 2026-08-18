@@ -12,6 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from oathcast.artifacts import atomic_write_text
 from oathcast.backtest import load_chronological_cases, run_chronological_backtest
 
 
@@ -47,8 +48,7 @@ def main() -> None:
         print(encoded, end="")
         return
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(encoded, encoding="utf-8")
+    atomic_write_text(args.output, encoded)
     holdout = report["provider_summaries"]
     print(
         json.dumps(

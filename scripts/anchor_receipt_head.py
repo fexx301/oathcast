@@ -38,15 +38,32 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
+from oathcast.artifacts import atomic_write_text
 from oathcast.receipts import SqliteReceiptStore
 
 
 ANCHOR_SCHEMA_VERSION = 1
+MAX_ANCHOR_NOTE_LENGTH = 256
+
+
+def _validated_note(note: str | None) -> str | None:
+    if note is None or note == "":
+        return None
+    if not isinstance(note, str):
+        raise ValueError("anchor note must be text")
+    if len(note) > MAX_ANCHOR_NOTE_LENGTH:
+        raise ValueError(
+            f"anchor note must be at most {MAX_ANCHOR_NOTE_LENGTH} characters"
+        )
+    if any(ord(character) < 32 or ord(character) == 127 for character in note):
+        raise ValueError("anchor note must not contain control characters")
+    return note
 
 
 def build_anchor(store: SqliteReceiptStore, *, note: str | None = None) -> dict:
     """Compute an anchor record for the store's current chain head."""
 
+    note = _validated_note(note)
     head = store.chain_head()
     anchor = {
         "schema_version": ANCHOR_SCHEMA_VERSION,
@@ -57,6 +74,12 @@ def build_anchor(store: SqliteReceiptStore, *, note: str | None = None) -> dict:
     if note:
         anchor["note"] = note
     return anchor
+
+
+def write_anchor(path: Path, record: dict) -> None:
+    """Install an anchor atomically so a failed write cannot truncate the old one."""
+
+    atomic_write_text(path, json.dumps(record, indent=2, sort_keys=True) + "\n")
 
 
 def verify_anchor(store: SqliteReceiptStore, anchor: dict) -> dict:
@@ -73,18 +96,28 @@ def verify_anchor(store: SqliteReceiptStore, anchor: dict) -> dict:
     claimed_head = anchor.get("head_sha256")
     if not isinstance(claimed_head, str) or not claimed_head:
         raise ValueError("anchor is missing a valid head_sha256")
+    claimed_algorithm = anchor.get("algorithm")
+    if not isinstance(claimed_algorithm, str) or not claimed_algorithm:
+        raise ValueError("anchor is missing a valid algorithm")
 
     current = store.chain_head()
     recomputed = store.chain_head(limit=claimed_count)
+    algorithm_matches = claimed_algorithm == current["algorithm"]
 
     # A store with fewer receipts than the anchor claims cannot reproduce it.
     # Without this check a truncated store would silently "verify" against a
     # short prefix, which is exactly the evidence loss the anchor exists to
     # detect.
     receipts_present = recomputed["receipt_count"] >= claimed_count
-    matches = receipts_present and recomputed["head_sha256"] == claimed_head
+    matches = (
+        algorithm_matches
+        and receipts_present
+        and recomputed["head_sha256"] == claimed_head
+    )
 
     result = {
+        "anchor_algorithm": claimed_algorithm,
+        "current_algorithm": current["algorithm"],
         "anchor_head_sha256": claimed_head,
         "anchor_receipt_count": claimed_count,
         "recomputed_head_sha256": recomputed["head_sha256"],
@@ -97,7 +130,13 @@ def verify_anchor(store: SqliteReceiptStore, anchor: dict) -> dict:
         "verified_at": datetime.now(tz=timezone.utc).isoformat().replace("+00:00", "Z"),
         "ok": matches,
     }
-    if not receipts_present:
+    if not algorithm_matches:
+        result["error"] = (
+            f"anchor algorithm {claimed_algorithm!r} does not match the current "
+            f"receipt-chain algorithm {current['algorithm']!r}; this anchor "
+            "cannot be compared under the current construction"
+        )
+    elif not receipts_present:
         result["error"] = (
             f"store holds {recomputed['receipt_count']} receipts but the anchor "
             f"commits to {claimed_count}: receipts are missing"
@@ -127,6 +166,10 @@ def main() -> None:
         # Silently replacing a published anchor would destroy the only record
         # of what was committed to.
         parser.error(f"anchor already exists (use --overwrite to replace): {args.output}")
+    try:
+        note = _validated_note(args.note)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     store = SqliteReceiptStore(args.database)
     try:
@@ -139,12 +182,9 @@ def main() -> None:
                 raise SystemExit(1)
             return
 
-        record = build_anchor(store, note=args.note)
+        record = build_anchor(store, note=note)
         if args.output:
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(
-                json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            write_anchor(args.output, record)
             record["anchor_file"] = str(args.output)
         print(json.dumps(record, indent=2, sort_keys=True))
     finally:

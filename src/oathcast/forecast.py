@@ -107,8 +107,14 @@ class ForecastQuestion:
                 "the preparation spike only accepts one-hour windows; "
                 "broader windows need provider-native probability semantics"
             )
-        if cutoff >= start:
-            raise ValueError("forecast_cutoff must be before horizon_start")
+        # A forecast is honestly ahead of its event when it is issued before the
+        # hour opens, so an equal cutoff is permitted. The integrity property the
+        # receipts exist to prove is "issued before the event", not "issued an
+        # hour early": defaulting to an hour of lead made a request for the very
+        # next hour impossible to satisfy. A caller that wants lead time still
+        # gets it by declaring an earlier cutoff explicitly.
+        if cutoff > start:
+            raise ValueError("forecast_cutoff must not be after horizon_start")
 
         object.__setattr__(self, "horizon_start", start)
         object.__setattr__(self, "horizon_end", end)
@@ -257,8 +263,14 @@ class ForecastWindowRequest:
             raise ValueError("forecast window duration must be between 1 and 24 hours")
         if duration.total_seconds() % 3600 != 0:
             raise ValueError("forecast window duration must be a whole number of hours")
-        if cutoff >= start:
-            raise ValueError("forecast_cutoff must be before horizon_start")
+        # A window forecast may be issued right up to the moment the window
+        # opens, so an equal cutoff is allowed here where the one-hour point
+        # contract requires strict lead time. Requiring an hour of lead on a
+        # span that already reaches 24 hours forward rejected the natural
+        # "next 24 hours" request without protecting anything: the forecast is
+        # still committed before the window it describes begins.
+        if cutoff > start:
+            raise ValueError("forecast_cutoff must not be after horizon_start")
 
         object.__setattr__(self, "horizon_start", start)
         object.__setattr__(self, "horizon_end", end)

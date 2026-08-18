@@ -76,15 +76,15 @@ func TestArtifactContract(t *testing.T) {
 	if evidence.SchemaVersion != "oathcast_weather_wasm_release_evidence_v7" {
 		t.Fatalf("unexpected release evidence schema %q", evidence.SchemaVersion)
 	}
-	if evidence.Status != "factual_paraphrase_revision_registration_41_stage_2_rejected" {
+	if evidence.Status != "probability_scan_fix_local_candidate_after_registration_41_stage_2_rejection" {
 		t.Fatalf("unexpected release evidence status %q", evidence.Status)
 	}
 	if !evidence.Artifact.RegistrationCandidate {
 		t.Fatal("rank-only artifact must be marked as a registration candidate")
 	}
-	if evidence.Artifact.ByteSize != 42798 ||
-		evidence.Artifact.SHA256 != "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174" ||
-		evidence.Artifact.Keccak256RawBytes != "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8" {
+	if evidence.Artifact.ByteSize != 42790 ||
+		evidence.Artifact.SHA256 != "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774" ||
+		evidence.Artifact.Keccak256RawBytes != "0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a" {
 		t.Fatalf("unexpected local candidate evidence: %+v", evidence.Artifact)
 	}
 	if evidence.Fixture.Path != "fixtures/wasm_scoring_cases.json" {
@@ -121,17 +121,25 @@ func TestArtifactContract(t *testing.T) {
 	}
 	if evidence.Artifact.SHA256 == evidence.RegisteredArtifact.SHA256 ||
 		evidence.Artifact.Keccak256RawBytes == evidence.RegisteredArtifact.Keccak256RawBytes {
-		t.Fatal("registration 41 and historical registration 19 artifacts must remain distinct")
+		t.Fatal("the local candidate and the registration 19 artifact must remain distinct")
 	}
+	// Registration 41 is settled on-chain, so its bytes are pinned to their own
+	// literals rather than to the local candidate. The candidate has since moved
+	// ahead of it and must be asserted distinct, exactly as it is against
+	// registration 19 above.
 	if evidence.Registration41Artifact.ByteSize != 42798 ||
-		evidence.Registration41Artifact.SHA256 != evidence.Artifact.SHA256 ||
-		evidence.Registration41Artifact.Keccak256RawBytes != evidence.Artifact.Keccak256RawBytes ||
+		evidence.Registration41Artifact.SHA256 != "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174" ||
+		evidence.Registration41Artifact.Keccak256RawBytes != "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8" ||
 		evidence.Registration41Artifact.DropboxURL != "https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=jwhbk80f&dl=1" ||
 		evidence.Registration41Artifact.RegistrationID != 41 ||
 		evidence.Registration41Artifact.Intent != "WEATHER_FORECAST" ||
 		evidence.Registration41Artifact.IntentID != "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e" ||
 		!evidence.Registration41Artifact.HostedBytesVerified {
 		t.Fatalf("unexpected registration 41 artifact evidence: %+v", evidence.Registration41Artifact)
+	}
+	if evidence.Artifact.SHA256 == evidence.Registration41Artifact.SHA256 ||
+		evidence.Artifact.Keccak256RawBytes == evidence.Registration41Artifact.Keccak256RawBytes {
+		t.Fatal("the local candidate must be distinct from the registered registration 41 artifact")
 	}
 	if evidence.CurrentArtifactABI.FunctionExportCount != 3 {
 		t.Fatalf("release evidence pins %d function exports, want 3", evidence.CurrentArtifactABI.FunctionExportCount)
@@ -289,11 +297,11 @@ func TestArtifactContract(t *testing.T) {
 		clarification.HiddenPairScoresDisclosed {
 		t.Fatalf("unexpected registration 19 fixture clarification: %+v", clarification)
 	}
-	if evidence.Verification.RustNativeTestsPassed != 39 ||
-		evidence.Verification.PythonRepositoryTestsPassed != 401 ||
-		evidence.Verification.SyntheticFactualPairCount != 87 ||
+	if evidence.Verification.RustNativeTestsPassed != 40 ||
+		evidence.Verification.PythonRepositoryTestsPassed != 422 ||
+		evidence.Verification.SyntheticFactualPairCount != 88 ||
 		evidence.Verification.SyntheticFactualMinimumMargin != 0.20625 ||
-		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.959623 {
+		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.959566 {
 		t.Fatalf("unexpected local factual-paraphrase verification: %+v", evidence.Verification)
 	}
 	postflight := evidence.Verification.HistoricalFirstRegistrationPostflight
@@ -524,8 +532,8 @@ func TestArtifactContract(t *testing.T) {
 	}
 	if registration41.WASMURL != evidence.Registration41Artifact.DropboxURL ||
 		registration41.WASMByteSize != evidence.Registration41Artifact.ByteSize ||
-		registration41.WASMSHA256 != evidence.Artifact.SHA256 ||
-		registration41.WASMKeccak256RawBytes != evidence.Artifact.Keccak256RawBytes ||
+		registration41.WASMSHA256 != evidence.Registration41Artifact.SHA256 ||
+		registration41.WASMKeccak256RawBytes != evidence.Registration41Artifact.Keccak256RawBytes ||
 		!registration41.HostedBytesVerified || registration41.Intent != evidence.Registration41Artifact.Intent ||
 		registration41.IntentID != evidence.Registration41Artifact.IntentID {
 		t.Fatalf("registration 41 must reference the exact hosted artifact and Intent: %+v", registration41)
@@ -1119,6 +1127,13 @@ func TestFixtureCorpus(t *testing.T) {
 	}
 	groups := map[string][]orderedScore{}
 
+	// Floors, so a renamed fixture key cannot make this test pass vacuously by
+	// running zero subtests. tests/test_wasm_scoring_fixture.py asserts the same
+	// two invariants on the Python side.
+	if len(fixture.Cases) < 27 {
+		t.Fatalf("fixture corpus has %d cases, want at least 27", len(fixture.Cases))
+	}
+
 	for _, testCase := range fixture.Cases {
 		t.Run(testCase.CaseID, func(t *testing.T) {
 			score, err := scorer.score(testCase.Question, testCase.GroundTruth, testCase.answer(t))
@@ -1140,6 +1155,9 @@ func TestFixtureCorpus(t *testing.T) {
 				)
 			}
 		})
+	}
+	if len(groups) == 0 {
+		t.Fatal("fixture corpus produced no ordering groups; the transitivity check below would be vacuous")
 	}
 	for group, scores := range groups {
 		for _, lower := range scores {

@@ -1,9 +1,11 @@
 """Development reference for the future Script Author input contract.
 
-This is not the official Telegraph scorer and is not intended to reproduce its
-cosine/BM25 implementation. It verifies that question, ground truth, and raw
-responses can be normalized deterministically and that malformed/empty/overly
-long responses receive a bounded result while the public harness is pending.
+This is not the official Telegraph scorer and is not intended to reproduce the
+cosine/BM25 behavior described in pre-launch guidance; that behavior has not
+been verified against the current Canonical Script. It verifies that question,
+ground truth, and raw responses can be normalized deterministically and that
+malformed/empty/overly long responses receive a bounded result while the public
+harness is pending.
 """
 
 from __future__ import annotations

@@ -1,16 +1,16 @@
 {
   "schema_version": "oathcast_weather_wasm_release_evidence_v7",
   "recorded_at": "2026-08-15T09:19:22Z",
-  "updated_at": "2026-08-17T19:42:00Z",
-  "status": "factual_paraphrase_revision_registration_41_stage_2_rejected",
+  "updated_at": "2026-08-18T00:30:26Z",
+  "status": "probability_scan_fix_local_candidate_after_registration_41_stage_2_rejection",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 42798,
+    "byte_size": 42790,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174",
-    "keccak256_raw_bytes": "0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8",
+    "sha256": "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774",
+    "keccak256_raw_bytes": "0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a",
     "registration_candidate": true,
-    "candidate_scope": "This 42,798-byte rank-only build is the exact artifact the user manually hosted on Dropbox and registered as registration 41 after registration 19 lost one factual paraphrase-ordering pair. Independent postflight download reproduced its byte size, SHA-256, and raw-byte Keccak-256. It passes the published ABI, the existing weather corpus, and 87 synthetic factual pairs with a minimum margin of 0.206250. Its 0.959623 synthetic ordinal Spearman measures exact > good > bad ordering on handcrafted cases and is not comparable to Telegraph's live candidate-versus-champion historical-score correlation. Registration 41 reached champion comparison, establishing Stage 1 passage, and failed Stage 2 at 31 of 32 candidate ordering wins versus the champion's 32 of 32. Its candidate margin was 0.37852418 versus the champion's 0.37360683, but the reported promotion rule is per-case ordering wins rather than direct aggregate-margin comparison. The previously registered 16,292-byte artifact remains retained under registered_artifact and produced registration 19's separate 31-of-32 Stage 2 result. No further registration is authorized."
+    "candidate_scope": "This 42,790-byte rank-only build is a local, unuploaded revision created after registration 41 was rejected at Stage 2. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. The single change is a probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' that carried no parseable number and so discarded a real percentage later in the same answer; scorer::evaluate then applied its 0.49 missing-probability ceiling to a materially correct response. Measured on a paraphrase corpus case, a stray leading '(%)' moved a correct answer from 0.989423 to 0.490000 before the fix. The fix is behaviour-preserving on the pre-existing corpus: the weakest synthetic factual margin is unchanged at 0.206250 and the 39 native Rust tests, the wazero ABI and adversarial suite, and the fixture corpus all still pass. One regression pair, stray_percent_sign_before_probability, was added because no pre-existing fixture exercised the defect; it scores a 0.000000 margin on the pre-fix binary against a 0.15 floor and 0.301042 after. Adding that 88th pair moved the synthetic ordinal Spearman from 0.959623 to 0.959566; the fix itself moved neither the margin nor the Spearman. That Spearman measures exact > good > bad ordering on handcrafted cases and is not comparable to Telegraph's live candidate-versus-champion historical-score correlation. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
   "registration_41_artifact": {
     "byte_size": 42798,
@@ -52,7 +52,7 @@
   },
   "fixture": {
     "path": "fixtures/wasm_scoring_cases.json",
-    "sha256": "bf4805e71a95379206f3446b8c185c0278a5702e4005fdd5973f24b99a4629f0"
+    "sha256": "c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f"
   },
   "build": {
     "rustc": "1.95.0 (59807616e 2026-04-14)",
@@ -64,8 +64,8 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "isolated_build_sha256": [
-      "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174",
-      "4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174"
+      "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774",
+      "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774"
     ]
   },
   "current_artifact_abi": {
@@ -266,14 +266,14 @@
       "viem 2.55.11 keccak256(raw bytes)",
       "Go golang.org/x/crypto/sha3 NewLegacyKeccak256 (artifact contract test)"
     ],
-    "rust_native_tests_passed": 39,
-    "python_repository_tests_passed": 401,
-    "python_repository_test_execution": "Repository discovery ran 401 tests and reported nine sandbox-only PermissionError failures while binding 127.0.0.1. The complete 15-test decision_ui module was rerun with approved loopback permission and passed, establishing 401/401 repository tests.",
+    "rust_native_tests_passed": 40,
+    "python_repository_tests_passed": 422,
+    "python_repository_test_execution": "Repository discovery ran 422 tests and reported nine sandbox-only PermissionError failures while binding 127.0.0.1. The complete 15-test decision_ui module was rerun with approved loopback permission and passed, establishing 401/401 repository tests.",
     "wazero_host_suite_passed": true,
     "wazero_host_suite_scope": "Current rank-only ABI, weather fixture ordering, 87 synthetic factual paraphrase and adversarial pairs with local margin and bad-score gates, synthetic ordinal Spearman, allocator safety, malformed input, exact byte limits, deterministic calls, and published Stage 1 behavior.",
-    "synthetic_factual_pair_count": 87,
+    "synthetic_factual_pair_count": 88,
     "synthetic_factual_minimum_margin": 0.20625,
-    "synthetic_factual_ordinal_spearman": 0.959623,
+    "synthetic_factual_ordinal_spearman": 0.959566,
     "synthetic_factual_evidence_limit": "This local ordinal proxy measures exact > good > bad ordering on handcrafted factual and adversarial cases. It reflects user-relayed Telegraph guidance about the factual paraphrase category and 0.15 margin floor, but it does not contain Telegraph's hidden cases or champion historical-score series and is not comparable to the live 0.60 candidate-versus-champion Spearman result.",
     "published_stage_1_checks_passed": {
       "exact_required_function_exports": true,
@@ -284,7 +284,7 @@
     },
     "deterministic_repeated_calls": 5000,
     "official_unmodified_tester_passed": true,
-    "official_tester_scope": "Current published rank-only interface.",
+    "official_tester_scope": "Current published rank-only interface. This 0.8500 example score was measured on the 42,798-byte registration 41 artifact. Telegraph's unmodified tester is not vendored in this repository, so it has NOT been re-run against the 42,790-byte probability-scan candidate.",
     "official_tester_example_score": 0.85,
     "historical_first_registration_postflight": {
       "transaction_hash": "0x82db3d5ade954cf4995cbc01ed4f2a0a3b24c352b0ce9efa15ceb1f18d7d7471",
@@ -614,8 +614,9 @@
     "live_validator_confirmation_source": "User-relayed Telegraph team response on 2026-08-15 reported the rank-only rejection fixed. Registration 19 subsequently proved authoritative validator ingestion and reached champion comparison, and registration 41 independently reached the same champion-comparison stage with the 42,798-byte artifact. Stage 1 passage is inferred from reaching champion comparison; registration 41 then failed Stage 2 at 31 of 32 comparable ordering cases.",
     "current_external_gate": "stop_no_further_registration_authorized",
     "next_transactional_gate": "none_without_fresh_complete_preflight_and_fresh_explicit_user_authorization",
-    "next_action": "Stop locally with registration 41 preserved as a Stage 2 rejection. Do not upload, sign, register, or initiate wallet activity. Any future attempt requires a fresh complete decoded wrapper and nested-call preflight plus fresh explicit user authorization.",
+    "next_action": "Stop locally. Registration 41 is preserved as a Stage 2 rejection of the 42,798-byte artifact, and the current 42,790-byte probability-scan revision is an unuploaded local candidate. Do not upload, host, sign, register, or initiate wallet activity. Any future attempt requires a fresh complete decoded wrapper and nested-call preflight plus fresh explicit user authorization.",
     "unresolved": [
+      "The probability-scan fix in percent_probability is correct in its own terms but exposes a separate pre-existing weakness: percent_probability returns the first in-range percentage anywhere in the text, whether or not it is the probability the answer asserts. Measured with ground truth at 70 percent, an answer reading \"Humidity (%) is high. Measurable rain is likely. Cloud cover 20%.\" now scores 0.000000 via ISSUE_CONTRADICTORY_POLARITY-adjacent ISSUE_CONTRADICTORY_PROBABILITY, where before the fix it scored 0.490000; and an unrelated percentage more than 0.51 from the truth clamps below the flat 0.49 missing-probability ceiling, for example 0.350000 at 5 percent. The same answer without any stray percent sign already scored 0.000000 before the fix, so the fix does not create this failure mode, it widens the set of inputs that reach it. Selecting the percentage nearest a probability cue, or refusing to guess when several in-range percentages disagree, is a separate behavioural change that needs its own before-and-after measurement and has not been made.",
       "Registration 41 evaluated the 42,798-byte artifact, but its 87 factual pairs and 0.959623 synthetic ordinal Spearman remain handcrafted local proxies rather than Telegraph hidden-fixture or champion-history evidence.",
       "According to user-relayed Telegraph guidance, 0.60 applies to Spearman correlation against the live champion's historical scores, but the historical score series is unavailable locally.",
       "Registration 19 failed exactly one of 32 comparable ordering pairs; Telegraph withholds the hidden fixture text and per-pair scores.",

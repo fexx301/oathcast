@@ -32,6 +32,12 @@ disabled API returns 503 before reading a request body.
 
 ## Local run
 
+Install the optional registration-tools extra before running the full test or
+registration-draft validation commands; production runtime does not import
+this tooling:
+
+    python3 -m pip install -e '.[registration-tools]'
+
     OATHCAST_REQUIRE_AUTH=false PYTHONPATH=src python3 -m oathcast.service
 
 Health: http://127.0.0.1:8080/healthz
@@ -128,6 +134,12 @@ Run the production container with
 `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. The Dockerfile and `.env.example`
 remain fail-closed at `false`, so a missing deployment setting must not silently
 claim the additive compatibility route is active.
+
+When a reverse proxy is not on loopback, set `OATHCAST_TRUSTED_PROXIES` to only
+the proxy's exact IP address or the narrowest required CIDR. A trusted proxy may
+set `X-Forwarded-For`, which selects client rate-limit buckets; broad networks
+let callers evade per-client limits. Leave the setting empty for direct traffic
+or loopback Caddy, which is trusted by default.
 
 After deployment, verify the exact release without printing secrets:
 
@@ -501,6 +513,9 @@ which is the only observation that actually distinguishes "persisting" from
 "returning 200 and dropping the write."
 
 **Steps**
+
+The validation commands below require the `registration-tools` extra described
+in Local run.
 
     PYTHONPATH=src python3 -m unittest discover -s tests -t .   # full suite passes locally
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py

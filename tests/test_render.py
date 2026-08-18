@@ -6,6 +6,7 @@ from oathcast.forecast import CanonicalForecast, ForecastQuestion
 from oathcast.render import (
     PREVIOUS_RENDERER_VERSION,
     RENDERER_VERSION,
+    _measurement,
     calibrated_phrase,
     public_response,
     public_response_json,
@@ -99,6 +100,10 @@ class RenderTests(unittest.TestCase):
                 self.assertFalse(lowered.startswith("no"))
                 self.assertNotIn("occurred", lowered)
                 self.assertNotIn("did not occur", lowered)
+
+    def test_measurement_does_not_render_negative_zero(self):
+        self.assertEqual(_measurement(-0.004), "0")
+        self.assertEqual(_measurement(-0.01), "-0.01")
 
 
 class CalibratedPhraseTests(unittest.TestCase):
