@@ -3,13 +3,21 @@
 The project contains a no-state canary at
 `.github/workflows/oathcast-canary.yml`. It requests a run every 15 minutes
 (GitHub scheduling is best-effort), checks the public staging Miner, verifies the
-expected v7 release identity, rejects unauthenticated `/predict` calls, verifies
-registered-path/canonical-path response and receipt parity, and uses the API key
-only through the repository secret `OATHCAST_MINER_API_KEY`.
+expected v8 release identity, rejects unauthenticated `/predict` calls, verifies
+registered-path/canonical-path response and receipt parity for both the
+registered one-hour forecast and additive 24-hour temperature response, and uses
+the API key only through the repository secret `OATHCAST_MINER_API_KEY`.
 
 The workflow is intentionally fail-closed. The repository and secret are
 already configured; if the secret disappears, scheduled and manual runs fail
 visibly rather than reporting a skipped success.
+
+The current pins are release `2026-08-17-temperature-v8`, source SHA-256
+`edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`, and
+image digest
+`sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672`.
+The workflow also passes `--require-temperature-window`; changing only the
+identity pins would leave the v8 compatibility contract unmonitored.
 
 ## Local repository
 
@@ -56,11 +64,15 @@ Actions tab. Confirm that the job reports:
 - `/healthz` = `200`;
 - `/readyz` = `200`;
 - `receipt_store_write` reports a successful transactional write and rollback
-  after the v7 cutover;
+  after the v8 cutover;
 - unauthenticated `/predict` = `401`;
 - authenticated `/predict` = `200` with a non-empty answer, receipt, and request
   ID; and
-- `/v1/forecast/point` returns the identical response and receipt.
+- `/v1/forecast/point` returns the identical response and receipt;
+- `forecast_hours=24&hourly=2t` returns the exact 24-hour RFC3339/Kelvin envelope
+  on `/predict`; and
+- the same temperature request returns the identical response and receipt on
+  `/v1/forecast/point`.
 
 This proves service availability only. Miner registration is established by
 separate on-chain/portal evidence; the canary itself does not prove paid

@@ -21,24 +21,24 @@ relevant to that track.
 - [x] Exact 4,960-byte YAML passed the official portal's aggregate validation
   (`valid: true`); durable per-endpoint sandbox cases were not retained.
 - [x] Canonical Miner registered and discoverable: on-chain ID `78`, routing ID `64173`.
-- [x] Registered `GET /predict` route deployed in `2026-08-16-route-v7` and
-  verified through public HTTPS. It shares authentication, rate limits,
-  semantic JSON, and receipt identity with `/v1/forecast/point`; near-miss
-  paths remain 404.
-- [~] Local, undeployed compatibility for the team-requested
-  `forecast_hours=1..24&hourly=2t` temperature request is implemented on
+- [x] Registered `GET /predict` route introduced in `2026-08-16-route-v7` and
+  retained in deployed `2026-08-17-temperature-v8`; it is verified through
+  public HTTPS and shares authentication, rate limits, semantic JSON, and
+  receipt identity with `/v1/forecast/point`; near-miss paths remain 404.
+- [x] Additive v8 compatibility for the team-requested
+  `forecast_hours=1..24&hourly=2t` temperature request is deployed on
   `/predict` and `/v1/forecast/point`, with next-complete-hour UTC alignment and
-  RFC3339/Kelvin output. The unregistered candidate schema is checked against a
-  real 24-hour service response. This is not live Track 1 evidence and does not
-  change the registered YAML; `/v1/forecast/window` retains its legacy
-  start/end contract.
+  RFC3339/Kelvin output. The strict public smoke checks the 24-hour response and
+  exact alias/receipt parity. The candidate remains unregistered and this route
+  does not change the protected registered YAML. The legacy
+  `/v1/forecast/window` path is not publicly exposed and returns 404. This is
+  runtime compatibility evidence, not an official Telegraph evaluation.
 - [x] At least three active `WEATHER_FORECAST` Miners observed in the live catalog on 2026-08-13. Recheck at submission; this does not satisfy the separate 100-request condition.
 - [~] Telegraph confirmed the earlier leaderboard zero came from `/predict`
   returning 404, which produced `miner_answer=""`. Release v7 fixed that route,
-  but an epoch-202 observation still scored OathCast `0`, rank `6/6`. The later
-  team diagnosis is that the scorer requests 24 hours while the live Miner
-  serves the registered one-hour contract. The local 24-hour fix is undeployed,
-  so no corrected live result exists.
+  but an epoch-202 observation still scored OathCast `0`, rank `6/6`; that is a
+  historical result. V8 now serves the diagnosed 24-hour request shape, but no
+  corrected official Telegraph evaluation or score has been observed.
 - [ ] Official Miner performance evidence from live evaluation.
 - [ ] X update evidence tagged `@Telegraphprotoc`.
 

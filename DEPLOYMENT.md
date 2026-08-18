@@ -1,7 +1,7 @@
 # Deployment and payment boundary
 
 The repository packages one public HTTPS OathCast Miner. The
-`2026-08-16-route-v7` release is running in Docker on AWS EC2
+`2026-08-17-temperature-v8` release is running in Docker on AWS EC2
 behind private host port 8080, with Caddy terminating HTTPS at
 `https://oathcastcourt.duckdns.org`.
 Set the environment variables from `.env.example`. Registration is complete and
@@ -12,11 +12,12 @@ public smoke output, and runtime details are archived under
 
 ## Current deployment status
 
-The deployed Miner is v7; stopped `oathcast-v6-rollback-20260816` is the
-immediate Miner rollback target, and the protected pre-v7 Caddyfile is the edge
-rollback target. The v6, v5, and v4 sections below are historical release
-records. The public decision UI is deployed separately. Its safe public surface
-is a read-only release/status page plus a client-only development fixture. It
+The deployed Miner is v8; stopped `oathcast-v7-rollback-20260817` is the
+immediate Miner rollback target. Caddy configuration did not change for v8 and
+remains pinned by its retained hash. The v7, v6, v5, and v4 sections below are
+historical release records. The public decision UI is deployed separately. Its
+safe public surface is a read-only release/status page plus a client-only
+development fixture. It
 has no Telegraph-backed runner, accepts no live Planning Desk intake, and
 returns 503 for decision requests. Live decisions must not be enabled until the
 authenticated, budgeted payment path has been reviewed and deployed.
@@ -113,24 +114,30 @@ Create a source manifest before each deployment:
 
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
-      --release-id 2026-08-16-route-v7 \
+      --release-id 2026-08-17-temperature-v8 \
       --output /tmp/oathcast-release-manifest.json
 
 Build the image with the manifest's `source_sha256` and a unique release ID:
 
     docker build \
-      --build-arg OATHCAST_RELEASE_ID=2026-08-16-route-v7 \
+      --build-arg OATHCAST_RELEASE_ID=2026-08-17-temperature-v8 \
       --build-arg OATHCAST_SOURCE_SHA256=<manifest-source-sha256> \
-      -t oathcast:2026-08-16-route-v7 .
+      -t oathcast:2026-08-17-temperature-v8 .
+
+Run the production container with
+`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. The Dockerfile and `.env.example`
+remain fail-closed at `false`, so a missing deployment setting must not silently
+claim the additive compatibility route is active.
 
 After deployment, verify the exact release without printing secrets:
 
     PYTHONPATH=src python3 scripts/smoke_miner.py \
       --base-url https://oathcastcourt.duckdns.org \
-      --expected-release-id 2026-08-16-route-v7 \
-      --expected-source-sha256 3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557 \
-      --expected-image-digest sha256:8bee7d497c0182b8899ad6ebbe162e89296d732311801edeaa26885665db4fac \
-      --require-receipt-write-probe
+      --expected-release-id 2026-08-17-temperature-v8 \
+      --expected-source-sha256 edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c \
+      --expected-image-digest sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672 \
+      --require-receipt-write-probe \
+      --require-temperature-window
 
 The smoke test is non-destructive with respect to Telegraph and uses one
 ordinary authenticated request against the OathCast service only; it does not
@@ -138,7 +145,9 @@ create paid demand. Record its JSON output with the release manifest.
 
 For a cutover, freeze one old-release question and its safe fingerprints before
 replacing the container, then replay that exact question after the new release
-starts. The v6-to-v7 comparison is retained at
+starts. The current v7-to-v8 comparison is retained at
+`artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-replay.json`.
+The earlier v6-to-v7 comparison remains historical evidence at
 `artifacts/release-evidence/oathcast-2026-08-16-route-v7-replay.json`.
 
 The general command shape is:
@@ -170,30 +179,33 @@ rerun. The comparator never needs or records the Bearer token.
 Before changing the live container, treat these as hard gates rather than
 follow-up checks:
 
-1. Transfer the complete candidate file set, including every currently
-   untracked runtime file; reproduce source digest
-   `3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557`
-   on the host and abort on any mismatch.
+1. Transfer the complete candidate file set; reproduce source digest
+   `edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`
+   across the manifest's exact 66-file set on the host and abort on any extra,
+   missing, or mismatched file.
 2. Back up the live database with SQLite's online backup mechanism, opening the
    source in read-only URI mode. Verify source and backup integrity plus
    row-count equality without printing receipt content. Preserve and hash the
    deployed Caddyfile separately.
-3. Build v7 and record its image digest. Start a disposable candidate container
-   on loopback with a copy of the receipt database; require health, readiness,
-   the transactional write probe, `/predict` authentication, canonical-path
-   parity, exactly one expected new receipt, restart replay, non-root UID, and
-   durable-volume behavior to pass before replacing v6.
-4. Capture the v6 replay question/fingerprints and preserve the stopped v6
-   container as the immediate rollback target. Validate the candidate Caddyfile
-   with the exact production Caddy image before changing the mounted file.
+3. Build v8, record its image digest, and enable
+   `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. Start a disposable candidate
+   container on loopback with a copy of the receipt database; require health,
+   readiness, the transactional write probe, `/predict` authentication,
+   canonical-path parity, the 24-hour temperature response and parity, exactly
+   one expected new temperature receipt, restart replay, non-root UID, and
+   durable-volume behavior to pass before replacing v7.
+4. Capture the v7 replay question/fingerprints and preserve the stopped v7
+   container as the immediate rollback target. Validate the production Caddyfile
+   with the exact production Caddy image; v8 does not require a Caddy change.
 
-After cutover, require the strict v7 smoke, the exact replay comparator, a
+After cutover, require the strict v8 smoke including
+`--require-temperature-window`, the exact replay comparator, a
 second persistence/restart check against the real host volume, and a manual
 canary pass. Roll back immediately on any identity, replay, readiness, or
-persistence mismatch. Caddy and Miner rollback are paired: restore and reload
-the backed-up Caddyfile, stop/remove v7, then restore/start the preserved v6
-container on port 8080. Update canary release/source/image pins only after the
-real v7 image digest exists.
+persistence mismatch. Stop/remove v8, then restore/start the preserved
+`oathcast-v7-rollback-20260817` container on port 8080; restore Caddy only if its
+retained hash or routing has changed. Update canary release/source/image pins
+only after the real v8 image digest exists.
 
 Live execution remains gated on a dedicated faucet-funded Solana-devnet wallet.
 The unpaid Miner-18 preflight passed on 2026-08-09 and is archived under
@@ -225,19 +237,57 @@ The staging host is an Amazon Linux 2023 `t3.micro` in `eu-north-1`
 key pair `oathcast-ec2`. Region matters operationally: the security group,
 the instance, and the key pair are all regional objects, so the console must
 be switched to `eu-north-1` before any of them is visible. The
-`oathcast:2026-08-16-route-v7` runs as container `oathcast` with restart policy
-`unless-stopped`; stopped container `oathcast-v6-rollback-20260816` preserves
-the immediate previous release. `/healthz`, `/readyz`, authenticated `/predict`,
-canonical-path parity, transactional write, and restart/replay smoke tests have
-passed. The Miner is
-bound to loopback port 8080 and the `oathcast-caddy`
+`oathcast:2026-08-17-temperature-v8` runs as container `oathcast` with restart
+policy `unless-stopped`; stopped container `oathcast-v7-rollback-20260817`
+preserves the immediate previous release. `/healthz`, `/readyz`, authenticated
+`/predict`, canonical-path parity, the additive 24-hour temperature contract and
+parity, transactional write, and restart/replay smoke tests have passed. The
+Miner is bound to loopback port 8080 and the `oathcast-caddy`
 container uses host networking to terminate HTTPS and redirect HTTP to it. The
 security group exposes only ports 80 and 443. DuckDNS currently maps
 `oathcastcourt.duckdns.org` to `13.49.229.253`. An EC2-side DuckDNS updater is
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-08-16 - registered route fix (DEPLOYED)
+## Release 2026-08-17 - additive temperature compatibility (CURRENT)
+
+Release v8 enables the additive temperature request shape on the existing
+public Miner while leaving the protected registered one-hour precipitation YAML
+unchanged.
+
+- Release ID: `2026-08-17-temperature-v8`
+- Source manifest digest:
+  `edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`
+- Runtime image ID:
+  `sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672`
+- Runtime flag: `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`
+- The protected registered YAML remains exactly 4,960 bytes with SHA-256
+  `9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e`.
+- Strict public smoke passed all nine checks: health, readiness, receipt
+  capacity/write rollback, unauthenticated `/predict` rejection, authenticated
+  registered/canonical forecast parity, and 24-hour temperature response/parity.
+- The v7 precipitation receipt and public-response fingerprints replayed
+  byte-identically through v8. Forecast and temperature fingerprints also
+  survived the live v8 restart; the database remained at 19 rows and
+  `PRAGMA integrity_check` returned `ok`.
+- Stopped `oathcast-v7-rollback-20260817` is the immediate rollback target.
+  Caddy configuration was unchanged and retains SHA-256
+  `5273d4429b6a0aa58d374a49c55934e7b3e3931d17dbb9e5590a7850f1b5c970`.
+- The temporary SSH maintenance rule was removed. The security group exposes
+  only ports 80 and 443; public HTTPS health/readiness returned 200, while
+  external probes to ports 22 and 8080 timed out.
+- Evidence:
+  `artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-manifest.json`,
+  `oathcast-2026-08-17-temperature-v8-public-smoke.json`,
+  `oathcast-2026-08-17-temperature-v8-replay.json`, and
+  `oathcast-2026-08-17-temperature-v8-runtime-evidence.json`.
+
+This is an additive runtime deployment, not a replacement, upload, or
+re-registration of `miners/oathcast-weather.yaml`. It proves the public service
+can answer the diagnosed 24-hour request shape; it does not establish a
+corrected official Telegraph score or retroactively alter epoch `202`.
+
+## Release 2026-08-16 - registered route fix (HISTORICAL; SUPERSEDED BY V8)
 
 Telegraph confirmed the observed Track 1 zero came from its scorer calling the
 registered `GET /predict` path and receiving 404, so the extracted Miner answer
@@ -268,11 +318,11 @@ Miner through the same authenticated handler as `/v1/forecast/point`.
   `oathcast-2026-08-16-route-v7-replay.json`, and
   `oathcast-2026-08-16-route-v7-runtime-evidence.json`.
 
-This deployment did not retroactively change the old leaderboard epoch. A later
-epoch-202 observation still scored OathCast `0`, rank `6/6`, because the live
-one-hour Miner did not satisfy the scorer's 24-hour temperature request. The
-local 24-hour implementation is undeployed. Do not deploy it or request another
-external evaluation without separate review and explicit authorization.
+This deployment did not retroactively change the old leaderboard epoch. At this
+v7 checkpoint, a later epoch-202 observation still scored OathCast `0`, rank
+`6/6`, because the live one-hour Miner did not satisfy the scorer's 24-hour
+temperature request. The compatibility implementation was still undeployed at
+that checkpoint; the current v8 section above supersedes that runtime state.
 
 Deployment verification on 2026-08-03:
 

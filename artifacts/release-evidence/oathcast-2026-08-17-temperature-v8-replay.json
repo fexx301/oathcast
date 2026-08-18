@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-17T23:53:02Z",
+  "release_id": "2026-08-17-temperature-v8",
+  "ok": true,
+  "before_release_id": "2026-08-16-route-v7",
+  "after_release_id": "2026-08-17-temperature-v8",
+  "fingerprints": {
+    "event_id": "canary-lagos-20260818T1200z",
+    "public_response_sha256": "74ddf1cb5deca709cdbf22e95ecd3bf621069ff062c7f2b56aedcba8ee1cb10a",
+    "receipt_sha256": "1cd5d1d3c691bea8c73b1f6ef075eca343ddc9c872edc143da46ce736946d7ef"
+  },
+  "errors": [],
+  "source_comparator_sha256": "0d3c06c5edb610e3b286c83f856c760657f5ce9530094c22ef3fdf7e88098c41",
+  "comparison_scope": "Exact equality of event ID, receipt SHA-256, and canonical public-response SHA-256 across the live v7-to-v8 cutover.",
+  "source_reports": {
+    "before": {
+      "release": {
+        "contract_version": "forecast_contract_v1",
+        "image_digest": "sha256:8bee7d497c0182b8899ad6ebbe162e89296d732311801edeaa26885665db4fac",
+        "release_id": "2026-08-16-route-v7",
+        "source_sha256": "3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557"
+      },
+      "question": {
+        "event_id": "canary-lagos-20260818T1200z",
+        "forecast_cutoff": "2026-08-18T11:00:00Z",
+        "horizon_end": "2026-08-18T13:00:00Z",
+        "horizon_start": "2026-08-18T12:00:00Z",
+        "latitude": 6.5244,
+        "location_name": "Lagos",
+        "longitude": 3.3792,
+        "metric": "precipitation",
+        "operator": ">",
+        "precipitation_type": "measurable",
+        "spatial_semantics": "point",
+        "threshold_mm": 0.1,
+        "timezone": "UTC"
+      },
+      "authenticated_forecast": {
+        "event_id": "canary-lagos-20260818T1200z",
+        "name": "authenticated_forecast",
+        "ok": true,
+        "path": "/predict",
+        "public_response_sha256": "74ddf1cb5deca709cdbf22e95ecd3bf621069ff062c7f2b56aedcba8ee1cb10a",
+        "receipt_sha256": "1cd5d1d3c691bea8c73b1f6ef075eca343ddc9c872edc143da46ce736946d7ef",
+        "request_id": "smoke-release",
+        "status": 200
+      }
+    },
+    "after": {
+      "artifact": "artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-public-smoke.json",
+      "release": {
+        "contract_version": "forecast_contract_v1",
+        "image_digest": "sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672",
+        "release_id": "2026-08-17-temperature-v8",
+        "source_sha256": "edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c"
+      },
+      "question": {
+        "event_id": "canary-lagos-20260818T1200z",
+        "forecast_cutoff": "2026-08-18T11:00:00Z",
+        "horizon_end": "2026-08-18T13:00:00Z",
+        "horizon_start": "2026-08-18T12:00:00Z",
+        "latitude": 6.5244,
+        "location_name": "Lagos",
+        "longitude": 3.3792,
+        "metric": "precipitation",
+        "operator": ">",
+        "precipitation_type": "measurable",
+        "spatial_semantics": "point",
+        "threshold_mm": 0.1,
+        "timezone": "UTC"
+      },
+      "authenticated_forecast": {
+        "event_id": "canary-lagos-20260818T1200z",
+        "name": "authenticated_forecast",
+        "ok": true,
+        "path": "/predict",
+        "public_response_sha256": "74ddf1cb5deca709cdbf22e95ecd3bf621069ff062c7f2b56aedcba8ee1cb10a",
+        "receipt_sha256": "1cd5d1d3c691bea8c73b1f6ef075eca343ddc9c872edc143da46ce736946d7ef",
+        "request_id": "smoke-release",
+        "status": 200
+      }
+    }
+  }
+}

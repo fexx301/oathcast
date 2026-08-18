@@ -35,7 +35,8 @@ jobs:
           OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
         run: |
           PYTHONPATH=src python3 scripts/public_canary.py \
-            --expected-release-id 2026-08-16-route-v7 \
-            --expected-source-sha256 3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557 \
-            --expected-image-digest sha256:8bee7d497c0182b8899ad6ebbe162e89296d732311801edeaa26885665db4fac \
-            --require-receipt-write-probe
+            --expected-release-id 2026-08-17-temperature-v8 \
+            --expected-source-sha256 edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c \
+            --expected-image-digest sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672 \
+            --require-receipt-write-probe \
+            --require-temperature-window

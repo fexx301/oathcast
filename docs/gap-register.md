@@ -1,14 +1,15 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-17
+Last reviewed: 2026-08-18
 
-Current baseline: the public Miner runs `2026-08-16-route-v7`. The separate
+Current baseline: the public Miner runs `2026-08-17-temperature-v8`. The separate
 decision UI provides a read-only status shell and development fixture while its
-live API remains fail-closed without a runner. The v7 release adds the exact
-registered `/predict` route at both Caddy and application boundaries. It passed
-the Python repository suite, the Go WASM suite, a disposable-container smoke, public
-identity/write-readiness checks, exact `/predict`/canonical receipt parity, and
-restart/replay persistence on the live receipt volume. OathCast is registered
+live API remains fail-closed without a runner. V8 retains the exact registered
+`/predict` route and enables the additive 1-to-24-hour `hourly=2t` compatibility
+path with `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. It passed a disposable
+candidate run, strict public identity/write-readiness checks, exact
+`/predict`/canonical parity for both forecast contracts, v7-to-v8 receipt replay,
+and restart persistence on the live receipt volume. OathCast is registered
 on Base Sepolia as on-chain registration ID `78` and active in the Telegraph
 dispatcher as routing ID `64173`, slug `oathcast-weather`.
 
@@ -25,13 +26,14 @@ breakdown-layout blocker before a registration candidate can be frozen.
   canonical HTTPS, exact `WEATHER_FORECAST` semantics, endpoint query contracts,
   and signal mappings. Slug availability remains a live portal check; routing-ID
   collision inspection is conservative and is not the on-chain registration ID.
-- Local compatibility implementation for the team-requested temperature shape
+- Deployed additive compatibility for the team-requested temperature shape
   `forecast_hours=1..24&hourly=2t` on `/predict` and
   `/v1/forecast/point`. It starts at the next complete UTC hour and returns only
   `content`, `reference_time`, `hourly`, and `hourly_units` with RFC3339/Kelvin
-  values. The path is unregistered and undeployed; the protected registered YAML
-  and its one-hour precipitation contract are unchanged. `/v1/forecast/window`
-  retains its separate legacy start/end contract.
+  values. The path is live but unregistered; the protected registered YAML and
+  its one-hour precipitation contract are unchanged. The legacy
+  `/v1/forecast/window` path is not publicly exposed and returns 404. The strict
+  v8 smoke requires this response and registered/canonical path parity.
 - Release provenance through a non-secret release ID, source-tree digest, and
   image digest fields exposed by `/healthz` and response headers.
 - `/readyz` readiness endpoint and a reproducible public Miner smoke script
@@ -56,16 +58,25 @@ breakdown-layout blocker before a registration candidate can be frozen.
   including a restore-count check and tests that refuse accidental overwrite.
 - An external-canary entry point plus a no-cost scheduled GitHub Actions
   workflow. The repository secret is configured, missing-secret runs fail
-  visibly, and the workflow is pinned to the deployed v7 identity.
+  visibly, and the workflow is pinned to the deployed v8 identity and requires
+  the temperature-window check.
 - The historical registered-path 404 is fixed in release
   `2026-08-16-route-v7`: Caddy routes exact `/predict`, the Miner accepts
   `/predict` and `/v1/forecast/point`, both paths share auth/rate limits and one
   receipt, and the smoke test rejects empty or invalid answers. Public HTTPS,
   exact v6-to-v7 replay, restart persistence, SQLite integrity, and sanitized
   logs all passed. A later epoch-202 observation still scored OathCast `0`, rank
-  `6/6`, because the scorer requests 24 hours while the live Miner serves the
-  registered one-hour contract. The local 24-hour fix is undeployed, so no
-  corrected live score exists.
+  `6/6`, because the scorer requested 24 hours while the then-live v7 Miner
+  served the registered one-hour contract. V8 now serves that additive request
+  shape, but no corrected official Telegraph evaluation has been observed.
+- Release `2026-08-17-temperature-v8` reproduced the exact 66-file source digest
+  `edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`
+  on the host and runs image
+  `sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672`.
+  All nine strict public smoke checks passed, the v7 receipt replayed exactly,
+  forecast and temperature receipts survived restart, and the live database
+  remained at 19 rows with integrity `ok`. Stopped
+  `oathcast-v7-rollback-20260817` preserves the immediate rollback target.
 - A demo ablation mode that runs the Application with the owned Miner disabled
   and asserts that valid external responses still drive the decision.
 - Staging API-key rotation: the old/new overlap was exercised through public
@@ -182,9 +193,9 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Actionable next, not platform-blocked
 
-- Keep the deployed v7 Miner and its recurring canary pinned to the release,
-  source, and image identities; retain stopped
-  `oathcast-v6-rollback-20260816` until v7 has accumulated an adequate stable
+- Keep the deployed v8 Miner and its recurring canary pinned to the release,
+  source, image, and required temperature-window check; retain stopped
+  `oathcast-v7-rollback-20260817` until v8 has accumulated an adequate stable
   operating window.
 - Run and verify the new provider-evidence freshness workflow. It alerts
   separately on stale collection and stale resolution; workflow code is local

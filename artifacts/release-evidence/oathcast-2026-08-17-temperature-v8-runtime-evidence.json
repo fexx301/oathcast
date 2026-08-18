@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-17T23:53:02Z",
+  "release_id": "2026-08-17-temperature-v8",
+  "source_sha256": "edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c",
+  "repository_commit": "78b5b73acfaadf47352b3f988ccbfe5ff86586d8",
+  "source_verification": {
+    "manifest_path": "artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-manifest.json",
+    "expected_source_sha256": "edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c",
+    "host_recomputed_source_sha256": "edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c",
+    "file_count": 66,
+    "clean_source_bundle_sha256": "d33447b7016911245d19ed371c05b555fc149904f4ac10bb8310756c54f85729",
+    "verified": true,
+    "build_root": "<release-root>/source-clean",
+    "initial_archive_rejected_before_build": true,
+    "initial_archive_rejection_reason": "Six macOS AppleDouble metadata files were present as extras; a clean 66-file archive was transferred and required to match the manifest exactly before backup, build, or cutover."
+  },
+  "image": {
+    "name": "oathcast:2026-08-17-temperature-v8",
+    "image_id": "sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672",
+    "image_digest": "sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672",
+    "created_at": "2026-08-17T23:28:48.701421624Z",
+    "built_on_host": true,
+    "labels": {
+      "org.opencontainers.image.title": "OathCast Miner",
+      "org.opencontainers.image.version": "2026-08-17-temperature-v8",
+      "org.opencontainers.image.revision": "edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c"
+    }
+  },
+  "runtime": {
+    "container_name": "oathcast",
+    "container_id": "37fd1f27e3503df7b1a27e25ec23ed65f3b0243711348ba857a305e91dfeca5e",
+    "status": "running",
+    "health": "healthy",
+    "started_at_after_restart": "2026-08-17T23:47:30.589100369Z",
+    "restart_policy": "unless-stopped",
+    "network_mode": "default",
+    "runtime_user": "1000:1000",
+    "temperature_window_enabled": true,
+    "temperature_window_env": "OATHCAST_ENABLE_TEMPERATURE_WINDOW=true",
+    "auth_required": true,
+    "durable_mount": "<release-data>:/data/oathcast",
+    "port_binding": "127.0.0.1:8080->8080/tcp",
+    "public_base_url": "https://oathcastcourt.duckdns.org"
+  },
+  "rollback": {
+    "container_name": "oathcast-v7-rollback-20260817",
+    "container_id": "093e9c5b5f57c9d34a0ee15ae037fa216143b603e27efaa53a842e8907f12827",
+    "status": "exited",
+    "image_name": "oathcast:2026-08-16-route-v7",
+    "image_id": "sha256:8bee7d497c0182b8899ad6ebbe162e89296d732311801edeaa26885665db4fac",
+    "release_id": "2026-08-16-route-v7",
+    "source_sha256": "3789e1ce6903c227e96869f29e570a822b93c59fe860243d840a3f43b6498557",
+    "durable_mount": "<release-data>:/data/oathcast",
+    "port_binding": "127.0.0.1:8080->8080/tcp"
+  },
+  "caddy": {
+    "container_name": "oathcast-caddy",
+    "container_id": "d860ddcbcf5941ac50c7a35729724847130723fd4815754a1ad7393c70abccc0",
+    "image_id": "sha256:af555904a0961945f16bb323a501457b13a4f7e9bde969b145b97da80b38ecbe",
+    "network_mode": "host",
+    "config_sha256": "5273d4429b6a0aa58d374a49c55934e7b3e3931d17dbb9e5590a7850f1b5c970",
+    "production_image_validation_passed": true,
+    "config_changed": false
+  },
+  "database": {
+    "live_path": "<release-data>/receipts.sqlite3",
+    "backup": {
+      "backup": {
+        "backup_row_count": 18,
+        "bytes": 131072,
+        "integrity_check": "ok",
+        "path": "<release-root>/backups/receipts-v7-pre-v8.sqlite3",
+        "restore_check": true,
+        "sha256": "cfb3ef63b768a123688771c83a1faf2da92523ab52b97449b901d02f115df0bf",
+        "source_open_mode": "ro",
+        "source_row_count": 18
+      },
+      "database": "<release-data>/receipts.sqlite3",
+      "source_integrity_check": "ok",
+      "verified_at": "2026-08-17T23:27:43.592284Z"
+    },
+    "row_count_before_deployment": 18,
+    "row_count_after_initial_live_temperature_smoke": 19,
+    "pre_restart": {
+      "row_count": 19,
+      "integrity_check": "ok"
+    },
+    "post_restart": {
+      "row_count": 19,
+      "integrity_check": "ok"
+    },
+    "receipt_row_delta_after_restart_replay": 0,
+    "final_integrity_check": "ok"
+  },
+  "candidate": {
+    "container_name": "oathcast-v8-candidate-20260817",
+    "container_id": "6b324f7944b705b3c0df69d4bebc96113423dd8789416ffc73247efe59589852",
+    "image_id": "sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672",
+    "base_url": "http://127.0.0.1:18080",
+    "database_copy": "<release-root>/candidate-data/receipts.sqlite3",
+    "initial_row_count": 18,
+    "row_count_after_first_smoke": 19,
+    "row_count_after_restart_replay": 19,
+    "before_restart_smoke_passed": true,
+    "after_restart_smoke_passed": true,
+    "forecast_fingerprints_persisted": true,
+    "temperature_fingerprints_persisted": true,
+    "temperature_window_enabled": true,
+    "runtime_user": "1000:1000",
+    "status_at_recording": "removed after validation",
+    "copied_database_removed_after_validation": true,
+    "cleanup_at": "2026-08-17T23:56:16Z"
+  },
+  "verification": {
+    "loopback_strict_smoke_passed": true,
+    "public_strict_smoke_passed": true,
+    "public_post_restart_smoke_passed": true,
+    "receipt_write_probe_required": true,
+    "receipt_write_probe_passed": true,
+    "public_unauthenticated_predict_status": 401,
+    "public_registered_path_status": 200,
+    "public_canonical_path_parity_passed": true,
+    "public_temperature_window_passed": true,
+    "public_temperature_path_parity_passed": true,
+    "v7_to_v8_replay_passed": true,
+    "post_restart_forecast_receipt_persisted": true,
+    "post_restart_forecast_response_persisted": true,
+    "post_restart_temperature_receipt_persisted": true,
+    "post_restart_temperature_response_persisted": true,
+    "live_log_sanitization_passed": true,
+    "live_log_observation": "Structured logs contained method, path, request ID, response bytes, and status only; no query strings, bearer tokens, or response bodies were emitted."
+  },
+  "public_smoke_command": "PYTHONPATH=src python3 scripts/smoke_miner.py --base-url https://oathcastcourt.duckdns.org --expected-release-id 2026-08-17-temperature-v8 --expected-source-sha256 edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c --expected-image-digest sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672 --require-receipt-write-probe --require-temperature-window --question-file <v7-replay-question.json>",
+  "boundaries": {
+    "wasm_uploaded_registered_or_signed": false,
+    "wallet_action_performed": false,
+    "paid_telegraph_request_created": false,
+    "telegraph_request_created": false,
+    "aws_security_group_changed": false,
+    "docs_edited": false
+  },
+  "post_deployment_cleanup": {
+    "recorded_at": "2026-08-18T00:08:15Z",
+    "security_group_id": "sg-086d2585c6a32fa07",
+    "temporary_ssh_rule_id": "sgr-069d7a988d1d77b48",
+    "temporary_ssh_rule_source": "102.89.32.111/32",
+    "temporary_ssh_rule_port": 22,
+    "temporary_ssh_rule_removed": true,
+    "remaining_public_tcp_ports": [80, 443],
+    "public_healthz_status": 200,
+    "public_readyz_status": 200,
+    "external_port_22_probe": "connection timed out",
+    "external_port_8080_probe": "connection timed out"
+  },
+  "evidence": {
+    "manifest": "artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-manifest.json",
+    "public_smoke": "artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-public-smoke.json",
+    "v7_to_v8_replay": "artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-replay.json",
+    "runtime": "artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-runtime-evidence.json"
+  },
+  "source_capture_sha256": {
+    "loopback_smoke": "2ed823163c120b7d5ccd246f9c6157159ec81a3bef8e4ac5398325835d844959",
+    "public_after_restart": "62ebf62357009999ef9bdb3499016ed77a8f2eb19d793eb67a1425c81584d045",
+    "public_smoke": "62ebf62357009999ef9bdb3499016ed77a8f2eb19d793eb67a1425c81584d045",
+    "v7_before": "93199ae6e7b4eedd96d3af576b31352154b071243e641982e90b5197ea4c844d"
+  }
+}

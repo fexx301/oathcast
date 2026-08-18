@@ -4,12 +4,13 @@
 
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
-publicly on release `2026-08-16-route-v7`. The registered `GET /predict` route
-and canonical `GET /v1/forecast/point` route now share the same authenticated
-forecast and receipt path. The separate public UI exposes a
-truthful read-only status surface and client-only development fixture. Its live
-decision endpoint remains degraded and returns 503 because no reviewed paid
-Application runner is configured.
+publicly on release `2026-08-17-temperature-v8`. The registered `GET /predict`
+route and canonical `GET /v1/forecast/point` route share the same authenticated
+forecast and receipt path; v8 also enables an additive, unregistered temperature
+compatibility route without changing the protected registered YAML. The
+separate public UI exposes a truthful read-only status surface and client-only
+development fixture. Its live decision endpoint remains degraded and returns
+503 because no reviewed paid Application runner is configured.
 
 The repository also contains provider adapters, a cross-Miner Application
 scaffold, durable case and receipt stores, a development Script Author proxy,
@@ -63,14 +64,16 @@ emit "Yes"/"No" or claim an event did or did not happen, at any probability.
 Provider model names, retrieval timestamps, raw hashes, and native event
 definitions remain internal. All three adapters require an exact native hourly
 point; they refuse to choose a nearest point or invent a max/mean aggregation.
-The registered precipitation contract remains a one-hour UTC window. The local
-worktree also implements an unregistered temperature-only contract for
-`/predict?lat=...&lon=...&forecast_hours=24&hourly=2t`: `forecast_hours`
+The registered precipitation contract remains a one-hour UTC window. The
+deployed v8 service also exposes an additive, unregistered temperature-only
+contract for `/predict?lat=...&lon=...&forecast_hours=24&hourly=2t`:
+`forecast_hours`
 accepts `1..24`, the window starts at the next complete UTC hour, and the
-response contains RFC3339 `time` values plus Kelvin `2t` values. The same local
-shape is available at `/v1/forecast/point`; `/v1/forecast/window` retains its
-separate start/end legacy contract and rejects the new query shape. This work
-has not been deployed or substituted into the registered YAML.
+response contains RFC3339 `time` values plus Kelvin `2t` values. The same
+shape is available at `/v1/forecast/point`. The legacy
+`/v1/forecast/window` path is not publicly exposed and returns 404. This work is
+served additively in v8 and has not been substituted into, uploaded as, or
+re-registered through the protected YAML.
 
 Open-Meteo is the only adapter currently marked as a documented event match.
 WeatherAPI and OpenWeather are intentionally marked unverified until their
@@ -145,11 +148,12 @@ To run the local Miner HTTP service:
 It exposes `/healthz`, `/readyz`, the registered `/predict` route, and the
 canonical `/v1/forecast/point` route. The two forecast paths are exact aliases;
 near-miss paths return 404 and both aliases share authentication, rate limits,
-responses, and receipt identity. In the local worktree they accept both the
-registered one-hour start/end contract and the unregistered 1-to-24-hour
-`forecast_hours`/`hourly=2t` temperature contract. The separate local
-`/v1/forecast/window` route retains its legacy start/end window response and
-rejects the new query shape. The service uses Open-Meteo by default.
+responses, and receipt identity. With
+`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true` (enabled by the deployed v8 service),
+they also accept the additive, unregistered 1-to-24-hour
+`forecast_hours`/`hourly=2t` temperature contract. The legacy
+`/v1/forecast/window` route is not publicly exposed and returns 404. The service
+uses Open-Meteo by default.
 WeatherAPI/OpenWeather remain local adapter experiments and are blocked as
 production failovers until their event semantics are validated.
 The service rejects new forecasts at or after the declared cutoff, persists an
@@ -169,7 +173,7 @@ of an already-issued receipt always succeeds, even at capacity. Defaults are
 200,000 rows and 512 MiB, overridable with `OATHCAST_RECEIPT_MAX_ROWS` and
 `OATHCAST_RECEIPT_MAX_BYTES` (`none` disables a cap).
 
-The deployed v7 release retains v6's deliberately fail-closed replay contract.
+The deployed v8 release retains v6's deliberately fail-closed replay contract.
 New receipts freeze the exact digest-covered `public_response`; replay serves
 those stored bytes rather than invoking a newer renderer. If a legacy receipt
 lacks `public_response`, the current service returns HTTP 503
@@ -188,6 +192,14 @@ release/request headers. `compare_release_replay.py` compares two smoke reports
 and proves a stored event's receipt and public response survived a release
 cutover unchanged.
 
+The current public identity is release `2026-08-17-temperature-v8`, source
+SHA-256 `edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`,
+and image digest
+`sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672`.
+The strict public smoke, v7-to-v8 replay, and runtime evidence are retained under
+`artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-*`; stopped
+`oathcast-v7-rollback-20260817` is the immediate Miner rollback target.
+
 `create_registration_draft.py` first requires that local check to pass, then
 records an unsigned registration snapshot. It hashes the exact YAML bytes and
 keeps price, pinned YAML URI, and fee address as explicit registration inputs;
@@ -197,7 +209,8 @@ or submits `registerMiner`.
 `public_canary.py` is the same no-state check intended to run from an
 independent scheduler such as GitHub Actions; `.github/workflows/oathcast-canary.yml`
 contains the no-cost scheduled path and expects the API key in a repository
-secret. See `docs/repository-and-canary.md` for the safe repository/secret
+secret. The v8 canary additionally requires the 24-hour temperature response and
+alias parity. See `docs/repository-and-canary.md` for the safe repository/secret
 setup. `backup_receipts.py` uses SQLite's online backup API, runs integrity
 checks on both copies, and verifies that the row count survives restoration.
 Because it initializes the current receipt store, use raw read-only `sqlite3.backup`

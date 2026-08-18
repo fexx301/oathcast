@@ -1,0 +1,102 @@
+{
+  "base_url": "https://oathcastcourt.duckdns.org",
+  "checks": [
+    {
+      "name": "healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "readyz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "accepting_new_receipts": true,
+      "bytes_headroom_percent": 99.974,
+      "name": "receipt_capacity",
+      "ok": true,
+      "reported": true,
+      "rows_headroom_percent": 99.99
+    },
+    {
+      "cached": false,
+      "name": "receipt_store_write",
+      "ok": true,
+      "probe": "sqlite_transactional_write",
+      "reported": true,
+      "required": true,
+      "rolled_back": true
+    },
+    {
+      "name": "unauthorized_rejected",
+      "ok": true,
+      "path": "/predict",
+      "status": 401
+    },
+    {
+      "event_id": "canary-lagos-20260818T1200z",
+      "name": "authenticated_forecast",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "74ddf1cb5deca709cdbf22e95ecd3bf621069ff062c7f2b56aedcba8ee1cb10a",
+      "receipt_sha256": "1cd5d1d3c691bea8c73b1f6ef075eca343ddc9c872edc143da46ce736946d7ef",
+      "request_id": "smoke-release",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "canonical_path_parity",
+      "ok": true,
+      "public_response_sha256": "74ddf1cb5deca709cdbf22e95ecd3bf621069ff062c7f2b56aedcba8ee1cb10a",
+      "receipt_sha256": "1cd5d1d3c691bea8c73b1f6ef075eca343ddc9c872edc143da46ce736946d7ef",
+      "registered_path": "/predict",
+      "status": 200
+    },
+    {
+      "event_id": "smoke-temperature-20260817T23z",
+      "expected_reference_time": "2026-08-17T23:00:00Z",
+      "forecast_hours": 24,
+      "hourly": "2t",
+      "name": "authenticated_temperature_window",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "5db2667197f53ef8463bd0bc3c07bfff32e59be567171f33276d8edb0755aefc",
+      "receipt_sha256": "f88b7a649799df4da5c080dbb73e3c77da2b90658fa1954a6d069f1a1f5f46e8",
+      "request_id": "smoke-release-temperature",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "temperature_path_parity",
+      "ok": true,
+      "public_response_sha256": "5db2667197f53ef8463bd0bc3c07bfff32e59be567171f33276d8edb0755aefc",
+      "receipt_sha256": "f88b7a649799df4da5c080dbb73e3c77da2b90658fa1954a6d069f1a1f5f46e8",
+      "registered_path": "/predict",
+      "status": 200
+    }
+  ],
+  "ok": true,
+  "question": {
+    "event_id": "canary-lagos-20260818T1200z",
+    "forecast_cutoff": "2026-08-18T11:00:00Z",
+    "horizon_end": "2026-08-18T13:00:00Z",
+    "horizon_start": "2026-08-18T12:00:00Z",
+    "latitude": 6.5244,
+    "location_name": "Lagos",
+    "longitude": 3.3792,
+    "metric": "precipitation",
+    "operator": ">",
+    "precipitation_type": "measurable",
+    "spatial_semantics": "point",
+    "threshold_mm": 0.1,
+    "timezone": "UTC"
+  },
+  "release": {
+    "contract_version": "forecast_contract_v1",
+    "image_digest": "sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672",
+    "release_id": "2026-08-17-temperature-v8",
+    "source_sha256": "edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c"
+  },
+  "release_id": "2026-08-17-temperature-v8"
+}
