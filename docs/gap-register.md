@@ -77,9 +77,9 @@ breakdown-layout blocker before a registration candidate can be frozen.
 - An external-canary entry point plus a no-cost scheduled GitHub Actions
   workflow. The repository secret is configured, missing-secret runs fail
   visibly, and the workflow requires the temperature-window check. Its checked-in
-  release-evidence pin is currently v11 and therefore stale against live v16;
-  repinning remains an explicit follow-up after sanitized v16 evidence is
-  retained in the repository.
+  release-evidence pin now resolves the live v16 identity through sanitized
+  manifest, final public-smoke, replay, and runtime-evidence artifacts. The
+  workflow integrity test invokes the production evidence loader.
 - The historical registered-path 404 is fixed in release
   `2026-08-16-route-v7`: Caddy routes exact `/predict`, the Miner accepts
   `/predict` and `/v1/forecast/point`, both paths share auth/rate limits and one
@@ -231,6 +231,25 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Actionable next, not platform-blocked
 
+- Revert the two zeroing rules introduced after registration `96`. Registration
+  `98` won `28/32` where the previous three builds all won `31/32`, so those two
+  changes cost three cases. `relation_mismatch` was promoted from the ambiguity
+  path, which caps at `0.49`, to `contradicted`, which returns zero, and
+  `question_entity_slot_substituted` returns zero as well; a correct answer that
+  trips either falls from a capped score that could still win to zero, which
+  cannot. Score stddev rose from `0.29768366` to `0.33863735`, consistent with
+  more answers being driven to zero.
+  Reverting will make the local ranking numbers worse: the `authorship_entity_swap`
+  tie and the `shared_token_distractor` inversion both return, and the ratcheted
+  floors will need loosening back. That conflict is real and the external measure
+  is the one that decides promotion.
+- Do not tune the scorer against locally authored corpora again without a held-out
+  check. Across four registrations local ranking improved monotonically while the
+  scored result went neutral, neutral, neutral, then down. Generated-pair
+  inversions fell from 66 of 375 to 9 and every suite stayed green while the win
+  count fell from 31 to 28. Prefer a cap over a zero unless a contradiction is
+  certain, because a zero can only remove a win a cap might have kept.
+
 - Registration `96` was rejected at Stage 2 on 2026-08-19 with candidate wins
   `31/32` against a champion at `32/32`, the same count as registrations `19` and
   `41`. The aggregate margin moved across the series, `0.31248063` then
@@ -304,11 +323,11 @@ breakdown-layout blocker before a registration candidate can be frozen.
   ceiling to a correct answer.
 
 - Keep deployed v16 stable and retain stopped `oathcast-v12-rollback-20260819`
-  as the immediate rollback target. The recurring workflow still points to the
-  checked-in v11 runtime-evidence file, so it is stale against live v16 and
-  should not be treated as a passing current-release canary. Retain equivalent
-  sanitized v16 runtime evidence locally before repinning and verifying the
-  workflow.
+  as the immediate rollback target. The recurring workflow now points to the
+  checked-in v16 runtime-evidence file and validates its linked manifest and
+  public smoke with the same loader used by the scheduled canary. Keep that
+  integrity gate green before treating a scheduled run as current-release
+  evidence.
 - Run and verify the new provider-evidence freshness workflow. It alerts
   separately on stale collection and stale resolution; workflow code is local
   until the branch is pushed and manually dispatched once.

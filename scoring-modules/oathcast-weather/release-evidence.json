@@ -2,7 +2,7 @@
   "schema_version": "oathcast_weather_wasm_release_evidence_v7",
   "recorded_at": "2026-08-15T09:19:22Z",
   "updated_at": "2026-08-18T00:30:26Z",
-  "status": "registration_96_rejected_at_stage_2_tie_hypothesis_open",
+  "status": "registration_98_regressed_to_28_of_32_revert_indicated",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
     "byte_size": 46809,
@@ -88,6 +88,48 @@
       "historical_rows_evaluated": 0
     },
     "further_registration_authorized": false
+  },
+  "registration_98_result": {
+    "registration_id": 98,
+    "chain_id": 84532,
+    "transaction_hash": "0x8a4ba0b781ebfec3586cbc54cbb53f28dd0d5978c6b29892a5dbc1992b195eb4",
+    "block_number": 45702504,
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "registrant": "0x7dc9c9d535b68c3c6273e3323f0e52e5851c3278",
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "wasm_hash": "0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065",
+    "wasm_byte_size": 46809,
+    "wasm_sha256": "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95",
+    "hosted_bytes_verified": true,
+    "activation_status": "rejected",
+    "stage_1_passed": true,
+    "rejection_reason": "lost to the current champion on ordering: candidate won 28 of 32 comparable cases while the champion won 32 of 32.",
+    "eval_details": {
+      "candidate_margin": 0.36663616,
+      "champion_margin": 0.37360683,
+      "candidate_wins": 28,
+      "champion_wins": 32,
+      "comparable_cases": 32,
+      "score_stddev": 0.33863735,
+      "historical_rows_evaluated": 0
+    },
+    "outcome_note": "This is the first regression in the series. The previous three builds all won 31 of 32; this one won 28, so the two changes made after registration 96 cost three cases.",
+    "further_registration_authorized": false
+  },
+  "overfitting_finding": {
+    "series": [
+      {"registration_id": 19, "wins": "31/32", "candidate_margin": 0.31248063, "score_stddev": 0.26765382},
+      {"registration_id": 41, "wins": "31/32", "candidate_margin": 0.37852418, "score_stddev": 0.29563302},
+      {"registration_id": 96, "wins": "31/32", "candidate_margin": 0.37149292, "score_stddev": 0.29768366},
+      {"registration_id": 98, "wins": "28/32", "candidate_margin": 0.36663616, "score_stddev": 0.33863735}
+    ],
+    "what_the_series_shows": "Local ranking quality improved monotonically across these builds while the external measure went neutral, neutral, then down. Generated-pair inversions fell from 66 of 375 to 9 of 375 and all ten handwritten pools went from 7 separated with 1 tie and 2 inversions to 10 separated with none, and across the same span Telegraph's per-case win count went 31, 31, 31, 28. The entity-binding, ordinal and weather-classifier fixes were neutral against their fixtures. The two changes in registration 98 were actively harmful.",
+    "leading_mechanism": "Both changes made after 96 convert a signal that previously capped a score into one that zeroes it: relation_mismatch was promoted from ambiguous_or_stuffed, which applies score.min(0.49), to contradicted, which returns zero, and question_entity_slot_substituted returns zero as well. A correct answer that trips either rule falls from a capped score that could still beat its paired wrong answer to zero, which loses the case. The score standard deviation rising from 0.29768366 to 0.33863735 is consistent with more answers being driven to zero.",
+    "why_local_measurement_did_not_catch_it": "The ranking pools and the generated pairs were written by us, so a rule that fires only on shapes we did not think of is invisible to them. Both new rules were validated against 53 native tests, 88 factual pairs, 27 fixture cases, 10 pools and 375 generated pairs, and all of them agreed the change was an improvement or neutral. The benchmark is a sound regression guard for properties we chose and is not a proxy for hidden fixtures.",
+    "correction_to_earlier_reasoning": "The tie hypothesis recorded under cross_registration_finding predicted that fixing a tie would move the win count up. The count moved down. That does not confirm or refute the hypothesis about the one originally failing case, because the same build introduced two zeroing rules whose harm could mask any gain, but it does mean the hypothesis is untested rather than supported.",
+    "implication": "Registration 96's scoring behaviour is the best externally measured state, at 31 of 32 tied with 41 and 19. Reverting the two zeroing changes is the action indicated by the only measurement that is actually scored. Doing so will make the local ranking numbers worse: the authorship_entity_swap tie and the shared_token_distractor inversion both return. That conflict is real and the external measure is the one that decides promotion.",
+    "rule_going_forward": "Do not tune the scorer against locally authored corpora without a held-out check. A hard zero is especially dangerous, because it can only ever remove a win that a capped score might have kept. Prefer a cap over a zero unless the contradiction is certain."
   },
   "cross_registration_finding": {
     "observation": "Three structurally different scorer builds produced an identical 31 of 32 per-case ordering result against a champion that wins 32 of 32.",

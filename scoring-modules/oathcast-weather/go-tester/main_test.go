@@ -84,7 +84,7 @@ func TestArtifactContract(t *testing.T) {
 	if evidence.SchemaVersion != "oathcast_weather_wasm_release_evidence_v7" {
 		t.Fatalf("unexpected release evidence schema %q", evidence.SchemaVersion)
 	}
-	if evidence.Status != "registration_96_rejected_at_stage_2_tie_hypothesis_open" {
+	if evidence.Status != "registration_98_regressed_to_28_of_32_revert_indicated" {
 		t.Fatalf("unexpected release evidence status %q", evidence.Status)
 	}
 	if !evidence.Artifact.RegistrationCandidate {

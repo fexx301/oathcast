@@ -466,6 +466,65 @@ subject row repeated the same string for the attribute and its rival, and anothe
 gave Tokyo the rival attribute "a port city in Japan", which Tokyo is. A true
 statement was being counted as a wrong answer.
 
+## Every local number improved. The only scored one got worse.
+
+**2026-08-19.** Four scoring-module registrations, measured by Telegraph's hidden
+32-case fixture set:
+
+| registration | wins | candidate margin | score stddev |
+| --- | --- | --- | --- |
+| 19 | 31/32 | 0.31248063 | 0.26765382 |
+| 41 | 31/32 | 0.37852418 | 0.29563302 |
+| 96 | 31/32 | 0.37149292 | 0.29768366 |
+| 98 | **28/32** | 0.36663616 | 0.33863735 |
+
+Across that same span the local measurements moved one way only. Generated-pair
+inversions fell from 66 of 375 to 9. The ten handwritten ranking pools went from 7
+separated with 1 tie and 2 inversions to 10 separated with neither. Five defects
+were found, each with a regression test and a ratcheted floor. Every suite was
+green at every step.
+
+The external result went neutral, neutral, neutral, then **down three cases**.
+
+So the three middle fixes — entity binding, inserted ordinals, the weather
+classifier — were worth nothing against the fixtures that decide promotion, and the
+two changes after registration 96 were worth *less* than nothing.
+
+The mechanism is not mysterious in hindsight. Both of those last two changes convert
+a signal that previously **capped** a score into one that **zeroes** it:
+`relation_mismatch` moved from the ambiguity path, which applies
+`score.min(0.49)`, to `contradicted`, which returns zero; and the slot-substitution
+rule returns zero as well. A correct answer that trips either falls from a capped
+score that could still beat its paired wrong answer to zero, which loses the case
+outright. The score standard deviation rising from `0.2977` to `0.3386` is what a
+build with more zeros in it looks like.
+
+Both rules were validated against 53 native tests, 88 factual pairs, 27 fixture
+cases, 10 pools and 375 generated pairs. All of them agreed. They agreed because
+**we wrote them**: a rule that misfires only on shapes we did not think of is
+invisible to a corpus we authored. The benchmark is a sound regression guard for the
+properties it encodes. It is not a proxy for a fixture set we cannot see, and
+treating a rising local score as evidence of external progress was the error.
+
+Two things worth keeping, beyond the obvious one about held-out data.
+
+**A hard zero is asymmetric.** It can only ever remove a win that a capped score
+might have kept. A cap that is too aggressive costs margin; a zero that is too
+aggressive costs the case. Given uncertainty about whether a signal means "false" or
+merely "unclear", the cap is the conservative choice, and I chose the zero twice in
+one build.
+
+**The measurement I trusted was the one I could improve.** The local benchmark gave
+fast, legible, monotonically improving feedback, and the external one gave a single
+integer every few hours. That asymmetry in convenience is exactly how optimisation
+pressure ends up pointed at the wrong target, and the safeguard is not better local
+metrics but a standing suspicion of them.
+
+Registration 96 remains the best externally measured state. Reverting the two
+zeroing rules is what the only scored measurement indicates, and it will make the
+local ranking numbers worse: the tie and the inversion both come back. That conflict
+is real, and the external measure is the one that decides.
+
 ## What this list has in common
 
 Seven of these are the same failure: a probe that returned a reassuring answer
