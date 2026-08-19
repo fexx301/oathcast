@@ -220,11 +220,25 @@ func scorePairsWithEngine(t *testing.T, engine wasmEngine, pairs []generatedPair
 	return out
 }
 
-// maxEngineVerdictFlips is a recorded ceiling, measured not chosen. A flip is a
-// generated pair that clears the Stage 2 margin floor under one engine and
-// fails it under the other, which is the concrete way this bug could cost a
-// case. Raising this number requires an explanation.
-const maxEngineVerdictFlips = 0
+// Recorded ceilings, measured not chosen.
+//
+// A flip is a generated pair that clears the Stage 2 margin floor under one
+// engine and fails it under the other, which is the concrete way this bug could
+// cost a case. That is the number that matters most.
+//
+// maxDivergingGeneratedPairs exists because the raw count moved from 84 to 90
+// with no test noticing, and was caught by reading a CI log. Every other quantity
+// in this file is ratcheted; leaving engine sensitivity unratcheted meant a
+// scoring change could quietly widen it. That increase turned out to be benign
+// (see below), but the point is that nothing established it was benign until
+// someone went looking.
+//
+// Both are platform-dependent by design: on arm64 the counts are zero and these
+// pass trivially, on amd64 they bite.
+const (
+	maxEngineVerdictFlips      = 0
+	maxDivergingGeneratedPairs = 90
+)
 
 func TestNearBoundaryEngineExposure(t *testing.T) {
 	pairs := generateBoundaryPairs()
@@ -339,6 +353,13 @@ func TestNearBoundaryEngineExposure(t *testing.T) {
 			id, reference[id].good, reference[id].bad, compiled[id].good, compiled[id].bad)
 	}
 
+	if len(scoreDiverged) > maxDivergingGeneratedPairs {
+		t.Errorf("%d generated pairs score differently between wazero's compiler and "+
+			"interpreter, want at most %d. Widening the module's engine sensitivity is "+
+			"a regression even when no verdict changes, because the margin that "+
+			"absorbed the shift may not exist in Telegraph's fixtures.",
+			len(scoreDiverged), maxDivergingGeneratedPairs)
+	}
 	if len(verdictFlips) > maxEngineVerdictFlips {
 		t.Errorf("%d generated pairs change their Stage 2 margin verdict depending on "+
 			"which wazero engine runs the module, want at most %d. A pass/fail that "+
