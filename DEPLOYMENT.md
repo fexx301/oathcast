@@ -12,7 +12,7 @@ public smoke output, and runtime details are archived under
 
 ## Current deployment status
 
-The deployed Miner is v10; stopped `oathcast-v8-rollback-20260818` is the
+The deployed Miner is v11; stopped `oathcast-v10-rollback-20260819` is the
 immediate Miner rollback target. Caddy configuration did not change for v8 and
 remains pinned by its retained hash. The v7, v6, v5, and v4 sections below are
 historical release records. The public decision UI is deployed separately. Its
@@ -261,7 +261,48 @@ security group exposes only ports 80 and 443. DuckDNS currently maps
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-08-18 - 1-to-24-hour window on the registered route (CURRENT)
+## Release 2026-08-19 - window release rebuilt from a clean bundle (CURRENT)
+
+Release v11 is v10's routing change rebuilt so its evidence is reproducible. The
+v10 image was built from the host working directory, which carries data, backups
+and caddy state beyond the manifest's include set, so the host could not
+recompute the manifest digest and `release_identity_from_evidence` had nothing
+honest to put in `host_recomputed_source_sha256`. Since `Caddyfile` is in the
+manifest include set, the edge change also moved the repository digest after the
+v10 manifest was written.
+
+- Release ID: `2026-08-19-window-v11`
+- Source manifest digest:
+  `03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659`
+- Runtime image ID:
+  `sha256:7f91d064a798be592681326ff812d286f718c120ea665fd5b7145b4d2ae03c39`
+- Built from `/home/ec2-user/oathcast/source-clean`, a 68-file bundle holding
+  exactly the manifest include set. The host recomputed the manifest digest from
+  that bundle and it matched the repository value **before** the build, so the
+  deployed image corresponds to a tree that reproduces its own digest.
+- Image labels carry the identity: `org.opencontainers.image.version` is the
+  release ID and `org.opencontainers.image.revision` is the source digest, which
+  is what the canary's evidence contract cross-checks.
+- All twelve strict public smoke checks passed, and the canary passes 12/12 when
+  run exactly as CI invokes it.
+- The frozen v8-era question `canary-lagos-20260819T1200z` was replayed by event
+  id against v11 and returned the same `receipt_sha256` `4cd26d60...` and the
+  same public-response digest. Receipt store integrity `ok`.
+- Stopped `oathcast-v10-rollback-20260819` is the immediate rollback target.
+- Build from the clean bundle, never from `~/oathcast` directly. The working
+  directory holds runtime state that is not in the manifest, so a build from it
+  produces an image whose provenance cannot be recomputed on the host.
+- Evidence:
+  `artifacts/release-evidence/oathcast-2026-08-19-window-v11-manifest.json`,
+  `oathcast-2026-08-19-window-v11-public-smoke.json`,
+  `oathcast-2026-08-19-window-v11-replay.json`, and
+  `oathcast-2026-08-19-window-v11-runtime-evidence.json`.
+
+The canary is pinned to this release's runtime evidence. A release that does not
+repin it leaves the canary asserting a stale identity and failing every 15
+minutes, which is what happened between the v10 cutover and this one.
+
+## Release 2026-08-18 - 1-to-24-hour window, first cut (HISTORICAL; SUPERSEDED BY V11)
 
 Release v10 answers Telegraph's 24-hour `WEATHER_FORECAST` requests. The handler
 previously called `question_from_query` directly, which enforces a one-hour

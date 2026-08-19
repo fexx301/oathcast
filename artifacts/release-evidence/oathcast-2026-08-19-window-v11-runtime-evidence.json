@@ -1,0 +1,68 @@
+{
+  "edge": {
+    "access_log": "stdout JSON; request>headers deleted and query stripped",
+    "caddyfile_sha256": "29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1",
+    "request_body_cap": "64KB on both handles",
+    "rollback_caddyfile": "Caddyfile.pre-access-log-20260818",
+    "security_headers": [
+      "Strict-Transport-Security",
+      "X-Content-Type-Options",
+      "Referrer-Policy"
+    ]
+  },
+  "evidence": {
+    "manifest": "artifacts/release-evidence/oathcast-2026-08-19-window-v11-manifest.json",
+    "public_smoke": "artifacts/release-evidence/oathcast-2026-08-19-window-v11-public-smoke.json",
+    "replay": "artifacts/release-evidence/oathcast-2026-08-19-window-v11-replay.json"
+  },
+  "image": {
+    "image_digest": "sha256:7f91d064a798be592681326ff812d286f718c120ea665fd5b7145b4d2ae03c39",
+    "image_id": "sha256:7f91d064a798be592681326ff812d286f718c120ea665fd5b7145b4d2ae03c39",
+    "labels": {
+      "org.opencontainers.image.revision": "03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659",
+      "org.opencontainers.image.title": "OathCast Miner",
+      "org.opencontainers.image.version": "2026-08-19-window-v11"
+    },
+    "name": "oathcast:2026-08-19-window-v11"
+  },
+  "public_smoke": {
+    "checks_passed": 12,
+    "checks_total": 12,
+    "ok": true,
+    "path": "artifacts/release-evidence/oathcast-2026-08-19-window-v11-public-smoke.json"
+  },
+  "recorded_at": "2026-08-19T05:11:44Z",
+  "release_id": "2026-08-19-window-v11",
+  "replay": {
+    "before_release_id": "2026-08-17-temperature-v8",
+    "byte_identical": true,
+    "frozen_event_id": "canary-lagos-20260819T1200z",
+    "note": "The v8-era question was replayed by event_id against v11 and returned the same receipt_sha256 and response digest.",
+    "path": "artifacts/release-evidence/oathcast-2026-08-19-window-v11-replay.json"
+  },
+  "repository_commit": "44688df8b0bc03ffff51a584d6f361dfd85cd65d",
+  "runtime": {
+    "container": "oathcast",
+    "port_binding": "127.0.0.1:8080:8080",
+    "receipt_integrity_check": "ok",
+    "receipt_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "receipt_rows": 54,
+    "restart_policy": "unless-stopped",
+    "rollback_container": "oathcast-v10-rollback-20260819",
+    "started_at": "2026-08-19T05:05:53.420652476Z",
+    "temperature_window_enabled": true,
+    "user": "1000:1000"
+  },
+  "schema_version": 1,
+  "scope": "Additive routing: multi-hour start/end spans on the registered route answer with the window response, plus public-edge access logging and the security headers. The registered YAML is unchanged and still matches its on-chain pin. Not an upload, signature, or re-registration.",
+  "source_sha256": "03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659",
+  "source_verification": {
+    "build_root": "/home/ec2-user/oathcast/source-clean",
+    "expected_source_sha256": "03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659",
+    "file_count": 68,
+    "host_recomputed_source_sha256": "03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659",
+    "manifest_path": "artifacts/release-evidence/oathcast-2026-08-19-window-v11-manifest.json",
+    "note": "Built from a clean 68-file bundle containing exactly the manifest include set. The host recomputed the manifest digest from that bundle and it matched the repository value before the build, so the deployed image corresponds to a source tree that reproduces its own digest.",
+    "verified": true
+  }
+}
