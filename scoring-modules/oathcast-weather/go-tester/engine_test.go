@@ -21,10 +21,13 @@ import (
 //	The two builds differ.        True but irrelevant. darwin/arm64 and
 //	                              linux/amd64 produce different bytes (2c1f7ad3
 //	                              vs 1daaf068, both 42,790 bytes, both matching
-//	                              the recorded platform digests). Running the
-//	                              linux bytes on the darwin host reproduced the
-//	                              darwin scores exactly, so the bytes do not
-//	                              carry the difference.
+//	                              the recorded platform digests; those are the
+//	                              digests of the build investigated at the time,
+//	                              not the current artifact, and are left as
+//	                              measured). Running the linux bytes on the
+//	                              darwin host reproduced the darwin scores
+//	                              exactly, so the bytes do not carry the
+//	                              difference.
 //	Our Rust is non-deterministic. No. The divergence reproduces on a single
 //	                              call into a freshly instantiated module, so it
 //	                              cannot come from allocator history or any
@@ -45,10 +48,15 @@ import (
 // fails loudly instead of being absorbed into a floor.
 //
 // The allowlist is a ceiling, not an expectation. It holds on arm64, where
-// nothing diverges, and it will keep holding if wazero fixes the backend.
+// nothing diverges, and it will keep holding if wazero fixes the backend. One
+// entry has already stopped firing: the entity-binding fix scores `unrelated`
+// 0.000000 on both engines, because the answer names a subject foreign to the
+// question, so that input no longer reaches the divergent path. It is retained
+// deliberately, since removing it would mean a reappearance failed the build for
+// the wrong reason.
 var knownEngineDivergences = map[string]string{
 	"ranking/negation_polarity/affirmative_paraphrase": "wazero v1.12.0 amd64 compiler: 0.49 vs interpreter 0.37",
-	"ranking/negation_polarity/unrelated":              "wazero v1.12.0 amd64 compiler: 0.49 vs interpreter 0.15",
+	"ranking/negation_polarity/unrelated":              "no longer diverges; zeroed by the entity-binding fix, retained as a ceiling",
 }
 
 type engineInput struct {

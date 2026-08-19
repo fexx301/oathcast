@@ -1274,6 +1274,214 @@ fn fact_anchors(question: &str, ground_truth: &str, weather_question: bool) -> F
     }
 }
 
+const MAX_BOUND_ENTITIES: usize = 24;
+
+/// True when `token` names the same entity as `other`, allowing the ordinary
+/// morphological variation between a place and its people or a noun and its
+/// plural.
+///
+/// `semantic_hash` has no general stemmer, only hand-written synonym groups for
+/// weather terms, so "Brazil" and "Brazilians" are unrelated hashes. A check that
+/// demanded an exact match would therefore treat the correct answer "Brazilians
+/// speak Portuguese" as having dropped Brazil, and penalise it. Prefix matching
+/// closes that specific hole without inventing a stemmer.
+///
+/// The bounds are what keep it from over-matching. Requiring five shared leading
+/// bytes and at most five trailing extras admits Brazil/Brazilians and
+/// Portugal/Portugal's, while still separating Portugal from Portuguese, which
+/// diverge at the seventh byte and are genuinely different entities. That pair is
+/// the reason the rule is a prefix test rather than a shared-stem test.
+fn entity_tokens_name_same(token: &[u8], other: &[u8]) -> bool {
+    if token_eq(token, other) {
+        return true;
+    }
+    let (shorter, longer) = if token.len() <= other.len() {
+        (token, other)
+    } else {
+        (other, token)
+    };
+    if shorter.len() < 5 || longer.len() - shorter.len() > 5 {
+        return false;
+    }
+    longer[..shorter.len()]
+        .iter()
+        .zip(shorter)
+        .all(|(left, right)| left.eq_ignore_ascii_case(right))
+}
+
+/// Collects the entity-like tokens of `text` that could carry a factual binding,
+/// skipping the relation words, weather signals, units and digits that are not
+/// entities.
+fn binding_entity_tokens<'a>(text: &'a str, out: &mut [&'a [u8]; MAX_BOUND_ENTITIES]) -> usize {
+    let mut len = 0usize;
+    for token in TokenIter::new(text) {
+        if len == out.len() {
+            break;
+        }
+        if !token_is_entity_like(token.bytes)
+            || is_fact_relation_or_filler(token.bytes)
+            || is_weather_anchor_signal(token.bytes)
+            || is_temporal_or_unit_anchor(token.bytes)
+            || is_context_provenance_or_modal(token.bytes)
+            || is_source_attribution_cue(token.bytes)
+            || token.bytes.first().is_some_and(u8::is_ascii_digit)
+        {
+            continue;
+        }
+        if out[..len]
+            .iter()
+            .any(|seen| entity_tokens_name_same(seen, token.bytes))
+        {
+            continue;
+        }
+        out[len] = token.bytes;
+        len += 1;
+    }
+    len
+}
+
+/// Tokens that can serve as evidence the answer named a *different* subject.
+///
+/// Deliberately stricter than `binding_entity_tokens`, and the asymmetry is the
+/// point. This rule returns a hard zero, so both of its halves should be biased
+/// against firing: presence of the expected subject is judged generously, and
+/// evidence of a substitute subject is judged strictly.
+///
+/// The strictness that matters is positional. A capital at the start of a
+/// sentence says nothing about whether the word is a name, so "That is correct."
+/// would otherwise read as naming an entity called That, and it scored zero
+/// before this was added. The boundary test is deliberately the strong one, which
+/// treats `.` `;` `!` `?` as sentence ends but not `,`: an earlier version used
+/// the ordinary clause boundary, which counted the comma in "Yes, K2 is the
+/// tallest mountain on Earth." and hid the substituted subject, taking the
+/// generated inversions back from 9 to 42. After a comma a capital is still
+/// informative. Acronyms and names containing digits are kept regardless of
+/// position, since their shape marks them as names on its own.
+fn foreign_entity_candidates<'a>(text: &'a str, out: &mut [&'a [u8]; MAX_BOUND_ENTITIES]) -> usize {
+    let mut len = 0usize;
+    let mut at_sentence_start = true;
+    let mut previous_end = 0usize;
+    for token in TokenIter::new(text) {
+        let start = token.end.saturating_sub(token.bytes.len());
+        if has_strong_clause_boundary(text, previous_end, start) {
+            at_sentence_start = true;
+        }
+        previous_end = token.end;
+        let positionally_ambiguous = at_sentence_start
+            && token_is_titlecase(token.bytes)
+            && !token_is_all_uppercase(token.bytes)
+            && !token.bytes.iter().any(u8::is_ascii_digit);
+        at_sentence_start = false;
+
+        if len == out.len() {
+            break;
+        }
+        if positionally_ambiguous
+            || !token_is_entity_like(token.bytes)
+            || is_fact_relation_or_filler(token.bytes)
+            || is_weather_anchor_signal(token.bytes)
+            || is_temporal_or_unit_anchor(token.bytes)
+            || is_context_provenance_or_modal(token.bytes)
+            || is_source_attribution_cue(token.bytes)
+            || token.bytes.first().is_some_and(u8::is_ascii_digit)
+        {
+            continue;
+        }
+        if out[..len]
+            .iter()
+            .any(|seen| entity_tokens_name_same(seen, token.bytes))
+        {
+            continue;
+        }
+        out[len] = token.bytes;
+        len += 1;
+    }
+    len
+}
+
+/// Detects an answer that swaps out the entity the question is about, in the one
+/// situation where nothing else in the scorer is looking.
+///
+/// `fact_anchors` deliberately drops truth tokens that already appear in the
+/// question, because an anchor the question gives away proves nothing about what
+/// the answer knows. For most shapes that is correct. It breaks for a question
+/// whose ground truth restates it: "Is Everest the tallest mountain on Earth?"
+/// answered by "Yes, Everest is the tallest mountain on Earth." leaves every
+/// content token in the question, so the anchor set comes out empty,
+/// `fact_anchor_assessment` returns `None`, and the score collapses to lexical
+/// overlap with no entity check anywhere in the path. An answer that copies the
+/// truth and swaps the subject then beats a correctly-bound paraphrase, measured
+/// at 0.8625 against 0.3700, and 45 of 45 generated pairs of this shape ranked
+/// the wrong answer first.
+///
+/// The caller must gate this on `fact_anchor_assessment` returning `None`. That
+/// is not a detail, it is what keeps the rule surgical. A first attempt applied it
+/// whenever the two halves below held and broke seven existing tests, because
+/// answers routinely do both halves innocently: "Paris." drops France, and
+/// "ECMWF expects rain tomorrow." drops the city while naming a forecast source.
+/// Restricting it to the case where the anchor machinery produced nothing at all
+/// means it can only add judgement where there was none, never override
+/// judgement that already exists.
+///
+/// Within that gate the condition is still conjunctive, because each half alone
+/// is something correct answers do:
+///
+///   * dropping the bound entity alone is what terse answers do, and "Yes." is
+///     not wrong for a yes/no question
+///   * naming an unfamiliar entity alone is what answers that add context do,
+///     and extra detail is not a contradiction
+///
+/// Requiring both means the answer talked about a different subject than the one
+/// asked about, which is a contradiction rather than a style difference.
+fn question_entity_substituted(question: &str, ground_truth: &str, answer: &str) -> bool {
+    let mut question_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut truth_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut answer_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let question_len = binding_entity_tokens(question, &mut question_entities);
+    let truth_len = binding_entity_tokens(ground_truth, &mut truth_entities);
+    let answer_len = binding_entity_tokens(answer, &mut answer_entities);
+    if question_len == 0 || answer_len == 0 {
+        return false;
+    }
+
+    // The entities the question asks about and the truth affirms. Agreement
+    // between the two is what makes them load-bearing: a name the truth
+    // introduces on its own is an anchor and already handled elsewhere.
+    let mut dropped_bound_entity = false;
+    for bound in &question_entities[..question_len] {
+        let affirmed_by_truth = truth_entities[..truth_len]
+            .iter()
+            .any(|candidate| entity_tokens_name_same(candidate, bound));
+        if !affirmed_by_truth {
+            continue;
+        }
+        let present_in_answer = answer_entities[..answer_len]
+            .iter()
+            .any(|candidate| entity_tokens_name_same(candidate, bound));
+        if !present_in_answer {
+            dropped_bound_entity = true;
+            break;
+        }
+    }
+    if !dropped_bound_entity {
+        return false;
+    }
+
+    let mut substitute_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let substitute_len = foreign_entity_candidates(answer, &mut substitute_entities);
+    substitute_entities[..substitute_len]
+        .iter()
+        .any(|candidate| {
+            let known_to_question = question_entities[..question_len]
+                .iter()
+                .any(|known| entity_tokens_name_same(known, candidate));
+            let known_to_truth = truth_entities[..truth_len]
+                .iter()
+                .any(|known| entity_tokens_name_same(known, candidate));
+            !known_to_question && !known_to_truth
+        })
+}
+
 fn fact_anchor_entity_representatives(
     text: &str,
     anchors: &HashSet<MAX_FACT_ANCHORS>,
@@ -2098,6 +2306,12 @@ struct FactAnchorAssessment {
     support: f32,
     contradicted: bool,
     ambiguous_or_stuffed: bool,
+    /// True when neither an entity anchor nor a context constraint was found, so
+    /// nothing here constrains which entity the answer bound. `support` can still
+    /// be meaningful in that state, because an acronym alone is enough to build
+    /// an assessment, which is why this is a separate flag rather than something
+    /// a caller can infer from `Option`.
+    no_binding_anchors: bool,
 }
 
 fn fact_anchor_assessment(
@@ -2422,6 +2636,7 @@ fn fact_anchor_assessment(
     Some(FactAnchorAssessment {
         support,
         contradicted,
+        no_binding_anchors: anchors.values.len == 0 && anchors.context_constraints.len == 0,
         ambiguous_or_stuffed: connector_ambiguity
             || relation_mismatch
             || directed_relation_mismatch
@@ -2721,6 +2936,21 @@ pub(crate) fn evaluate(
     if fact_assessment.is_some_and(|assessment| assessment.contradicted) {
         return zero(ISSUE_CONTRADICTORY_FACT_ANCHOR);
     }
+    // Gated on there being no anchor that constrains entity binding, which is
+    // exactly the shape this catches: a ground truth that restates its question
+    // leaves nothing to anchor on. Ungated, the rule overrides judgement that
+    // already exists and misreads terse answers and source citations as
+    // contradictions, which broke seven tests.
+    //
+    // The gate deliberately asks about anchors rather than about the assessment
+    // being `None`. An earlier version tested `is_none()` and silently missed 9
+    // of the 45 generated cases, because a long ground truth yields an acronym
+    // candidate, an acronym alone is enough to return `Some`, and the assessment
+    // then existed while still saying nothing about which entity was bound.
+    let unanchored_binding = fact_assessment.is_none_or(|assessment| assessment.no_binding_anchors);
+    if unanchored_binding && question_entity_substituted(question, ground_truth, answer) {
+        return zero(ISSUE_CONTRADICTORY_FACT_ANCHOR);
+    }
 
     if matches!(truth_polarity, Polarity::Positive | Polarity::Negative)
         && matches!(answer_polarity, Polarity::Positive | Polarity::Negative)
@@ -2811,6 +3041,99 @@ pub(crate) fn evaluate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_restated_question_still_penalises_a_swapped_subject() {
+        const Q: &str = "Is Everest the tallest mountain on Earth?";
+        const T: &str = "Yes, Everest is the tallest mountain on Earth.";
+
+        // The defect this closes. Before the fix the swapped subject scored
+        // 0.862500 by copying the truth's wording, while the correctly-bound
+        // paraphrase scored 0.370000, so the pool ranked backwards.
+        let swapped = evaluate(Q, T, "Yes, K2 is the tallest mountain on Earth.");
+        assert_eq!(swapped.score, 0.0, "{swapped:?}");
+        assert_ne!(swapped.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR, 0);
+
+        let bound = evaluate(Q, T, "Everest is indeed Earth's highest peak.");
+        assert!(bound.score > swapped.score, "{bound:?}");
+        assert_eq!(bound.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR, 0);
+    }
+
+    #[test]
+    fn dropping_the_subject_without_naming_another_is_not_a_substitution() {
+        const Q: &str = "Is Everest the tallest mountain on Earth?";
+        const T: &str = "Yes, Everest is the tallest mountain on Earth.";
+
+        // A terse answer omits the subject and is still correct. Only the
+        // conjunction of omission and a foreign subject is a contradiction, so
+        // each half alone has to stay clean.
+        for answer in ["Yes.", "Yes, it is.", "That is correct."] {
+            let evaluation = evaluate(Q, T, answer);
+            assert_eq!(
+                evaluation.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR,
+                0,
+                "{answer:?}: {evaluation:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_named_source_is_not_a_swapped_subject() {
+        // Attributing a forecast to its source names an entity that appears in
+        // neither question nor truth, while omitting the city. That is a
+        // citation, not a contradiction, and an earlier ungated version of this
+        // rule scored it zero.
+        let evaluation = evaluate(
+            "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+            "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+            "ECMWF expects rain during that hour.",
+        );
+        assert_eq!(
+            evaluation.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR,
+            0,
+            "{evaluation:?}"
+        );
+    }
+
+    #[test]
+    fn entity_matching_tolerates_demonyms_without_conflating_neighbours() {
+        // "Brazilians" has to count as naming Brazil, or the correct answer
+        // "Brazilians speak Portuguese." reads as having dropped the subject.
+        // There is no general stemmer in semantic_hash, so this is a bounded
+        // prefix rule.
+        assert!(entity_tokens_name_same(b"Brazil", b"Brazilians"));
+        assert!(entity_tokens_name_same(b"Portugal", b"Portugal's"));
+        assert!(entity_tokens_name_same(b"everest", b"Everest"));
+
+        // Portugal and Portuguese diverge at the seventh byte and are different
+        // entities. Conflating them would silently forgive the country swap in
+        // the shared_token_distractor pool, which is the case the prefix bound
+        // exists to preserve.
+        assert!(!entity_tokens_name_same(b"Portugal", b"Portuguese"));
+        assert!(!entity_tokens_name_same(b"Everest", b"K2"));
+        assert!(!entity_tokens_name_same(b"Spain", b"Spanish"));
+        // Below the five-byte floor only exact matches count, so a short name
+        // cannot prefix-match a longer unrelated one.
+        assert!(!entity_tokens_name_same(b"Nile", b"Niles"));
+    }
+
+    #[test]
+    fn a_subject_swap_is_only_judged_where_no_anchor_exists() {
+        // With an anchor available the existing assessment owns the verdict.
+        // "Paris." drops France and names an entity absent from the question, so
+        // an ungated rule scored it zero; the anchor path scores it properly.
+        let evaluation = evaluate(
+            "What is the capital of France?",
+            "Paris is the capital of France.",
+            "Paris.",
+        );
+        assert_eq!(
+            evaluation.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR,
+            0,
+            "{evaluation:?}"
+        );
+        assert!(evaluation.score > 0.0, "{evaluation:?}");
+    }
 
     const QUESTION: &str =
         "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?";

@@ -301,16 +301,16 @@ suite. Telegraph's unmodified official tester returned example score `0.8500`
 for the earlier 42,798-byte registration `41` artifact; it is not vendored here
 and has not been re-run against the current candidate. See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
-build commands and safeguards. The current frozen rank-only artifact is 42,790
+build commands and safeguards. The current frozen rank-only artifact is 44,838
 bytes with SHA-256
-`2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774` and
+`5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345` and
 raw-byte Keccak-256
-`0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`.
+`0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041`.
 Its fixture SHA-256 is
 `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
 Two isolated clean builds on the same host are byte-identical, but the artifact
 is **not** byte-identical across platforms: `darwin/arm64` and `linux/amd64` both
-emit 42,790 bytes with different content under the same pinned `rustc 1.95.0` and
+emit 44,838 bytes with different content under the same pinned `rustc 1.95.0` and
 target. The registered bytes are the `darwin/arm64` build, since registration
 identifies a specific hosted artifact rather than whatever a given machine
 compiles; `release-evidence.json` records both digests under
@@ -350,7 +350,7 @@ The historical bytes are not present in this workspace.
 
 The machine-readable v7 record in
 [`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json)
-records the 42,790-byte local candidate artifact, the registered 42,798-byte
+records the 44,838-byte local candidate artifact, the registered 42,798-byte
 registration `41` artifact, their local proxy evidence, the historical
 16,292-byte registration `19` artifact, and the scalar-build metadata
 separately. According to user-relayed Telegraph guidance,

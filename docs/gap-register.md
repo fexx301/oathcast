@@ -1,10 +1,14 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-18
+Last reviewed: 2026-08-19
 
-Current baseline: the public Miner runs `2026-08-18-window-v10`. The separate
-decision UI provides a read-only status shell and development fixture while its
-live API remains fail-closed without a runner. V10 retains the exact registered
+Current baseline: the public Miner runs `2026-08-19-window-v11`. V11 is the v10
+window behavior rebuilt from a clean 68-file source bundle so the host can
+reproduce source digest
+`03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659`.
+The separate decision UI provides a read-only status shell and development
+fixture while its live API remains fail-closed without a runner. V11 retains
+the exact registered
 `/predict` route and its one-hour precipitation contract, adds multi-hour
 `start`/`end` spans of 1 to 24 hours on that route so Telegraph's 24-hour
 requests are answered rather than refused, and keeps the additive
@@ -14,6 +18,16 @@ temperature checks, replayed the v8 receipt and public response byte-identically
 and left the live receipt database with integrity `ok`. OathCast is registered
 on Base Sepolia as on-chain registration ID `78` and active in the Telegraph
 dispatcher as routing ID `64173`, slug `oathcast-weather`.
+
+The local repair changes only the multi-hour timestamp boundary: production code
+accepts any aware ISO/RFC3339 `start`/`end`, normalizes `start` internally to
+the nearest whole UTC hour with deterministic half-up rounding, and derives
+`end` from that normalized start while preserving the original integral-hour
+duration. Explicit `forecast_cutoff` remains as
+provided. One-hour point and `forecast_hours=1..24&hourly=2t` behavior are
+unchanged. Focused window/registration tests pass `85/85`, full Python
+discovery passes `506/506` with loopback access, and Rust tests pass `41/41`.
+No deployment or other external action has occurred.
 
 This register separates work we can complete now that Miner registration is
 live from work that still depends on external participants, independent
@@ -152,15 +166,15 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `32/32`, with candidate margin `0.31248063`, champion margin `0.37360683`, and
   zero historical rows. According to user-relayed Telegraph guidance, these margins are not directly
   compared for promotion.
-- The current 42,790-byte factual-paraphrase artifact is reproducible and is an
+- The current 44,838-byte factual-paraphrase artifact is reproducible and is an
   unregistered local candidate: it has not been uploaded, hosted, signed, or
   registered. Its single change over the registration `41` bytes is a
   probability-scan fix in `percent_probability`, which previously abandoned the
   scan on the first `%` carrying no parseable number and so discarded a real
   percentage later in the same answer. Its SHA-256 is
-  `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774`
+  `5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345`
   and raw-byte Keccak-256
-  `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`.
+  `0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041`.
   The fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. All 88 synthetic factual pairs
@@ -207,20 +221,29 @@ breakdown-layout blocker before a registration candidate can be frozen.
 ## Actionable next, not platform-blocked
 
 - Decide whether to report the wazero amd64 compiler divergence upstream and to
-  Telegraph. The same registered module bytes score two ranking-pool inputs
+  Telegraph. The same registered module bytes score a ranking-pool input
   differently under wazero `v1.12.0`'s amd64 optimising compiler than under its
   interpreter or its arm64 compiler, on five-of-six agreeing configurations, and
   the divergence reproduces on a single call into a fresh instance. A minimal
-  reproduction exists; nothing has been filed and Telegraph has not been told.
-  Measured registration impact is none, because every factual-pair margin holds
-  under both engines and the affected inputs are local pools only. What is not
-  established is which runtime and engine Telegraph's validators use, so no
-  claim should be made about network-wide score reproducibility.
-- Fix the three recorded ranking defects, whose shared cause is that lexical
-  overlap with the ground truth outweighs correct entity binding. This changes
-  how `effective_semantic` and `assessment.support` combine and will move scores
-  across the whole corpus, so it needs the ranking benchmark as the arbiter and
-  an explicit decision before the scoring weights are touched.
+  reproduction exists; nothing has been filed. The question of which runtime and
+  engine Telegraph's validators use has been asked and is unanswered, so no claim
+  should be made about network-wide score reproducibility until it is.
+  Measured registration impact is none: every factual-pair margin holds under
+  both engines and no generated pair changes its Stage 2 verdict. That is not the
+  same as safety. On 375 generated near-miss-shaped pairs the divergence rate is
+  22.4 percent, and 17 of the 20 pairs sitting within 0.10 of the 0.15 margin
+  floor score differently between engines, with a worst margin shift of 0.282105
+  against a floor of 0.15. Nothing crossed the floor only because the generated
+  margins are bimodal and no pair was positioned to; a shift of nearly twice the
+  floor is more than sufficient to flip a verdict. Telegraph's hidden near-miss
+  cases are selected for sitting near a boundary, so they are more exposed than
+  this sample rather than less.
+- Fix the remaining attribute-discrimination defect. 18 of 375 generated pairs
+  keep the correct entity and swap the attribute, usually by inserting an ordinal
+  such as "second", and the two remaining ranking-pool defects sit on the
+  anchored path. The entity-binding rule cannot reach either by construction.
+  `generated_pair_scoreboard` in `release-evidence.json` is the measurement to
+  move; the ceilings are ratcheted so a change that degrades ranking fails.
 
 - Keep the deployed v8 Miner and its recurring canary pinned to the release,
   source, image, and required temperature-window check; retain stopped
@@ -277,6 +300,34 @@ breakdown-layout blocker before a registration candidate can be frozen.
   whenever `miners/oathcast-weather.yaml` is next re-registered, since the file
   is content-addressed at raw-byte SHA-256
   `9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e`.
+- Telegraph sent two authenticated 24-hour `start`/`end` requests from dispatcher
+  IP `13.237.89.59` on 2026-08-19 at `11:45:48Z` and `11:50:48Z`. Both omitted
+  `cutoff` and failed with HTTP 400 because `horizon_start` was not aligned to a
+  whole UTC hour. The pinned YAML says only `format: date-time`; its `start` and
+  `end` descriptions do not state that minutes, seconds, and fractional seconds
+  must be zero. Telegraph asked for that requirement to be explicit in the YAML.
+  Proposed wording for the next authorized pin: `start` is an inclusive RFC3339
+  UTC timestamp aligned to a whole UTC hour (minutes, seconds, and fractional
+  seconds must be zero), for example `2026-08-19T12:00:00Z`; `end` is the
+  exclusive RFC3339 UTC timestamp on the same whole-hour grid, exactly one to 24
+  whole hours after `start`.
+  A local prose edit cannot affect registration `78` because the YAML is
+  content-addressed. Do not round explicit timestamps in the Miner: that would
+  answer a different event and change receipt identity. The live request
+  generator must emit boundaries such as `2026-08-19T12:00:00Z`, or use the
+  separately documented `forecast_hours=1..24&hourly=2t` compatibility shape.
+  Any replacement YAML remains a reviewed, authorization-gated re-registration.
+- **Superseding local contract (2026-08-19):** the prior strict whole-hour
+  requirement remains historical incident evidence. The Miner must instead
+  accept any aware ISO/RFC3339 timestamps on multi-hour requests, round `start`
+  half-up to a whole UTC hour (`:30` and later rounds up), and derive `end` from
+  that normalized start while preserving the original integral-hour duration.
+  Preserve explicit `forecast_cutoff`; leave one-hour point and temperature
+  compatibility behavior unchanged. Production code and focused tests are
+  verified locally: focused tests pass `85/85`, full Python discovery passes
+  `506/506` with loopback access, and Rust tests pass `41/41`. No YAML edit,
+  deployment, upload, registration, deregistration, wallet action, commit, or
+  push occurred.
 - The deployed `2026-08-17-temperature-v8` service answers the additive
   `forecast_hours`/`hourly=2t` shape on the registered `/predict` route with
   `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`, but the registered YAML does not

@@ -299,7 +299,10 @@ extraction. Four hypotheses followed, and the first two were both wrong:
 
 **The two builds differ.** True, and irrelevant. darwin/arm64 and linux/amd64
 produce different bytes from identical source — `2c1f7ad3` against `1daaf068`,
-both 42,790 bytes, both matching the recorded platform digests. So the obvious
+both 42,790 bytes, both matching the recorded platform digests. (Those are the
+digests of the build under investigation that day; the scorer has changed since,
+and the current artifact is recorded in `release-evidence.json`. The numbers here
+are left as measured.) So the obvious
 story is that the Linux binary is a different program. Running the *Linux bytes
 on this Mac* reproduced the darwin scores exactly. The bytes do not carry the
 difference, and the platform digests recorded in the evidence were a red herring
@@ -341,6 +344,70 @@ all 256 corpus inputs are scored under both engines and any divergence outside
 the two recorded ones fails the build. Pinning the bug is not the same as fixing
 it; the point is that the next one cannot hide inside a threshold.
 
+## The wrong fix passed every test we had. Twice.
+
+**2026-08-19.** Telegraph's team reframed what the scoring module is for: not
+winning the canonical-script slot, but ranking miners well, so a better scorer
+improves the network's ranking of intelligence. That changed what to measure. A
+pass/fail against the 0.15 margin floor says nothing about ranking quality, which
+is why an earlier sweep of 324 generated cases reported **zero** failures while a
+real defect sat untouched.
+
+Measuring ranking instead found it immediately. Of 375 generated near-miss-shaped
+pairs, 66 ranked the wrong answer above the right one, and one template failed
+**45 of 45**: every pair whose ground truth restates its question.
+
+The cause is a deliberate decision that is right almost everywhere. `fact_anchors`
+drops ground-truth tokens that already appear in the question, because an anchor
+the question gives away proves nothing about what the answer knows. But for "Is
+Everest the tallest mountain on Earth?" answered by "Yes, Everest is the tallest
+mountain on Earth.", *every* content token is in the question. The anchor set comes
+out empty, the assessment returns `None`, and the score falls back to lexical
+overlap with no entity check anywhere in the path. So copying the truth and
+swapping the subject beat a correct paraphrase, 0.8625 against 0.3700.
+
+The fix is one narrow rule: penalise an answer that both drops an entity the
+question and truth agree on *and* asserts an entity foreign to both. Each half
+alone is innocent, which is the whole difficulty. It took three attempts, and the
+instructive part is which tests caught which mistake:
+
+**Ungated, it broke seven native tests.** Caught immediately by the existing
+suite, because correct answers do each half routinely: "Paris." drops France, and
+"ECMWF expects rain tomorrow." drops the city while naming a forecast source.
+
+**Using the ordinary clause boundary instead of the sentence boundary.** A comma
+counts as a clause boundary, so the capital in "Yes, **K2** is the tallest
+mountain on Earth." read as sentence-initial, and sentence-initial capitals are
+discarded as uninformative (otherwise "That is correct." names an entity called
+That). The substituted subject became invisible. **Every suite stayed green** —
+native tests, ABI tests, fixture corpus, all 88 factual pairs — and only the
+375-pair generator showed it, as inversions going from 9 back to 42.
+
+**Gating on the assessment being `None`.** Also green everywhere, and also wrong:
+a long ground truth yields an acronym candidate, an acronym alone is enough to
+return `Some`, and the assessment then existed while still saying nothing about
+which entity was bound. It silently missed 9 of the 45. The gate now asks whether
+any binding anchor exists, which is what was meant all along.
+
+Two of those three would have shipped. The pre-existing suite is not weak — it
+catches contradictions, stuffing, polarity, numerics, JSON, ABI abuse — but it was
+built to answer "is this answer scored correctly", and the question here is "are
+these two answers ordered correctly." A suite cannot catch a defect in a property
+it never measures.
+
+The generator was not innocent either. It charged three inversions to the scorer
+that belonged to its own table: one subject row had the same string for the
+attribute and the rival attribute, so the "wrong" answer was the ground truth
+verbatim and correctly scored 1.0. A measurement instrument needs its own
+invariants, and that row now fails a check rather than a scorer.
+
+Result: 66 inversions to 21, the 45-of-45 template to 3 of 45, ranking-pool
+inversions 2 to 1, worst separation `-0.4925` to `-0.0459`, with no regression in
+any pair margin under either wazero engine. What remains is a different defect:
+18 pairs keep the entity and swap the attribute, usually by inserting an ordinal
+like "second". An entity-binding rule cannot reach those by construction, so they
+are recorded as the next measured target rather than folded into this one.
+
 ## What this list has in common
 
 Seven of these are the same failure: a probe that returned a reassuring answer
@@ -362,6 +429,14 @@ the measuring apparatus** — a number attributed to the scorer that partly
 described the runtime executing it. The remedy is not a second observation but a
 stated one: say which engine produced a number, and assert that the numbers used
 as evidence do not depend on the answer.
+
+The entity-binding entry is the same lesson from the other side. Nothing there
+returned a false green through a broken probe; every test ran and reported
+honestly. Two wrong fixes still passed, because the suite measured whether an
+answer scores correctly and the defect was in whether two answers *order*
+correctly. That is the sharpest form of the pattern in this list: a green suite is
+evidence about the properties it measures and about nothing else, and the way out
+is not a better probe but a new measurement.
 
 That is also the argument for the receipt chain, and the reason the anchor is
 described as a commitment rather than a proof. A system that scores forecasts has

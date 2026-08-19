@@ -190,7 +190,7 @@ its three-string shape and fatal-zero/order constraints. The CI job is
 
 ## Evidence status
 
-The current frozen rank-only artifact is a 42,790-byte local candidate. Its
+The current frozen rank-only artifact is a 44,838-byte local candidate. Its
 single change from the registered 42,798-byte registration `41` build is a
 probability-scan fix in `percent_probability`, which previously abandoned the
 scan on the first `%` that carried no parseable number and so discarded a real
@@ -204,9 +204,9 @@ the size, SHA-256, and raw-byte Keccak-256 were independently checked:
 | Measurement | Value |
 |---|---|
 | Reproducible clean-build comparison | Two clean builds were byte-identical |
-| WASM byte size | `42,790` bytes |
-| WASM SHA-256 | `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774` |
-| Raw-byte Keccak-256 (portal-compatible) | `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a` |
+| WASM byte size | `44,838` bytes |
+| WASM SHA-256 | `5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345` |
+| Raw-byte Keccak-256 (portal-compatible) | `0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041` |
 | Fixture SHA-256 | `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f` |
 | Rust native tests | `40/40` passed |
 | Go/wazero suite | Full suite passed |
@@ -218,7 +218,7 @@ Registration `19` evaluated the earlier 16,292-byte artifact, SHA-256
 raw-byte Keccak-256
 `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
 That historical registered artifact is retained separately from both
-registration `41`'s 42,798-byte artifact and the current 42,790-byte local
+registration `41`'s 42,798-byte artifact and the current 44,838-byte local
 candidate.
 
 Registration `41` evaluated the 42,798-byte artifact. Its confirmed
@@ -260,7 +260,7 @@ passed, and Stage 2 rejected them at `31/32` ordering wins versus the champion's
 
 Registration `41` is the 42,798-byte artifact's retained validator
 result: hosted bytes match that recorded registration `41` build rather than the
-current 42,790-byte candidate, Stage 1 passed by reaching
+current 44,838-byte candidate, Stage 1 passed by reaching
 champion comparison, and Stage 2 rejected it at `31/32` versus the champion's
 `32/32`. No replacement registration is currently authorized. Before any future
 confirmation, decode a fresh complete wallet wrapper and nested call for the new

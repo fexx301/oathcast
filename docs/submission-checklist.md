@@ -59,12 +59,12 @@ relevant to that track.
   the node-log root cause as `module[env] not instantiated`; a six-`i32`/`f32`
   probe loaded far enough for the self-match check. These observations are
   historical, and neither the export nor any five-field result is current.
-- [x] Current 42,790-byte rank-only revision reproduced and locally verified:
+- [x] Current 44,838-byte rank-only revision reproduced and locally verified:
   two byte-identical clean builds;
   SHA-256
-  `2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774`;
+  `5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345`;
   raw-byte Keccak-256
-  `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`;
+  `0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041`;
   fixture SHA-256
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   It remains an unregistered local candidate: not uploaded, hosted, signed, or
