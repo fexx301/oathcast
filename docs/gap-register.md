@@ -220,24 +220,32 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Actionable next, not platform-blocked
 
-- Decide whether to report the wazero amd64 compiler divergence upstream and to
-  Telegraph. The same registered module bytes score a ranking-pool input
-  differently under wazero `v1.12.0`'s amd64 optimising compiler than under its
-  interpreter or its arm64 compiler, on five-of-six agreeing configurations, and
-  the divergence reproduces on a single call into a fresh instance. A minimal
-  reproduction exists; nothing has been filed. The question of which runtime and
-  engine Telegraph's validators use has been asked and is unanswered, so no claim
-  should be made about network-wide score reproducibility until it is.
-  Measured registration impact is none: every factual-pair margin holds under
-  both engines and no generated pair changes its Stage 2 verdict. That is not the
-  same as safety. On 375 generated near-miss-shaped pairs the divergence rate is
-  22.4 percent, and 17 of the 20 pairs sitting within 0.10 of the 0.15 margin
-  floor score differently between engines, with a worst margin shift of 0.282105
-  against a floor of 0.15. Nothing crossed the floor only because the generated
-  margins are bimodal and no pair was positioned to; a shift of nearly twice the
-  floor is more than sufficient to flip a verdict. Telegraph's hidden near-miss
-  cases are selected for sitting near a boundary, so they are more exposed than
-  this sample rather than less.
+- Make the scorer produce identical results under both wazero engines. Telegraph
+  was told about the amd64 compiler divergence on 2026-08-19 and replied that
+  they run a single validator today, so it does not affect them much yet, that
+  they will move to deterministic execution as they scale to multiple validators,
+  and that they have not because deterministic execution is roughly 10 to 50
+  times slower. That answers the runtime question by implication: the 10-to-50
+  figure is the interpreter-versus-compiler tradeoff, so their validator is
+  almost certainly running the configuration where this module diverges.
+  Their single validator does close the fairness half. Every miner is scored on
+  the same machine, so identical answers get identical scores, and the
+  multi-validator inconsistency concern is deferred. It does not close the half
+  that is ours: whether the scores their machine computes match the scores
+  measured here. Validator count has no bearing on that.
+  Measured direction, which corrects an earlier assumption: in all 84 diverging
+  generated pairs the compiler raised the correct answer to exactly `0.490000`
+  and never moved the wrong answer, so every margin widened. The mechanism pulls
+  low scores up to `0.490000` regardless of correctness, and these templates make
+  the correct answer the lower-scoring one; in the curated pools the opposite
+  occurred once, a wrong answer rising from `0.150000` and narrowing a margin. So
+  current exposure is favourable to neutral on the sample measured, and the sign
+  is a property of which side scores low rather than a safety property.
+  Because Telegraph will not change execution before multi-validator scaling,
+  waiting does not close this. The tractable route is to localise the miscompiled
+  construct, which is feasible since the divergence reproduces on a single call
+  into a fresh instance with one known input, and to write the scorer so both
+  engines agree. Filing upstream with wazero remains optional and unfiled.
 - Fix the remaining attribute-discrimination defect. 18 of 375 generated pairs
   keep the correct entity and swap the attribute, usually by inserting an ordinal
   such as "second", and the two remaining ranking-pool defects sit on the

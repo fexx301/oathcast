@@ -108,7 +108,16 @@
     },
     "registration_impact": "None measured. TestRegistrationMarginsHoldOnBothEngines confirms every factual pair clears its minimum margin under both engines, so no margin quoted in this file depends on the engine. The two affected inputs belong to the local ranking pools only.",
     "guard": "scoring-modules/oathcast-weather/go-tester/engine_test.go scores all 256 corpus inputs under both engines and fails on any divergence outside the two recorded above.",
-    "not_reported_upstream": "A minimal reproduction exists but no upstream wazero issue has been filed and Telegraph has not been told. Both are pending an explicit decision."
+    "not_reported_upstream": "A minimal reproduction exists. No upstream wazero issue has been filed.",
+    "telegraph_response": {
+      "reported": true,
+      "reported_on": "2026-08-19",
+      "substance": "Telegraph confirmed they run a single validator today, so the divergence does not affect them much yet; they intend to move to deterministic execution as they scale to multiple validators, and have not done so because deterministic execution is roughly 10 to 50 times slower.",
+      "what_it_resolves": "Cross-miner fairness is not currently at risk. With one validator every miner is scored on the same machine under the same engine, so two identical answers receive identical scores. The multi-validator inconsistency concern is deferred rather than present.",
+      "what_it_does_not_resolve": "Whether the scores their validator computes match the scores measured here. Their 10-to-50-times figure is the interpreter-versus-compiler tradeoff, which implies their single validator runs an optimising JIT, that is, the configuration where this module diverges. Validator count is irrelevant to that: it is a question about agreement between their machine and ours, not between two of theirs. Not directly confirmed, since they did not name the runtime.",
+      "measured_direction_of_effect": "In all 84 diverging generated pairs the compiler raised the correct answer to exactly 0.490000 and never moved the wrong answer, so every margin widened. The mechanism is not a preference for correct answers: it pulls low scores up to 0.490000 regardless of correctness, and these templates make the correct answer the lexically distant, lower-scoring one. In the curated pools the opposite case occurred once, where a wrong answer rose from 0.150000 to 0.490000 and narrowed a margin. Current net exposure on the measured sample is therefore favourable to neutral, not adverse, but the sign is a property of which side scores low rather than a safety property.",
+      "consequence_for_us": "The exposure cannot be closed by waiting for Telegraph, because they have said they will not change execution until multi-validator scaling. Closing it means making this module produce identical scores under both engines, which is tractable: the divergence reproduces on a single call into a fresh instance with one known input."
+    }
   },
   "entity_binding_fix": {
     "defect": "fact_anchors drops ground-truth tokens that already appear in the question, because an anchor the question gives away proves nothing about what the answer knows. For a ground truth that restates its question, such as 'Is Everest the tallest mountain on Earth?' answered by 'Yes, Everest is the tallest mountain on Earth.', that removes every anchor, so no entity check ran anywhere in the path and the score fell back to lexical overlap alone. An answer that copied the truth and swapped the subject then beat a correctly-bound paraphrase.",
@@ -147,6 +156,7 @@
       "diverging_pairs": "84 of 375 on linux/amd64, a 22.4 percent divergence rate against 0.4 percent on the curated corpus, with a worst margin shift of 0.282105 against a 0.15 floor.",
       "near_boundary_divergence": "17 of the 20 pairs whose margin sits within 0.10 of the floor score differently between the two engines, so divergence concentrates where it matters most rather than avoiding it.",
       "verdict_flips_observed": 0,
+      "margin_direction": "84 widened, 0 narrowed, measured on the current artifact on linux/amd64. The compiler pulls low scores up to exactly 0.490000 irrespective of correctness, and these templates make the correct answer the lexically distant, lower-scoring side, so uniform widening is an artefact of the generator rather than a safety property.",
       "why_zero_is_not_reassurance": "No pair sat where a shift could cross the floor, but 17 of 20 pairs near the floor do shift, and the worst shift of 0.282105 is nearly twice the entire floor. The mechanism is more than sufficient to flip a verdict; this sample had no candidate positioned to demonstrate it. Absence of a flip here is a property of the generator, not evidence of safety.",
       "scope": "Handcrafted templates. Says nothing directly about Telegraph's hidden near-miss cases, which are selected for sitting near a boundary and are therefore more exposed than this sample, not less."
     }

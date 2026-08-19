@@ -8,17 +8,30 @@ import (
 
 // Exposure estimate for the wazero amd64 compiler divergence.
 //
-// TestEngineScoresAgree measures the divergence rate on the curated corpus: 2
-// of 256 inputs. That number understates the risk that matters, because those
-// inputs were not written to sit near a decision boundary, and Telegraph's Stage
-// 2 near-miss cases are selected for exactly that. A score shifting by 0.12
-// changes nothing in the middle of the range and changes the verdict at the
-// edge.
+// TestEngineScoresAgree measures the divergence rate on the curated corpus: 1 of
+// 256 inputs. That number understates the risk that matters, because those inputs
+// were not written to sit near a decision boundary, and Telegraph's Stage 2
+// near-miss cases are selected for exactly that. A score shifting by 0.12 changes
+// nothing in the middle of the range and changes the verdict at the edge.
 //
 // So this generates pairs across the shapes a near-miss case takes, finds the
 // ones whose margin lands close to the 0.15 floor, and asks a sharper question
-// than "do scores differ": does the pass/fail verdict differ. That is the number
-// worth quoting, because it is the number that would have cost us a case.
+// than "do scores differ": does the pass/fail verdict differ, and in which
+// direction did the margin move.
+//
+// Measured on amd64, the answer is 22.4 percent of pairs diverge, 17 of the 20
+// pairs near the floor diverge, no verdict flips, and every divergence widened
+// the margin. That last part is not a safety property. The compiler pulls low
+// scores up to exactly 0.490000 regardless of correctness, and these templates
+// make the correct answer the lexically distant, lower-scoring side, so widening
+// is an artefact of the generator. In the curated pools the opposite occurred
+// once: a wrong answer rose from 0.150000 and narrowed a margin.
+//
+// Telegraph confirmed on 2026-08-19 that they run a single validator and will not
+// move to deterministic execution until multi-validator scaling, because
+// determinism costs 10 to 50 times the speed. That ratio is the
+// interpreter-versus-compiler tradeoff, so their validator is very likely the
+// diverging configuration, and waiting will not close this.
 //
 // On arm64 every count here is zero, which is the correct answer for arm64 and
 // not evidence that the bug is harmless. Run it on amd64 to see the exposure.
@@ -227,6 +240,8 @@ func TestNearBoundaryEngineExposure(t *testing.T) {
 		verdictFlips   []string
 		worstShift     float64
 		worstShiftPair string
+		marginWidened  int
+		marginNarrowed int
 	)
 
 	for _, p := range pairs {
@@ -237,6 +252,17 @@ func TestNearBoundaryEngineExposure(t *testing.T) {
 		differs := ref.good != cmp.good || ref.bad != cmp.bad
 		if differs {
 			scoreDiverged = append(scoreDiverged, p.id)
+			// The sign matters more than the magnitude. A divergence that widens
+			// every margin is a windfall; one that narrows them is the thing that
+			// costs a case. Counted rather than inferred, because the direction
+			// depends on which side of the pair happened to score low, and these
+			// templates make the correct answer the lexically distant one, which
+			// biases the sample toward widening.
+			if cmpMargin > refMargin {
+				marginWidened++
+			} else if cmpMargin < refMargin {
+				marginNarrowed++
+			}
 			shift := cmpMargin - refMargin
 			if shift < 0 {
 				shift = -shift
@@ -270,6 +296,7 @@ func TestNearBoundaryEngineExposure(t *testing.T) {
 	t.Logf("EXPOSURE %d pairs within %.2f of the %.2f floor, %d of those diverge",
 		nearBoundary, nearBoundaryBand, stageTwoMarginFloor, nearDiverged)
 	t.Logf("EXPOSURE %d verdict flips at the %.2f floor", len(verdictFlips), stageTwoMarginFloor)
+	t.Logf("EXPOSURE margin direction: %d widened, %d narrowed", marginWidened, marginNarrowed)
 	if worstShiftPair != "" {
 		t.Logf("EXPOSURE worst margin shift %.6f (%s)", worstShift, worstShiftPair)
 	}
