@@ -1,0 +1,135 @@
+{
+  "schema": "oathcast_scorer_ranking_pools_v1",
+  "purpose": "Measure the scorer as a judge rather than as a fixture-passer. Each pool is a question with several candidate answers whose relative quality is known, so the benchmark can ask the question that matters for ranking a pool of miners: does every correct answer score above every wrong one, and by how much.",
+  "metric_notes": {
+    "separation": "worst correct candidate minus best wrong candidate. Positive means the pool is ordered usefully; zero means the scorer cannot tell a right answer from a wrong one; negative means it prefers a wrong answer.",
+    "quality": "Graded rank used for pairwise ordering accuracy. 4 = verbatim truth, 3 = faithful paraphrase, 2 = correct but loosely worded, 1 = wrong but lexically or topically close, 0 = unrelated.",
+    "correct": "Whether the answer states the fact the question asks for. This is the binary the separation metric uses.",
+    "scope": "Handcrafted development pools. Not Telegraph fixtures, and not a claim about Telegraph's hidden Stage 2 cases."
+  },
+  "pools": [
+    {
+      "pool_id": "authorship_entity_swap",
+      "question": "Who wrote Hamlet?",
+      "ground_truth": "Hamlet was written by Shakespeare.",
+      "candidates": [
+        {"label": "verbatim", "answer": "Hamlet was written by Shakespeare.", "correct": true, "quality": 4},
+        {"label": "faithful_paraphrase", "answer": "Shakespeare is the author of Hamlet.", "correct": true, "quality": 3},
+        {"label": "terse_correct", "answer": "Shakespeare.", "correct": true, "quality": 3},
+        {"label": "loose_correct", "answer": "It is Shakespeare that is associated with Hamlet.", "correct": true, "quality": 2, "note": "Softens the relation but names the right author."},
+        {"label": "near_copy_wrong_entity", "answer": "Hamlet was written by Marlowe.", "correct": false, "quality": 1, "note": "Copies the truth's frame verbatim and swaps only the name."},
+        {"label": "both_named_wrong_claim", "answer": "Shakespeare and Marlowe were contemporaries, but Hamlet was written by Marlowe.", "correct": false, "quality": 1, "note": "Mentions the correct entity while asserting the wrong one."},
+        {"label": "unrelated", "answer": "Ulysses was written by Joyce.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "capital_entity_swap",
+      "question": "What is the capital of Germany?",
+      "ground_truth": "The capital of Germany is Berlin.",
+      "candidates": [
+        {"label": "verbatim", "answer": "The capital of Germany is Berlin.", "correct": true, "quality": 4},
+        {"label": "faithful_paraphrase", "answer": "Berlin is Germany's capital city.", "correct": true, "quality": 3},
+        {"label": "terse_correct", "answer": "Berlin.", "correct": true, "quality": 3},
+        {"label": "near_copy_wrong_entity", "answer": "The capital of Germany is Munich.", "correct": false, "quality": 1},
+        {"label": "both_named_wrong_claim", "answer": "Between Berlin and Munich, the capital of Germany is Munich.", "correct": false, "quality": 1},
+        {"label": "topical_no_answer", "answer": "Germany is a country in central Europe with a long history.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "relation_direction",
+      "question": "Who taught Alexander?",
+      "ground_truth": "Aristotle taught Alexander.",
+      "candidates": [
+        {"label": "verbatim", "answer": "Aristotle taught Alexander.", "correct": true, "quality": 4},
+        {"label": "passive_paraphrase", "answer": "Alexander was taught by Aristotle.", "correct": true, "quality": 3},
+        {"label": "reversed_relation", "answer": "Alexander taught Aristotle.", "correct": false, "quality": 1, "note": "Same two entities, reversed direction."},
+        {"label": "wrong_entity", "answer": "Alexander was taught by Plato.", "correct": false, "quality": 1},
+        {"label": "unrelated", "answer": "Socrates taught Plato.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "discovery_synonym_gap",
+      "question": "Who discovered penicillin?",
+      "ground_truth": "Penicillin was discovered by Fleming.",
+      "candidates": [
+        {"label": "verbatim", "answer": "Penicillin was discovered by Fleming.", "correct": true, "quality": 4},
+        {"label": "nominal_recast", "answer": "Fleming made the discovery of penicillin.", "correct": true, "quality": 3},
+        {"label": "low_overlap_paraphrase", "answer": "The antibiotic was first identified by Fleming.", "correct": true, "quality": 2, "note": "Correct, but shares almost no wording with the truth."},
+        {"label": "near_copy_wrong_entity", "answer": "Penicillin was discovered by Pasteur.", "correct": false, "quality": 1},
+        {"label": "unrelated", "answer": "Radium was discovered by Curie.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "acronym_expansion",
+      "question": "What does NASA stand for?",
+      "ground_truth": "NASA stands for the National Aeronautics and Space Administration.",
+      "candidates": [
+        {"label": "verbatim", "answer": "NASA stands for the National Aeronautics and Space Administration.", "correct": true, "quality": 4},
+        {"label": "reordered", "answer": "The National Aeronautics and Space Administration is what NASA means.", "correct": true, "quality": 3},
+        {"label": "near_miss_acronym", "answer": "NASA stands for the National Oceanic and Atmospheric Administration.", "correct": false, "quality": 1, "note": "Shares most tokens with the truth; wrong expansion."},
+        {"label": "different_acronym", "answer": "NOAA stands for the National Oceanic and Atmospheric Administration.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "location_binding",
+      "question": "Where is the Eiffel Tower?",
+      "ground_truth": "The Eiffel Tower is in Paris.",
+      "candidates": [
+        {"label": "verbatim", "answer": "The Eiffel Tower is in Paris.", "correct": true, "quality": 4},
+        {"label": "fronted_paraphrase", "answer": "Paris is where the Eiffel Tower stands.", "correct": true, "quality": 3},
+        {"label": "near_copy_wrong_entity", "answer": "The Eiffel Tower is in Lyon.", "correct": false, "quality": 1},
+        {"label": "swapped_subject", "answer": "The Colosseum is in Paris.", "correct": false, "quality": 1, "note": "Right city, wrong monument."},
+        {"label": "unrelated", "answer": "The Colosseum is in Rome.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "verbose_versus_terse",
+      "question": "What is the capital of Japan?",
+      "ground_truth": "The capital city of Japan is Tokyo, its largest metropolis.",
+      "candidates": [
+        {"label": "verbatim", "answer": "The capital city of Japan is Tokyo, its largest metropolis.", "correct": true, "quality": 4},
+        {"label": "terse_correct", "answer": "Tokyo.", "correct": true, "quality": 3, "note": "Correct and minimal; must not be punished for brevity."},
+        {"label": "verbose_correct", "answer": "Having reviewed the record, the capital of Japan is without question Tokyo.", "correct": true, "quality": 3},
+        {"label": "near_copy_wrong_entity", "answer": "The capital city of Japan is Kyoto, its largest metropolis.", "correct": false, "quality": 1},
+        {"label": "unrelated", "answer": "The capital of China is Beijing.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "negation_polarity",
+      "question": "Is Everest the tallest mountain on Earth?",
+      "ground_truth": "Yes, Everest is the tallest mountain on Earth.",
+      "candidates": [
+        {"label": "verbatim", "answer": "Yes, Everest is the tallest mountain on Earth.", "correct": true, "quality": 4},
+        {"label": "affirmative_paraphrase", "answer": "Everest is indeed Earth's highest peak.", "correct": true, "quality": 3},
+        {"label": "negated_truth", "answer": "No, Everest is not the tallest mountain on Earth.", "correct": false, "quality": 1, "note": "Near-identical wording, inverted polarity."},
+        {"label": "wrong_entity_affirmed", "answer": "Yes, K2 is the tallest mountain on Earth.", "correct": false, "quality": 1},
+        {"label": "unrelated", "answer": "The Pacific is the deepest ocean.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "shared_token_distractor",
+      "question": "What language is spoken in Brazil?",
+      "ground_truth": "Portuguese is spoken in Brazil.",
+      "candidates": [
+        {"label": "verbatim", "answer": "Portuguese is spoken in Brazil.", "correct": true, "quality": 4},
+        {"label": "synonym_rewrite", "answer": "Brazilians speak Portuguese.", "correct": true, "quality": 3},
+        {"label": "near_copy_wrong_entity", "answer": "Spanish is spoken in Brazil.", "correct": false, "quality": 1},
+        {"label": "right_language_wrong_country", "answer": "Portuguese is spoken in Portugal.", "correct": false, "quality": 1, "note": "True in the world, wrong answer to this question."},
+        {"label": "unrelated", "answer": "Spanish is spoken in Argentina.", "correct": false, "quality": 0}
+      ]
+    },
+    {
+      "pool_id": "weather_probability_pool",
+      "question": "What is the probability of measurable rain in Lagos between 15:00 and 16:00 UTC?",
+      "ground_truth": "Measurable rain is likely, with a 70% probability.",
+      "candidates": [
+        {"label": "verbatim", "answer": "Measurable rain is likely, with a 70% probability.", "correct": true, "quality": 4},
+        {"label": "paraphrase_same_number", "answer": "Rain over 0.1 mm is likely at a 70% chance.", "correct": true, "quality": 3},
+        {"label": "stray_percent_then_number", "answer": "Humidity (%) aside, measurable rain is likely at a 70% probability.", "correct": true, "quality": 3, "note": "Regression guard: a stray percent sign once discarded the real figure."},
+        {"label": "wrong_number", "answer": "Measurable rain is likely, with a 20% probability.", "correct": false, "quality": 1},
+        {"label": "contradictory", "answer": "Measurable rain is unlikely, with a 70% probability.", "correct": false, "quality": 1},
+        {"label": "unrelated", "answer": "The temperature will reach 31 C.", "correct": false, "quality": 0}
+      ]
+    }
+  ]
+}

@@ -50,6 +50,30 @@
     },
     "superseded_reason": "This build preserved a breakdown_answer alias while the portal/API output and public guide appeared inconsistent. Telegraph's current guide deprecates and removes that export; the current candidate contains only the three required functions."
   },
+  "ranking_benchmark": {
+    "path": "fixtures/scorer_ranking_pools.json",
+    "sha256": "824d0d42e36faab6705d14970d096ee1cfb940d54953282788be02769694b194",
+    "driver": "scoring-modules/oathcast-weather/go-tester/ranking_test.go",
+    "purpose": "Measures the module as a judge rather than a fixture-passer, after Telegraph's team clarified that the module's value is how well it ranks miners rather than whether it becomes the canonical script.",
+    "metric": "separation = worst correct candidate minus best wrong candidate, per pool, against the real WASM through wazero",
+    "baseline": {
+      "pools": 10,
+      "separated": 7,
+      "tied": 1,
+      "inverted": 2,
+      "worst_separation": -0.4925,
+      "worst_separation_pool": "negation_polarity",
+      "pairwise_ordering_accuracy": 0.9434,
+      "pairwise_ordered_pairs": "100/106"
+    },
+    "known_ranking_defects": [
+      "negation_polarity: 'Yes, K2 is the tallest mountain on Earth' (wrong) scores 0.862500 while 'Everest is indeed Earth's highest peak' (correct) scores 0.370000.",
+      "shared_token_distractor: 'Portuguese is spoken in Portugal', wrong for the question asked, outranks the correct 'Brazilians speak Portuguese'.",
+      "authorship_entity_swap: a correct loosely-worded answer and a wrong answer are both pinned to the 0.49 ambiguity clamp, so the pool cannot be ordered."
+    ],
+    "common_cause": "Lexical overlap with the ground truth outweighs correct entity binding, so copying the truth's frame and swapping the entity beats a faithful paraphrase. Not yet fixed; the benchmark exists so a fix can be measured rather than asserted.",
+    "scope": "Handcrafted development pools. Not Telegraph fixtures and not a claim about hidden Stage 2 cases."
+  },
   "fixture": {
     "path": "fixtures/wasm_scoring_cases.json",
     "sha256": "c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f"
