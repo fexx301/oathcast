@@ -5,12 +5,12 @@
   "status": "probability_scan_fix_local_candidate_after_registration_41_stage_2_rejection",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 44838,
+    "byte_size": 45394,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345",
-    "keccak256_raw_bytes": "0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041",
+    "sha256": "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36",
+    "keccak256_raw_bytes": "0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21",
     "registration_candidate": true,
-    "candidate_scope": "This 44,838-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries two changes on top of that build. The first is the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' that carried no parseable number and so discarded a real percentage later in the same answer, after which scorer::evaluate applied its 0.49 missing-probability ceiling to a materially correct response; a stray leading '(%)' moved a correct answer from 0.989423 to 0.490000 before the fix. The second is question_entity_substituted, which closes the entity-binding hole described under entity_binding_fix. Both are measured rather than asserted: 45 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, and every pair still clears its minimum margin under both wazero engines. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
+    "candidate_scope": "This 45,394-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.959566. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
   "registration_41_artifact": {
     "byte_size": 42798,
@@ -92,7 +92,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345",
+      "measured_on_artifact": "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -137,15 +137,34 @@
     ],
     "not_addressed": "The 18 remaining attribute_swap inversions keep the entity and swap the attribute, most often by inserting an ordinal such as 'second'. That is a different defect and an entity-binding rule cannot reach it."
   },
+  "ordinal_and_classifier_fix": {
+    "defect_1": {
+      "name": "unsupported ordinal rank",
+      "description": "Inserting one word into an otherwise faithful copy of the ground truth inverts the claim while raising lexical overlap. Against 'Everest is known as the tallest mountain on Earth.', the wrong answer 'Everest is known as the second tallest mountain on Earth.' scored 0.839423 while a correctly-bound paraphrase scored 0.804167. It keeps the right entity, so the anchor path does not object, and it shares more wording with the truth than the paraphrase does.",
+      "fix": "introduces_unsupported_rank_modifier plus ISSUE_RANK_MODIFIER_CONFLICT, clamping to 0.30, the same ceiling has_conflicting_numeric_facts already uses for a number the truth does not support.",
+      "asymmetry": "Introducing a modifier the truth lacks is penalised; omitting one the truth has is not. Omission is ordinary paraphrase: against 'Curie is the first woman to win a Nobel Prize.', the answer 'Curie won a Nobel Prize before any other woman.' drops the ordinal and stays correct. Matching is per exact token, so a truth saying 'second' does not license an answer saying 'third'.",
+      "word_list_scope": "Demoting forms only, second through tenth plus digit forms and penultimate. 'first' and 'last' are excluded as common discourse words, and the plural 'seconds' is excluded because it is a duration.",
+      "measured_effect": "attribute_swap inversions 18 to 9, generated total 21 to 12."
+    },
+    "defect_2": {
+      "name": "weather classifier over-trigger",
+      "description": "is_weather_question fired on a weather concept plus a binary question, and weather concepts were matched against the whole question string irrespective of case. 'Sun' sits in the CLEAR synonym group, so 'Is Mercury the closest planet to the Sun?' was scored as a weather question: it picked up context constraints and the missing-probability ceiling, pinning the correct answer at 0.490000 while the swapped-subject answer scored 0.965625. This is the most consequential of the three fixes for Telegraph's fixtures, whose category is factual paraphrase and lexical discrimination rather than weather.",
+      "fix": "Weather concepts now count only as lowercase tokens, the same guard the function already applied to the words 'weather' and 'forecast'.",
+      "measured_effect": "identity_binary inversions 3 to 0, generated total 12 to 9. Genuine weather questions still classify as weather, asserted directly.",
+      "residual_not_fixed": "A lowercase weather word used non-meteorologically still routes a binary question down the weather path, so 'Is ice less dense than water?' is still treated as a weather question. Closing it means dropping the weather-concept-plus-binary clause, which changes how a genuine weather question with no temporal cue classifies. Asserted as a known limitation in the native tests rather than guessed at."
+    },
+    "not_addressed": "The 9 remaining generated inversions substitute one superlative for another: 'the longest river in Africa' becomes 'the deepest river in Africa'. That is the same surface operation as a correct paraphrase, where 'the tallest mountain' becomes 'the highest peak', and separating them needs a synonym lexicon this module does not have. A heuristic would penalise exactly the paraphrases Telegraph's fixture category rewards, so the ceiling records the defect rather than trading a measured loss for an unmeasured one.",
+    "test_table_correction": "Two generated subject rows were wrong and were charging inversions to the scorer. Brazil had the same string for attr and rivalAttr, so its wrong answer was the ground truth verbatim and scored 1.0. Tokyo's rival attribute was 'a port city in Japan', which Tokyo is, so a true statement was counted as a wrong answer. An invariant now fails on the first case."
+  },
   "generated_pair_scoreboard": {
     "driver": "scoring-modules/oathcast-weather/go-tester/exposure_test.go",
     "purpose": "Measures ranking quality on 375 generated near-miss-shaped pairs, a scale the 10 handwritten ranking pools cannot reach, and measures how far the wazero engine divergence could move a Stage 2 margin.",
     "pairs": 375,
-    "inverted": 21,
-    "below_margin_floor": 21,
+    "inverted": 9,
+    "below_margin_floor": 9,
     "by_template": {
-      "identity_binary": 3,
-      "attribute_swap": 18,
+      "identity_binary": 0,
+      "attribute_swap": 9,
       "identity_open": 0,
       "relation_direction": 0,
       "negation_polarity": 0,
@@ -175,13 +194,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345",
-      "linux/amd64": "f1df1f2541fca6b9390a28a7115b8cebb5e38cf6cb25fc8c83d23c6d42f21b56"
+      "darwin/arm64": "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36",
+      "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
-    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 44,838 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
+    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 45,394 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345",
-      "5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345"
+      "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36",
+      "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36"
     ]
   },
   "current_artifact_abi": {
@@ -382,7 +401,7 @@
       "viem 2.55.11 keccak256(raw bytes)",
       "Go golang.org/x/crypto/sha3 NewLegacyKeccak256 (artifact contract test)"
     ],
-    "rust_native_tests_passed": 45,
+    "rust_native_tests_passed": 50,
     "python_repository_tests_passed": 498,
     "python_repository_test_execution": "Repository discovery ran 498 tests and reported nine sandbox-only PermissionError failures while binding 127.0.0.1. The complete 15-test decision_ui module was rerun with approved loopback permission and passed, establishing 401/401 repository tests.",
     "wazero_host_suite_passed": true,

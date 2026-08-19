@@ -408,6 +408,64 @@ any pair margin under either wazero engine. What remains is a different defect:
 like "second". An entity-binding rule cannot reach those by construction, so they
 are recorded as the next measured target rather than folded into this one.
 
+## A capitalised word silently changed which scoring model ran
+
+**2026-08-19.** With the entity-binding defect closed, nine of the twelve
+remaining generated inversions were a clean ordinal insertion: against the truth
+"Everest is known as the tallest mountain on Earth.", the wrong answer "Everest is
+known as the **second** tallest mountain on Earth." scored `0.839423` while a
+correct paraphrase scored `0.804167`. One inserted word inverts the claim and
+*raises* lexical overlap, and because the entity is still right, nothing in the
+anchor path objects. Ordinals are a closed word class, so this one is genuinely
+easy: penalise a rank the ground truth does not support, asymmetrically, since
+dropping an ordinal is ordinary paraphrase while adding one is a different claim.
+That took the inversions from 21 to 12.
+
+The last three were the interesting ones, and they were not an ordering defect at
+all. `identity_binary/Mercury` scored the *correct* answer `0.490000` against the
+swapped-subject answer's `0.965625`, and `0.49` is the missing-probability
+ceiling. A general-knowledge question was being scored as a weather forecast.
+
+`is_weather_question` returns true for a weather concept plus a binary question,
+and it matched concepts against the whole question string regardless of case.
+**"Sun" is in the CLEAR synonym group**, alongside clear, sunny and sunshine. So
+"Is Mercury the closest planet to the Sun?" satisfied both clauses, picked up
+context constraints and the probability ceiling, and had its correct answer pinned
+at `0.49`.
+
+This is the most consequential of the three fixes, because of what it implies
+about the fixtures we are actually judged on. Telegraph describes that category as
+factual paraphrase and lexical discrimination, not weather. Any binary
+general-knowledge question containing a proper noun that collides with a weather
+synonym — Sun, Storm, Frost, Snow as a surname — was silently routed to the wrong
+scoring model. We would have seen a mysterious single-case loss with no way to
+attribute it.
+
+The fix was already written elsewhere in the same function: the words "weather"
+and "forecast" were guarded on being lowercase, and weather *concepts* were not.
+Applying the existing guard consistently fixed all three, and the residual is
+stated rather than smoothed over: a *lowercase* weather word used
+non-meteorologically still routes a binary question to the weather path, so "Is
+ice less dense than water?" is still treated as a forecast. Closing that means
+dropping the weather-concept-plus-binary clause, which changes how a genuine
+weather question with no temporal cue classifies, so it is asserted as a known
+limitation in the tests instead of guessed at.
+
+Two things worth keeping. First, the defect was invisible for the same reason as
+the last one: every suite was green, and only a corpus that measures *ordering*
+surfaced it. Second, the stopping point. The nine inversions that remain
+substitute one superlative for another, "the longest river in Africa" becoming
+"the deepest river in Africa" — the same surface operation as the correct
+paraphrase "the tallest mountain" becoming "the highest peak", with the opposite
+verdict. Separating those needs a synonym lexicon this module does not have, and
+any heuristic would penalise exactly the paraphrases the fixture category rewards.
+Recording a measured defect is better than trading it for an unmeasured one.
+
+The generator was wrong twice more, both charging inversions to the scorer: one
+subject row repeated the same string for the attribute and its rival, and another
+gave Tokyo the rival attribute "a port city in Japan", which Tokyo is. A true
+statement was being counted as a wrong answer.
+
 ## What this list has in common
 
 Seven of these are the same failure: a probe that returned a reassuring answer

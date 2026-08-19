@@ -62,16 +62,18 @@ func generateBoundaryPairs() []generatedPair {
 		// each one actually has.
 		entity, rival, attr, rivalAttr, kind string
 	}
-	// rivalAttr must differ from attr in every row. Brazil originally carried
-	// "Portuguese" for both, which made the attribute_swap wrong answer identical
-	// to the ground truth, so it scored 1.0 and was counted as three scorer
-	// inversions that were really a defect in this table.
+	// rivalAttr must differ from attr in every row, and must be genuinely false of
+	// the entity. Two rows failed that. Brazil originally carried "Portuguese" for
+	// both, which made the attribute_swap wrong answer identical to the ground
+	// truth so it scored 1.0. Tokyo's rival attribute was "a port city in Japan",
+	// which Tokyo is, so a true statement was being counted as a wrong answer.
+	// Both charged inversions to the scorer that belonged to this table.
 	subjects := []subject{
 		{"Everest", "K2", "the tallest mountain on Earth", "the second tallest mountain on Earth", "peak"},
 		{"Brazil", "Portugal", "the largest country in South America", "the westernmost country in Iberia", "country"},
 		{"Shakespeare", "Marlowe", "Hamlet", "Doctor Faustus", "author"},
 		{"Pacific", "Atlantic", "the deepest ocean", "the second largest ocean", "ocean"},
-		{"Tokyo", "Osaka", "the capital of Japan", "a port city in Japan", "city"},
+		{"Tokyo", "Osaka", "the capital of Japan", "a small fishing village in Japan", "city"},
 		{"Amazon", "Nile", "the largest river by discharge", "the longest river", "river"},
 		{"Mercury", "Venus", "the closest planet to the Sun", "the second planet from the Sun", "planet"},
 		{"Vatican", "Monaco", "the smallest sovereign state", "the second smallest sovereign state", "state"},
@@ -372,13 +374,21 @@ func TestNearBoundaryEngineExposure(t *testing.T) {
 // verbatim and scored 1.0, and three inversions were charged to the scorer that
 // belonged to the table.
 //
-// What remains is a different defect, not a weaker version of the same one: the
-// 18 attribute_swap inversions keep the entity and swap the attribute, so an
-// entity-binding rule cannot reach them by construction. The ceilings are
-// measured, not chosen.
+// A later pass took it to 9, all in attribute_swap, by penalising an inserted
+// ordinal ("the second tallest") and by stopping a capitalised weather synonym
+// from routing a general-knowledge question down the weather path.
+//
+// The 9 that remain are deliberately not fixed. They substitute one superlative
+// for another: "the longest river in Africa" becomes "the deepest river in
+// Africa". That is the same surface operation as a correct paraphrase, where
+// "the tallest mountain" becomes "the highest peak", and separating the two needs
+// a synonym lexicon this module does not have. A heuristic here would penalise
+// exactly the paraphrases Telegraph's fixture category rewards, so the ceiling
+// records the defect instead of trading a measured loss for an unmeasured one.
+// The ceilings are measured, not chosen.
 const (
-	maxInvertedGeneratedPairs   = 21
-	maxBelowFloorGeneratedPairs = 21
+	maxInvertedGeneratedPairs   = 9
+	maxBelowFloorGeneratedPairs = 9
 )
 
 func TestGeneratedPairRankingQuality(t *testing.T) {

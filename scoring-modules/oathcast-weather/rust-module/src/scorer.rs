@@ -28,6 +28,7 @@ pub(crate) const ISSUE_NO_SCORABLE_GROUND_TRUTH: u32 = 1 << 10;
 pub(crate) const ISSUE_MISSING_BINARY_ANSWER: u32 = 1 << 11;
 pub(crate) const ISSUE_CONTRADICTORY_FACT_ANCHOR: u32 = 1 << 12;
 pub(crate) const ISSUE_AMBIGUOUS_FACT_ANCHORS: u32 = 1 << 13;
+pub(crate) const ISSUE_RANK_MODIFIER_CONFLICT: u32 = 1 << 14;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -300,6 +301,67 @@ fn numeric_binding_conflict(ground_truth: &str, answer: &str) -> bool {
         && truth.len == response.len
         && truth.overlap(&response) == truth.len
         && numeric_operator_mask(ground_truth) != numeric_operator_mask(answer)
+}
+
+/// Rank modifiers that demote a superlative claim by one or more places.
+///
+/// Only the demoting forms are listed. "first" and "last" are deliberately
+/// absent: both are common discourse words ("first of all", "last week") and
+/// including them would fire on answers that never made a ranking claim.
+///
+/// The plural "seconds" is absent for the same reason in the other direction. As
+/// a bare ordinal "second" demotes a claim, but "30 seconds" is a duration, and
+/// only the singular form is treated as a rank.
+fn is_demoting_rank_modifier(token: &[u8]) -> bool {
+    const VALUES: &[&[u8]] = &[
+        b"second",
+        b"third",
+        b"fourth",
+        b"fifth",
+        b"sixth",
+        b"seventh",
+        b"eighth",
+        b"ninth",
+        b"tenth",
+        b"2nd",
+        b"3rd",
+        b"4th",
+        b"5th",
+        b"6th",
+        b"7th",
+        b"8th",
+        b"9th",
+        b"10th",
+        b"penultimate",
+    ];
+    VALUES.iter().any(|value| token_eq(token, value))
+}
+
+/// True when the answer asserts a rank the ground truth does not support.
+///
+/// This is the defect the entity-binding rule could not reach. Inserting one word
+/// into an otherwise faithful copy of the truth inverts the claim while *raising*
+/// lexical overlap: against the truth "Everest is known as the tallest mountain on
+/// Earth.", the wrong answer "Everest is known as the second tallest mountain on
+/// Earth." scored 0.839423 while a correctly-bound paraphrase scored 0.804167. It
+/// keeps the right entity, so nothing in the anchor path objects, and it shares
+/// more wording with the truth than the paraphrase does, so overlap rewards it. 18
+/// of 375 generated pairs failed this way.
+///
+/// The comparison is asymmetric, and that is deliberate. Introducing a modifier
+/// the truth lacks is penalised; omitting one the truth has is not. Omission is
+/// ordinary paraphrase: against "Curie is the first woman to win a Nobel Prize.",
+/// the answer "Curie won a Nobel Prize before any other woman." drops the ordinal
+/// and is still correct. Requiring the two sets to match would fail it.
+///
+/// Matching is per exact token rather than by presence of any modifier, so a truth
+/// that says "second" does not license an answer that says "third".
+fn introduces_unsupported_rank_modifier(ground_truth: &str, answer: &str) -> bool {
+    TokenIter::new(answer)
+        .filter(|token| is_demoting_rank_modifier(token.bytes))
+        .any(|token| {
+            !TokenIter::new(ground_truth).any(|supported| token_eq(supported.bytes, token.bytes))
+        })
 }
 
 fn is_fact_relation_or_filler(token: &[u8]) -> bool {
@@ -2753,8 +2815,20 @@ fn is_weather_question(question: &str) -> bool {
     let mut weather_word = false;
     let mut forecast_word = false;
     let mut temporal_cue = false;
+    // Weather concepts count only as lowercase words, the same guard already
+    // applied to "weather" and "forecast" below. Without it a capitalised proper
+    // noun that collides with a weather synonym group routes a general-knowledge
+    // question down the weather path: "Sun" sits in the CLEAR group, so "Is
+    // Mercury the closest planet to the Sun?" satisfied the weather-concept and
+    // binary-question clause, picked up context constraints and the
+    // missing-probability ceiling, and pinned a correct answer at 0.490000 while
+    // a wrong one scored 0.965625.
+    let mut lowercase_weather_concept = false;
     for token in TokenIter::new(question) {
         let lowercase_word = !token_is_entity_like(token.bytes);
+        lowercase_weather_concept |= lowercase_word
+            && core::str::from_utf8(token.bytes)
+                .is_ok_and(|value| weather_concept_mask(value) != 0);
         weather_word |= lowercase_word && token_eq(token.bytes, b"weather");
         forecast_word |= lowercase_word && token_eq(token.bytes, b"forecast");
         temporal_cue |= token_eq(token.bytes, b"current")
@@ -2768,7 +2842,7 @@ fn is_weather_question(question: &str) -> bool {
             || token_eq(token.bytes, b"tonight")
             || token_eq(token.bytes, b"utc");
     }
-    let has_weather_concept = weather_concept_mask(question) != 0;
+    let has_weather_concept = lowercase_weather_concept;
     weather_word
         || (forecast_word && temporal_cue)
         || (has_weather_concept && temporal_cue)
@@ -3021,6 +3095,16 @@ pub(crate) fn evaluate(
     if numeric_binding_conflict(ground_truth, answer) {
         score = score.min(0.49);
     }
+    // Clamped to the same ceiling as has_conflicting_numeric_facts, because a rank
+    // the truth does not support is the same kind of factual conflict as a number
+    // the truth does not support. A clamp rather than a zero: the check reads one
+    // inserted word, and an answer that adds a genuine aside such as "K2 is the
+    // second tallest" would trip it, so the penalty has to be severe enough to
+    // rank the claim below a faithful paraphrase without being fatal.
+    if introduces_unsupported_rank_modifier(ground_truth, answer) {
+        issues |= ISSUE_RANK_MODIFIER_CONFLICT;
+        score = score.min(0.30);
+    }
     if let Some(expected_probability) = truth_probability {
         score = match answer_probability {
             Some(actual_probability) => {
@@ -3041,6 +3125,109 @@ pub(crate) fn evaluate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_inserted_ordinal_ranks_below_a_faithful_paraphrase() {
+        const Q: &str = "What is Everest known for?";
+        const T: &str = "Everest is known as the tallest mountain on Earth.";
+
+        // Before the fix the demoted claim scored 0.839423 against the
+        // paraphrase's 0.804167, because inserting one word raises lexical
+        // overlap with the truth while inverting the meaning.
+        let demoted = evaluate(
+            Q,
+            T,
+            "Everest is known as the second tallest mountain on Earth.",
+        );
+        let faithful = evaluate(
+            Q,
+            T,
+            "Everest holds the record: the tallest mountain on Earth.",
+        );
+        assert_ne!(
+            demoted.issues & ISSUE_RANK_MODIFIER_CONFLICT,
+            0,
+            "{demoted:?}"
+        );
+        assert!(
+            faithful.score > demoted.score,
+            "faithful={faithful:?} demoted={demoted:?}"
+        );
+    }
+
+    #[test]
+    fn an_omitted_ordinal_is_ordinary_paraphrase() {
+        // Asymmetry check. Dropping an ordinal the truth carries is normal
+        // rewording, so only introduction is penalised.
+        let evaluation = evaluate(
+            "What is Curie known for?",
+            "Curie is the first woman to win a Nobel Prize.",
+            "Curie won a Nobel Prize before any other woman.",
+        );
+        assert_eq!(
+            evaluation.issues & ISSUE_RANK_MODIFIER_CONFLICT,
+            0,
+            "{evaluation:?}"
+        );
+    }
+
+    #[test]
+    fn a_supported_ordinal_is_allowed_and_a_different_one_is_not() {
+        const Q: &str = "What is K2 known for?";
+        const T: &str = "K2 is known as the second tallest mountain on Earth.";
+
+        let supported = evaluate(Q, T, "K2 is the second tallest peak on Earth.");
+        assert_eq!(
+            supported.issues & ISSUE_RANK_MODIFIER_CONFLICT,
+            0,
+            "{supported:?}"
+        );
+
+        // Matching is per exact token, so a truth that says "second" does not
+        // license an answer that says "third".
+        let mismatched = evaluate(Q, T, "K2 is the third tallest peak on Earth.");
+        assert_ne!(
+            mismatched.issues & ISSUE_RANK_MODIFIER_CONFLICT,
+            0,
+            "{mismatched:?}"
+        );
+    }
+
+    #[test]
+    fn a_duration_in_seconds_is_not_a_rank() {
+        assert!(is_demoting_rank_modifier(b"second"));
+        assert!(!is_demoting_rank_modifier(b"seconds"));
+        // Common discourse words are excluded, or they would fire on answers that
+        // never made a ranking claim.
+        assert!(!is_demoting_rank_modifier(b"first"));
+        assert!(!is_demoting_rank_modifier(b"last"));
+    }
+
+    #[test]
+    fn a_capitalised_weather_synonym_does_not_make_a_question_meteorological() {
+        // "Sun" sits in the CLEAR synonym group, so this binary general-knowledge
+        // question was routed down the weather path, picked up the
+        // missing-probability ceiling, and pinned the correct answer at 0.490000
+        // while the swapped-subject answer scored 0.965625.
+        assert!(!is_weather_question(
+            "Is Mercury the closest planet to the Sun?"
+        ));
+
+        // Residual, and asserted so it is documented rather than assumed away: a
+        // *lowercase* weather word used non-meteorologically still routes a binary
+        // question down the weather path. Closing it means dropping the
+        // weather-concept-plus-binary clause, which changes how a genuine weather
+        // question with no temporal cue classifies, so it is recorded as a known
+        // limitation instead of guessed at.
+        assert!(is_weather_question("Is ice less dense than water?"));
+
+        // Genuine weather questions must still classify as weather.
+        assert!(is_weather_question(
+            "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?"
+        ));
+        assert!(is_weather_question("What is the weather in Lagos?"));
+        assert!(is_weather_question("Is it sunny in Lagos now?"));
+    }
 
     #[test]
     fn a_restated_question_still_penalises_a_swapped_subject() {

@@ -99,10 +99,10 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   requirement against champion historical scores. Registration `19` evaluated
   zero historical rows, so it did not observe that Spearman gate.
 
-  The current artifact is instead 44,838 bytes, SHA-256
-  `5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345`,
+  The current artifact is instead 45,394 bytes, SHA-256
+  `9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36`,
   and raw-byte Keccak-256
-  `0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041`.
+  `0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21`.
   Its fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. Rust tests pass `40/40`, the
@@ -122,7 +122,7 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` and
   raw-byte Keccak-256
   `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`; the
-  44,838-byte artifact above has not been uploaded, hosted, or registered. The
+  45,394-byte artifact above has not been uploaded, hosted, or registered. The
   user manually hosted that exact 42,798-byte registration `41` build and registered
   it for `WEATHER_FORECAST` as registration `41` in Base Sepolia transaction
   `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.

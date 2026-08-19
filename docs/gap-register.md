@@ -166,15 +166,15 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `32/32`, with candidate margin `0.31248063`, champion margin `0.37360683`, and
   zero historical rows. According to user-relayed Telegraph guidance, these margins are not directly
   compared for promotion.
-- The current 44,838-byte factual-paraphrase artifact is reproducible and is an
+- The current 45,394-byte factual-paraphrase artifact is reproducible and is an
   unregistered local candidate: it has not been uploaded, hosted, signed, or
   registered. Its single change over the registration `41` bytes is a
   probability-scan fix in `percent_probability`, which previously abandoned the
   scan on the first `%` carrying no parseable number and so discarded a real
   percentage later in the same answer. Its SHA-256 is
-  `5ee47b08f58d33c9b3778868a87c86d30ede4d8d36c82d8e32dc3c06a325d345`
+  `9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36`
   and raw-byte Keccak-256
-  `0x6bbb07264405fe70eb0a2b46bca534a636581250f43cc6fe7ea834d8ae5ae041`.
+  `0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21`.
   The fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. All 88 synthetic factual pairs
@@ -246,12 +246,25 @@ breakdown-layout blocker before a registration candidate can be frozen.
   construct, which is feasible since the divergence reproduces on a single call
   into a fresh instance with one known input, and to write the scorer so both
   engines agree. Filing upstream with wazero remains optional and unfiled.
-- Fix the remaining attribute-discrimination defect. 18 of 375 generated pairs
-  keep the correct entity and swap the attribute, usually by inserting an ordinal
-  such as "second", and the two remaining ranking-pool defects sit on the
-  anchored path. The entity-binding rule cannot reach either by construction.
-  `generated_pair_scoreboard` in `release-evidence.json` is the measurement to
-  move; the ceilings are ratcheted so a change that degrades ranking fails.
+- Superlative substitution is the last measured ranking defect and is
+  deliberately unfixed. 9 of 375 generated pairs replace the ground truth's
+  attribute with a different one, so "the longest river in Africa" becomes "the
+  deepest river in Africa". That is the same surface operation as a correct
+  paraphrase, where "the tallest mountain" becomes "the highest peak", and
+  separating them needs a synonym lexicon this module does not have. A heuristic
+  would penalise exactly the paraphrases Telegraph's fixture category rewards, so
+  the ratcheted ceiling records the defect rather than trading a measured loss for
+  an unmeasured one. Reopen only with a way to decide synonymy, not with a
+  keyword list.
+- The weather-question classifier still over-triggers on a lowercase weather word
+  used non-meteorologically, so "Is ice less dense than water?" is scored as a
+  forecast. The capitalised case is fixed. Closing the lowercase case means
+  dropping the weather-concept-plus-binary clause, which changes how a genuine
+  weather question with no temporal cue classifies, so it is asserted as a known
+  limitation in the native tests rather than guessed at. Worth revisiting before
+  any future registration, because Telegraph's fixture category is factual
+  paraphrase rather than weather and every such misroute applies a probability
+  ceiling to a correct answer.
 
 - Keep the deployed v8 Miner and its recurring canary pinned to the release,
   source, image, and required temperature-window check; retain stopped
