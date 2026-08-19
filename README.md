@@ -301,16 +301,16 @@ suite. Telegraph's unmodified official tester returned example score `0.8500`
 for the earlier 42,798-byte registration `41` artifact; it is not vendored here
 and has not been re-run against the current candidate. See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
-build commands and safeguards. The current frozen rank-only artifact is 45,395
+build commands and safeguards. The current frozen rank-only artifact is 46,809
 bytes with SHA-256
-`8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c` and
+`ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95` and
 raw-byte Keccak-256
-`0xef42c86fe9d1d1485693c8ba9d724b48cd2883d34d4cb6212c31ef8a2c5494ce`.
+`0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065`.
 Its fixture SHA-256 is
 `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
 Two isolated clean builds on the same host are byte-identical, but the artifact
 is **not** byte-identical across platforms: `darwin/arm64` and `linux/amd64` both
-emit 45,395 bytes with different content under the same pinned `rustc 1.95.0` and
+emit 46,809 bytes with different content under the same pinned `rustc 1.95.0` and
 target. The registered bytes are the `darwin/arm64` build, since registration
 identifies a specific hosted artifact rather than whatever a given machine
 compiles; `release-evidence.json` records both digests under
@@ -350,7 +350,7 @@ The historical bytes are not present in this workspace.
 
 The machine-readable v7 record in
 [`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json)
-records the 45,395-byte local candidate artifact, the registered 42,798-byte
+records the 46,809-byte local candidate artifact, the registered 42,798-byte
 registration `41` artifact, their local proxy evidence, the historical
 16,292-byte registration `19` artifact, and the scalar-build metadata
 separately. According to user-relayed Telegraph guidance,
@@ -360,7 +360,7 @@ margin floor for each of six near-miss cases, and do not compare the candidate's
 aggregate margin directly with the champion's. The reported `0.60` metric is
 Spearman rank correlation against the live champion's historical scores. The
 candidate artifact passes 88 synthetic factual pairs with minimum margin
-`0.206250`. Its synthetic ordinal Spearman is `0.958919`; that metric measures
+`0.206250`. Its synthetic ordinal Spearman is `0.958926`; that metric measures
 `exact > good > bad` ordering on handcrafted cases and is not comparable to the
 live candidate-versus-champion correlation. Predicate-family identity,
 inverse `learned from` and `lost to` phrasing, parenthetical commas,

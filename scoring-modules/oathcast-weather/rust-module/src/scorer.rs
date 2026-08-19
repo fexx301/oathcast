@@ -1544,6 +1544,134 @@ fn question_entity_substituted(question: &str, ground_truth: &str, answer: &str)
         })
 }
 
+/// Collects entity-like tokens together with the token that immediately precedes
+/// each one, which is what makes a slot comparison possible.
+fn entity_tokens_with_predecessor<'a>(
+    text: &'a str,
+    strict: bool,
+    entities: &mut [&'a [u8]; MAX_BOUND_ENTITIES],
+    predecessors: &mut [&'a [u8]; MAX_BOUND_ENTITIES],
+) -> usize {
+    let mut len = 0usize;
+    let mut previous: &[u8] = b"";
+    let mut at_sentence_start = true;
+    let mut previous_end = 0usize;
+    for token in TokenIter::new(text) {
+        let start = token.end.saturating_sub(token.bytes.len());
+        if has_strong_clause_boundary(text, previous_end, start) {
+            at_sentence_start = true;
+        }
+        previous_end = token.end;
+        let positionally_ambiguous = strict
+            && at_sentence_start
+            && token_is_titlecase(token.bytes)
+            && !token_is_all_uppercase(token.bytes)
+            && !token.bytes.iter().any(u8::is_ascii_digit);
+        at_sentence_start = false;
+
+        let usable = !positionally_ambiguous
+            && token_is_entity_like(token.bytes)
+            && !is_fact_relation_or_filler(token.bytes)
+            && !is_weather_anchor_signal(token.bytes)
+            && !is_temporal_or_unit_anchor(token.bytes)
+            && !is_context_provenance_or_modal(token.bytes)
+            && !is_source_attribution_cue(token.bytes)
+            && !token.bytes.first().is_some_and(u8::is_ascii_digit);
+        if usable && len < entities.len() {
+            entities[len] = token.bytes;
+            predecessors[len] = previous;
+            len += 1;
+        }
+        previous = token.bytes;
+    }
+    len
+}
+
+/// True when the answer swaps a foreign entity into the exact slot the ground
+/// truth used for an entity the question asks about.
+///
+/// This is the anchored counterpart to `question_entity_substituted`. Against the
+/// question "What language is spoken in Brazil?" and the truth "Portuguese is
+/// spoken in Brazil.", the wrong answer "Portuguese is spoken in Portugal." scored
+/// 0.804167 while the correct paraphrase "Brazilians speak Portuguese." scored
+/// 0.758333. An anchor does exist here, `Portuguese`, and the wrong answer
+/// contains it, so anchor support is satisfied and nothing objected to the country
+/// being swapped.
+///
+/// `question_entity_substituted` cannot be extended to cover this by removing its
+/// gate: ungated it fails six tests, because dropping a question entity while
+/// naming an unfamiliar one is something correct answers do routinely. The
+/// measured false positives were "The capital is not Berlin but Paris." (naming an
+/// entity in order to deny it), "ECMWF expects rain during that hour." (attributing
+/// a source), and answers that supply an alias the truth does not spell out.
+///
+/// What separates those from a real swap is the slot. The truth says "spoken *in*
+/// Brazil" and the wrong answer says "spoken *in* Portugal", the same preceding
+/// token with the entity exchanged. "not Berlin" does not match "of France", and a
+/// sentence-initial source attribution has no preceding token at all. So the test
+/// is: the truth's bound entity is absent from the answer, and a foreign entity
+/// appears in the answer behind the very token that preceded the bound entity in
+/// the truth.
+fn question_entity_slot_substituted(question: &str, ground_truth: &str, answer: &str) -> bool {
+    let mut question_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut question_prev = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut truth_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut truth_prev = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut answer_entities = [&b""[..]; MAX_BOUND_ENTITIES];
+    let mut answer_prev = [&b""[..]; MAX_BOUND_ENTITIES];
+    let q_len =
+        entity_tokens_with_predecessor(question, false, &mut question_entities, &mut question_prev);
+    let t_len =
+        entity_tokens_with_predecessor(ground_truth, false, &mut truth_entities, &mut truth_prev);
+    let a_len =
+        entity_tokens_with_predecessor(answer, true, &mut answer_entities, &mut answer_prev);
+    if q_len == 0 || a_len == 0 {
+        return false;
+    }
+
+    for index in 0..t_len {
+        let bound = truth_entities[index];
+        // Load-bearing only where the question and the truth agree on the entity.
+        let asked_about = question_entities[..q_len]
+            .iter()
+            .any(|candidate| entity_tokens_name_same(candidate, bound));
+        if !asked_about {
+            continue;
+        }
+        if answer_entities[..a_len]
+            .iter()
+            .any(|candidate| entity_tokens_name_same(candidate, bound))
+        {
+            continue;
+        }
+        let slot = truth_prev[index];
+        // Any lowercase function word can mark a slot. The first version required
+        // is_fact_relation_or_filler, which silently did nothing here because "in"
+        // is not on that list, so "spoken in Brazil" never registered a slot at
+        // all. Slot *equality* is what discriminates a swap from a mention, so the
+        // admissibility test only has to exclude an empty predecessor, which is a
+        // sentence-initial entity, and another entity, which is a name sequence
+        // rather than a position.
+        if slot.is_empty() || token_is_entity_like(slot) {
+            continue;
+        }
+        for other in 0..a_len {
+            let candidate = answer_entities[other];
+            let known = question_entities[..q_len]
+                .iter()
+                .chain(truth_entities[..t_len].iter())
+                .any(|seen| entity_tokens_name_same(seen, candidate));
+            if known {
+                continue;
+            }
+            if token_eq(answer_prev[other], slot) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn fact_anchor_entity_representatives(
     text: &str,
     anchors: &HashSet<MAX_FACT_ANCHORS>,
@@ -3052,7 +3180,16 @@ pub(crate) fn evaluate(
     // candidate, an acronym alone is enough to return `Some`, and the assessment
     // then existed while still saying nothing about which entity was bound.
     let unanchored_binding = fact_assessment.is_none_or(|assessment| assessment.no_binding_anchors);
-    if unanchored_binding && question_entity_substituted(question, ground_truth, answer) {
+    // The slot rule is the non-weather analogue of the context-constraint check.
+    // `fact_anchors` only populates context_constraints for weather questions, and
+    // `context_conflict` already rejects a swapped location there, uniformly across
+    // casings and phrasings. Letting the slot rule also apply to weather questions
+    // duplicated that mechanism and did it worse: it caught "in Abuja" but not "in
+    // abuja" or "in the city of abuja", turning consistent handling into
+    // capitalisation-dependent handling.
+    if (unanchored_binding && question_entity_substituted(question, ground_truth, answer))
+        || (!weather_question && question_entity_slot_substituted(question, ground_truth, answer))
+    {
         return zero(ISSUE_CONTRADICTORY_FACT_ANCHOR);
     }
 
@@ -3155,6 +3292,57 @@ pub(crate) fn evaluate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn swapping_an_entity_into_the_same_slot_is_a_contradiction() {
+        const Q: &str = "What language is spoken in Brazil?";
+        const T: &str = "Portuguese is spoken in Brazil.";
+
+        // The defect: an anchor exists here, "Portuguese", and the wrong answer
+        // contains it, so anchor support was satisfied and nothing objected to the
+        // country being exchanged. It scored 0.804167 while the correct paraphrase
+        // scored 0.758333, inverting the pool.
+        let swapped = evaluate(Q, T, "Portuguese is spoken in Portugal.");
+        assert_eq!(swapped.score, 0.0, "{swapped:?}");
+        assert_ne!(swapped.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR, 0);
+
+        // "Brazilians" has to keep counting as naming Brazil, or the correct
+        // paraphrase reads as having dropped the subject too.
+        let paraphrase = evaluate(Q, T, "Brazilians speak Portuguese.");
+        assert!(paraphrase.score > swapped.score, "{paraphrase:?}");
+        assert_eq!(paraphrase.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR, 0);
+    }
+
+    #[test]
+    fn a_mentioned_entity_is_not_a_slot_substitution() {
+        // The discriminator is the slot, not the mere presence of an unfamiliar
+        // name. These are the measured false positives from an earlier version
+        // that tested presence alone, and each has to stay clean: naming an entity
+        // in order to deny it, and attributing a source.
+        let denied = evaluate(
+            "What is the capital of France?",
+            "The capital of France is Paris.",
+            "The capital is not Berlin but Paris.",
+        );
+        assert_eq!(
+            denied.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR,
+            0,
+            "{denied:?}"
+        );
+
+        // "of France" and "not Berlin" are different slots, which is what keeps
+        // the above clean while the Brazil/Portugal exchange is caught.
+        assert!(question_entity_slot_substituted(
+            "What language is spoken in Brazil?",
+            "Portuguese is spoken in Brazil.",
+            "Portuguese is spoken in Portugal.",
+        ));
+        assert!(!question_entity_slot_substituted(
+            "What is the capital of France?",
+            "The capital of France is Paris.",
+            "The capital is not Berlin but Paris.",
+        ));
+    }
 
     #[test]
     fn a_reassigned_relation_outranks_nothing_even_when_the_right_name_appears() {

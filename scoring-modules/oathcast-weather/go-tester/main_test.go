@@ -90,9 +90,9 @@ func TestArtifactContract(t *testing.T) {
 	if !evidence.Artifact.RegistrationCandidate {
 		t.Fatal("rank-only artifact must be marked as a registration candidate")
 	}
-	if evidence.Artifact.ByteSize != 45395 ||
-		evidence.Artifact.SHA256 != "8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c" ||
-		evidence.Artifact.Keccak256RawBytes != "0xef42c86fe9d1d1485693c8ba9d724b48cd2883d34d4cb6212c31ef8a2c5494ce" {
+	if evidence.Artifact.ByteSize != 46809 ||
+		evidence.Artifact.SHA256 != "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95" ||
+		evidence.Artifact.Keccak256RawBytes != "0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065" {
 		t.Fatalf("unexpected local candidate evidence: %+v", evidence.Artifact)
 	}
 	if evidence.Fixture.Path != "fixtures/wasm_scoring_cases.json" {
@@ -305,11 +305,11 @@ func TestArtifactContract(t *testing.T) {
 		clarification.HiddenPairScoresDisclosed {
 		t.Fatalf("unexpected registration 19 fixture clarification: %+v", clarification)
 	}
-	if evidence.Verification.RustNativeTestsPassed != 51 ||
+	if evidence.Verification.RustNativeTestsPassed != 53 ||
 		evidence.Verification.PythonRepositoryTestsPassed != 498 ||
 		evidence.Verification.SyntheticFactualPairCount != 88 ||
 		evidence.Verification.SyntheticFactualMinimumMargin != 0.20625 ||
-		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.958919 {
+		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.958926 {
 		t.Fatalf("unexpected local factual-paraphrase verification: %+v", evidence.Verification)
 	}
 	postflight := evidence.Verification.HistoricalFirstRegistrationPostflight
@@ -578,7 +578,7 @@ func TestArtifactContract(t *testing.T) {
 		)
 	}
 	// The artifact is deterministic per platform but not across platforms: the
-	// same pinned rustc and target emit 45,395 bytes with different content on
+	// same pinned rustc and target emit 46,809 bytes with different content on
 	// darwin/arm64 and linux/amd64. evidence.Artifact.SHA256 names the registered
 	// bytes, which are the darwin/arm64 build, so asserting it unconditionally
 	// could never pass on CI's linux/amd64 runner. Assert the digest recorded for

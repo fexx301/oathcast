@@ -5,12 +5,12 @@
   "status": "registration_96_rejected_at_stage_2_tie_hypothesis_open",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 45395,
+    "byte_size": 46809,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c",
-    "keccak256_raw_bytes": "0xef42c86fe9d1d1485693c8ba9d724b48cd2883d34d4cb6212c31ef8a2c5494ce",
+    "sha256": "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95",
+    "keccak256_raw_bytes": "0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065",
     "registration_candidate": true,
-    "candidate_scope": "This 45,395-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.958919. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
+    "candidate_scope": "This 46,809-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.958926. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
   "registration_41_artifact": {
     "byte_size": 42798,
@@ -110,24 +110,23 @@
     "metric": "separation = worst correct candidate minus best wrong candidate, per pool, against the real WASM through wazero",
     "baseline": {
       "pools": 10,
-      "separated": 9,
+      "separated": 10,
       "tied": 0,
-      "inverted": 1,
-      "worst_separation": -0.045833,
-      "worst_separation_pool": "shared_token_distractor",
+      "inverted": 0,
+      "worst_separation": 0.048125,
+      "worst_separation_pool": "location_binding",
       "pairwise_ordering_accuracy": 0.9434,
       "pairwise_ordered_pairs": "100/106",
       "engine_independent": true,
       "measured_on": ["darwin/arm64", "linux/amd64", "linux/arm64"]
     },
     "fixed_ranking_defects": [
+      "shared_token_distractor: 'Portuguese is spoken in Portugal', wrong for the question asked, outranked the correct 'Brazilians speak Portuguese' by 0.045833. The wrong answer now scores 0.000000 and every pool separates. See slot_substitution_fix.",
       "authorship_entity_swap: a correct loosely-worded answer and a wrong answer were both pinned to the 0.49 ambiguity ceiling, a separation of exactly 0.000000, so the pool could not be ordered. The wrong answer now scores 0.000000 as a contradiction and the pool separates. See relation_mismatch_contradiction_fix.",
       "negation_polarity: 'Yes, K2 is the tallest mountain on Earth' (wrong) scored 0.862500 while 'Everest is indeed Earth's highest peak' (correct) scored 0.370000, a separation of -0.4925. The wrong answer now scores 0.000000 and the pool separates. See entity_binding_fix."
     ],
-    "known_ranking_defects": [
-      "shared_token_distractor: 'Portuguese is spoken in Portugal', wrong for the question asked, outranks the correct 'Brazilians speak Portuguese' by 0.045833. Not reached by the entity-binding fix, because an entity anchor does exist here and the assessment path owns the verdict."
-    ],
-    "common_cause": "Lexical overlap with the ground truth outweighed correct entity binding, so copying the truth's frame and swapping the entity beat a faithful paraphrase. Addressed for the unanchored case by question_entity_substituted; the one defect still listed above sits on the anchored path and is not fixed.",
+    "known_ranking_defects": [],
+    "common_cause": "Lexical overlap with the ground truth outweighed correct entity binding, so copying the truth's frame and swapping the entity beat a faithful paraphrase. Addressed for the unanchored case by question_entity_substituted; and for the anchored case by question_entity_slot_substituted. All ten pools now separate; the remaining defect class, predicate substitution, is not represented in these pools and is tracked in generated_pair_scoreboard.",
     "scope": "Handcrafted development pools. Not Telegraph fixtures and not a claim about hidden Stage 2 cases.",
     "engine": "wazero interpreter. The default compiler backend was measured scoring two candidates differently on linux/amd64, so the benchmark uses the engine that agrees across every os/arch/engine combination tested. See runtime_determinism."
   },
@@ -144,7 +143,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c",
+      "measured_on_artifact": "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -218,12 +217,30 @@
       "ranking_pools": "tied 1 to 0, separated 8 to 9, inverted unchanged at 1",
       "generated_pairs": "unchanged at 9 of 375 inverted",
       "weakest_synthetic_factual_margin": "unchanged at 0.206250",
-      "synthetic_ordinal_spearman": "0.959566 to 0.958919, a decrease of 0.000647",
+      "synthetic_ordinal_spearman": "0.959566 to 0.958926, a decrease of 0.000647",
       "pair_margins": "all 88 still clear their minimum margins under both wazero engines",
       "engine_divergence": "unchanged"
     },
     "cost_acknowledged": "The ordinal Spearman decreased slightly. It measures exact-over-good-over-bad ordering on handcrafted pairs, and one pair's ordering shifted. Recorded rather than omitted, because removing a tie that made a pool unorderable is the more consequential property, but it is a cost rather than a free win.",
     "hypothesis_status": "This addresses the mechanism proposed in cross_registration_finding after registration 96 was rejected at 31 of 32 for the third consecutive time. It is not confirmed to be the failing hidden case, and two earlier hypotheses also fit the evidence and did not move the win count."
+  },
+  "slot_substitution_fix": {
+    "defect": "With an anchor present and satisfied, exchanging the entity behind the same preposition went unpunished. Against the question 'What language is spoken in Brazil?' and the truth 'Portuguese is spoken in Brazil.', the wrong answer 'Portuguese is spoken in Portugal.' scored 0.804167 while the correct paraphrase 'Brazilians speak Portuguese.' scored 0.758333. The anchor is 'Portuguese', the wrong answer contains it, so anchor support was satisfied and nothing objected to the country being swapped.",
+    "why_the_existing_rule_could_not_be_extended": "question_entity_substituted is gated to the case where no binding anchor exists. Removing that gate fails six tests, because dropping a question entity while naming an unfamiliar one is something correct answers do routinely. The measured false positives were 'The capital is not Berlin but Paris.' which names an entity in order to deny it, 'ECMWF expects rain during that hour.' which attributes a source, and answers supplying an alias the truth does not spell out.",
+    "discriminator": "The slot. The truth says 'spoken in Brazil' and the wrong answer says 'spoken in Portugal', the same preceding token with the entity exchanged. 'not Berlin' does not match 'of France', and a sentence-initial source attribution has no preceding token at all. So the test is that the truth's bound entity is absent from the answer and a foreign entity appears behind the very token that preceded the bound entity in the truth.",
+    "two_corrections_during_implementation": [
+      "The first version required the slot token to satisfy is_fact_relation_or_filler, which silently did nothing here because 'in' is not on that list, so 'spoken in Brazil' never registered a slot and the rule never fired. Slot equality is what discriminates, so admissibility only needs to exclude an empty predecessor and another entity.",
+      "The rule initially applied to weather questions too, where it duplicated context_conflict and did it worse: it caught 'in Abuja' but not 'in abuja' or 'in the city of abuja', turning consistent handling into capitalisation-dependent handling. It is now the non-weather analogue of the context-constraint check, which is only populated for weather questions."
+    ],
+    "measured_effect": {
+      "ranking_pools": "separated 9 to 10, inverted 1 to 0, ties remain 0. Worst separation goes from -0.045833 to +0.048125, positive for the first time.",
+      "generated_pairs": "unchanged at 9 of 375 inverted",
+      "weakest_synthetic_factual_margin": "unchanged at 0.206250",
+      "synthetic_ordinal_spearman": "0.958919 to 0.958926",
+      "pair_margins": "all 88 still clear their minimum margins under both wazero engines",
+      "engine_divergence": "unchanged"
+    },
+    "ranking_floors_ratcheted": "The benchmark floors moved from the original baseline of 7 separated, at most 1 tie, at most 2 inversions and a worst separation of -0.4930, to 10 separated, no ties, no inversions and a worst separation of at least +0.0480. Any scoring change that reintroduces a tie or an inversion now fails the build."
   },
   "generated_pair_scoreboard": {
     "driver": "scoring-modules/oathcast-weather/go-tester/exposure_test.go",
@@ -265,13 +282,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c",
-      "linux/amd64": "03445f503093281b899011ec356109c7b48910f7e26480514c51e3f3060333f7"
+      "darwin/arm64": "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95",
+      "linux/amd64": "f8680941b8260e331f043e67415d2e3766c896c9a08fd45b7cec46dab36fe421"
     },
-    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 45,395 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
+    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 46,809 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c",
-      "8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c"
+      "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95",
+      "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95"
     ]
   },
   "current_artifact_abi": {
@@ -472,14 +489,14 @@
       "viem 2.55.11 keccak256(raw bytes)",
       "Go golang.org/x/crypto/sha3 NewLegacyKeccak256 (artifact contract test)"
     ],
-    "rust_native_tests_passed": 51,
+    "rust_native_tests_passed": 53,
     "python_repository_tests_passed": 498,
     "python_repository_test_execution": "Repository discovery ran 498 tests and reported nine sandbox-only PermissionError failures while binding 127.0.0.1. The complete 15-test decision_ui module was rerun with approved loopback permission and passed, establishing 401/401 repository tests.",
     "wazero_host_suite_passed": true,
     "wazero_host_suite_scope": "Current rank-only ABI, weather fixture ordering, 88 synthetic factual paraphrase and adversarial pairs with local margin and bad-score gates, synthetic ordinal Spearman, allocator safety, malformed input, exact byte limits, deterministic calls, and published Stage 1 behavior.",
     "synthetic_factual_pair_count": 88,
     "synthetic_factual_minimum_margin": 0.20625,
-    "synthetic_factual_ordinal_spearman": 0.958919,
+    "synthetic_factual_ordinal_spearman": 0.958926,
     "synthetic_factual_evidence_limit": "This local ordinal proxy measures exact > good > bad ordering on handcrafted factual and adversarial cases. It reflects user-relayed Telegraph guidance about the factual paraphrase category and 0.15 margin floor, but it does not contain Telegraph's hidden cases or champion historical-score series and is not comparable to the live 0.60 candidate-versus-champion Spearman result.",
     "published_stage_1_checks_passed": {
       "exact_required_function_exports": true,

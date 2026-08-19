@@ -25,28 +25,36 @@ import (
 // module. TestEngineScoresAgree pins that divergence; the floors below are
 // engine-independent and hold identically on arm64 and amd64.
 
-// These floors record MEASURED CURRENT QUALITY, defects included. They are a
-// ratchet so a scoring change that degrades ranking fails here, not a statement
-// that the present behaviour is correct. Three known failures are encoded:
+// These floors record MEASURED CURRENT QUALITY and are a ratchet: a scoring change
+// that degrades ranking fails here rather than passing quietly.
 //
-//	negation_polarity      -0.492500  "Yes, K2 is the tallest mountain on Earth"
-//	                                  (wrong) scores 0.862500 while "Everest is
-//	                                  indeed Earth's highest peak" (correct)
-//	                                  scores 0.370000.
-//	shared_token_distractor -0.045833 "Portuguese is spoken in Portugal" (wrong
-//	                                  for this question) outranks "Brazilians
-//	                                  speak Portuguese" (correct).
-//	authorship_entity_swap  +0.000000 A correct answer and a wrong one are both
-//	                                  pinned to the 0.49 ambiguity clamp.
+// Every pool now separates. That was not true when this benchmark was written: the
+// first run reported 7 separated, 1 tied and 2 inverted, with a worst separation of
+// -0.4925. Four fixes closed the gap, and each was found by this measurement rather
+// than by the pre-existing suite, which stayed green through all of them:
 //
-// All three share one cause: lexical overlap with the ground truth outweighs
-// correct entity binding, so copying the truth's frame and swapping the entity
-// beats a faithful paraphrase. Tighten these numbers as that is fixed.
+//	entity binding      A truth that restates its question left no anchor, so no
+//	                    entity check ran at all and a swapped subject scored
+//	                    0.862500 against a correct paraphrase's 0.370000.
+//	weather classifier  "Sun" is in the CLEAR synonym group, so a binary
+//	                    general-knowledge question was scored as a forecast and the
+//	                    probability ceiling pinned a correct answer at 0.490000.
+//	relation reassigned A ceiling flattened a correct and a wrong answer onto
+//	                    exactly 0.490000. Ties lose a case just as inversions do.
+//	slot substitution   With an anchor present and satisfied, exchanging the entity
+//	                    behind the same preposition went unpunished, so "spoken in
+//	                    Portugal" outranked a correct paraphrase.
+//
+// The remaining known defect is not visible in these pools: predicate substitution,
+// where the answer keeps the entity and replaces the truth's distinguishing
+// predicate with a non-equivalent one. Separating that from a legitimate paraphrase
+// needs synonymy this module cannot judge, so it is tracked in
+// generated_pair_scoreboard rather than papered over here.
 const (
-	minSeparatedPools     = 7
-	minWorstSeparation    = -0.4930
-	maxBoundaryTies       = 1
-	maxBoundaryInversions = 2
+	minSeparatedPools     = 10
+	minWorstSeparation    = 0.0480
+	maxBoundaryTies       = 0
+	maxBoundaryInversions = 0
 	minPairwiseAccuracy   = 0.9400
 )
 
