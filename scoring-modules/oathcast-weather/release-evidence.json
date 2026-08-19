@@ -2,7 +2,7 @@
   "schema_version": "oathcast_weather_wasm_release_evidence_v7",
   "recorded_at": "2026-08-15T09:19:22Z",
   "updated_at": "2026-08-18T00:30:26Z",
-  "status": "probability_scan_fix_local_candidate_after_registration_41_stage_2_rejection",
+  "status": "registration_96_rejected_at_stage_2_tie_hypothesis_open",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
     "byte_size": 45394,
@@ -49,6 +49,55 @@
       "breakdown_answer": "(i32, i32, i32, i32, i32, i32) -> f32"
     },
     "superseded_reason": "This build preserved a breakdown_answer alias while the portal/API output and public guide appeared inconsistent. Telegraph's current guide deprecates and removes that export; the current candidate contains only the three required functions."
+  },
+  "registration_96_result": {
+    "registration_id": 96,
+    "chain": "Base Sepolia",
+    "chain_id": 84532,
+    "transaction_hash": "0xb88ef16fe292dded20deea91196399abbdd61429c77f6aaba55a4c392fa09b83",
+    "block_number": 45699029,
+    "block_timestamp": "2026-08-19T19:05:46Z",
+    "transaction_status": 1,
+    "gas_used": 476361,
+    "outer_from": "0xC066ac5D385419B1A8c43A0E146fA439837a8B8c",
+    "outer_to": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+    "outer_signature": "redeemDelegations(bytes[],bytes32[],bytes[])",
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "registrant": "0x7dc9c9d535b68c3c6273e3323f0e52e5851c3278",
+    "entity_type": 2,
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "wasm_hash": "0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21",
+    "wasm_url": "https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=9sn6o5b2&dl=1",
+    "hosted_bytes_verified": true,
+    "hosted_bytes_verification_method": "Independent re-fetch of the exact registered URL, byte comparison against the local artifact, SHA-256 and OpenSSL KECCAK-256 agreement, plus execution of the fetched bytes through wazero on both engines confirming the entity-binding fix is present (swapped-subject answer scores 0.000000 where the pre-fix build scored 0.862500).",
+    "activation_status": "rejected",
+    "stage_1_passed": true,
+    "rejection_reason": "lost to the current champion on ordering: candidate won 31 of 32 comparable cases while the champion won 32 of 32.",
+    "eval_details": {
+      "candidate_margin": 0.37149292,
+      "champion_margin": 0.37360683,
+      "candidate_wins": 31,
+      "champion_wins": 32,
+      "comparable_cases": 32,
+      "worst_self_match": 1,
+      "score_stddev": 0.29768366,
+      "historical_rows_evaluated": 0
+    },
+    "further_registration_authorized": false
+  },
+  "cross_registration_finding": {
+    "observation": "Three structurally different scorer builds produced an identical 31 of 32 per-case ordering result against a champion that wins 32 of 32.",
+    "series": [
+      {"registration_id": 19, "candidate_margin": 0.31248063, "candidate_wins": 31, "score_stddev": 0.26765382},
+      {"registration_id": 41, "candidate_margin": 0.37852418, "candidate_wins": 31, "score_stddev": 0.29563302},
+      {"registration_id": 96, "candidate_margin": 0.37149292, "candidate_wins": 31, "score_stddev": 0.29768366}
+    ],
+    "why_it_is_informative": "Registration 96 changed scoring behaviour substantially against 41: whole answer classes moved from 0.862500 to 0.000000 through question_entity_substituted, an inserted-ordinal penalty was added, and a weather-classifier over-trigger that was applying a probability ceiling to correct general-knowledge answers was removed. Local generated inversions fell from 66 of 375 to 9 of 375. None of that moved the per-case win count. The aggregate margin moved in both directions across the series while the win count never did, which is evidence that the single failing case is not an instance of any inversion class fixed so far.",
+    "leading_hypothesis": "The failing case is a tie rather than an inversion. Telegraph's wording is that the scorer must rank the good answer *above* the bad one, so an equal score is not a win. The scorer applies hard ceilings via score.min(0.49) and score.min(0.30), and a hard ceiling collapses every answer above it onto one value. Measured on the local ranking pools, the authorship_entity_swap pool ties a correct answer against a wrong one at exactly 0.490000, and four distinct candidates share that value. Clamps are structural and were never touched by any of the three builds, which fits an invariant single-case failure.",
+    "hypothesis_status": "Unconfirmed against Telegraph's fixtures, which are hidden and whose per-case scores they have stated cannot be disclosed. Supported only by the local reproduction of the same mechanism.",
+    "implied_fix": "Make the ceilings order-preserving rather than flattening: map scores that exceed a triggered ceiling into a narrow monotone band ending at that ceiling, so two defective answers of different quality stay distinguishable while both remain capped. This helps only where the pre-clamp ordering is already correct; where it is not, a tie becomes an inversion, which is no worse for Stage 2 but no better either. Not yet implemented.",
+    "note_on_priority": "Telegraph's team stated the objective is ranking quality across the network rather than winning the canonical-script slot. This defect serves both readings: a scorer that assigns a correct and a wrong answer the same score cannot rank them at all, so fixing it is ranking work rather than fixture chasing."
   },
   "ranking_benchmark": {
     "path": "fixtures/scorer_ranking_pools.json",

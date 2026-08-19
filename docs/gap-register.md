@@ -220,6 +220,32 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Actionable next, not platform-blocked
 
+- Registration `96` was rejected at Stage 2 on 2026-08-19 with candidate wins
+  `31/32` against a champion at `32/32`, the same count as registrations `19` and
+  `41`. The aggregate margin moved across the series, `0.31248063` then
+  `0.37852418` then `0.37149292`, while the win count never did. Registration 96
+  changed scoring behaviour substantially, moving whole answer classes from
+  `0.862500` to `0.000000` and taking local generated inversions from 66 of 375 to
+  9 of 375, and still did not move it. That is evidence the single failing case is
+  not an instance of any inversion class fixed so far.
+  Leading hypothesis: it is a tie, not an inversion. Telegraph requires the good
+  answer to rank *above* the bad one, so an equal score is not a win, and the
+  scorer's hard ceilings `score.min(0.49)` and `score.min(0.30)` collapse every
+  answer above them onto a single value. Locally the `authorship_entity_swap` pool
+  ties a correct answer against a wrong one at exactly `0.490000`, with four
+  candidates sharing that value. Ceilings are structural and were untouched by all
+  three builds, which fits an invariant single-case failure.
+  Fix direction: make the ceilings order-preserving, mapping scores above a
+  triggered ceiling into a narrow monotone band ending at it, so two defective
+  answers of different quality stay distinguishable while both stay capped. This
+  only helps where the pre-clamp ordering is already correct; where it is not, a
+  tie becomes an inversion, which is no worse for Stage 2 but no better. Unverifiable
+  against Telegraph's hidden fixtures, whose per-case scores they have said cannot
+  be disclosed.
+  Worth doing on ranking grounds regardless of promotion: a scorer that gives a
+  correct and a wrong answer the same score cannot rank them at all, which is the
+  property Telegraph's team said actually matters.
+
 - Make the scorer produce identical results under both wazero engines. Telegraph
   was told about the amd64 compiler divergence on 2026-08-19 and replied that
   they run a single validator today, so it does not affect them much yet, that
