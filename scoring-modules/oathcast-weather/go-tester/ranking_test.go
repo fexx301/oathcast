@@ -28,33 +28,42 @@ import (
 // These floors record MEASURED CURRENT QUALITY and are a ratchet: a scoring change
 // that degrades ranking fails here rather than passing quietly.
 //
-// Every pool now separates. That was not true when this benchmark was written: the
-// first run reported 7 separated, 1 tied and 2 inverted, with a worst separation of
-// -0.4925. Four fixes closed the gap, and each was found by this measurement rather
-// than by the pre-existing suite, which stayed green through all of them:
+// They were LOOSENED on 2026-08-19, which is the thing a ratchet exists to prevent,
+// so the reason is recorded here rather than in a commit message alone.
 //
-//	entity binding      A truth that restates its question left no anchor, so no
-//	                    entity check ran at all and a swapped subject scored
-//	                    0.862500 against a correct paraphrase's 0.370000.
-//	weather classifier  "Sun" is in the CLEAR synonym group, so a binary
-//	                    general-knowledge question was scored as a forecast and the
-//	                    probability ceiling pinned a correct answer at 0.490000.
-//	relation reassigned A ceiling flattened a correct and a wrong answer onto
-//	                    exactly 0.490000. Ties lose a case just as inversions do.
-//	slot substitution   With an anchor present and satisfied, exchanging the entity
-//	                    behind the same preposition went unpunished, so "spoken in
-//	                    Portugal" outranked a correct paraphrase.
+// Two changes had taken these numbers to 10 separated with no ties and no
+// inversions, a worst separation of +0.048125. Registration 98 shipped that build
+// and won 28 of Telegraph's 32 fixture cases, where the three previous builds all
+// won 31. Both changes converted a signal that capped a score into one that zeroes
+// it, so a correct answer tripping either fell from a capped score that could still
+// beat its paired wrong answer to zero, which cannot. Score stddev rose from
+// 0.29768366 to 0.33863735, which is what a build with more zeros looks like.
 //
-// The remaining known defect is not visible in these pools: predicate substitution,
-// where the answer keeps the entity and replaces the truth's distinguishing
-// predicate with a non-equivalent one. Separating that from a legitimate paraphrase
-// needs synonymy this module cannot judge, so it is tracked in
-// generated_pair_scoreboard rather than papered over here.
+// Both were reverted. The scorer now rebuilds byte-identical to the registration 96
+// artifact, 9183cbde, which is the best externally measured state at 31 of 32. The
+// tie and the inversion below come back with it:
+//
+//	authorship_entity_swap    +0.000000  a correct and a wrong answer both pinned to
+//	                                     the 0.49 ambiguity ceiling
+//	shared_token_distractor   -0.045833  "Portuguese is spoken in Portugal" outranks
+//	                                     the correct "Brazilians speak Portuguese"
+//
+// The lesson is not that those defects are acceptable. It is that this corpus was
+// authored by us, so it cannot see a rule that misfires only on shapes we did not
+// think of. Across four registrations these local numbers improved monotonically
+// while the scored result went 31, 31, 31, 28. A rising number here is evidence
+// about the properties encoded here and about nothing else.
+//
+// Telegraph's team has said they are publishing a champion baseline that gives the
+// scoring surface to test against locally. Tighten these again when a fix can be
+// checked against that rather than against pools we wrote, and prefer a cap over a
+// zero unless a contradiction is certain, because a zero can only ever remove a win
+// a cap might have kept.
 const (
-	minSeparatedPools     = 10
-	minWorstSeparation    = 0.0480
-	maxBoundaryTies       = 0
-	maxBoundaryInversions = 0
+	minSeparatedPools     = 8
+	minWorstSeparation    = -0.0459
+	maxBoundaryTies       = 1
+	maxBoundaryInversions = 1
 	minPairwiseAccuracy   = 0.9400
 )
 

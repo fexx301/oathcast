@@ -84,15 +84,15 @@ func TestArtifactContract(t *testing.T) {
 	if evidence.SchemaVersion != "oathcast_weather_wasm_release_evidence_v7" {
 		t.Fatalf("unexpected release evidence schema %q", evidence.SchemaVersion)
 	}
-	if evidence.Status != "registration_98_regressed_to_28_of_32_revert_indicated" {
+	if evidence.Status != "reverted_to_registration_96_scoring_awaiting_champion_baseline" {
 		t.Fatalf("unexpected release evidence status %q", evidence.Status)
 	}
 	if !evidence.Artifact.RegistrationCandidate {
 		t.Fatal("rank-only artifact must be marked as a registration candidate")
 	}
-	if evidence.Artifact.ByteSize != 46809 ||
-		evidence.Artifact.SHA256 != "ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95" ||
-		evidence.Artifact.Keccak256RawBytes != "0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065" {
+	if evidence.Artifact.ByteSize != 45394 ||
+		evidence.Artifact.SHA256 != "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36" ||
+		evidence.Artifact.Keccak256RawBytes != "0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21" {
 		t.Fatalf("unexpected local candidate evidence: %+v", evidence.Artifact)
 	}
 	if evidence.Fixture.Path != "fixtures/wasm_scoring_cases.json" {
@@ -305,11 +305,11 @@ func TestArtifactContract(t *testing.T) {
 		clarification.HiddenPairScoresDisclosed {
 		t.Fatalf("unexpected registration 19 fixture clarification: %+v", clarification)
 	}
-	if evidence.Verification.RustNativeTestsPassed != 53 ||
+	if evidence.Verification.RustNativeTestsPassed != 50 ||
 		evidence.Verification.PythonRepositoryTestsPassed != 498 ||
 		evidence.Verification.SyntheticFactualPairCount != 88 ||
 		evidence.Verification.SyntheticFactualMinimumMargin != 0.20625 ||
-		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.958926 {
+		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.959566 {
 		t.Fatalf("unexpected local factual-paraphrase verification: %+v", evidence.Verification)
 	}
 	postflight := evidence.Verification.HistoricalFirstRegistrationPostflight
@@ -578,7 +578,7 @@ func TestArtifactContract(t *testing.T) {
 		)
 	}
 	// The artifact is deterministic per platform but not across platforms: the
-	// same pinned rustc and target emit 46,809 bytes with different content on
+	// same pinned rustc and target emit 45,394 bytes with different content on
 	// darwin/arm64 and linux/amd64. evidence.Artifact.SHA256 names the registered
 	// bytes, which are the darwin/arm64 build, so asserting it unconditionally
 	// could never pass on CI's linux/amd64 runner. Assert the digest recorded for

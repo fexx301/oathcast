@@ -4,10 +4,12 @@
 
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
-publicly on release `2026-08-17-temperature-v8`. The registered `GET /predict`
+publicly on release `2026-08-19-window-v16`. The registered `GET /predict`
 route and canonical `GET /v1/forecast/point` route share the same authenticated
-forecast and receipt path; v8 also enables an additive, unregistered temperature
-compatibility route without changing the protected registered YAML. The
+forecast and receipt path. V16 accepts aware multi-hour ISO/RFC3339 bounds,
+normalizes their start to the nearest whole UTC hour using half-up rounding,
+and retains the additive, unregistered temperature compatibility route without
+changing the protected registered YAML. The
 separate public UI exposes a truthful read-only status surface and client-only
 development fixture. Its live decision endpoint remains degraded and returns
 503 because no reviewed paid Application runner is configured.
@@ -192,13 +194,14 @@ release/request headers. `compare_release_replay.py` compares two smoke reports
 and proves a stored event's receipt and public response survived a release
 cutover unchanged.
 
-The current public identity is release `2026-08-17-temperature-v8`, source
-SHA-256 `edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`,
+The current public identity is release `2026-08-19-window-v16`, source
+SHA-256 `a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1`,
 and image digest
-`sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672`.
-The strict public smoke, v7-to-v8 replay, and runtime evidence are retained under
-`artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-*`; stopped
-`oathcast-v7-rollback-20260817` is the immediate Miner rollback target.
+`sha256:7ac7f6f81cac9e66e33187e140ae21f76d6e7ab4b3e6fc6c9d6944312aaedc28`.
+The exact manifest, strict post-restart public smoke, v12-to-v16 replay, and
+runtime evidence are retained under
+`artifacts/release-evidence/oathcast-2026-08-19-window-v16-*`; stopped
+`oathcast-v12-rollback-20260819` is the immediate Miner rollback target.
 
 `create_registration_draft.py` first requires that local check to pass, then
 records an unsigned registration snapshot. It hashes the exact YAML bytes and
@@ -209,8 +212,9 @@ or submits `registerMiner`.
 `public_canary.py` is the same no-state check intended to run from an
 independent scheduler such as GitHub Actions; `.github/workflows/oathcast-canary.yml`
 contains the no-cost scheduled path and expects the API key in a repository
-secret. The v8 canary additionally requires the 24-hour temperature response and
-alias parity. See `docs/repository-and-canary.md` for the safe repository/secret
+secret. The v16 canary requires the 24-hour temperature response and alias
+parity, and resolves release identity from the checked-in v16 evidence bundle.
+See `docs/repository-and-canary.md` for the safe repository/secret
 setup. `backup_receipts.py` uses SQLite's online backup API, runs integrity
 checks on both copies, and verifies that the row count survives restoration.
 Because it initializes the current receipt store, use raw read-only `sqlite3.backup`
@@ -301,16 +305,16 @@ suite. Telegraph's unmodified official tester returned example score `0.8500`
 for the earlier 42,798-byte registration `41` artifact; it is not vendored here
 and has not been re-run against the current candidate. See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
-build commands and safeguards. The current frozen rank-only artifact is 46,809
+build commands and safeguards. The current frozen rank-only artifact is 45,394
 bytes with SHA-256
-`ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95` and
+`9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36` and
 raw-byte Keccak-256
-`0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065`.
+`0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21`.
 Its fixture SHA-256 is
 `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
 Two isolated clean builds on the same host are byte-identical, but the artifact
 is **not** byte-identical across platforms: `darwin/arm64` and `linux/amd64` both
-emit 46,809 bytes with different content under the same pinned `rustc 1.95.0` and
+emit 45,394 bytes with different content under the same pinned `rustc 1.95.0` and
 target. The registered bytes are the `darwin/arm64` build, since registration
 identifies a specific hosted artifact rather than whatever a given machine
 compiles; `release-evidence.json` records both digests under
@@ -350,7 +354,7 @@ The historical bytes are not present in this workspace.
 
 The machine-readable v7 record in
 [`release-evidence.json`](scoring-modules/oathcast-weather/release-evidence.json)
-records the 46,809-byte local candidate artifact, the registered 42,798-byte
+records the 45,394-byte local candidate artifact, the registered 42,798-byte
 registration `41` artifact, their local proxy evidence, the historical
 16,292-byte registration `19` artifact, and the scalar-build metadata
 separately. According to user-relayed Telegraph guidance,
@@ -360,7 +364,7 @@ margin floor for each of six near-miss cases, and do not compare the candidate's
 aggregate margin directly with the champion's. The reported `0.60` metric is
 Spearman rank correlation against the live champion's historical scores. The
 candidate artifact passes 88 synthetic factual pairs with minimum margin
-`0.206250`. Its synthetic ordinal Spearman is `0.958926`; that metric measures
+`0.206250`. Its synthetic ordinal Spearman is `0.959566`; that metric measures
 `exact > good > bad` ordering on handcrafted cases and is not comparable to the
 live candidate-versus-champion correlation. Predicate-family identity,
 inverse `learned from` and `lost to` phrasing, parenthetical commas,

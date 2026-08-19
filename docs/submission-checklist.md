@@ -59,12 +59,12 @@ relevant to that track.
   the node-log root cause as `module[env] not instantiated`; a six-`i32`/`f32`
   probe loaded far enough for the self-match check. These observations are
   historical, and neither the export nor any five-field result is current.
-- [x] Current 46,809-byte rank-only revision reproduced and locally verified:
+- [x] Current 45,394-byte rank-only revision reproduced and locally verified:
   two byte-identical clean builds;
   SHA-256
-  `ef687d45cd3cf86fa4e0c56dd01459238370e36b443c7021d58ea152a3049d95`;
+  `9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36`;
   raw-byte Keccak-256
-  `0x71d5f30d96c2bcd15e02f52af933857a51d76e0a381d6779dab414d952179065`;
+  `0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21`;
   fixture SHA-256
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   It remains an unregistered local candidate: not uploaded, hosted, signed, or
@@ -74,7 +74,7 @@ relevant to that track.
   16,292-byte artifact, and the 16,318-byte scalar-export metadata separately; the
   scalar-export bytes are not present in this workspace.
 - [x] Local factual-paraphrase proxy passes 88 synthetic pairs with minimum
-  margin `0.206250` and synthetic ordinal Spearman `0.958926`.
+  margin `0.206250` and synthetic ordinal Spearman `0.959566`.
   Predicate-family identity, inverse learned-from and lost-to phrasing,
   parenthetical commas, coordinated relation swaps, mixed explicit reversals,
   partial multi-relation omissions, mixed directed pairs, shared predicates,
@@ -168,7 +168,7 @@ relevant to that track.
   candidate and champion aggregate margins. The `0.60` metric is Spearman
   correlation against the champion's historical scores.
 - [~] The live Spearman threshold is still unobserved because the retained result
-  reports zero historical rows. Synthetic ordinal Spearman `0.958926` is a proxy only.
+  reports zero historical rows. Synthetic ordinal Spearman `0.959566` is a proxy only.
 - [x] All registration authorizations used so far, including registrations `19`
   and `41`, are consumed.
 - [x] The 42,798-byte artifact manually hosted and registered as registration
