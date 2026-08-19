@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -24,6 +25,13 @@ const (
 	maxGroundTruthBytes = 8 * 1024
 	maxMinerAnswerBytes = 4 * 1024
 )
+
+// buildPlatform names the host this test is compiling the artifact on. It is a
+// package-level helper because TestArtifactContract later declares a local
+// `runtime` for the wazero instance, which would shadow the runtime package.
+func buildPlatform() string {
+	return runtime.GOOS + "/" + runtime.GOARCH
+}
 
 func repoRoot(t *testing.T) string {
 	t.Helper()
@@ -569,18 +577,47 @@ func TestArtifactContract(t *testing.T) {
 			len(bytes), evidence.Artifact.ByteSize,
 		)
 	}
+	// The artifact is deterministic per platform but not across platforms: the
+	// same pinned rustc and target emit 42,790 bytes with different content on
+	// darwin/arm64 and linux/amd64. evidence.Artifact.SHA256 names the registered
+	// bytes, which are the darwin/arm64 build, so asserting it unconditionally
+	// could never pass on CI's linux/amd64 runner. Assert the digest recorded for
+	// the platform this build actually ran on, and refuse to pass silently on a
+	// platform the evidence does not cover.
+	platform := buildPlatform()
+	expectedSHA, recorded := evidence.Build.PlatformDigests[platform]
+	if !recorded {
+		t.Fatalf(
+			"release evidence records no build digest for %s; add it to build.platform_digests",
+			platform,
+		)
+	}
 	digest := sha256.Sum256(bytes)
-	if actual := hex.EncodeToString(digest[:]); actual != evidence.Artifact.SHA256 {
-		t.Fatalf("WASM SHA-256 is %s, release evidence pins %s", actual, evidence.Artifact.SHA256)
+	if actual := hex.EncodeToString(digest[:]); actual != expectedSHA {
+		t.Fatalf(
+			"WASM SHA-256 on %s is %s, release evidence pins %s",
+			platform, actual, expectedSHA,
+		)
 	}
 	keccak := sha3.NewLegacyKeccak256()
 	if _, err := keccak.Write(bytes); err != nil {
 		t.Fatal(err)
 	}
-	if actual := "0x" + hex.EncodeToString(keccak.Sum(nil)); actual != evidence.Artifact.Keccak256RawBytes {
-		t.Fatalf(
-			"WASM raw-byte Keccak-256 is %s, release evidence pins %s",
-			actual, evidence.Artifact.Keccak256RawBytes,
+	// The Keccak digest is the on-chain registration identity of a specific
+	// artifact, so it is only meaningful on the platform that produced the
+	// registered bytes. Asserting it elsewhere would compare a different build
+	// against a registration it was never part of.
+	if expectedSHA == evidence.Artifact.SHA256 {
+		if actual := "0x" + hex.EncodeToString(keccak.Sum(nil)); actual != evidence.Artifact.Keccak256RawBytes {
+			t.Fatalf(
+				"WASM raw-byte Keccak-256 is %s, release evidence pins %s",
+				actual, evidence.Artifact.Keccak256RawBytes,
+			)
+		}
+	} else {
+		t.Logf(
+			"skipping the registered Keccak-256 assertion: %s builds %s, which is not the registered artifact",
+			platform, expectedSHA,
 		)
 	}
 	if len(bytes) > maxWASMBytes {
@@ -725,9 +762,10 @@ type releaseEvidence struct {
 		SHA256 string `json:"sha256"`
 	} `json:"fixture"`
 	Build struct {
-		IsolatedCleanBuilds int      `json:"isolated_clean_builds"`
-		ByteIdentical       bool     `json:"byte_identical"`
-		IsolatedBuildSHA256 []string `json:"isolated_build_sha256"`
+		IsolatedCleanBuilds int               `json:"isolated_clean_builds"`
+		ByteIdentical       bool              `json:"byte_identical"`
+		PlatformDigests     map[string]string `json:"platform_digests"`
+		IsolatedBuildSHA256 []string          `json:"isolated_build_sha256"`
 	} `json:"build"`
 	CurrentArtifactABI struct {
 		FunctionExportCount     int  `json:"function_export_count"`

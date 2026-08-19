@@ -308,8 +308,15 @@ raw-byte Keccak-256
 `0xe217913a8a22b2d80b607008b3605e45b646e624b56005f1df84925e9818e47a`.
 Its fixture SHA-256 is
 `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
-Two isolated clean builds are byte-identical, and Python discovery passes
-`422/422`. Its only change from the previously registered build is a
+Two isolated clean builds on the same host are byte-identical, but the artifact
+is **not** byte-identical across platforms: `darwin/arm64` and `linux/amd64` both
+emit 42,790 bytes with different content under the same pinned `rustc 1.95.0` and
+target. The registered bytes are the `darwin/arm64` build, since registration
+identifies a specific hosted artifact rather than whatever a given machine
+compiles; `release-evidence.json` records both digests under
+`build.platform_digests`, and CI asserts the one for the platform it builds on.
+Python discovery passes
+`498/498`. Its only change from the previously registered build is a
 probability-scan fix in `percent_probability`, which abandoned the scan at the
 first `%` carrying no parseable number and so discarded a stated probability
 later in the same answer; the fix is behaviour-preserving on the pre-existing

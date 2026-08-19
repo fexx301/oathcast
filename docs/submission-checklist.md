@@ -52,7 +52,7 @@ relevant to that track.
   `rank_answer(6 x i32) -> f32`; `breakdown_answer` is deprecated and removed.
 - [x] OathCast `no_std` rank path compiled with pinned Rust and tested with
   `40/40` native Rust tests, the full Go/wazero ABI and adversarial harness,
-  deterministic repeated calls, `422/422` Python discovery tests, and Telegraph's
+  deterministic repeated calls, `498/498` Python discovery tests, and Telegraph's
   unmodified official tester (`0.8500` published example score).
 - [x] Historical validator evidence retained: the August 14 portal/API response
   surfaced a missing `breakdown_answer` message, while Telegraph later reported

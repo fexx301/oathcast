@@ -106,7 +106,7 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   Its fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. Rust tests pass `40/40`, the
-  full Go/wazero suite passes, and Python discovery passes `422/422`. It passes
+  full Go/wazero suite passes, and Python discovery passes `498/498`. It passes
   88 synthetic factual pairs with minimum
   margin `0.206250` and a synthetic ordinal Spearman proxy of `0.959566`;
   predicate-family identity, inverse

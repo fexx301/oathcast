@@ -129,7 +129,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   weather semantics, probability/polarity consistency, numeric facts, UTC time
   windows, JSON envelopes, stuffing, and concision. Rust tests pass `40/40`, the
   full Go/wazero ABI and adversarial suite passes, Python discovery passes
-  `422/422`, and
+  `498/498`, and
   deterministic repeated `rank_answer` calls pass.
   Telegraph's unmodified tester example also returns `0.8500`. An earlier
   validator-observed scalar `breakdown_answer` export and its tests are now

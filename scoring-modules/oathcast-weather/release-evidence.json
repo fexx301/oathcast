@@ -63,6 +63,11 @@
     "ci_rust_toolchain_action_commit": "6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772",
     "isolated_clean_builds": 2,
     "byte_identical": true,
+    "platform_digests": {
+      "darwin/arm64": "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774",
+      "linux/amd64": "1daaf068c2eff7f506a611b30fa23c599b4a19a02408775dc92c74b044f5d59f"
+    },
+    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 42,790 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
       "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774",
       "2c1f7ad3ec409d91a778a3d49a6d554de09bc12701834fd859f07591550a0774"

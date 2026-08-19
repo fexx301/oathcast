@@ -159,7 +159,7 @@ The full Go harness uses wazero `v1.12.0` and checks the published ABI, determin
 fixture ordering, repeated-call behavior, malformed UTF-8, invalid pointers,
 bounded allocation traps, import/start-section absence, and score range.
 Rust tests pass `40/40`, the Go/wazero suite passes, and Python discovery passes
-`422/422`.
+`498/498`.
 Telegraph's unmodified official tester also ran successfully against the rank
 path (example case `0.8500`). According to user-relayed Telegraph guidance, its
 Stage 2 fixtures test
@@ -210,7 +210,7 @@ the size, SHA-256, and raw-byte Keccak-256 were independently checked:
 | Fixture SHA-256 | `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f` |
 | Rust native tests | `40/40` passed |
 | Go/wazero suite | Full suite passed |
-| Python discovery | `422/422` passed |
+| Python discovery | `498/498` passed |
 | Official unmodified Telegraph tester | Passed; example score `0.8500` |
 
 Registration `19` evaluated the earlier 16,292-byte artifact, SHA-256
