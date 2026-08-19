@@ -2666,6 +2666,35 @@ fn fact_anchor_assessment(
             && expected_directed_pairs.len == observed_directed_pairs.len
             && directed_relation_overlap == expected_directed_pairs.len);
 
+    // A relation mismatch is a false claim, not vague phrasing, so it is a
+    // contradiction rather than an ambiguity.
+    //
+    // The distinction is what separates two answers the scorer previously could
+    // not tell apart. Against the truth "Hamlet was written by Shakespeare.",
+    // both of these were flattened to exactly 0.490000 by the ambiguity ceiling:
+    //
+    //   "It is Shakespeare that is associated with Hamlet."          correct
+    //   "Shakespeare and Marlowe were contemporaries, but Hamlet
+    //    was written by Marlowe."                                    wrong
+    //
+    // Equal scores mean the pool cannot be ordered, and Telegraph's Stage 2
+    // requires the good answer to rank *above* the bad one, so a tie is not a win.
+    // Raising the ceiling would not have helped: measured pre-clamp, the wrong
+    // answer scored 0.795000 against the correct answer's 0.781250, because naming
+    // Shakespeare anywhere satisfied anchor support while the operative relation
+    // bound Marlowe. The ceiling was concealing an inversion, which is why an
+    // earlier attempt to relax it made the margin negative.
+    //
+    // Both answers trip connector and directed-relation ambiguity, so neither of
+    // those discriminates. Only relation_mismatch separates them, and it is the
+    // right signal on its own terms: it requires the answer's entity pairing to
+    // disagree with the truth's, with a novel entity introduced after a contrast
+    // word. That describes "you said someone else did it", which belongs with the
+    // other contradictions rather than with "I cannot tell what you claimed".
+    if relation_mismatch {
+        contradicted = true;
+    }
+
     let expected_entity_pairs = fact_entity_pairs(ground_truth, &anchors.values);
     let observed_entity_pairs = fact_entity_pairs(answer, &anchors.values);
     let entity_recombination = anchors.values.len >= 4
@@ -2699,8 +2728,9 @@ fn fact_anchor_assessment(
         support,
         contradicted,
         no_binding_anchors: anchors.values.len == 0 && anchors.context_constraints.len == 0,
+        // relation_mismatch is deliberately absent: it now sets `contradicted`
+        // above, which short-circuits to zero before any ceiling applies.
         ambiguous_or_stuffed: connector_ambiguity
-            || relation_mismatch
             || directed_relation_mismatch
             || entity_recombination
             || max_anchor_repeats > 3
@@ -3125,6 +3155,48 @@ pub(crate) fn evaluate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_reassigned_relation_outranks_nothing_even_when_the_right_name_appears() {
+        const Q: &str = "Who wrote Hamlet?";
+        const T: &str = "Hamlet was written by Shakespeare.";
+
+        // Both of these were flattened to exactly 0.490000 by the ambiguity
+        // ceiling, so the pool could not be ordered at all. Telegraph's Stage 2
+        // requires the good answer to rank *above* the bad one, and equal is not
+        // above, so a tie loses the case just as an inversion does.
+        let vague_but_correct = evaluate(Q, T, "It is Shakespeare that is associated with Hamlet.");
+        let names_both_claims_wrong = evaluate(
+            Q,
+            T,
+            "Shakespeare and Marlowe were contemporaries, but Hamlet was written by Marlowe.",
+        );
+
+        assert!(
+            vague_but_correct.score > names_both_claims_wrong.score,
+            "correct={vague_but_correct:?} wrong={names_both_claims_wrong:?}"
+        );
+        assert_eq!(
+            names_both_claims_wrong.score, 0.0,
+            "{names_both_claims_wrong:?}"
+        );
+        assert_ne!(
+            names_both_claims_wrong.issues & ISSUE_CONTRADICTORY_FACT_ANCHOR,
+            0,
+            "{names_both_claims_wrong:?}"
+        );
+
+        // Raising the ceiling would not have fixed this. Measured before the
+        // change, the wrong answer's pre-clamp score was 0.795000 against the
+        // correct answer's 0.781250, because naming Shakespeare anywhere satisfied
+        // anchor support while the operative relation bound Marlowe. The ceiling
+        // was concealing an inversion, so the fix had to separate a false claim
+        // from vague phrasing rather than relax the cap.
+        assert!(
+            vague_but_correct.score > 0.0,
+            "vague phrasing is not a contradiction: {vague_but_correct:?}"
+        );
+    }
 
     #[test]
     fn an_inserted_ordinal_ranks_below_a_faithful_paraphrase() {

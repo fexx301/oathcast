@@ -2,32 +2,34 @@
 
 Last reviewed: 2026-08-19
 
-Current baseline: the public Miner runs `2026-08-19-window-v11`. V11 is the v10
-window behavior rebuilt from a clean 68-file source bundle so the host can
-reproduce source digest
-`03dc6f1dd0d831eb16efb6f2a823a2a1b1bc2fd1cf7372f3422496eeb3fe9659`.
+Current baseline: the public Miner runs `2026-08-19-window-v16`, source SHA-256
+`a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1`, image
+`sha256:7ac7f6f81cac9e66e33187e140ae21f76d6e7ab4b3e6fc6c9d6944312aaedc28`.
 The separate decision UI provides a read-only status shell and development
-fixture while its live API remains fail-closed without a runner. V11 retains
-the exact registered
-`/predict` route and its one-hour precipitation contract, adds multi-hour
-`start`/`end` spans of 1 to 24 hours on that route so Telegraph's 24-hour
-requests are answered rather than refused, and keeps the additive
-`hourly=2t` compatibility path with `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`.
-It passed all twelve strict public identity, readiness, write-probe, parity and
-temperature checks, replayed the v8 receipt and public response byte-identically,
-and left the live receipt database with integrity `ok`. OathCast is registered
-on Base Sepolia as on-chain registration ID `78` and active in the Telegraph
-dispatcher as routing ID `64173`, slug `oathcast-weather`.
+fixture while its live API remains fail-closed without a runner. V16 retains
+the exact registered `/predict` route, the legacy one-hour precipitation
+contract, multi-hour `start`/`end` spans of 1 to 24 hours, and the additive
+`hourly=2t` compatibility path with
+`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`.
 
-The local repair changes only the multi-hour timestamp boundary: production code
-accepts any aware ISO/RFC3339 `start`/`end`, normalizes `start` internally to
-the nearest whole UTC hour with deterministic half-up rounding, and derives
-`end` from that normalized start while preserving the original integral-hour
-duration. Explicit `forecast_cutoff` remains as
-provided. One-hour point and `forecast_hours=1..24&hourly=2t` behavior are
-unchanged. Focused window/registration tests pass `85/85`, full Python
-discovery passes `506/506` with loopback access, and Rust tests pass `41/41`.
-No deployment or other external action has occurred.
+For multi-hour requests, v16 accepts timezone-aware ISO/RFC3339 bounds,
+normalizes `start` internally to the nearest whole UTC hour using half-up
+rounding, and derives `end` from the original integral-hour duration. An
+omitted cutoff serializes as normalized `start` with `cutoff_policy:
+"implicit_grace"` and expires at the end of that first normalized hour. An
+explicit cutoff is preserved exactly, must not be after normalized `start`, and
+receives no grace. The one-hour point and
+`forecast_hours=1..24&hourly=2t` contracts are unchanged.
+
+Focused window/registration tests passed `94/94`; full Python discovery passed
+`515/515`. Twelve-check public smoke, six boundary positions, restart replay,
+and v12-to-v16 replay passed. Telegraph dispatcher `13.237.89.59` then created a
+real normalized 24-hour receipt at `2026-08-19T19:28:32.043277Z`; the live store
+reported 76 rows and SQLite integrity `ok`. A later 72-hour dispatcher request
+correctly returned 400. Stopped `oathcast-v12-rollback-20260819` is the immediate
+rollback target, and the disposable v16 container has been removed. OathCast
+remains registered on Base Sepolia as on-chain registration ID `78` and active
+in the Telegraph dispatcher as routing ID `64173`, slug `oathcast-weather`.
 
 This register separates work we can complete now that Miner registration is
 live from work that still depends on external participants, independent
@@ -49,7 +51,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   values. The path is live but unregistered; the protected registered YAML and
   its one-hour precipitation contract are unchanged. The legacy
   `/v1/forecast/window` path is not publicly exposed and returns 404. The strict
-  v8 smoke requires this response and registered/canonical path parity.
+  v16 smoke requires this response and registered/canonical path parity.
 - Release provenance through a non-secret release ID, source-tree digest, and
   image digest fields exposed by `/healthz` and response headers.
 - `/readyz` readiness endpoint and a reproducible public Miner smoke script
@@ -74,8 +76,10 @@ breakdown-layout blocker before a registration candidate can be frozen.
   including a restore-count check and tests that refuse accidental overwrite.
 - An external-canary entry point plus a no-cost scheduled GitHub Actions
   workflow. The repository secret is configured, missing-secret runs fail
-  visibly, and the workflow is pinned to the deployed v8 identity and requires
-  the temperature-window check.
+  visibly, and the workflow requires the temperature-window check. Its checked-in
+  release-evidence pin is currently v11 and therefore stale against live v16;
+  repinning remains an explicit follow-up after sanitized v16 evidence is
+  retained in the repository.
 - The historical registered-path 404 is fixed in release
   `2026-08-16-route-v7`: Caddy routes exact `/predict`, the Miner accepts
   `/predict` and `/v1/forecast/point`, both paths share auth/rate limits and one
@@ -166,20 +170,20 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `32/32`, with candidate margin `0.31248063`, champion margin `0.37360683`, and
   zero historical rows. According to user-relayed Telegraph guidance, these margins are not directly
   compared for promotion.
-- The current 45,394-byte factual-paraphrase artifact is reproducible and is an
+- The current 45,395-byte factual-paraphrase artifact is reproducible and is an
   unregistered local candidate: it has not been uploaded, hosted, signed, or
   registered. Its single change over the registration `41` bytes is a
   probability-scan fix in `percent_probability`, which previously abandoned the
   scan on the first `%` carrying no parseable number and so discarded a real
   percentage later in the same answer. Its SHA-256 is
-  `9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36`
+  `8d9c6d362acbd5cf3f0d3fb358f7f763e747cf96a0e6d5bf2e2b40fc6b4bce6c`
   and raw-byte Keccak-256
-  `0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21`.
+  `0xef42c86fe9d1d1485693c8ba9d724b48cd2883d34d4cb6212c31ef8a2c5494ce`.
   The fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. All 88 synthetic factual pairs
   pass the reported `0.15` floor with minimum margin `0.206250`; synthetic
-  ordinal Spearman is `0.959566`. Predicate-family identity, inverse
+  ordinal Spearman is `0.958919`. Predicate-family identity, inverse
   learned-from and lost-to phrasing, parenthetical commas, coordinated relation
   swaps, mixed explicit reversals, partial multi-relation omissions, and mixed
   directed pairs have Rust and fixture regressions. Shared predicates, bounded
@@ -217,6 +221,13 @@ breakdown-layout blocker before a registration candidate can be frozen.
   operator-verification requirement for source independence.
 - A pilot runbook, evidence-led X drafts, and a track/submission checklist
   that distinguish completed local preparation from live protocol gates.
+- V16 runtime deployment checkpoint: the 68-file host payload matched the local
+  manifest; focused Python tests passed `94/94` and full discovery passed
+  `515/515`; disposable/public smoke, six boundary positions, v12 compatibility,
+  and restart replay passed. Telegraph then persisted a normalized 24-hour
+  receipt, the live database reached 76 rows with integrity `ok`, and the
+  disposable container was removed. Caddy, the registered YAML, registration,
+  wallet state, and Track 2 scorer bytes were unchanged by the runtime release.
 
 ## Actionable next, not platform-blocked
 
@@ -292,10 +303,12 @@ breakdown-layout blocker before a registration candidate can be frozen.
   paraphrase rather than weather and every such misroute applies a probability
   ceiling to a correct answer.
 
-- Keep the deployed v8 Miner and its recurring canary pinned to the release,
-  source, image, and required temperature-window check; retain stopped
-  `oathcast-v7-rollback-20260817` until v8 has accumulated an adequate stable
-  operating window.
+- Keep deployed v16 stable and retain stopped `oathcast-v12-rollback-20260819`
+  as the immediate rollback target. The recurring workflow still points to the
+  checked-in v11 runtime-evidence file, so it is stale against live v16 and
+  should not be treated as a passing current-release canary. Retain equivalent
+  sanitized v16 runtime evidence locally before repinning and verifying the
+  workflow.
 - Run and verify the new provider-evidence freshness workflow. It alerts
   separately on stale collection and stale resolution; workflow code is local
   until the branch is pushed and manually dispatched once.
@@ -324,9 +337,10 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Blocked on authorization, external evidence, or remaining documentation
 
-- Release `2026-08-18-window-v10` serves multi-hour `start`/`end` spans on the
-  registered `/predict` route so Telegraph's 24-hour `WEATHER_FORECAST` requests
-  are answered instead of refused with 400. The response is structurally
+- Release `2026-08-19-window-v16` retains the multi-hour `start`/`end` branch
+  introduced by v10 on the registered `/predict` route, so Telegraph's valid
+  1-to-24-hour `WEATHER_FORECAST` requests are answered instead of refused. The
+  response is structurally
   compliant, carrying both `content` and the `probability` the registered
   `output_schema` requires, and the YAML's `input_schema` constrains `start` and
   `end` only to `format: date-time`. It is not semantically declared: in a
@@ -341,41 +355,38 @@ breakdown-layout blocker before a registration candidate can be frozen.
 - Two prose descriptions in the pinned registered YAML are now stale against the
   deployed service: `start`/`end` are described as "the one-hour forecast
   window", and `cutoff` as "defaults to one hour before start", which remains
-  true for the one-hour point contract but not for a window request, where the
-  default is the window opening. Both are prose only, so the machine-readable
-  schema still validates and no re-registration is forced. They are debt for
+  true for the one-hour point contract but not for a window request. V16 still
+  serializes an omitted window cutoff as the normalized opening, but marks it
+  `cutoff_policy: "implicit_grace"` and uses the end of the first normalized
+  hour as the effective issuance deadline. These are prose-only differences, so
+  the machine-readable schema still validates and no re-registration is forced.
+  They are debt for
   whenever `miners/oathcast-weather.yaml` is next re-registered, since the file
   is content-addressed at raw-byte SHA-256
   `9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e`.
-- Telegraph sent two authenticated 24-hour `start`/`end` requests from dispatcher
+- **Historical incident, superseded by v16:** Telegraph sent two authenticated
+  24-hour `start`/`end` requests from dispatcher
   IP `13.237.89.59` on 2026-08-19 at `11:45:48Z` and `11:50:48Z`. Both omitted
   `cutoff` and failed with HTTP 400 because `horizon_start` was not aligned to a
   whole UTC hour. The pinned YAML says only `format: date-time`; its `start` and
   `end` descriptions do not state that minutes, seconds, and fractional seconds
   must be zero. Telegraph asked for that requirement to be explicit in the YAML.
-  Proposed wording for the next authorized pin: `start` is an inclusive RFC3339
-  UTC timestamp aligned to a whole UTC hour (minutes, seconds, and fractional
-  seconds must be zero), for example `2026-08-19T12:00:00Z`; `end` is the
-  exclusive RFC3339 UTC timestamp on the same whole-hour grid, exactly one to 24
-  whole hours after `start`.
-  A local prose edit cannot affect registration `78` because the YAML is
-  content-addressed. Do not round explicit timestamps in the Miner: that would
-  answer a different event and change receipt identity. The live request
-  generator must emit boundaries such as `2026-08-19T12:00:00Z`, or use the
-  separately documented `forecast_hours=1..24&hourly=2t` compatibility shape.
-  Any replacement YAML remains a reviewed, authorization-gated re-registration.
-- **Superseding local contract (2026-08-19):** the prior strict whole-hour
-  requirement remains historical incident evidence. The Miner must instead
-  accept any aware ISO/RFC3339 timestamps on multi-hour requests, round `start`
-  half-up to a whole UTC hour (`:30` and later rounds up), and derive `end` from
-  that normalized start while preserving the original integral-hour duration.
-  Preserve explicit `forecast_cutoff`; leave one-hour point and temperature
-  compatibility behavior unchanged. Production code and focused tests are
-  verified locally: focused tests pass `85/85`, full Python discovery passes
-  `506/506` with loopback access, and Rust tests pass `41/41`. No YAML edit,
-  deployment, upload, registration, deregistration, wallet action, commit, or
-  push occurred.
-- The deployed `2026-08-17-temperature-v8` service answers the additive
+  V16 now absorbs the dispatcher's timestamp choice by normalizing multi-hour
+  bounds internally; only an explicit cutoff remains exact and unrounded. A
+  local prose edit still cannot affect registration `78`, because the YAML is
+  content-addressed. Any replacement YAML remains a reviewed,
+  authorization-gated re-registration.
+- **Superseding deployed contract (2026-08-19):** the prior strict whole-hour
+  requirement remains historical incident evidence. V16 accepts aware
+  ISO/RFC3339 timestamps on multi-hour requests, rounds `start` half-up to a
+  whole UTC hour (`:30` and later rounds up), and derives `end` from the original
+  integral-hour duration. Omitted cutoff uses the first normalized hour as an
+  auditable implicit grace window; explicit cutoff remains exact. Focused tests
+  passed `94/94`, full Python discovery passed `515/515`, public boundary and
+  replay gates passed, and Telegraph subsequently persisted a normalized
+  24-hour receipt. The registered YAML was not edited, uploaded, or
+  re-registered.
+- The deployed `2026-08-19-window-v16` service answers the additive
   `forecast_hours`/`hourly=2t` shape on the registered `/predict` route with
   `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`, but the registered YAML does not
   declare that response. `output_schema.required` is `[content, probability]`
