@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -287,14 +288,46 @@ class CanaryWorkflowIntegrityTests(unittest.TestCase):
         return repository, head.stdout.strip()
 
     def test_production_canary_uses_evidence_identity_and_requires_capacity(self):
+        """The canary must pin a runtime-evidence file that actually exists.
+
+        This used to assert one hardcoded release path, so every deployment had to
+        edit the workflow and this test in lockstep, and forgetting either left the
+        canary asserting a stale identity and failing every fifteen minutes. The
+        check now follows whatever release the workflow names and verifies the file
+        is present and self-consistent, which catches the failure that actually
+        happens: a pin left pointing at evidence that was never written or was
+        removed.
+        """
+
         workflow = (ROOT / ".github" / "workflows" / "oathcast-canary.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            "--release-evidence artifacts/release-evidence/"
-            "oathcast-2026-08-17-temperature-v8-runtime-evidence.json",
+        match = re.search(
+            r"--release-evidence\s+(artifacts/release-evidence/\S+-runtime-evidence\.json)",
             workflow,
         )
+        self.assertIsNotNone(match, "the canary must pass --release-evidence")
+        evidence_path = ROOT / match.group(1)
+        self.assertTrue(
+            evidence_path.is_file(),
+            f"canary pins {match.group(1)}, which does not exist",
+        )
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        release_id = evidence.get("release_id")
+        self.assertIsInstance(release_id, str)
+        self.assertIn(
+            release_id,
+            evidence_path.name,
+            "the evidence file name must name the release it records",
+        )
+        for field in ("source_sha256", "source_verification", "image"):
+            self.assertIn(field, evidence)
+        self.assertEqual(
+            evidence["source_verification"].get("host_recomputed_source_sha256"),
+            evidence["source_sha256"],
+            "the host must have reproduced the manifest digest for this release",
+        )
+
         self.assertIn("--require-receipt-capacity", workflow)
         self.assertNotIn("--expected-release-id", workflow)
         self.assertNotIn("--expected-source-sha256", workflow)
