@@ -85,4 +85,9 @@ jobs:
         run: cargo build --locked --release --target wasm32-unknown-unknown --manifest-path scoring-modules/oathcast-weather/rust-module/Cargo.toml
       - name: Run wazero ABI and scoring tests
         working-directory: scoring-modules/oathcast-weather/go-tester
-        run: go test -count=1 -mod=readonly ./...
+        # -v because the ranking benchmark and the cross-engine check report
+        # their measurements through t.Logf, which Go prints only in verbose
+        # mode. Without it the separation figures and the engine-divergence
+        # count are visible only when a run fails, which is the opposite of
+        # what a tracked baseline needs.
+        run: go test -count=1 -mod=readonly -v ./...
