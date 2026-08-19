@@ -64,7 +64,9 @@
       "worst_separation": -0.4925,
       "worst_separation_pool": "negation_polarity",
       "pairwise_ordering_accuracy": 0.9434,
-      "pairwise_ordered_pairs": "100/106"
+      "pairwise_ordered_pairs": "100/106",
+      "engine_independent": true,
+      "measured_on": ["darwin/arm64", "linux/amd64", "linux/arm64"]
     },
     "known_ranking_defects": [
       "negation_polarity: 'Yes, K2 is the tallest mountain on Earth' (wrong) scores 0.862500 while 'Everest is indeed Earth's highest peak' (correct) scores 0.370000.",
@@ -72,7 +74,36 @@
       "authorship_entity_swap: a correct loosely-worded answer and a wrong answer are both pinned to the 0.49 ambiguity clamp, so the pool cannot be ordered."
     ],
     "common_cause": "Lexical overlap with the ground truth outweighs correct entity binding, so copying the truth's frame and swapping the entity beats a faithful paraphrase. Not yet fixed; the benchmark exists so a fix can be measured rather than asserted.",
-    "scope": "Handcrafted development pools. Not Telegraph fixtures and not a claim about hidden Stage 2 cases."
+    "scope": "Handcrafted development pools. Not Telegraph fixtures and not a claim about hidden Stage 2 cases.",
+    "engine": "wazero interpreter. The default compiler backend was measured scoring two candidates differently on linux/amd64, so the benchmark uses the engine that agrees across every os/arch/engine combination tested. See runtime_determinism."
+  },
+  "runtime_determinism": {
+    "finding": "The same module bytes score two inputs differently under wazero v1.12.0's amd64 compiler backend than under its interpreter or its arm64 compiler. Registration pins this module by Keccak over raw bytes, so identical bytes are supposed to imply identical scores; on one of six measured configurations they do not.",
+    "divergent_configuration": "linux/amd64 + wazero optimising compiler",
+    "agreeing_configurations": [
+      "darwin/arm64 + compiler",
+      "darwin/arm64 + interpreter",
+      "linux/arm64 + compiler",
+      "linux/arm64 + interpreter",
+      "linux/amd64 + interpreter"
+    ],
+    "affected_inputs": {
+      "count": 2,
+      "of_total_scored": 256,
+      "detail": [
+        "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000",
+        "negation_polarity/unrelated: amd64 compiler 0.490000, every other configuration 0.150000"
+      ]
+    },
+    "ruled_out": {
+      "differing_build_output": "darwin/arm64 and linux/amd64 produce different bytes (2c1f7ad3 vs 1daaf068, both 42790 bytes, both matching the recorded platform digests), but running the linux bytes on the darwin host reproduces the darwin scores exactly, so the bytes do not carry the difference.",
+      "module_nondeterminism": "The divergence reproduces on a single call into a freshly instantiated module, so no allocator history or other cross-call state is involved.",
+      "host_architecture": "linux/arm64 agrees with darwin/arm64, and linux/amd64 under the interpreter agrees with both.",
+      "local_emulation": "GitHub Actions ubuntu-latest runners are native amd64 and reproduce the divergence, so it is not Rosetta."
+    },
+    "registration_impact": "None measured. TestRegistrationMarginsHoldOnBothEngines confirms every factual pair clears its minimum margin under both engines, so no margin quoted in this file depends on the engine. The two affected inputs belong to the local ranking pools only.",
+    "guard": "scoring-modules/oathcast-weather/go-tester/engine_test.go scores all 256 corpus inputs under both engines and fails on any divergence outside the two recorded above.",
+    "not_reported_upstream": "A minimal reproduction exists but no upstream wazero issue has been filed and Telegraph has not been told. Both are pending an explicit decision."
   },
   "fixture": {
     "path": "fixtures/wasm_scoring_cases.json",

@@ -17,6 +17,13 @@ import (
 // The decisive number is separation: the worst correct answer minus the best
 // wrong one. Positive means the pool is ordered usefully. Zero means the scorer
 // cannot tell right from wrong. Negative means it prefers a wrong answer.
+//
+// This runs on wazero's interpreter rather than its default compiler, because
+// the compiler's amd64 backend has been measured scoring two of these
+// candidates differently from every other os/arch/engine combination. A ranking
+// number that changes with the validator's CPU describes the runtime, not the
+// module. TestEngineScoresAgree pins that divergence; the floors below are
+// engine-independent and hold identically on arm64 and amd64.
 
 // These floors record MEASURED CURRENT QUALITY, defects included. They are a
 // ratchet so a scoring change that degrades ranking fails here, not a statement
@@ -84,7 +91,7 @@ func loadRankingPools(t *testing.T) rankingFixture {
 }
 
 func TestScorerRanksCandidatePools(t *testing.T) {
-	scorer, err := openScorer(wasmPath(t))
+	scorer, err := openScorerWithEngine(wasmPath(t), engineInterpreter)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,13 +20,47 @@ type scorerModule struct {
 	rank    api.Function
 }
 
+// wasmEngine selects which of wazero's two execution engines runs the module.
+// The choice is not a performance detail here: the same module bytes have been
+// measured producing different scores under the two engines on linux/amd64, so
+// any number quoted about the scorer has to say which engine produced it. See
+// TestEngineScoresAgree for the measured divergence.
+type wasmEngine int
+
+const (
+	// engineCompiler is wazero's per-architecture optimising compiler. It is
+	// wazero's default, so it is what a validator gets without asking, and it
+	// is what CI exercises everywhere except this one benchmark.
+	engineCompiler wasmEngine = iota
+	// engineInterpreter is wazero's portable interpreter. Of the six
+	// os/arch/engine combinations measured, five agree and all of those five
+	// match the interpreter, so it is used as the reference for measurements
+	// that are meant to describe the module rather than the host.
+	engineInterpreter
+)
+
+func (e wasmEngine) String() string {
+	if e == engineInterpreter {
+		return "interpreter"
+	}
+	return "compiler"
+}
+
 func openScorer(path string) (*scorerModule, error) {
+	return openScorerWithEngine(path, engineCompiler)
+}
+
+func openScorerWithEngine(path string, engine wasmEngine) (*scorerModule, error) {
 	wasmBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read WASM: %w", err)
 	}
 	ctx := context.Background()
-	runtime := wazero.NewRuntime(ctx)
+	config := wazero.NewRuntimeConfigCompiler()
+	if engine == engineInterpreter {
+		config = wazero.NewRuntimeConfigInterpreter()
+	}
+	runtime := wazero.NewRuntimeWithConfig(ctx, config)
 	module, err := runtime.Instantiate(ctx, wasmBytes)
 	if err != nil {
 		runtime.Close(ctx)

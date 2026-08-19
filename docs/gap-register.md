@@ -206,6 +206,22 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Actionable next, not platform-blocked
 
+- Decide whether to report the wazero amd64 compiler divergence upstream and to
+  Telegraph. The same registered module bytes score two ranking-pool inputs
+  differently under wazero `v1.12.0`'s amd64 optimising compiler than under its
+  interpreter or its arm64 compiler, on five-of-six agreeing configurations, and
+  the divergence reproduces on a single call into a fresh instance. A minimal
+  reproduction exists; nothing has been filed and Telegraph has not been told.
+  Measured registration impact is none, because every factual-pair margin holds
+  under both engines and the affected inputs are local pools only. What is not
+  established is which runtime and engine Telegraph's validators use, so no
+  claim should be made about network-wide score reproducibility.
+- Fix the three recorded ranking defects, whose shared cause is that lexical
+  overlap with the ground truth outweighs correct entity binding. This changes
+  how `effective_semantic` and `assessment.support` combine and will move scores
+  across the whole corpus, so it needs the ranking benchmark as the arbiter and
+  an explicit decision before the scoring weights are touched.
+
 - Keep the deployed v8 Miner and its recurring canary pinned to the release,
   source, image, and required temperature-window check; retain stopped
   `oathcast-v7-rollback-20260817` until v8 has accumulated an adequate stable

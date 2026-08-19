@@ -278,6 +278,69 @@ was wrong; both were answering a narrower question than the one being asked.
 Never `mv` over a bind-mounted file. Verify a config change from inside the
 container that serves it, not from the host that wrote it.
 
+## Five runtimes agreed. The sixth was the one CI used.
+
+**2026-08-19.** A new ranking benchmark measured the scorer as a judge rather
+than a fixture-passer, and its floors were set from a run on this laptop: worst
+separation `-0.4925`, pairwise ordering accuracy `100/106`. CI failed on the
+first push with `0.9340`, and a worst separation of `-0.3725`. Same commit, same
+pinned `rustc 1.95.0`.
+
+The fix that suggests itself is to lower the floor to whatever CI reports. That
+would have been the expensive mistake, because it records a number as a property
+of our scorer when the scorer was not what changed.
+
+Only 2 of 43 candidate scores differed, both in one pool, and both landed on
+Linux at exactly `0.49` — a value that appears in `evaluate` five times, always
+as `score.min(0.49)`. A `min` cannot raise a score, so Linux was not clamping
+something down to `0.49`; it was computing a *base* score above `0.49` where this
+machine computed `0.15`. That ruled out the clamps and pointed at anchor
+extraction. Four hypotheses followed, and the first two were both wrong:
+
+**The two builds differ.** True, and irrelevant. darwin/arm64 and linux/amd64
+produce different bytes from identical source — `2c1f7ad3` against `1daaf068`,
+both 42,790 bytes, both matching the recorded platform digests. So the obvious
+story is that the Linux binary is a different program. Running the *Linux bytes
+on this Mac* reproduced the darwin scores exactly. The bytes do not carry the
+difference, and the platform digests recorded in the evidence were a red herring
+pointing at the wrong layer.
+
+**Our Rust is non-deterministic.** No. The scorer keeps a bump allocator across
+calls and the harness never deallocates, so allocation history was the obvious
+suspect. But the divergence reproduces on a *single* call into a freshly
+instantiated module. Nothing about call order is involved.
+
+**The host architecture decides.** No. linux/arm64 agrees with darwin/arm64.
+
+**The engine decides.** Yes. wazero ships two engines, a per-architecture
+optimising compiler and a portable interpreter, and the test used the default
+without ever saying so. Across six combinations, five agree:
+
+| host | compiler | interpreter |
+| --- | --- | --- |
+| darwin/arm64 | 0.37 / 0.15 | 0.37 / 0.15 |
+| linux/arm64 | 0.37 / 0.15 | 0.37 / 0.15 |
+| linux/amd64 | **0.49 / 0.49** | 0.37 / 0.15 |
+
+Those two values give `0.49 - 0.8625 = -0.3725`, exactly CI's number. GitHub's
+runners are native amd64, so this is not local emulation. It is wazero v1.12.0's
+amd64 compiler backend disagreeing with its own interpreter.
+
+What makes this worth writing down is which assumption broke. A WASM module is
+the one artefact whose behaviour is supposed to be independent of the machine
+under it, and registration leans on exactly that: Telegraph pins the module by
+Keccak over its raw bytes, on the premise that fixed bytes mean fixed behaviour.
+Every margin in `release-evidence.json` is only evidence if that holds. So the
+first thing to measure was not the ranking metric but the margins — and they
+hold on both engines, which is now asserted rather than assumed. The affected
+inputs are confined to local pools.
+
+The benchmark now runs on the interpreter, because a ranking number that moves
+with the validator's CPU describes the runtime and not the module. Separately,
+all 256 corpus inputs are scored under both engines and any divergence outside
+the two recorded ones fails the build. Pinning the bug is not the same as fixing
+it; the point is that the next one cannot hide inside a threshold.
+
 ## What this list has in common
 
 Seven of these are the same failure: a probe that returned a reassuring answer
@@ -291,6 +354,14 @@ None were caught by the check that was supposed to catch them — each needed a
 second, differently-shaped observation: the step conclusion rather than the run
 status, a real write rather than a permission bit, a control port alongside the
 target, an independent collector rather than a re-run of the same one.
+
+The wazero entry is the one exception, and it is worth separating. That check did
+not pass without verifying anything; it failed, correctly, and pointed straight at
+the problem. The failure mode there was **a measurement that silently included
+the measuring apparatus** — a number attributed to the scorer that partly
+described the runtime executing it. The remedy is not a second observation but a
+stated one: say which engine produced a number, and assert that the numbers used
+as evidence do not depend on the answer.
 
 That is also the argument for the receipt chain, and the reason the anchor is
 described as a commitment rather than a proof. A system that scores forecasts has
