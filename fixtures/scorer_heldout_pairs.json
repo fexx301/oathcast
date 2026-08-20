@@ -1,0 +1,278 @@
+{
+  "schema": "oathcast_scorer_heldout_pairs_v1",
+  "purpose": "Held-out generalisation corpus. Every shape here is deliberately one that no rule in scorer.rs was written to address, so accuracy on it measures whether the scorer generalises rather than whether its own rules fire. This is the instrument whose absence let four registrations improve locally while the scored result went 31, 31, 31, 28.",
+  "labelling_rule": "good_answer must be factually correct and bad_answer factually wrong, independent of how either scorer treats them. Two earlier corpora in this repository shipped rows where the 'wrong' answer was actually true, so each row below states why the bad answer is false.",
+  "not_covered_by_existing_rules": "None of these shapes is entity substitution, an inserted ordinal, a polarity flip, a numeric conflict, an acronym, weather context, or keyword stuffing. Those are what the existing rules detect and are covered by fixtures/scorer_ranking_pools.json instead.",
+  "pairs": [
+    {
+      "pair_id": "process_direction_photosynthesis",
+      "shape": "process_direction",
+      "question": "What does photosynthesis do?",
+      "ground_truth": "Photosynthesis converts carbon dioxide and water into glucose and oxygen.",
+      "good_answer": "It turns carbon dioxide and water into sugar and oxygen.",
+      "bad_answer": "Photosynthesis converts glucose and oxygen into carbon dioxide and water.",
+      "why_bad_is_wrong": "The reactants and products are reversed; that describes respiration, not photosynthesis. Lexical overlap with the truth is near total, which is what makes it hard."
+    },
+    {
+      "pair_id": "process_direction_evaporation",
+      "shape": "process_direction",
+      "question": "What happens during evaporation?",
+      "ground_truth": "During evaporation liquid water becomes water vapour.",
+      "good_answer": "Water in liquid form turns into vapour.",
+      "bad_answer": "During evaporation water vapour becomes liquid water.",
+      "why_bad_is_wrong": "That is condensation. The direction of the phase change is inverted."
+    },
+    {
+      "pair_id": "process_direction_digestion",
+      "shape": "process_direction",
+      "question": "What do enzymes do to starch during digestion?",
+      "ground_truth": "Enzymes break starch down into simple sugars.",
+      "good_answer": "Starch is broken apart into simple sugars by enzymes.",
+      "bad_answer": "Enzymes build simple sugars up into starch.",
+      "why_bad_is_wrong": "Digestion breaks polymers down rather than assembling them."
+    },
+    {
+      "pair_id": "comparative_frame_everest",
+      "shape": "comparative_frame",
+      "question": "How does Everest compare with K2 in height?",
+      "ground_truth": "Everest is taller than K2.",
+      "good_answer": "K2 is shorter than Everest.",
+      "bad_answer": "K2 is taller than Everest.",
+      "why_bad_is_wrong": "Everest is the taller of the two. The good answer states the same fact from the other side, which is why a scorer keyed on which name appears first will mis-handle it."
+    },
+    {
+      "pair_id": "comparative_frame_pacific",
+      "shape": "comparative_frame",
+      "question": "How does the Pacific compare with the Atlantic in size?",
+      "ground_truth": "The Pacific is larger than the Atlantic.",
+      "good_answer": "The Atlantic is smaller than the Pacific.",
+      "bad_answer": "The Atlantic is larger than the Pacific.",
+      "why_bad_is_wrong": "The Pacific is the larger ocean."
+    },
+    {
+      "pair_id": "comparative_frame_sound_light",
+      "shape": "comparative_frame",
+      "question": "How does the speed of sound compare with the speed of light?",
+      "ground_truth": "Light travels faster than sound.",
+      "good_answer": "Sound is slower than light.",
+      "bad_answer": "Sound travels faster than light.",
+      "why_bad_is_wrong": "Light is far faster than sound."
+    },
+    {
+      "pair_id": "typo_brazil",
+      "shape": "typo_robustness",
+      "question": "What language is spoken in Brazil?",
+      "ground_truth": "Portuguese is spoken in Brazil.",
+      "good_answer": "Portugese is spoken in Brazil.",
+      "bad_answer": "Spanish is spoken in Brazil.",
+      "why_bad_is_wrong": "Brazil's language is Portuguese. The good answer is correct but misspelled, so a scorer that treats an unknown token as an unknown fact will punish the right answer."
+    },
+    {
+      "pair_id": "typo_capital_australia",
+      "shape": "typo_robustness",
+      "question": "What is the capital of Australia?",
+      "ground_truth": "Canberra is the capital of Australia.",
+      "good_answer": "Canbera is the capital of Australia.",
+      "bad_answer": "Sydney is the capital of Australia.",
+      "why_bad_is_wrong": "Sydney is the largest city, not the capital."
+    },
+    {
+      "pair_id": "typo_mitochondria",
+      "shape": "typo_robustness",
+      "question": "Which organelle produces most of a cell's energy?",
+      "ground_truth": "The mitochondrion produces most of a cell's energy.",
+      "good_answer": "The mitochondrian produces most of the cell's energy.",
+      "bad_answer": "The ribosome produces most of a cell's energy.",
+      "why_bad_is_wrong": "Ribosomes synthesise proteins; mitochondria generate ATP."
+    },
+    {
+      "pair_id": "overclaim_amazon",
+      "shape": "scope_overclaim",
+      "question": "Where is the Amazon rainforest?",
+      "ground_truth": "The Amazon rainforest lies mostly in Brazil but extends across several South American countries.",
+      "good_answer": "Mainly in Brazil, though it reaches into a number of other South American countries.",
+      "bad_answer": "The Amazon rainforest lies entirely within Brazil.",
+      "why_bad_is_wrong": "It extends into Peru, Colombia and others, so 'entirely within Brazil' is false. The wrong answer is shorter and closer to the truth's wording than the correct one."
+    },
+    {
+      "pair_id": "overclaim_penguins",
+      "shape": "scope_overclaim",
+      "question": "Where do penguins live?",
+      "ground_truth": "Most penguin species live in the southern hemisphere, not only in Antarctica.",
+      "good_answer": "Across the southern hemisphere, with only some species in Antarctica.",
+      "bad_answer": "Penguins live only in Antarctica.",
+      "why_bad_is_wrong": "Species live in South America, Africa, Australia and New Zealand."
+    },
+    {
+      "pair_id": "overclaim_antibiotics",
+      "shape": "scope_overclaim",
+      "question": "What do antibiotics treat?",
+      "ground_truth": "Antibiotics treat bacterial infections and have no effect on viruses.",
+      "good_answer": "They work against bacteria but do nothing to a virus.",
+      "bad_answer": "Antibiotics treat bacterial infections and viral infections.",
+      "why_bad_is_wrong": "Antibiotics do not act on viruses."
+    },
+    {
+      "pair_id": "hedged_correct_canberra",
+      "shape": "confidence_versus_correctness",
+      "question": "What is the capital of Australia?",
+      "ground_truth": "Canberra is the capital of Australia.",
+      "good_answer": "I believe it is most likely Canberra.",
+      "bad_answer": "It is definitely and unambiguously Sydney.",
+      "why_bad_is_wrong": "Sydney is not the capital. The correct answer hedges and the wrong one asserts, so a scorer that rewards confident phrasing inverts the pair."
+    },
+    {
+      "pair_id": "hedged_correct_shakespeare",
+      "shape": "confidence_versus_correctness",
+      "question": "Who wrote Macbeth?",
+      "ground_truth": "Macbeth was written by Shakespeare.",
+      "good_answer": "If I recall correctly, that would probably be Shakespeare.",
+      "bad_answer": "Without any doubt whatsoever, Macbeth was written by Christopher Marlowe.",
+      "why_bad_is_wrong": "Marlowe did not write Macbeth."
+    },
+    {
+      "pair_id": "hedged_correct_gravity",
+      "shape": "confidence_versus_correctness",
+      "question": "What causes tides on Earth?",
+      "ground_truth": "Tides are caused mainly by the Moon's gravitational pull.",
+      "good_answer": "Mostly the Moon pulling on the oceans, I think.",
+      "bad_answer": "Tides are caused entirely and certainly by the Earth's rotation alone.",
+      "why_bad_is_wrong": "Rotation affects timing, but the tidal force comes from the Moon and to a lesser degree the Sun."
+    },
+    {
+      "pair_id": "definition_reversed_mammal",
+      "shape": "definition_inversion",
+      "question": "What is a mammal?",
+      "ground_truth": "A mammal is a warm-blooded animal with hair that feeds its young on milk.",
+      "good_answer": "An animal that is warm blooded, has hair, and nurses its young.",
+      "bad_answer": "A mammal is a cold-blooded animal without hair that lays eggs.",
+      "why_bad_is_wrong": "Each clause is the negation of a defining property."
+    },
+    {
+      "pair_id": "definition_reversed_insulator",
+      "shape": "definition_inversion",
+      "question": "What is an electrical insulator?",
+      "ground_truth": "An insulator is a material that does not conduct electric current well.",
+      "good_answer": "A material through which current passes poorly.",
+      "bad_answer": "An insulator is a material that conducts electric current well.",
+      "why_bad_is_wrong": "That describes a conductor. One dropped negation reverses the definition."
+    },
+    {
+      "pair_id": "definition_reversed_acid",
+      "shape": "definition_inversion",
+      "question": "What is an acid?",
+      "ground_truth": "An acid is a substance that donates protons in solution.",
+      "good_answer": "A substance that gives up protons when dissolved.",
+      "bad_answer": "An acid is a substance that accepts protons in solution.",
+      "why_bad_is_wrong": "Accepting protons defines a base."
+    },
+    {
+      "pair_id": "register_sky_blue",
+      "shape": "register_variation",
+      "question": "Why is the sky blue?",
+      "ground_truth": "The sky appears blue because shorter wavelengths of sunlight scatter more in the atmosphere.",
+      "good_answer": "Air scatters the short blue wavelengths way more than the long red ones, so that is what we see.",
+      "bad_answer": "The sky appears blue because sunlight reflects off the blue of the oceans.",
+      "why_bad_is_wrong": "Ocean colour does not tint the sky; the sky is blue over deserts too."
+    },
+    {
+      "pair_id": "register_seasons",
+      "shape": "register_variation",
+      "question": "What causes the seasons?",
+      "ground_truth": "The seasons are caused by the tilt of Earth's rotational axis relative to its orbit.",
+      "good_answer": "Earth leans over as it goes round, so each half gets more sun at different times.",
+      "bad_answer": "The seasons are caused by Earth moving closer to and further from the Sun.",
+      "why_bad_is_wrong": "Distance varies slightly but does not drive the seasons, which are opposite in the two hemispheres at once."
+    },
+    {
+      "pair_id": "register_immune",
+      "shape": "register_variation",
+      "question": "How do vaccines work?",
+      "ground_truth": "A vaccine trains the immune system to recognise a pathogen before any real exposure.",
+      "good_answer": "It gives your body a practice run so it already knows the bug if it ever shows up.",
+      "bad_answer": "A vaccine works by killing pathogens already present in the bloodstream.",
+      "why_bad_is_wrong": "Vaccines are prophylactic and do not clear an existing infection."
+    },
+    {
+      "pair_id": "list_primary_colours",
+      "shape": "list_membership",
+      "question": "What are the primary additive colours?",
+      "ground_truth": "The primary additive colours are red, green and blue.",
+      "good_answer": "Red, green and blue.",
+      "bad_answer": "The primary additive colours are red, yellow and blue.",
+      "why_bad_is_wrong": "Red, yellow and blue are the subtractive primaries taught for paint; additive light primaries are red, green and blue."
+    },
+    {
+      "pair_id": "list_noble_gases",
+      "shape": "list_membership",
+      "question": "Name some noble gases.",
+      "ground_truth": "Helium, neon and argon are noble gases.",
+      "good_answer": "Argon, neon and helium all count.",
+      "bad_answer": "Helium, neon and nitrogen are noble gases.",
+      "why_bad_is_wrong": "Nitrogen is not a noble gas."
+    },
+    {
+      "pair_id": "list_senses",
+      "shape": "list_membership",
+      "question": "Which senses do the eyes and ears provide?",
+      "ground_truth": "The eyes provide sight and the ears provide hearing.",
+      "good_answer": "Sight comes from the eyes, hearing from the ears.",
+      "bad_answer": "The eyes provide hearing and the ears provide sight.",
+      "why_bad_is_wrong": "The two senses are swapped between the organs."
+    },
+    {
+      "pair_id": "temporal_order_press",
+      "shape": "temporal_order",
+      "question": "Which came first, the printing press or the telephone?",
+      "ground_truth": "The printing press came before the telephone.",
+      "good_answer": "The telephone came later than the printing press.",
+      "bad_answer": "The telephone came before the printing press.",
+      "why_bad_is_wrong": "The press predates the telephone by centuries."
+    },
+    {
+      "pair_id": "temporal_order_flight",
+      "shape": "temporal_order",
+      "question": "Did powered flight come before or after the first radio broadcast?",
+      "ground_truth": "Powered flight came before the first radio broadcast.",
+      "good_answer": "The first radio broadcast came after powered flight.",
+      "bad_answer": "Powered flight came after the first radio broadcast.",
+      "why_bad_is_wrong": "The order is inverted."
+    },
+    {
+      "pair_id": "temporal_order_writing",
+      "shape": "temporal_order",
+      "question": "Which came first, writing or the wheel?",
+      "ground_truth": "Writing and the wheel both appeared in antiquity, with writing generally placed earlier.",
+      "good_answer": "Writing is usually dated earlier than the wheel.",
+      "bad_answer": "The wheel is generally placed thousands of years before writing.",
+      "why_bad_is_wrong": "Conventional dating puts early writing at or before the wheel, not thousands of years after."
+    },
+    {
+      "pair_id": "causal_direction_smoke",
+      "shape": "causal_direction",
+      "question": "What is the relationship between smoking and lung cancer?",
+      "ground_truth": "Smoking increases the risk of lung cancer.",
+      "good_answer": "Lung cancer risk goes up as a result of smoking.",
+      "bad_answer": "Lung cancer causes people to smoke.",
+      "why_bad_is_wrong": "The causal arrow is reversed."
+    },
+    {
+      "pair_id": "causal_direction_pressure",
+      "shape": "causal_direction",
+      "question": "How does altitude relate to air pressure?",
+      "ground_truth": "Air pressure falls as altitude increases.",
+      "good_answer": "The higher you go, the lower the pressure gets.",
+      "bad_answer": "Air pressure rises as altitude increases.",
+      "why_bad_is_wrong": "Pressure decreases with height."
+    },
+    {
+      "pair_id": "causal_direction_moon",
+      "shape": "causal_direction",
+      "question": "What is the relationship between the Moon and the tides?",
+      "ground_truth": "The Moon's gravity raises the tides.",
+      "good_answer": "Tides are lifted by the pull of the Moon.",
+      "bad_answer": "The tides pull the Moon into its orbit.",
+      "why_bad_is_wrong": "The direction of influence is reversed."
+    }
+  ]
+}
