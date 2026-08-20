@@ -2,7 +2,7 @@
   "schema_version": "oathcast_weather_wasm_release_evidence_v7",
   "recorded_at": "2026-08-15T09:19:22Z",
   "updated_at": "2026-08-18T00:30:26Z",
-  "status": "champion_baseline_available_held_out_signal_established",
+  "status": "harness_frozen_for_hybrid_handover",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
     "byte_size": 45394,
@@ -161,6 +161,41 @@
     "what_this_unlocks": "A held-out signal. Until now local ranking numbers could improve while the scored result went 31, 31, 31, 28, with no way to tell overfitting from progress. The champion can now be run locally on unlimited inputs, and breakdown_answer decomposes its verdict into relevance, correctness, lexical and length, so a disagreement can be attributed to a signal rather than guessed at.",
     "indicated_direction": "Neither architecture dominates. The champion has broad semantic coverage with thin margins, typically 0.005 to 0.06 on cases it gets right, and is weak on entity substitution. Ours has wide margins where its rules fire and is blind where they do not. A judge that combined a semantic signal for paraphrase coverage with discrete contradiction rules for entity binding would beat either, which is presumably why the team published theirs as a starting point. Not attempted; it is an architectural decision rather than a fix.",
     "upstream_note": "Their README records that cargo test does not run their unit tests, because the unconditional #[panic_handler] in allocator.rs clashes with std on the native target, and states the fix as gating it behind #[cfg(not(test))]. Not reported or offered; noted only so it is not rediscovered."
+  },
+  "length_signal_investigation": {
+    "prompted_by": "Telegraph confirmed on 2026-08-20 that the baseline's length term is a real and known limitation, rewarding longer wrong answers over shorter correct ones, and asked that a fix be considered. They also added an MIT LICENSE to the baseline repository on request, which removes the blocker on building from their code.",
+    "method": "Three variants of their module were built and measured rather than reasoning about which is right: v0 the shipped sigmoid((len - 50) / 20) bonus, v1 the term held constant which is rank-equivalent to removing it, and v2 a penalty-only signal where any answer up to 1.5x the ground truth's length scores full marks and only excess beyond that is penalised.",
+    "acceptance_corpus": "fixtures/scorer_length_cases.json, four pairs in both directions. Two where a verbose wrong answer must lose to a concise correct one, and two where a legitimately longer correct answer must beat a terse wrong one, so a fix cannot pass by trading one failure for the other.",
+    "results": {
+      "v0_shipped_bonus": "Fails 2 of 4. Paris/Lyon at -0.0815 and Tokyo/Osaka at -0.1524.",
+      "v1_term_held_constant": "Fails 1 of 4. Paris/Lyon becomes a bare +0.0074 but Tokyo/Osaka still fails at -0.0648. Removing the bonus is therefore NOT sufficient, because cosine and BM25 also favour the answer that reuses the ground truth's phrasing; only actively penalising excess verbosity overcomes it. This is a more precise diagnosis than remove-or-cap.",
+      "v2_penalty_only": "Passes 4 of 4, at +0.1074 and +0.0352, while the legitimately long correct answers still win at +0.3458 and +0.0704, so it does not over-correct.",
+      "heldout_effect": "All three variants order 3 of 30 held-out pairs correctly. The length fix is neutral on ranking generalisation, which was one of the acceptance conditions."
+    },
+    "recommendation": "Penalty-only. Reached by measurement rather than by preference, which was the explicit request.",
+    "separate_finding_not_asked_for": "Gating the panic handler so that cargo test runs surfaces a pre-existing failure their suite could never report: bm25::tests::exact_match_scores_high expects above 0.85 and gets exactly 0.400000. The cause is arithmetic, not the test. max_raw accumulates K1 + 1.0 per term, the bound as term frequency tends to infinity, while an exact match achieves tf_norm of exactly 1.0 per term when doc_len equals avg_dl. With K1 = 1.5 the ratio is 1 / 2.5 = 0.4, so a verbatim answer scores 0.4 on a signal meant to run to 1.0 and the 0.15-weighted lexical term can contribute at most 0.06 of the composite. Reported rather than changed: altering their normalisation would change scoring semantics across the network, which is their decision and not a side effect of a test fix.",
+    "contributions_prepared_not_sent": "Two local branches against the baseline clone: fix/cargo-test-panic-handler, gating #[panic_handler] behind #[cfg(not(test))] and #![no_std] behind cfg_attr so their 20 unit tests run, and experiment/length-variants carrying the three length signals behind cargo features. Nothing has been pushed, forked, or opened as a pull request."
+  },
+  "handover_contract": {
+    "split": "Agreed with Codex's proposal: this side finishes and freezes the harness, corpora and acceptance thresholds; Codex builds the hybrid scorer against them; this side reviews the results independently. The reason is the central failure of the registration series. One author wrote both the scorer and every corpus that judged it, so the corpora agreed with the rules because the same blind spots produced both. Separating author from evaluator is a structural fix rather than a process courtesy.",
+    "amendment_1_thresholds_frozen_first": "The thresholds are committed BEFORE the hybrid is measured, not chosen after. A bar set once the result is known is the same error as authoring your own evaluator, applied to the bar.",
+    "amendment_2_resolution_limit_stated": "The held-out corpus has 30 pairs and 20 of them defeat both architectures, so the measurable headroom is 10 pairs and a single pair is 3.3 percent. It cannot resolve small differences. Treat a change of one pair as noise; a claim of improved generalisation needs at least +3, meaning 12 of 30 or better. This limit is stated rather than left for the reader to infer from the sample size.",
+    "frozen_bar": {
+      "TestLengthBehaviour": "4 of 4, no tolerance. Both directions must hold.",
+      "TestHeldOutPairAccuracy": "at least 9 of 30 to pass; at least 12 of 30 to claim improved generalisation",
+      "TestScorerRanksCandidatePools": "at least 8 separated, at most 1 tie, at most 1 inversion, worst separation at least -0.0459",
+      "TestGeneratedPairRankingQuality": "at most 9 inverted and at most 9 below the 0.15 floor of 375",
+      "TestRegistrationMarginsHoldOnBothEngines": "all 88 factual pairs clear their minimum margins under both wazero engines. Non-negotiable: these margins are the registered evidence.",
+      "TestSyntheticOrdinalFactualPairs": "weakest synthetic factual margin at least 0.206250; a change in the ordinal Spearman must be recorded with its cause rather than silently repinned",
+      "TestEngineScoresAgree": "no divergence outside the recorded allowlist",
+      "TestNearBoundaryEngineExposure": "at most 90 diverging pairs and 0 verdict flips at the 0.15 floor",
+      "TestArtifactContract": "artifact identity, isolated clean builds and platform digests all reproduce"
+    },
+    "design_constraints_from_measured_failure": [
+      "No hard zeros on a signal that can fire on a correct answer. Registration 98 lost three cases because two rules moved from capping at 0.49 to returning zero, and a zero can only ever remove a win that a cap might have kept. Prefer a multiplicative discount on a semantically grounded base.",
+      "One change per registration. Bundling two in registration 98 destroyed the ability to attribute the regression to either.",
+      "A rising local number is evidence about the properties that corpus encodes and about nothing else. Across four registrations local ranking improved monotonically while the scored result went 31, 31, 31, 28."
+    ]
   },
   "heldout_generalisation_finding": {
     "fixture": "fixtures/scorer_heldout_pairs.json",

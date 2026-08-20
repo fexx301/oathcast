@@ -60,7 +60,20 @@ type heldOutFixture struct {
 
 func loadHeldOutPairs(t *testing.T) heldOutFixture {
 	t.Helper()
-	path := filepath.Join(repoRoot(t), "fixtures", "scorer_heldout_pairs.json")
+	return loadPairFixture(t, "scorer_heldout_pairs.json", "oathcast_scorer_heldout_pairs_v1", 25)
+}
+
+// loadLengthCases loads the frozen length-behaviour acceptance corpus. It is
+// separate from the held-out corpus because it measures a different property: not
+// whether the scorer generalises, but whether verbosity can buy a win.
+func loadLengthCases(t *testing.T) heldOutFixture {
+	t.Helper()
+	return loadPairFixture(t, "scorer_length_cases.json", "oathcast_scorer_length_cases_v1", 4)
+}
+
+func loadPairFixture(t *testing.T, name, schema string, minPairs int) heldOutFixture {
+	t.Helper()
+	path := filepath.Join(repoRoot(t), "fixtures", name)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -69,11 +82,11 @@ func loadHeldOutPairs(t *testing.T) heldOutFixture {
 	if err := json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	if fixture.Schema != "oathcast_scorer_heldout_pairs_v1" {
-		t.Fatalf("unexpected held-out fixture schema %q", fixture.Schema)
+	if fixture.Schema != schema {
+		t.Fatalf("%s: unexpected schema %q, want %q", name, fixture.Schema, schema)
 	}
-	if len(fixture.Pairs) < 25 {
-		t.Fatalf("held-out fixture has %d pairs, want at least 25", len(fixture.Pairs))
+	if len(fixture.Pairs) < minPairs {
+		t.Fatalf("%s has %d pairs, want at least %d", name, len(fixture.Pairs), minPairs)
 	}
 	// Every row must justify its label. Two earlier corpora in this repository
 	// shipped rows whose "wrong" answer was actually true, and each cost real time
@@ -192,6 +205,39 @@ func TestHeldOutPairAccuracy(t *testing.T) {
 			"These shapes have no corresponding rule, so a drop here is a loss of "+
 			"generalisation rather than a rule regression.",
 			total, len(fixture.Pairs), minHeldOutOrdered)
+	}
+}
+
+// TestLengthBehaviour is part of the FROZEN acceptance bar for any future scorer,
+// including a hybrid. It requires every pair in the length corpus to be ordered
+// correctly, in both directions: a verbose wrong answer must never outrank a concise
+// correct one, and a legitimately longer correct answer must not be punished below a
+// terse wrong one. Both directions are present so a fix cannot pass by trading one
+// failure for the other.
+//
+// Measured on Telegraph's baseline for reference, at the point the corpus was
+// written: the shipped sigmoid length bonus fails 2 of 4, holding the term constant
+// fails 1 of 4, and a penalty-only signal passes all 4. Our module passes all 4
+// through its entity rules rather than through its length term.
+func TestLengthBehaviour(t *testing.T) {
+	fixture := loadLengthCases(t)
+	ordered, margins := scoreHeldOut(t, wasmPath(t), engineInterpreter, fixture.Pairs)
+
+	failed := 0
+	for _, pair := range fixture.Pairs {
+		status := "OK"
+		if !ordered[pair.PairID] {
+			status = "FAIL"
+			failed++
+		}
+		t.Logf("LENGTH %-4s %-38s margin %+.6f", status, pair.PairID, margins[pair.PairID])
+	}
+	if failed > 0 {
+		t.Errorf("%d of %d length-behaviour pairs ordered incorrectly. Every pair here "+
+			"must pass: the corpus contains both a verbose wrong answer that must lose "+
+			"and a legitimately long correct answer that must win, so neither a length "+
+			"bonus nor an over-aggressive length penalty can satisfy it.",
+			failed, len(fixture.Pairs))
 	}
 }
 

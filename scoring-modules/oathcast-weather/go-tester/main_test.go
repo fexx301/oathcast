@@ -84,7 +84,7 @@ func TestArtifactContract(t *testing.T) {
 	if evidence.SchemaVersion != "oathcast_weather_wasm_release_evidence_v7" {
 		t.Fatalf("unexpected release evidence schema %q", evidence.SchemaVersion)
 	}
-	if evidence.Status != "champion_baseline_available_held_out_signal_established" {
+	if evidence.Status != "harness_frozen_for_hybrid_handover" {
 		t.Fatalf("unexpected release evidence status %q", evidence.Status)
 	}
 	if !evidence.Artifact.RegistrationCandidate {

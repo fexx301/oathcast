@@ -1,0 +1,43 @@
+{
+  "schema": "oathcast_scorer_length_cases_v1",
+  "purpose": "Frozen acceptance corpus for length behaviour. A judge must never rank a verbose wrong answer above a concise correct one, and must not over-correct by punishing a legitimately longer correct answer. Both directions are represented so a fix cannot pass by trading one failure for the other.",
+  "provenance": "Written after Telegraph confirmed the baseline's length term rewards verbosity. Measured against three variants of their module: the shipped sigmoid bonus fails 2 of 4, holding the term constant fails 1 of 4, and a penalty-only signal passes all 4. That result is why penalty-only is the recommendation rather than the assumption.",
+  "pairs": [
+    {
+      "pair_id": "wrong_verbose_vs_correct_terse",
+      "shape": "verbosity_must_not_win",
+      "question": "What is the capital of France?",
+      "ground_truth": "Paris is the capital of France.",
+      "good_answer": "Paris.",
+      "bad_answer": "Lyon is the capital of France, and that is the established answer, well documented in the record for anyone who cares to check it carefully.",
+      "why_bad_is_wrong": "Paris is the capital, not Lyon. The wrong answer shares almost all of the truth's wording and is far longer, so a length bonus plus high cosine similarity can lift it above a bare correct answer."
+    },
+    {
+      "pair_id": "wrong_verbose_vs_correct_terse_tokyo",
+      "shape": "verbosity_must_not_win",
+      "question": "What is the capital of Japan?",
+      "ground_truth": "Tokyo is the capital of Japan.",
+      "good_answer": "Tokyo.",
+      "bad_answer": "Osaka is the capital of Japan, which is a fact that is very widely documented and repeated in reference works of every kind.",
+      "why_bad_is_wrong": "Tokyo is the capital, not Osaka. This is the case that shows removing the length bonus is not enough: with the term held constant the wrong answer still wins by 0.0648, because cosine and BM25 also favour the answer that reuses the truth's phrasing."
+    },
+    {
+      "pair_id": "correct_verbose_vs_wrong_terse",
+      "shape": "length_must_not_be_punished",
+      "question": "Why is the sky blue?",
+      "ground_truth": "The sky appears blue because shorter wavelengths of sunlight scatter more in the atmosphere.",
+      "good_answer": "Sunlight hits the atmosphere and the shorter blue wavelengths are scattered far more strongly than the longer red ones, so blue is what reaches your eye from all directions.",
+      "bad_answer": "Ozone.",
+      "why_bad_is_wrong": "Ozone does not make the sky blue. Present so that a length fix which simply punishes long answers fails here instead of passing."
+    },
+    {
+      "pair_id": "legitimate_long_paraphrase",
+      "shape": "length_must_not_be_punished",
+      "question": "How do vaccines work?",
+      "ground_truth": "A vaccine trains the immune system to recognise a pathogen before any real exposure.",
+      "good_answer": "A vaccine gives the immune system a rehearsal, presenting a harmless likeness of the pathogen so that antibodies and memory cells are ready long before a genuine infection arrives.",
+      "bad_answer": "Vaccines kill pathogens already in the blood.",
+      "why_bad_is_wrong": "Vaccines are prophylactic and do not clear an existing infection. The correct answer is twice the length of the ground truth, so an over-aggressive length penalty would invert this pair."
+    }
+  ]
+}
