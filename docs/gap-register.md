@@ -231,6 +231,33 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Actionable next, not platform-blocked
 
+- The champion baseline is published at
+  `https://github.com/telegraphprotocol/telegraph-wasm-baseline` and is the
+  held-out signal this work has lacked. It is not a rule engine: it embeds
+  question, ground truth and answer with MiniLM-L6-v2 and blends cosine
+  similarity `0.25/0.50` with BM25 `0.15` and a length sigmoid `0.10`. Built with
+  `--features real_weights` it runs locally through our existing wazero probe,
+  and `breakdown_answer` decomposes a verdict into its four signals, so a
+  disagreement can be attributed rather than guessed at.
+  Measured complementarity, both directions. It solves predicate substitution,
+  which was recorded here as needing synonymy this module cannot judge: on the
+  Nile case it scores the correct paraphrase `0.704282` above the wrong "deepest
+  river" at `0.654421`, where ours inverts. It is weak where we are strong: on
+  "Paris is the capital of France.", the wrong verbose "Lyon is the capital of
+  France, and that is the established answer..." scores `0.609420`, above a
+  correct bare "Paris." at `0.527878`; ours scores that pair `0.334375` against
+  `0.781250`.
+  The champion inverts 8 of our 10 pools where ours inverts 1. That is **not**
+  evidence our module is the better judge: those pools were authored here around
+  the failure modes of a lexical scorer, so they are adversarial toward
+  surface-similarity judging generally. Reading that number as a verdict would
+  repeat the overfitting error in the opposite direction.
+  Indicated direction, not attempted, because it is an architectural decision
+  rather than a fix: a semantic signal for paraphrase coverage combined with the
+  discrete contradiction rules for entity binding would beat either alone. The
+  champion's margins on cases it gets right are thin, typically `0.005` to
+  `0.06`; ours are wide where the rules fire and absent where they do not.
+
 - Revert the two zeroing rules introduced after registration `96`. Registration
   `98` won `28/32` where the previous three builds all won `31/32`, so those two
   changes cost three cases. `relation_mismatch` was promoted from the ambiguity

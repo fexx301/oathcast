@@ -2,7 +2,7 @@
   "schema_version": "oathcast_weather_wasm_release_evidence_v7",
   "recorded_at": "2026-08-15T09:19:22Z",
   "updated_at": "2026-08-18T00:30:26Z",
-  "status": "reverted_to_registration_96_scoring_awaiting_champion_baseline",
+  "status": "champion_baseline_available_held_out_signal_established",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
     "byte_size": 45394,
@@ -143,6 +143,24 @@
     "hypothesis_status": "Unconfirmed against Telegraph's fixtures, which are hidden and whose per-case scores they have stated cannot be disclosed. Supported only by the local reproduction of the same mechanism.",
     "implied_fix": "Make the ceilings order-preserving rather than flattening: map scores that exceed a triggered ceiling into a narrow monotone band ending at that ceiling, so two defective answers of different quality stay distinguishable while both remain capped. This helps only where the pre-clamp ordering is already correct; where it is not, a tie becomes an inversion, which is no worse for Stage 2 but no better either. Not yet implemented.",
     "note_on_priority": "Telegraph's team stated the objective is ranking quality across the network rather than winning the canonical-script slot. This defect serves both readings: a scorer that assigns a correct and a wrong answer the same score cannot rank them at all, so fixing it is ranking work rather than fixture chasing."
+  },
+  "champion_baseline_comparison": {
+    "source": "https://github.com/telegraphprotocol/telegraph-wasm-baseline",
+    "fetched": "2026-08-20",
+    "what_it_is": "Telegraph's production scoring module, published by the team as the intended path for closing the gap locally rather than reverse-engineering hidden fixtures. It is not a rule engine: it embeds question, ground truth and answer with MiniLM-L6-v2 and blends cosine similarity with BM25 and a length signal.",
+    "composite": "0.25 * cosine(question, answer) + 0.50 * cosine(ground_truth, answer) + 0.15 * bm25(ground_truth, answer) + 0.10 * sigmoid((answer_len - 50) / 20), clamped to [0,1]. Exports alloc, dealloc, rank_answer, plus breakdown_answer, embed, cosine_sim and bm25_score. Built with --features real_weights it is 24,184,674 bytes against our 45,394.",
+    "harness_validated": "Driven through our existing wazero probe, same ABI. Real weights confirmed working rather than the repo's projection fallback: a true paraphrase with almost no lexical overlap, 'Everest is the highest peak on the planet.' against the truth 'Everest is the tallest mountain on Earth.', scores 0.693950 while unrelated text scores 0.059760. Projection mode could not produce that.",
+    "architectural_difference": "Ours is a hand-written lexical and entity-binding rule engine with discrete penalties; theirs is a semantic model with a smooth composite. That difference explains the registration series: our entity-binding, ordinal and weather-classifier fixes were neutral against fixtures judged by a scorer whose primary signal is embedding similarity, because none of those fixes touched semantic coverage.",
+    "measured_complementarity": {
+      "champion_solves_what_we_declared_out_of_reach": "Predicate substitution. Against 'Nile is known as the longest river in Africa.', the champion scores the correct paraphrase 0.704282 above the wrong 'deepest river' at 0.654421. Ours inverts it, 0.804167 against 0.827083. This was recorded as needing synonymy the module cannot judge; a sentence transformer judges it directly.",
+      "we_are_sharper_where_our_rules_fire": "Entity swap in a preserved frame. Against 'Yes, Everest is the tallest mountain on Earth.', both rank the correct paraphrase first, but the champion's margin is 0.059603 where ours is 0.370000.",
+      "champion_weakness_found": "Entity substitution combined with verbosity. Against 'Paris is the capital of France.', the wrong verbose answer 'Lyon is the capital of France, and that is the established answer, well documented in the record...' scores 0.609420, above every correct answer including a bare 'Paris.' at 0.527878. Ours scores the same pair 0.334375 against 0.781250. A judge that prefers a confident wrong verbose answer to a correct terse one is exploitable by exactly that behaviour.",
+      "length_signal_is_not_simply_gameable": "Padding a correct answer with content-free filler lowers the champion's score rather than raising it, 0.527878 down to 0.338312 across four padding levels, because embedding dilution at weight 0.50 outweighs the length term at weight 0.10. An earlier prediction that padding would farm the length signal was wrong."
+    },
+    "fairness_caveat": "The champion inverts 8 of our 10 ranking pools where our module inverts 1. That number must NOT be read as evidence that our module is the better judge. Those pools were authored by us and deliberately built around the failure modes of a lexical scorer, so they are adversarial toward surface-similarity judging in general. Treating that 8 versus 1 as a quality verdict would repeat exactly the overfitting error recorded under overfitting_finding, in the opposite direction.",
+    "what_this_unlocks": "A held-out signal. Until now local ranking numbers could improve while the scored result went 31, 31, 31, 28, with no way to tell overfitting from progress. The champion can now be run locally on unlimited inputs, and breakdown_answer decomposes its verdict into relevance, correctness, lexical and length, so a disagreement can be attributed to a signal rather than guessed at.",
+    "indicated_direction": "Neither architecture dominates. The champion has broad semantic coverage with thin margins, typically 0.005 to 0.06 on cases it gets right, and is weak on entity substitution. Ours has wide margins where its rules fire and is blind where they do not. A judge that combined a semantic signal for paraphrase coverage with discrete contradiction rules for entity binding would beat either, which is presumably why the team published theirs as a starting point. Not attempted; it is an architectural decision rather than a fix.",
+    "upstream_note": "Their README records that cargo test does not run their unit tests, because the unconditional #[panic_handler] in allocator.rs clashes with std on the native target, and states the fix as gating it behind #[cfg(not(test))]. Not reported or offered; noted only so it is not rediscovered."
   },
   "ranking_benchmark": {
     "path": "fixtures/scorer_ranking_pools.json",
