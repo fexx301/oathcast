@@ -2,7 +2,7 @@
   "schema_version": "oathcast_weather_wasm_release_evidence_v7",
   "recorded_at": "2026-08-15T09:19:22Z",
   "updated_at": "2026-08-18T00:30:26Z",
-  "status": "harness_frozen_for_hybrid_handover",
+  "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
     "byte_size": 45394,
@@ -196,6 +196,22 @@
       "One change per registration. Bundling two in registration 98 destroyed the ability to attribute the regression to either.",
       "A rising local number is evidence about the properties that corpus encodes and about nothing else. Across four registrations local ranking improved monotonically while the scored result went 31, 31, 31, 28."
     ]
+  },
+  "quantisation_finding": {
+    "source": "Measured through the third-party harness in zkasuran/telegraph-salience-scorer, MIT licensed, run on its own 40-case benchmark and 12-case attack suite. That module is the active champion for eight intents at registrations 26 to 33, is 8.4 KB, no_std with no imports, and reports 32 of 32 fixture wins. Its harness accepts an arbitrary second wasm, so it evaluates ours on cases authored by someone with no knowledge of our rules.",
+    "headline": "Over the 80 benchmark scores, ours produces 30 distinct values and theirs produces 75. Ours repeats 0.3000 eighteen times, 0.0000 nine times, 0.1500 six times, 0.4900 six times and 0.7812 five times. 0.30 and 0.49 are literal score.min() ceilings in evaluate, so the scorer quantises onto its own clamp values.",
+    "head_to_head": "Their benchmark: theirs margin 0.6847 with 40 of 40 correct rankings, ours margin 0.3148 with 33 of 40.",
+    "attack_suite_failures": [
+      "direction-flip: attack 0.4031 scores ABOVE honest 0.3000. Independent confirmation of the relation-direction defect.",
+      "negation-insert: attack 0.4250 above honest 0.3071. Inserting a negation raises our score.",
+      "word-order-swap: exact tie at 0.8500. Swapping argument order is invisible.",
+      "stopword-spam and empty-ish: expected near zero, both score exactly 0.3000, which is the clamp rather than a judgement.",
+      "shotgun-candidates: 0.7337 against honest 0.7812, below but not far enough below to pass their gate."
+    ],
+    "why_this_matters_more_than_the_individual_defects": "It connects five observations that were recorded separately and never linked. The authorship_entity_swap tie at exactly 0.490000, the three misspelling pairs tying at exactly 0.000000, the word-order tie at 0.8500, the Stage 2 score_stddev of 0.2977 against the salience author's 0.391, and the fact that five defect fixes moved Telegraph's per-case count by zero. All are the same structural property: when a scorer's primary discrimination mechanism is a hard ceiling, its output collapses onto a handful of values, ties become frequent by construction, and adding further rules only moves answers between the same few buckets. The information is not in the score to begin with.",
+    "corroboration_from_the_other_author": "Their README states that a flat-scoring or all-or-nothing module is rejected by the node, and they apply a deliberate smoothstep contrast curve for that reason. Their score_stddev is 0.391 against ours at 0.2977.",
+    "necessary_but_possibly_not_sufficient": "Continuity alone is not the whole fix. An earlier attempt to relax the 0.49 ceiling into an order-preserving band turned a tie into an inversion, because the pre-clamp ordering was already wrong: the wrong answer scored 0.795000 against the correct answer's 0.781250. So the underlying signals must be right as well as continuous. Quantisation is what makes fine distinctions inexpressible; it is not what makes the coarse ones wrong.",
+    "design_consequence": "The next scorer should compute continuous signals and apply graded multiplicative discounts, rather than deriving discrimination from hard ceilings. That is independent of the structural role-binding work and has to come first, because role binding expressed through another clamp would land in the same buckets."
   },
   "heldout_generalisation_finding": {
     "fixture": "fixtures/scorer_heldout_pairs.json",
