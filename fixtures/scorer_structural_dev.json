@@ -1,0 +1,310 @@
+{
+  "schema": "oathcast_scorer_structural_dev_v1",
+  "role": "DEVELOPMENT corpus, not held out. Written to develop against the four structural categories Codex declared for the blind evaluation: relation direction, coordinated swaps, parenthetical binding, and mixed correct/false answers. Knowing the categories is legitimate; the cases in the blind set are unknown here and must stay so.",
+  "pools": [
+    {
+      "pool_id": "relation_direction__wolves",
+      "shape": "relation_direction",
+      "question": "How do wolves and rabbits relate?",
+      "ground_truth": "Wolves prey on rabbits.",
+      "why_bad_is_wrong": "The predator and prey roles are exchanged.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Rabbits are preyed on by wolves.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Rabbits prey on wolves.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "relation_direction__socrates",
+      "shape": "relation_direction",
+      "question": "Who taught whom, Socrates or Plato?",
+      "ground_truth": "Socrates taught Plato.",
+      "why_bad_is_wrong": "The teaching relation runs from Socrates to Plato.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Plato was taught by Socrates.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Plato taught Socrates.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "relation_direction__nile_sea",
+      "shape": "relation_direction",
+      "question": "Which body of water does the Nile flow into?",
+      "ground_truth": "The Nile flows into the Mediterranean.",
+      "why_bad_is_wrong": "A river flows into a sea, not the reverse.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The Mediterranean receives the Nile.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The Mediterranean flows into the Nile.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "relation_direction__altitude",
+      "shape": "relation_direction",
+      "question": "How does altitude relate to air pressure?",
+      "ground_truth": "Air pressure falls as altitude increases.",
+      "why_bad_is_wrong": "Pressure decreases with height.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The higher you go, the lower the pressure.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Air pressure rises as altitude increases.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "coordinated_swap__senses",
+      "shape": "coordinated_swap",
+      "question": "Which organs provide sight and hearing?",
+      "ground_truth": "The eyes provide sight and the ears provide hearing.",
+      "why_bad_is_wrong": "Both bindings are exchanged at once, so every entity still appears.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Sight comes from the eyes and hearing from the ears.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The eyes provide hearing and the ears provide sight.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "coordinated_swap__playwrights",
+      "shape": "coordinated_swap",
+      "question": "Who wrote Hamlet and who wrote Doctor Faustus?",
+      "ground_truth": "Shakespeare wrote Hamlet and Marlowe wrote Doctor Faustus.",
+      "why_bad_is_wrong": "Both author bindings are exchanged.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Hamlet is Shakespeare's and Doctor Faustus is Marlowe's.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Marlowe wrote Hamlet and Shakespeare wrote Doctor Faustus.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "coordinated_swap__languages",
+      "shape": "coordinated_swap",
+      "question": "Which of Brazil and Mexico speaks Portuguese, and which Spanish?",
+      "ground_truth": "Brazil speaks Portuguese and Mexico speaks Spanish.",
+      "why_bad_is_wrong": "Both language bindings are exchanged.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Portuguese in Brazil, Spanish in Mexico.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Brazil speaks Spanish and Mexico speaks Portuguese.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "coordinated_swap__organs",
+      "shape": "coordinated_swap",
+      "question": "What do the lungs and the heart each do?",
+      "ground_truth": "The lungs exchange gases and the heart pumps blood.",
+      "why_bad_is_wrong": "Both organ functions are exchanged.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Gas exchange is the lungs, pumping blood is the heart.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The lungs pump blood and the heart exchanges gases.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "parenthetical_binding__paris_berlin",
+      "shape": "parenthetical_binding",
+      "question": "What is the capital of France?",
+      "ground_truth": "Paris is the capital of France.",
+      "why_bad_is_wrong": "The parenthetical names the rejected candidate, so the main claim is what counts and it is Berlin in the wrong answer.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Paris (not Berlin) is the capital of France.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Berlin (not Paris) is the capital of France.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "parenthetical_binding__hamlet_marlowe",
+      "shape": "parenthetical_binding",
+      "question": "Who wrote Hamlet?",
+      "ground_truth": "Hamlet was written by Shakespeare.",
+      "why_bad_is_wrong": "Both answers name both men; only the subject of the main clause differs.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Shakespeare (not Marlowe) wrote Hamlet.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Marlowe (not Shakespeare) wrote Hamlet.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "parenthetical_binding__everest_k2",
+      "shape": "parenthetical_binding",
+      "question": "What is the tallest mountain on Earth?",
+      "ground_truth": "Everest is the tallest mountain on Earth.",
+      "why_bad_is_wrong": "The contrastive phrase marks the rejected candidate.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Everest, rather than K2, is the tallest.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "K2, rather than Everest, is the tallest.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "parenthetical_binding__mercury_venus",
+      "shape": "parenthetical_binding",
+      "question": "Which planet is closest to the Sun?",
+      "ground_truth": "Mercury is the closest planet to the Sun.",
+      "why_bad_is_wrong": "Mercury is closest; the wrong answer asserts Venus as the main claim.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Mercury, and not Venus, is the closest.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Venus, and not Mercury, is the closest.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth__hamlet_extra",
+      "shape": "mixed_truth",
+      "question": "Who wrote Hamlet?",
+      "ground_truth": "Hamlet was written by Shakespeare.",
+      "why_bad_is_wrong": "Shakespeare did write Macbeth; Doctor Faustus is Marlowe's, so the second clause is false while the first is true.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Shakespeare wrote Hamlet, and he also wrote Macbeth.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Shakespeare wrote Hamlet, and he also wrote Doctor Faustus.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth__tokyo_extra",
+      "shape": "mixed_truth",
+      "question": "What is the capital of Japan?",
+      "ground_truth": "Tokyo is the capital of Japan.",
+      "why_bad_is_wrong": "Osaka is a Japanese port city and not the capital of China.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Tokyo is the capital, and Osaka is a major port city.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Tokyo is the capital, and Osaka is the capital of China.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth__tides_extra",
+      "shape": "mixed_truth",
+      "question": "What causes the tides?",
+      "ground_truth": "Tides are caused mainly by the Moon's gravity.",
+      "why_bad_is_wrong": "The Sun does contribute to tides; the magnetic field does not.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Mainly the Moon's gravity, with a smaller contribution from the Sun.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Mainly the Moon's gravity, and also the Earth's magnetic field.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth__brazil_extra",
+      "shape": "mixed_truth",
+      "question": "What language is spoken in Brazil?",
+      "ground_truth": "Portuguese is spoken in Brazil.",
+      "why_bad_is_wrong": "Portuguese is spoken in Portugal; it is not a language of Japan.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Portuguese, which is also spoken in Portugal.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Portuguese, which is also spoken in Japan.",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
