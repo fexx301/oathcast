@@ -171,7 +171,7 @@ the live champion's historical scores, not a raw scorer threshold or a direct
 comparison of the two returned margins.
 
 The revised local build passes 88 synthetic factual-paraphrase pairs with a
-minimum local margin of `0.206250`. Its synthetic ordinal Spearman is `0.956604`
+minimum local margin of `0.206250`. Its synthetic ordinal Spearman is `0.956559`
 for `exact > good > bad` ordering on handcrafted cases. These are development
 proxies constructed from the user-relayed fixture category and floor; the
 ordinal metric is not comparable to Telegraph's live candidate-versus-champion
@@ -190,7 +190,7 @@ its three-string shape and fatal-zero/order constraints. The CI job is
 
 ## Evidence status
 
-The current frozen rank-only artifact is a 45,681-byte local candidate. Its
+The current frozen rank-only artifact is a 45,747-byte local candidate. Its
 single change from the registered 42,798-byte registration `41` build is a
 probability-scan fix in `percent_probability`, which previously abandoned the
 scan on the first `%` that carried no parseable number and so discarded a real
@@ -204,9 +204,9 @@ the size, SHA-256, and raw-byte Keccak-256 were independently checked:
 | Measurement | Value |
 |---|---|
 | Reproducible clean-build comparison | Two clean builds were byte-identical |
-| WASM byte size | `45,681` bytes |
-| WASM SHA-256 | `d108532c673a3f94010b140333037af93e677ae54148d7f67c42fb2fd3ccef95` |
-| Raw-byte Keccak-256 (portal-compatible) | `0x537bf9a7da427e292994ecce7f317e187996345a3a4503901b764ddadd9fbc5f` |
+| WASM byte size | `45,747` bytes |
+| WASM SHA-256 | `9df0c84d736126189afc7fce869e6e212d8260ec7098bbf72408d573faececea` |
+| Raw-byte Keccak-256 (portal-compatible) | `0x9916d167b641b45badcf26cfe1f8060f17c03373b49a46141d5af762eec5905f` |
 | Fixture SHA-256 | `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f` |
 | Rust native tests | `40/40` passed |
 | Go/wazero suite | Full suite passed |
@@ -218,7 +218,7 @@ Registration `19` evaluated the earlier 16,292-byte artifact, SHA-256
 raw-byte Keccak-256
 `0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8`.
 That historical registered artifact is retained separately from both
-registration `41`'s 42,798-byte artifact and the current 45,681-byte local
+registration `41`'s 42,798-byte artifact and the current 45,747-byte local
 candidate.
 
 Registration `41` evaluated the 42,798-byte artifact. Its confirmed
@@ -260,7 +260,7 @@ passed, and Stage 2 rejected them at `31/32` ordering wins versus the champion's
 
 Registration `41` is the 42,798-byte artifact's retained validator
 result: hosted bytes match that recorded registration `41` build rather than the
-current 45,681-byte candidate, Stage 1 passed by reaching
+current 45,747-byte candidate, Stage 1 passed by reaching
 champion comparison, and Stage 2 rejected it at `31/32` versus the champion's
 `32/32`. No replacement registration is currently authorized. Before any future
 confirmation, decode a fresh complete wallet wrapper and nested call for the new

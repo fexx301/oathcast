@@ -214,18 +214,92 @@ fn semantic_set(text: &str) -> HashSet<MAX_SEMANTIC_TOKENS> {
     set
 }
 
-fn semantic_f1(ground_truth: &str, answer: &str) -> Option<f32> {
-    let truth = semantic_set(ground_truth);
-    let response = semantic_set(answer);
-    if truth.len == 0 {
+/// Informativeness weight for a token, so that overlap can be measured on a
+/// continuous scale.
+///
+/// Set F1 over token sets is coarse by construction: across sets of size 2 to 8 it
+/// can only take 40 distinct values. That is a large part of why this module emitted
+/// 30 distinct scores over 80 third-party benchmark answers where the incumbent
+/// champion emitted 75. Weighting each token by a real number makes the same overlap
+/// measure continuous, and gives the weight a meaning: a number carries more of a
+/// factual claim than an ordinary noun, and a proper noun carries more than a common
+/// word.
+///
+/// Corpus-free by necessity. There is no document collection to derive IDF from
+/// inside a `no_std` module with no imports, so token shape stands in for it.
+fn token_salience(token: &[u8]) -> f32 {
+    if token.iter().any(u8::is_ascii_digit) {
+        // A number is the sharpest factual content an answer can carry, and getting
+        // one wrong is the most direct way to be wrong.
+        return 3.0;
+    }
+    if token_is_all_uppercase(token) {
+        return 2.5;
+    }
+    if token_is_titlecase(token) {
+        return 2.0;
+    }
+    // Ordinary words: longer carries more, saturating so a single long word cannot
+    // dominate a short clause.
+    1.0 + (token.len() as f32 / 12.0).min(0.8)
+}
+
+/// Salience-weighted F1 between the ground truth and the answer.
+///
+/// Same shape as `semantic_f1`, which it replaces, but each token contributes its
+/// weight rather than a count. Each distinct token is weighted once, so repeating a
+/// term cannot inflate either side.
+fn salience_weighted_f1(ground_truth: &str, answer: &str) -> Option<f32> {
+    let truth_set = semantic_set(ground_truth);
+    let answer_set = semantic_set(answer);
+    if truth_set.len == 0 {
         return None;
     }
-    if response.len == 0 {
+    if answer_set.len == 0 {
         return Some(0.0);
     }
-    let overlap = truth.overlap(&response) as f32;
-    let precision = overlap / response.len as f32;
-    let recall = overlap / truth.len as f32;
+
+    let mut truth_weight = 0.0f32;
+    let mut matched_truth_weight = 0.0f32;
+    let mut counted = HashSet::<MAX_SEMANTIC_TOKENS>::new();
+    for token in TokenIter::new(ground_truth) {
+        let Some(hash) = semantic_hash(token.bytes) else {
+            continue;
+        };
+        if counted.contains(hash) {
+            continue;
+        }
+        counted.insert(hash);
+        let weight = token_salience(token.bytes);
+        truth_weight += weight;
+        if answer_set.contains(hash) {
+            matched_truth_weight += weight;
+        }
+    }
+
+    let mut answer_weight = 0.0f32;
+    let mut matched_answer_weight = 0.0f32;
+    let mut counted_answer = HashSet::<MAX_SEMANTIC_TOKENS>::new();
+    for token in TokenIter::new(answer) {
+        let Some(hash) = semantic_hash(token.bytes) else {
+            continue;
+        };
+        if counted_answer.contains(hash) {
+            continue;
+        }
+        counted_answer.insert(hash);
+        let weight = token_salience(token.bytes);
+        answer_weight += weight;
+        if truth_set.contains(hash) {
+            matched_answer_weight += weight;
+        }
+    }
+
+    if truth_weight == 0.0 || answer_weight == 0.0 {
+        return Some(0.0);
+    }
+    let recall = matched_truth_weight / truth_weight;
+    let precision = matched_answer_weight / answer_weight;
     if precision + recall == 0.0 {
         Some(0.0)
     } else {
@@ -3085,7 +3159,7 @@ pub(crate) fn evaluate(
         return zero(ISSUE_POLARITY_MISMATCH);
     }
 
-    let semantic_quality = semantic_f1(ground_truth, answer);
+    let semantic_quality = salience_weighted_f1(ground_truth, answer);
     let has_other_truth_signal = truth_polarity != Polarity::Unknown
         || truth_probability.is_some()
         || numeric_quality(ground_truth, answer).is_some();

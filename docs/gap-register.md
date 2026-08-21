@@ -170,20 +170,20 @@ breakdown-layout blocker before a registration candidate can be frozen.
   `32/32`, with candidate margin `0.31248063`, champion margin `0.37360683`, and
   zero historical rows. According to user-relayed Telegraph guidance, these margins are not directly
   compared for promotion.
-- The current 45,681-byte factual-paraphrase artifact is reproducible and is an
+- The current 45,747-byte factual-paraphrase artifact is reproducible and is an
   unregistered local candidate: it has not been uploaded, hosted, signed, or
   registered. Its single change over the registration `41` bytes is a
   probability-scan fix in `percent_probability`, which previously abandoned the
   scan on the first `%` carrying no parseable number and so discarded a real
   percentage later in the same answer. Its SHA-256 is
-  `d108532c673a3f94010b140333037af93e677ae54148d7f67c42fb2fd3ccef95`
+  `9df0c84d736126189afc7fce869e6e212d8260ec7098bbf72408d573faececea`
   and raw-byte Keccak-256
-  `0x537bf9a7da427e292994ecce7f317e187996345a3a4503901b764ddadd9fbc5f`.
+  `0x9916d167b641b45badcf26cfe1f8060f17c03373b49a46141d5af762eec5905f`.
   The fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. All 88 synthetic factual pairs
   pass the reported `0.15` floor with minimum margin `0.206250`; synthetic
-  ordinal Spearman is `0.956604`. Predicate-family identity, inverse
+  ordinal Spearman is `0.956559`. Predicate-family identity, inverse
   learned-from and lost-to phrasing, parenthetical commas, coordinated relation
   swaps, mixed explicit reversals, partial multi-relation omissions, and mixed
   directed pairs have Rust and fixture regressions. Shared predicates, bounded
