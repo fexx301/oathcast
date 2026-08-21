@@ -30,6 +30,7 @@ pub(crate) const ISSUE_CONTRADICTORY_FACT_ANCHOR: u32 = 1 << 12;
 pub(crate) const ISSUE_AMBIGUOUS_FACT_ANCHORS: u32 = 1 << 13;
 pub(crate) const ISSUE_RANK_MODIFIER_CONFLICT: u32 = 1 << 14;
 pub(crate) const ISSUE_ROLE_BINDING_REVERSED: u32 = 1 << 15;
+pub(crate) const ISSUE_TREND_CONTRADICTION: u32 = 1 << 16;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -678,6 +679,114 @@ fn role_binding_reversed(ground_truth: &str, answer: &str) -> bool {
         }
     }
     false
+}
+
+/// Direction a token asserts a quantity is moving: `Some(true)` up, `Some(false)`
+/// down, `None` if it says nothing about direction.
+fn trend_direction(token: &[u8]) -> Option<bool> {
+    const UP: &[&[u8]] = &[
+        b"rise",
+        b"rises",
+        b"rising",
+        b"rose",
+        b"risen",
+        b"increase",
+        b"increases",
+        b"increasing",
+        b"increased",
+        b"grow",
+        b"grows",
+        b"growing",
+        b"grew",
+        b"gain",
+        b"gains",
+        b"climb",
+        b"climbs",
+        b"climbing",
+        b"climbed",
+        b"strengthen",
+        b"strengthens",
+        b"improve",
+        b"improves",
+        b"improved",
+        b"appreciate",
+        b"upward",
+    ];
+    const DOWN: &[&[u8]] = &[
+        b"fall",
+        b"falls",
+        b"falling",
+        b"fell",
+        b"fallen",
+        b"decrease",
+        b"decreases",
+        b"decreasing",
+        b"decreased",
+        b"drop",
+        b"drops",
+        b"dropping",
+        b"dropped",
+        b"decline",
+        b"declines",
+        b"declining",
+        b"declined",
+        b"shrink",
+        b"shrinks",
+        b"weaken",
+        b"weakens",
+        b"worsen",
+        b"worsens",
+        b"depreciate",
+        b"downward",
+    ];
+    if UP.iter().any(|word| token_eq(token, word)) {
+        return Some(true);
+    }
+    if DOWN.iter().any(|word| token_eq(token, word)) {
+        return Some(false);
+    }
+    None
+}
+
+/// The single direction a text asserts, or `None` when it asserts none or more than
+/// one.
+///
+/// Returning `None` on mixed direction is load-bearing rather than defensive. A
+/// ground truth like "Air pressure falls as altitude increases." states both
+/// directions about two different quantities, and with no parse to say which belongs
+/// to which, any verdict drawn from it would be a guess. Silence is the honest
+/// answer there.
+///
+/// A negation within three tokens flips the direction, so "prices did not rise" reads
+/// as down rather than as agreement with a rising ground truth.
+fn asserted_trend(text: &str) -> Option<bool> {
+    let mut up = false;
+    let mut down = false;
+    let mut negation_age = usize::MAX;
+    for token in TokenIter::new(text) {
+        if is_fact_negation(text, token) {
+            negation_age = 0;
+            continue;
+        }
+        if let Some(direction) = trend_direction(token.bytes) {
+            let flipped = if negation_age < 3 {
+                !direction
+            } else {
+                direction
+            };
+            if flipped {
+                up = true;
+            } else {
+                down = true;
+            }
+        }
+        negation_age = negation_age.saturating_add(1);
+    }
+    match (up, down) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
 }
 
 fn decoded_json_content_eq(raw_content: &str, expected: &str) -> bool {
@@ -3684,6 +3793,19 @@ pub(crate) fn evaluate(
     // is why it is the only one that can see an argument exchange at all. The
     // third-party word-order-swap attack scored exactly 0.8500 for both the honest
     // and the swapped answer, because the multiset is unchanged.
+    // Opposite asserted direction, where there are no roles to exchange. The
+    // third-party direction-flip attack turns "Bond prices usually rise." into "Bond
+    // prices usually fall.": same subject, one word apart, and the honest answer
+    // "They tend to increase." shares almost no vocabulary with either. Overlap
+    // signals therefore rank the attack above the honest answer, 0.4089 against
+    // 0.3000, and no role binding exists to notice.
+    if let (Some(truth_trend), Some(answer_trend)) =
+        (asserted_trend(ground_truth), asserted_trend(answer))
+        && truth_trend != answer_trend
+    {
+        issues |= ISSUE_TREND_CONTRADICTION;
+        score = cap_preserving_order(score, 0.30);
+    }
     if role_binding_reversed(ground_truth, answer) {
         issues |= ISSUE_ROLE_BINDING_REVERSED;
         // 0.40 rather than something tighter, and the reason is a frozen gate rather

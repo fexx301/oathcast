@@ -205,8 +205,8 @@ the size, SHA-256, and raw-byte Keccak-256 were independently checked:
 |---|---|
 | Reproducible clean-build comparison | Two clean builds were byte-identical |
 | WASM byte size | `45,747` bytes |
-| WASM SHA-256 | `fc1d45dfb9cf0c98be07d97903e2d177bd21515a1fa657534a6e16b645152f7a` |
-| Raw-byte Keccak-256 (portal-compatible) | `0xf7b30f7ed0584eea65b43a6ebc9a7e3bc4a1e0c4e27a7e2b7bb5377aaa9eec83` |
+| WASM SHA-256 | `69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69` |
+| Raw-byte Keccak-256 (portal-compatible) | `0x63aa5d75872e6962cf4c1e5561f02a96b8a89ef4fb52fb8ef8170e8f63d94d4d` |
 | Fixture SHA-256 | `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f` |
 | Rust native tests | `40/40` passed |
 | Go/wazero suite | Full suite passed |
