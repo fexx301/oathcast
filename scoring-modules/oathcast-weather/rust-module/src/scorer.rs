@@ -32,6 +32,7 @@ pub(crate) const ISSUE_RANK_MODIFIER_CONFLICT: u32 = 1 << 14;
 pub(crate) const ISSUE_ROLE_BINDING_REVERSED: u32 = 1 << 15;
 pub(crate) const ISSUE_TREND_CONTRADICTION: u32 = 1 << 16;
 pub(crate) const ISSUE_ROLE_BINDING_RECOMBINED: u32 = 1 << 17;
+pub(crate) const ISSUE_CLAUSE_CONTRADICTION: u32 = 1 << 18;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -448,6 +449,12 @@ struct RolePair {
     relation: u64,
     actor: u64,
     target: u64,
+    /// Whether each argument is a named thing rather than a common noun. A conflict
+    /// between two named things is a substitution; a difference between two common
+    /// nouns is usually a paraphrase, and treating those alike took generated-pair
+    /// inversions from 8 of 375 to 14 and pairs below the margin floor from 9 to 23.
+    actor_named: bool,
+    target_named: bool,
 }
 
 /// Extracts ordered role bindings from `text`.
@@ -467,6 +474,7 @@ struct RolePair {
 /// produces, and only a real role exchange differs.
 fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
     let mut tokens: [(u64, usize); MAX_TRACKED_TOKENS] = [(0, 0); MAX_TRACKED_TOKENS];
+    let mut named: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
     let mut raw: [Option<RoleRelation>; MAX_TRACKED_TOKENS] = [None; MAX_TRACKED_TOKENS];
     let mut copula: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
     let mut by_marker: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
@@ -487,6 +495,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         by_marker[count] = token_eq(token.bytes, b"by");
         genitive[count] = token_eq(token.bytes, b"of") || token_eq(token.bytes, b"in");
         tokens[count] = (semantic_hash(token.bytes).unwrap_or(0), 0);
+        named[count] = token_is_entity_like(token.bytes);
         count += 1;
     }
 
@@ -500,6 +509,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         }
         // Nearest content word before, not crossing a sentence boundary.
         let mut actor = 0u64;
+        let mut actor_named = false;
         let mut back = index;
         while back > 0 && index - back < ROLE_WINDOW {
             if boundary[back] {
@@ -508,11 +518,13 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
             back -= 1;
             if tokens[back].0 != 0 && raw[back].is_none() {
                 actor = tokens[back].0;
+                actor_named = named[back];
                 break;
             }
         }
         // Nearest content word after, same constraints.
         let mut target = 0u64;
+        let mut target_named = false;
         let mut passive = false;
         let mut forward = index + 1;
         while forward < count && forward - index < ROLE_WINDOW {
@@ -524,6 +536,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
             }
             if tokens[forward].0 != 0 && raw[forward].is_none() {
                 target = tokens[forward].0;
+                target_named = named[forward];
                 break;
             }
             forward += 1;
@@ -540,10 +553,17 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         } else {
             (actor, target)
         };
+        let (actor_named, target_named) = if exchange {
+            (target_named, actor_named)
+        } else {
+            (actor_named, target_named)
+        };
         out[len] = RolePair {
             relation: relation.dimension as u64,
             actor,
             target,
+            actor_named,
+            target_named,
         };
         len += 1;
     }
@@ -587,6 +607,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         };
         // Object of the genitive: nearest content word after the connector.
         let mut target = 0u64;
+        let mut target_named = false;
         let mut target_at = connector;
         for ahead in connector + 1..count {
             if boundary[ahead] || ahead - connector > ROLE_WINDOW {
@@ -594,6 +615,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
             }
             if tokens[ahead].0 != 0 && raw[ahead].is_none() && !copula[ahead] {
                 target = tokens[ahead].0;
+                target_named = named[ahead];
                 target_at = ahead;
                 break;
             }
@@ -603,6 +625,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         }
         // Subject before the head noun, skipping articles and copulas.
         let mut actor = 0u64;
+        let mut actor_named = false;
         let mut back = index;
         while back > 0 && index - back < ROLE_WINDOW {
             if boundary[back] {
@@ -611,6 +634,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
             back -= 1;
             if tokens[back].0 != 0 && raw[back].is_none() && !copula[back] && !genitive[back] {
                 actor = tokens[back].0;
+                actor_named = named[back];
                 break;
             }
         }
@@ -628,6 +652,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
                 }
                 if seen_copula && tokens[ahead].0 != 0 && raw[ahead].is_none() {
                     actor = tokens[ahead].0;
+                    actor_named = named[ahead];
                     break;
                 }
             }
@@ -639,6 +664,8 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
             relation: tokens[index].0,
             actor,
             target,
+            actor_named,
+            target_named,
         };
         len += 1;
     }
@@ -665,6 +692,8 @@ fn role_binding_recombined(ground_truth: &str, answer: &str) -> bool {
         relation: 0,
         actor: 0,
         target: 0,
+        actor_named: false,
+        target_named: false,
     };
     let mut expected = [blank; MAX_ROLE_PAIRS];
     let mut observed = [blank; MAX_ROLE_PAIRS];
@@ -759,6 +788,8 @@ fn role_binding_reversed(ground_truth: &str, answer: &str) -> bool {
         relation: 0,
         actor: 0,
         target: 0,
+        actor_named: false,
+        target_named: false,
     }; MAX_ROLE_PAIRS];
     let mut observed = expected;
     let expected_len = role_pairs(ground_truth, &mut expected);
@@ -3665,6 +3696,145 @@ fn cap_preserving_order(score: f32, ceiling: f32) -> f32 {
     }
 }
 
+const MAX_CLAUSES: usize = 8;
+
+/// True when `token` coordinates two clauses, so that what follows is a separate
+/// claim rather than a continuation of the current one.
+fn is_clause_coordinator(token: &[u8]) -> bool {
+    const VALUES: &[&[u8]] = &[
+        b"and",
+        b"but",
+        b"while",
+        b"whereas",
+        b"though",
+        b"although",
+        b"however",
+        b"yet",
+    ];
+    VALUES.iter().any(|value| token_eq(token, value))
+}
+
+/// Byte ranges of the clauses in `text`.
+///
+/// Splits on sentence punctuation, on commas, and before a coordinator, because a
+/// mixed answer joins its claims with exactly those. A clause is the unit a
+/// contradiction lives in: "Socrates taught Plato, and Plato taught Socrates."
+/// contradicts the ground truth in its second clause while its first clause states
+/// the truth verbatim.
+fn clause_ranges(text: &str, out: &mut [(usize, usize); MAX_CLAUSES]) -> usize {
+    let bytes = text.as_bytes();
+    let mut len = 0usize;
+    let mut start = 0usize;
+    let mut previous_end = 0usize;
+    for token in TokenIter::new(text) {
+        let token_start = token.end.saturating_sub(token.bytes.len());
+        let split_before = bytes.get(previous_end..token_start).is_some_and(|gap| {
+            gap.iter()
+                .any(|byte| matches!(byte, b',' | b';' | b'.' | b'!' | b'?' | b'\n'))
+        }) || is_clause_coordinator(token.bytes);
+        if split_before && token_start > start {
+            if len < MAX_CLAUSES {
+                out[len] = (start, previous_end.max(start));
+                len += 1;
+            }
+            start = token_start;
+        }
+        previous_end = token.end;
+    }
+    if len < MAX_CLAUSES && previous_end > start {
+        out[len] = (start, previous_end);
+        len += 1;
+    }
+    len
+}
+
+/// True when the answer asserts a binding that disagrees with one the ground truth
+/// states, sharing one argument and differing on the other.
+///
+/// Distinct from a reversal and from a recombination. Against "Paris is the capital of
+/// France.", the clause "Berlin is the capital of France." keeps the relation and the
+/// target and substitutes the actor. Nothing is reversed and the cast is not the
+/// truth's, so neither earlier check applies.
+fn role_binding_conflicts(ground_truth: &str, answer: &str) -> bool {
+    let blank = RolePair {
+        relation: 0,
+        actor: 0,
+        target: 0,
+        actor_named: false,
+        target_named: false,
+    };
+    let mut expected = [blank; MAX_ROLE_PAIRS];
+    let mut observed = [blank; MAX_ROLE_PAIRS];
+    let expected_len = role_pairs(ground_truth, &mut expected);
+    let observed_len = role_pairs(answer, &mut observed);
+    for truth_pair in &expected[..expected_len] {
+        for answer_pair in &observed[..observed_len] {
+            if answer_pair.relation != truth_pair.relation {
+                continue;
+            }
+            let same_actor = answer_pair.actor == truth_pair.actor;
+            let same_target = answer_pair.target == truth_pair.target;
+            if same_actor && same_target {
+                continue;
+            }
+            // One argument shared and the other replaced. Both the replaced argument
+            // and the truth's original must be named things: swapping Berlin for Paris
+            // is a substitution, whereas "mountain" becoming "peak" is a paraphrase,
+            // and treating those alike put 14 of 375 generated pairs into inversion.
+            if same_actor && answer_pair.target_named && truth_pair.target_named {
+                return true;
+            }
+            if same_target && answer_pair.actor_named && truth_pair.actor_named {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// True when any single clause of the answer contradicts the ground truth.
+///
+/// The whole-answer checks are defeated by a mixed answer, and defeated in two
+/// different ways. `role_binding_reversed` returns early the moment it finds any
+/// binding that agrees, so a correct first clause vouches for a reversed second one:
+/// "Socrates taught Plato, and Plato taught Socrates." scored 0.8500. `asserted_trend`
+/// deliberately falls silent when a text asserts both directions, which is right for a
+/// ground truth describing two quantities but wrong for an answer that asserts a
+/// direction and then its opposite: "Bond prices usually rise, and bond prices usually
+/// fall." also scored above its honest counterpart.
+///
+/// Evaluating clause by clause fixes both, because a contradiction is a property of a
+/// claim and each clause is one claim.
+fn any_clause_contradicts(ground_truth: &str, answer: &str) -> bool {
+    let mut clauses = [(0usize, 0usize); MAX_CLAUSES];
+    let count = clause_ranges(answer, &mut clauses);
+    if count < 2 {
+        // A single clause is already covered by the whole-answer checks, and running
+        // them again here would only duplicate their penalty.
+        return false;
+    }
+    let truth_trend = asserted_trend(ground_truth);
+    for &(start, end) in &clauses[..count] {
+        let Some(clause) = answer.get(start..end) else {
+            continue;
+        };
+        if clause.trim().is_empty() {
+            continue;
+        }
+        if role_binding_reversed(ground_truth, clause)
+            || role_binding_conflicts(ground_truth, clause)
+        {
+            return true;
+        }
+        if let (Some(expected), Some(actual)) = (truth_trend, asserted_trend(clause))
+            && expected != actual
+        {
+            return true;
+        }
+    }
+    false
+}
+
 pub(crate) fn evaluate(
     question: &str,
     ground_truth_raw: &str,
@@ -3914,6 +4084,12 @@ pub(crate) fn evaluate(
     {
         issues |= ISSUE_TREND_CONTRADICTION;
         score = cap_preserving_order(score, 0.30);
+    }
+    // A contradiction inside one clause of a multi-clause answer, which the
+    // whole-answer checks above cannot see because a correct clause masks it.
+    if any_clause_contradicts(ground_truth, answer) {
+        issues |= ISSUE_CLAUSE_CONTRADICTION;
+        score = cap_preserving_order(score, 0.40);
     }
     if role_binding_recombined(ground_truth, answer) {
         issues |= ISSUE_ROLE_BINDING_RECOMBINED;

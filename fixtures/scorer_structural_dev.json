@@ -1,6 +1,6 @@
 {
   "schema": "oathcast_scorer_structural_dev_v1",
-  "role": "DEVELOPMENT corpus, not held out. Written to develop against the four structural categories Codex declared for the blind evaluation: relation direction, coordinated swaps, parenthetical binding, and mixed correct/false answers. Knowing the categories is legitimate; the cases in the blind set are unknown here and must stay so.",
+  "role": "DEVELOPMENT corpus, not held out. Written to develop against the four structural categories Codex declared for the blind evaluation: relation direction, coordinated swaps, parenthetical binding, and mixed correct/false answers. Knowing the categories is legitimate; the cases in the blind set are unknown here and must stay so. Four mixed_truth_decidable rows were added on 2026-08-21 after measuring that the original four mixed_truth rows are decidable only from distributional world knowledge: MiniLM scored 3 of 4 and the salience champion 2 of 4 on them while this module scored 1 of 4, and every margin was under 0.10. Those rows are kept because they measure a real limit, but they do not test clause structure. These four do: in each, one clause is verbatim correct and another contradicts the ground truth itself, so no world knowledge is required.",
   "pools": [
     {
       "pool_id": "relation_direction__wolves",
@@ -302,6 +302,82 @@
         {
           "label": "bad",
           "answer": "Portuguese, which is also spoken in Japan.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth_decidable__contradicting_clause_capital",
+      "shape": "mixed_truth_decidable",
+      "question": "What is the capital of France?",
+      "ground_truth": "Paris is the capital of France.",
+      "why_bad_is_wrong": "The second clause asserts a different capital for the same country, contradicting the ground truth directly. The first clause is verbatim correct, so whole-answer overlap hides it.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Paris is the capital of France, and it sits on the Seine.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Paris is the capital of France, and Berlin is the capital of France.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth_decidable__contradicting_clause_author",
+      "shape": "mixed_truth_decidable",
+      "question": "Who wrote Hamlet?",
+      "ground_truth": "Hamlet was written by Shakespeare.",
+      "why_bad_is_wrong": "The second clause reassigns the same work to a different author, contradicting the truth. The first clause is verbatim correct.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Hamlet was written by Shakespeare, and it is a tragedy.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Hamlet was written by Shakespeare, and Hamlet was written by Marlowe.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth_decidable__contradicting_clause_trend",
+      "shape": "mixed_truth_decidable",
+      "question": "What happens to bond prices when rates are cut?",
+      "ground_truth": "Bond prices usually rise.",
+      "why_bad_is_wrong": "The second clause asserts the opposite direction from the truth. The first is verbatim correct, so the answer overlaps the truth perfectly.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Bond prices usually rise, and yields move the other way.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Bond prices usually rise, and bond prices usually fall.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "mixed_truth_decidable__contradicting_clause_direction",
+      "shape": "mixed_truth_decidable",
+      "question": "Who taught whom, Socrates or Plato?",
+      "ground_truth": "Socrates taught Plato.",
+      "why_bad_is_wrong": "The second clause reverses the teaching relation the truth states. The first clause states it correctly.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Socrates taught Plato, and Plato later founded the Academy.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Socrates taught Plato, and Plato taught Socrates.",
           "correct": false
         }
       ]
