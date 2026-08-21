@@ -100,9 +100,9 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   zero historical rows, so it did not observe that Spearman gate.
 
   The current artifact is instead 45,747 bytes, SHA-256
-  `9df0c84d736126189afc7fce869e6e212d8260ec7098bbf72408d573faececea`,
+  `d6f8e1dd67dc1afc83df1f2bc47a479bc51668011377a801b64045195b8e8f35`,
   and raw-byte Keccak-256
-  `0x9916d167b641b45badcf26cfe1f8060f17c03373b49a46141d5af762eec5905f`.
+  `0x50d48d16cc4b84a89ba562d7dc8f9aca4306d0bb2ff35578de1a17576c738acb`.
   Its fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. Rust tests pass `40/40`, the

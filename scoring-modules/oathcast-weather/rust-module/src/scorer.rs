@@ -29,6 +29,7 @@ pub(crate) const ISSUE_MISSING_BINARY_ANSWER: u32 = 1 << 11;
 pub(crate) const ISSUE_CONTRADICTORY_FACT_ANCHOR: u32 = 1 << 12;
 pub(crate) const ISSUE_AMBIGUOUS_FACT_ANCHORS: u32 = 1 << 13;
 pub(crate) const ISSUE_RANK_MODIFIER_CONFLICT: u32 = 1 << 14;
+pub(crate) const ISSUE_ROLE_BINDING_REVERSED: u32 = 1 << 15;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -305,6 +306,277 @@ fn salience_weighted_f1(ground_truth: &str, answer: &str) -> Option<f32> {
     } else {
         Some((2.0 * precision * recall) / (precision + recall))
     }
+}
+
+const MAX_ROLE_PAIRS: usize = 16;
+const ROLE_WINDOW: usize = 6;
+
+/// A relation that binds two entities in a fixed order, plus whether this
+/// particular wording states it inverted.
+///
+/// Dimension ids keep antonyms comparable while keeping unrelated comparisons
+/// apart: "taller" and "shorter" are the same dimension with opposite sign, so
+/// "Everest is taller than K2" and "K2 is shorter than Everest" state one fact, and
+/// a scorer that reads only token order would call the second a contradiction. But
+/// "longest" and "deepest" are different dimensions, so they are deliberately NOT
+/// comparable, which stops this machinery from silently accepting a swapped
+/// predicate as a paraphrase.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RoleRelation {
+    dimension: u8,
+    inverted: bool,
+}
+
+const DIM_HEIGHT: u8 = 1;
+const DIM_SIZE: u8 = 2;
+const DIM_SPEED: u8 = 3;
+const DIM_LENGTH: u8 = 4;
+const DIM_DEPTH: u8 = 5;
+const DIM_AGE: u8 = 6;
+const DIM_TEMPERATURE: u8 = 7;
+const DIM_AMOUNT: u8 = 8;
+const DIM_TIME: u8 = 9;
+const DIM_TEACH: u8 = 10;
+const DIM_PREY: u8 = 11;
+const DIM_CAUSE: u8 = 12;
+const DIM_FLOW: u8 = 13;
+const DIM_AUTHORSHIP: u8 = 14;
+const DIM_CONVERT: u8 = 15;
+const DIM_PROVIDE: u8 = 16;
+
+/// Maps a token to the relation it expresses, if any.
+fn role_relation(token: &[u8]) -> Option<RoleRelation> {
+    const TABLE: &[(&[u8], u8, bool)] = &[
+        (b"taller", DIM_HEIGHT, false),
+        (b"tallest", DIM_HEIGHT, false),
+        (b"higher", DIM_HEIGHT, false),
+        (b"highest", DIM_HEIGHT, false),
+        (b"shorter", DIM_HEIGHT, true),
+        (b"lower", DIM_HEIGHT, true),
+        (b"lowest", DIM_HEIGHT, true),
+        (b"larger", DIM_SIZE, false),
+        (b"largest", DIM_SIZE, false),
+        (b"bigger", DIM_SIZE, false),
+        (b"biggest", DIM_SIZE, false),
+        (b"smaller", DIM_SIZE, true),
+        (b"smallest", DIM_SIZE, true),
+        (b"faster", DIM_SPEED, false),
+        (b"fastest", DIM_SPEED, false),
+        (b"slower", DIM_SPEED, true),
+        (b"slowest", DIM_SPEED, true),
+        (b"longer", DIM_LENGTH, false),
+        (b"longest", DIM_LENGTH, false),
+        (b"deeper", DIM_DEPTH, false),
+        (b"deepest", DIM_DEPTH, false),
+        (b"shallower", DIM_DEPTH, true),
+        (b"older", DIM_AGE, false),
+        (b"oldest", DIM_AGE, false),
+        (b"younger", DIM_AGE, true),
+        (b"youngest", DIM_AGE, true),
+        (b"hotter", DIM_TEMPERATURE, false),
+        (b"warmer", DIM_TEMPERATURE, false),
+        (b"colder", DIM_TEMPERATURE, true),
+        (b"cooler", DIM_TEMPERATURE, true),
+        (b"more", DIM_AMOUNT, false),
+        (b"less", DIM_AMOUNT, true),
+        (b"fewer", DIM_AMOUNT, true),
+        (b"before", DIM_TIME, false),
+        (b"predates", DIM_TIME, false),
+        (b"earlier", DIM_TIME, false),
+        (b"after", DIM_TIME, true),
+        (b"later", DIM_TIME, true),
+        (b"taught", DIM_TEACH, false),
+        (b"teaches", DIM_TEACH, false),
+        (b"teach", DIM_TEACH, false),
+        (b"preys", DIM_PREY, false),
+        (b"prey", DIM_PREY, false),
+        (b"preyed", DIM_PREY, false),
+        (b"eats", DIM_PREY, false),
+        (b"causes", DIM_CAUSE, false),
+        (b"cause", DIM_CAUSE, false),
+        (b"caused", DIM_CAUSE, false),
+        (b"raises", DIM_CAUSE, false),
+        (b"flows", DIM_FLOW, false),
+        (b"flow", DIM_FLOW, false),
+        (b"empties", DIM_FLOW, false),
+        (b"receives", DIM_FLOW, true),
+        (b"wrote", DIM_AUTHORSHIP, false),
+        (b"writes", DIM_AUTHORSHIP, false),
+        (b"written", DIM_AUTHORSHIP, false),
+        (b"authored", DIM_AUTHORSHIP, false),
+        (b"converts", DIM_CONVERT, false),
+        (b"convert", DIM_CONVERT, false),
+        (b"becomes", DIM_CONVERT, false),
+        (b"become", DIM_CONVERT, false),
+        (b"provides", DIM_PROVIDE, false),
+        (b"provide", DIM_PROVIDE, false),
+    ];
+    TABLE.iter().find_map(|(word, dimension, inverted)| {
+        token_eq(token, word).then_some(RoleRelation {
+            dimension: *dimension,
+            inverted: *inverted,
+        })
+    })
+}
+
+/// True when `token` is a form of "to be", which together with a following "by"
+/// marks the passive voice.
+fn is_copula(token: &[u8]) -> bool {
+    const VALUES: &[&[u8]] = &[b"is", b"are", b"was", b"were", b"been", b"being"];
+    VALUES.iter().any(|value| token_eq(token, value))
+}
+
+/// An ordered binding: this relation holds from `actor` to `target`.
+#[derive(Clone, Copy)]
+struct RolePair {
+    dimension: u8,
+    actor: u64,
+    target: u64,
+}
+
+/// Extracts ordered role bindings from `text`.
+///
+/// For each relation token, the nearest content word before it becomes the actor
+/// and the nearest content word after it becomes the target, within a bounded
+/// window and never across a sentence boundary. Two normalisations make the
+/// bindings comparable across wordings:
+///
+///   voice    "B was taught by A" is passive, marked by a copula before the
+///            relation and "by" after it, so its roles are exchanged to (A, B).
+///   antonym  a relation flagged inverted, such as "shorter" against "taller",
+///            exchanges its roles too, so "K2 is shorter than Everest" yields the
+///            same binding as "Everest is taller than K2".
+///
+/// The result is that a genuine paraphrase produces the binding the ground truth
+/// produces, and only a real role exchange differs.
+fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
+    let mut tokens: [(u64, usize); MAX_TRACKED_TOKENS] = [(0, 0); MAX_TRACKED_TOKENS];
+    let mut raw: [Option<RoleRelation>; MAX_TRACKED_TOKENS] = [None; MAX_TRACKED_TOKENS];
+    let mut copula: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
+    let mut by_marker: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
+    let mut boundary: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
+    let mut count = 0usize;
+    let mut previous_end = 0usize;
+
+    for token in TokenIter::new(text) {
+        if count == MAX_TRACKED_TOKENS {
+            break;
+        }
+        let start = token.end.saturating_sub(token.bytes.len());
+        boundary[count] = has_strong_clause_boundary(text, previous_end, start);
+        previous_end = token.end;
+        raw[count] = role_relation(token.bytes);
+        copula[count] = is_copula(token.bytes);
+        by_marker[count] = token_eq(token.bytes, b"by");
+        tokens[count] = (semantic_hash(token.bytes).unwrap_or(0), 0);
+        count += 1;
+    }
+
+    let mut len = 0usize;
+    for index in 0..count {
+        let Some(relation) = raw[index] else {
+            continue;
+        };
+        if len == MAX_ROLE_PAIRS {
+            break;
+        }
+        // Nearest content word before, not crossing a sentence boundary.
+        let mut actor = 0u64;
+        let mut back = index;
+        while back > 0 && index - back < ROLE_WINDOW {
+            if boundary[back] {
+                break;
+            }
+            back -= 1;
+            if tokens[back].0 != 0 && raw[back].is_none() {
+                actor = tokens[back].0;
+                break;
+            }
+        }
+        // Nearest content word after, same constraints.
+        let mut target = 0u64;
+        let mut passive = false;
+        let mut forward = index + 1;
+        while forward < count && forward - index < ROLE_WINDOW {
+            if boundary[forward] {
+                break;
+            }
+            if by_marker[forward] {
+                passive = true;
+            }
+            if tokens[forward].0 != 0 && raw[forward].is_none() {
+                target = tokens[forward].0;
+                break;
+            }
+            forward += 1;
+        }
+        if actor == 0 || target == 0 || actor == target {
+            continue;
+        }
+        // Passive voice needs a copula somewhere in the preceding window as well as
+        // the "by", or "written by" in an active clause would read as inverted.
+        let copula_before = (index.saturating_sub(ROLE_WINDOW)..index).any(|i| copula[i]);
+        let exchange = relation.inverted || (passive && copula_before);
+        let (actor, target) = if exchange {
+            (target, actor)
+        } else {
+            (actor, target)
+        };
+        out[len] = RolePair {
+            dimension: relation.dimension,
+            actor,
+            target,
+        };
+        len += 1;
+    }
+    len
+}
+
+/// True when the answer states a relation the ground truth also states, but with
+/// the two entities exchanged.
+///
+/// This is the one thing a bag-of-tokens signal cannot see. The third-party
+/// word-order-swap attack scored exactly 0.8500 for both the honest answer and the
+/// swapped one, because the token multiset is identical and every signal in this
+/// module was computed over that multiset.
+///
+/// Deliberately requires the same dimension and the same unordered entity pair, so
+/// it fires only on a genuine exchange and stays silent when the answer talks about
+/// something else.
+fn role_binding_reversed(ground_truth: &str, answer: &str) -> bool {
+    let mut expected = [RolePair {
+        dimension: 0,
+        actor: 0,
+        target: 0,
+    }; MAX_ROLE_PAIRS];
+    let mut observed = expected;
+    let expected_len = role_pairs(ground_truth, &mut expected);
+    let observed_len = role_pairs(answer, &mut observed);
+    if expected_len == 0 || observed_len == 0 {
+        return false;
+    }
+    for truth_pair in &expected[..expected_len] {
+        for answer_pair in &observed[..observed_len] {
+            if answer_pair.dimension != truth_pair.dimension {
+                continue;
+            }
+            // Same binding: the answer agrees, so nothing to report for this pair.
+            if answer_pair.actor == truth_pair.actor && answer_pair.target == truth_pair.target {
+                return false;
+            }
+        }
+    }
+    for truth_pair in &expected[..expected_len] {
+        for answer_pair in &observed[..observed_len] {
+            if answer_pair.dimension == truth_pair.dimension
+                && answer_pair.actor == truth_pair.target
+                && answer_pair.target == truth_pair.actor
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 fn decoded_json_content_eq(raw_content: &str, expected: &str) -> bool {
@@ -3268,6 +3540,32 @@ pub(crate) fn evaluate(
     if introduces_unsupported_rank_modifier(ground_truth, answer) {
         issues |= ISSUE_RANK_MODIFIER_CONFLICT;
         score = cap_preserving_order(score, 0.30);
+    }
+    // A reversed role binding is the strongest factual contradiction this module can
+    // detect, so it takes the tightest ceiling, and takes it as a compression rather
+    // than a zero for the reason registration 98 established: a zero can only remove
+    // a win that a cap might have kept.
+    //
+    // This is the only signal here that is not computed over a token multiset, which
+    // is why it is the only one that can see an argument exchange at all. The
+    // third-party word-order-swap attack scored exactly 0.8500 for both the honest
+    // and the swapped answer, because the multiset is unchanged.
+    if role_binding_reversed(ground_truth, answer) {
+        issues |= ISSUE_ROLE_BINDING_REVERSED;
+        // 0.40 rather than something tighter, and the reason is a frozen gate rather
+        // than taste. At 0.20 the reversed-relation candidate in the ranking pools
+        // fell from 0.478235 to 0.173912, below the unrelated candidate at 0.337500,
+        // which broke the pool's graded expectation that an on-topic reversal ranks
+        // above an off-topic answer and took pairwise accuracy from 100/106 to
+        // 99/106, under the 0.9400 floor.
+        //
+        // The tempting fix was to re-grade that pool. That would be tuning the
+        // evaluator to fit the code, which is the failure this whole split exists to
+        // prevent, so the ceiling moved instead. Whether a confidently reversed claim
+        // really should outrank an irrelevant one is a genuine question about grading
+        // and belongs to whoever authors the blind corpus, not to the author of the
+        // rule being graded.
+        score = cap_preserving_order(score, 0.40);
     }
     if let Some(expected_probability) = truth_probability {
         // Already continuous in the data when a probability is present, so the
