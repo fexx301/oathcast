@@ -31,6 +31,7 @@ pub(crate) const ISSUE_AMBIGUOUS_FACT_ANCHORS: u32 = 1 << 13;
 pub(crate) const ISSUE_RANK_MODIFIER_CONFLICT: u32 = 1 << 14;
 pub(crate) const ISSUE_ROLE_BINDING_REVERSED: u32 = 1 << 15;
 pub(crate) const ISSUE_TREND_CONTRADICTION: u32 = 1 << 16;
+pub(crate) const ISSUE_ROLE_BINDING_RECOMBINED: u32 = 1 << 17;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -344,6 +345,9 @@ const DIM_FLOW: u8 = 13;
 const DIM_AUTHORSHIP: u8 = 14;
 const DIM_CONVERT: u8 = 15;
 const DIM_PROVIDE: u8 = 16;
+const DIM_SPEAK: u8 = 17;
+const DIM_PUMP: u8 = 18;
+const DIM_EXCHANGE: u8 = 19;
 
 /// Maps a token to the relation it expresses, if any.
 fn role_relation(token: &[u8]) -> Option<RoleRelation> {
@@ -411,6 +415,13 @@ fn role_relation(token: &[u8]) -> Option<RoleRelation> {
         (b"become", DIM_CONVERT, false),
         (b"provides", DIM_PROVIDE, false),
         (b"provide", DIM_PROVIDE, false),
+        (b"speaks", DIM_SPEAK, false),
+        (b"speak", DIM_SPEAK, false),
+        (b"spoken", DIM_SPEAK, true),
+        (b"pumps", DIM_PUMP, false),
+        (b"pump", DIM_PUMP, false),
+        (b"exchange", DIM_EXCHANGE, false),
+        (b"exchanges", DIM_EXCHANGE, false),
     ];
     TABLE.iter().find_map(|(word, dimension, inverted)| {
         token_eq(token, word).then_some(RoleRelation {
@@ -632,6 +643,104 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         len += 1;
     }
     len
+}
+
+/// True when the answer uses the ground truth's own entities but pairs them up
+/// differently.
+///
+/// This is a distinct failure from a reversed binding and neither overlap nor
+/// reversal can see it. Against "The eyes provide sight and the ears provide
+/// hearing.", the answer "The eyes provide hearing and the ears provide sight."
+/// contains every entity the truth does, so overlap is unchanged, and no single pair
+/// is reversed either, since (eyes, hearing) is not (sight, eyes). What changed is
+/// the pairing across two clauses.
+///
+/// The test is deliberately strict: the same relation, the same set of actors, the
+/// same set of targets, and at least one pairing the truth does not contain. Anything
+/// less would fire on an answer that simply discusses different entities. Requiring
+/// two bindings on each side matters too, because with one binding matching sets
+/// would mean the pairing already matched.
+fn role_binding_recombined(ground_truth: &str, answer: &str) -> bool {
+    let blank = RolePair {
+        relation: 0,
+        actor: 0,
+        target: 0,
+    };
+    let mut expected = [blank; MAX_ROLE_PAIRS];
+    let mut observed = [blank; MAX_ROLE_PAIRS];
+    let expected_len = role_pairs(ground_truth, &mut expected);
+    let observed_len = role_pairs(answer, &mut observed);
+    if expected_len < 2 || observed_len < 2 {
+        return false;
+    }
+
+    // Consider each relation the two texts share.
+    for anchor in 0..expected_len {
+        let relation = expected[anchor].relation;
+        if expected[..anchor].iter().any(|p| p.relation == relation) {
+            continue; // already considered
+        }
+        let truth_count = expected[..expected_len]
+            .iter()
+            .filter(|p| p.relation == relation)
+            .count();
+        let answer_count = observed[..observed_len]
+            .iter()
+            .filter(|p| p.relation == relation)
+            .count();
+        if truth_count < 2 || truth_count != answer_count {
+            continue;
+        }
+        // Same actors and same targets, as sets.
+        let actors_match = expected[..expected_len]
+            .iter()
+            .filter(|p| p.relation == relation)
+            .all(|t| {
+                observed[..observed_len]
+                    .iter()
+                    .any(|o| o.relation == relation && o.actor == t.actor)
+            })
+            && observed[..observed_len]
+                .iter()
+                .filter(|p| p.relation == relation)
+                .all(|o| {
+                    expected[..expected_len]
+                        .iter()
+                        .any(|t| t.relation == relation && t.actor == o.actor)
+                });
+        let targets_match = expected[..expected_len]
+            .iter()
+            .filter(|p| p.relation == relation)
+            .all(|t| {
+                observed[..observed_len]
+                    .iter()
+                    .any(|o| o.relation == relation && o.target == t.target)
+            })
+            && observed[..observed_len]
+                .iter()
+                .filter(|p| p.relation == relation)
+                .all(|o| {
+                    expected[..expected_len]
+                        .iter()
+                        .any(|t| t.relation == relation && t.target == o.target)
+                });
+        if !actors_match || !targets_match {
+            continue;
+        }
+        // Same cast on both sides, so any pairing the truth lacks is a recombination.
+        let recombined = observed[..observed_len]
+            .iter()
+            .filter(|p| p.relation == relation)
+            .any(|o| {
+                !expected[..expected_len]
+                    .iter()
+                    .any(|t| t.relation == relation && t.actor == o.actor && t.target == o.target)
+            });
+        if recombined {
+            return true;
+        }
+    }
+    false
 }
 
 /// True when the answer states a relation the ground truth also states, but with
@@ -3805,6 +3914,10 @@ pub(crate) fn evaluate(
     {
         issues |= ISSUE_TREND_CONTRADICTION;
         score = cap_preserving_order(score, 0.30);
+    }
+    if role_binding_recombined(ground_truth, answer) {
+        issues |= ISSUE_ROLE_BINDING_RECOMBINED;
+        score = cap_preserving_order(score, 0.40);
     }
     if role_binding_reversed(ground_truth, answer) {
         issues |= ISSUE_ROLE_BINDING_REVERSED;

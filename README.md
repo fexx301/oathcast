@@ -307,7 +307,7 @@ and has not been re-run against the current candidate. See the
 [scoring-module README](scoring-modules/oathcast-weather/README.md) for the
 build commands and safeguards. The current frozen rank-only artifact is 45,747
 bytes with SHA-256
-`69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69` and
+`282f38040cb8e635374ef11f4d9f448487fd4fd2404894f4844d62706fe4c503` and
 raw-byte Keccak-256
 `0xd75c3f264a3dc553fa3508ca4e4fe23a25330c11aad5a1e0ba8f1f31fcad1c3d`.
 Its fixture SHA-256 is

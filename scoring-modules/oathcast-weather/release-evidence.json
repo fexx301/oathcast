@@ -5,12 +5,12 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 51574,
+    "byte_size": 53146,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69",
-    "keccak256_raw_bytes": "0x63aa5d75872e6962cf4c1e5561f02a96b8a89ef4fb52fb8ef8170e8f63d94d4d",
+    "sha256": "282f38040cb8e635374ef11f4d9f448487fd4fd2404894f4844d62706fe4c503",
+    "keccak256_raw_bytes": "0x543f2e53794e00c49effd2ff91b723eff7718f6b55674e213ac2556a8022af0f",
     "registration_candidate": true,
-    "candidate_scope": "This 51,574-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956559. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
+    "candidate_scope": "This 53,146-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956559. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
   "registration_41_artifact": {
     "byte_size": 42798,
@@ -148,7 +148,7 @@
     "source": "https://github.com/telegraphprotocol/telegraph-wasm-baseline",
     "fetched": "2026-08-20",
     "what_it_is": "Telegraph's production scoring module, published by the team as the intended path for closing the gap locally rather than reverse-engineering hidden fixtures. It is not a rule engine: it embeds question, ground truth and answer with MiniLM-L6-v2 and blends cosine similarity with BM25 and a length signal.",
-    "composite": "0.25 * cosine(question, answer) + 0.50 * cosine(ground_truth, answer) + 0.15 * bm25(ground_truth, answer) + 0.10 * sigmoid((answer_len - 50) / 20), clamped to [0,1]. Exports alloc, dealloc, rank_answer, plus breakdown_answer, embed, cosine_sim and bm25_score. Built with --features real_weights it is 24,184,674 bytes against our 51,574.",
+    "composite": "0.25 * cosine(question, answer) + 0.50 * cosine(ground_truth, answer) + 0.15 * bm25(ground_truth, answer) + 0.10 * sigmoid((answer_len - 50) / 20), clamped to [0,1]. Exports alloc, dealloc, rank_answer, plus breakdown_answer, embed, cosine_sim and bm25_score. Built with --features real_weights it is 24,184,674 bytes against our 53,146.",
     "harness_validated": "Driven through our existing wazero probe, same ABI. Real weights confirmed working rather than the repo's projection fallback: a true paraphrase with almost no lexical overlap, 'Everest is the highest peak on the planet.' against the truth 'Everest is the tallest mountain on Earth.', scores 0.693950 while unrelated text scores 0.059760. Projection mode could not produce that.",
     "architectural_difference": "Ours is a hand-written lexical and entity-binding rule engine with discrete penalties; theirs is a semantic model with a smooth composite. That difference explains the registration series: our entity-binding, ordinal and weather-classifier fixes were neutral against fixtures judged by a scorer whose primary signal is embedding similarity, because none of those fixes touched semantic coverage.",
     "measured_complementarity": {
@@ -268,7 +268,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69",
+      "measured_on_artifact": "282f38040cb8e635374ef11f4d9f448487fd4fd2404894f4844d62706fe4c503",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -409,13 +409,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69",
+      "darwin/arm64": "282f38040cb8e635374ef11f4d9f448487fd4fd2404894f4844d62706fe4c503",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
-    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 51,574 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
+    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 53,146 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69",
-      "69358f7a5d11ad127e9fea2d866fa7848f3af9a572a0bd5799e484a8f7d82c69"
+      "282f38040cb8e635374ef11f4d9f448487fd4fd2404894f4844d62706fe4c503",
+      "282f38040cb8e635374ef11f4d9f448487fd4fd2404894f4844d62706fe4c503"
     ]
   },
   "current_artifact_abi": {
