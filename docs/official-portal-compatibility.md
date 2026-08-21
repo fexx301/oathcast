@@ -99,16 +99,16 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   requirement against champion historical scores. Registration `19` evaluated
   zero historical rows, so it did not observe that Spearman gate.
 
-  The current artifact is instead 45,394 bytes, SHA-256
-  `9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36`,
+  The current artifact is instead 45,681 bytes, SHA-256
+  `d108532c673a3f94010b140333037af93e677ae54148d7f67c42fb2fd3ccef95`,
   and raw-byte Keccak-256
-  `0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21`.
+  `0x537bf9a7da427e292994ecce7f317e187996345a3a4503901b764ddadd9fbc5f`.
   Its fixture SHA-256 is
   `c96960e6a5e0d0d410686bcf9a2c0dece48ec130e19403322355f19ca4096b0f`.
   Two isolated clean builds are byte-identical. Rust tests pass `40/40`, the
   full Go/wazero suite passes, and Python discovery passes `498/498`. It passes
   88 synthetic factual pairs with minimum
-  margin `0.206250` and a synthetic ordinal Spearman proxy of `0.959566`;
+  margin `0.206250` and a synthetic ordinal Spearman proxy of `0.956604`;
   predicate-family identity, inverse
   learned-from and lost-to phrasing, parenthetical commas, coordinated relation
   swaps, mixed explicit reversals, partial multi-relation omissions, mixed
@@ -122,7 +122,7 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   `4c3e91ac887abf492cbc662a2d02e0b0bae906a176b2ae4b7bf986419a2db174` and
   raw-byte Keccak-256
   `0xd8b298ded6e50a69fd6cc79350a819536927d879c81250924689edbea98517f8`; the
-  45,394-byte artifact above has not been uploaded, hosted, or registered. The
+  45,681-byte artifact above has not been uploaded, hosted, or registered. The
   user manually hosted that exact 42,798-byte registration `41` build and registered
   it for `WEATHER_FORECAST` as registration `41` in Base Sepolia transaction
   `0x4bfdc7a894ca55edbb18c18cd5ee79b32673c8b3f5b8d04ab6bc5e48a458ccf8`.

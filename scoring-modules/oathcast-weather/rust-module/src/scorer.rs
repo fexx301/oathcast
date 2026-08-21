@@ -2367,6 +2367,14 @@ fn fact_entity_pairs(
 struct FactAnchorAssessment {
     support: f32,
     contradicted: bool,
+    /// The answer's entity pairing disagrees with the ground truth's, with a novel
+    /// entity introduced after a contrast word. Exposed separately from
+    /// `ambiguous_or_stuffed` because it means "you said someone else did it"
+    /// rather than "I cannot tell what you claimed", and the two deserve different
+    /// weight. It rode inside the ambiguity flag before, which gave a reassigned
+    /// relation exactly the same ceiling as vague phrasing and made the two
+    /// indistinguishable.
+    relation_mismatch: bool,
     ambiguous_or_stuffed: bool,
     /// True when neither an entity anchor nor a context constraint was found, so
     /// nothing here constrains which entity the answer bound. `support` can still
@@ -2698,6 +2706,7 @@ fn fact_anchor_assessment(
     Some(FactAnchorAssessment {
         support,
         contradicted,
+        relation_mismatch,
         no_binding_anchors: anchors.values.len == 0 && anchors.context_constraints.len == 0,
         ambiguous_or_stuffed: connector_ambiguity
             || relation_mismatch
@@ -2916,6 +2925,48 @@ fn factual_quality(
     }
 }
 
+/// Width of the band that flagged scores are compressed into, just below their
+/// ceiling. Larger keeps more resolution among flagged answers; smaller costs the
+/// unflagged range less.
+const CAP_BAND: f32 = 0.04;
+
+/// Applies a ceiling while preserving order on both sides of it.
+///
+/// Three shapes were measured here and the first two both failed:
+///
+///   `score.min(c)`  truncates. Every value above `c` collapses onto exactly `c`,
+///                   which is what made this module emit 30 distinct values across
+///                   80 scores where the incumbent emitted 75, and what produced a
+///                   string of exact ties between correct and wrong answers.
+///
+///   `score * c`     scales the whole range. Monotone, but it charges every answer
+///                   that trips a flag, and these flags have false positives: they
+///                   fire on correct answers too. Under truncation a false positive
+///                   was free whenever the score already sat below `c`; under
+///                   scaling it always costs. Measured, that took generated pairs
+///                   below the 0.15 margin floor from 9 of 375 to 56, and turned a
+///                   ranking-pool tie into an inversion.
+///
+///   this            compresses. `[0, c]` maps to `[0, c - CAP_BAND]` and `(c, 1]`
+///                   maps to `(c - CAP_BAND, c]`. Continuous, monotone across the
+///                   whole domain, never exceeds `c`, and charges an answer already
+///                   below the ceiling only the narrow band rather than a
+///                   proportional cut.
+fn cap_preserving_order(score: f32, ceiling: f32) -> f32 {
+    let band = CAP_BAND.min(ceiling * 0.5);
+    let knee = ceiling - band;
+    if score <= ceiling {
+        // Squeeze the unflagged-magnitude range into [0, knee]. At ceiling 0.49 and
+        // a 0.04 band this is a 92% factor, against the 49% a proportional cut
+        // would apply.
+        score * (knee / ceiling)
+    } else {
+        // Map (ceiling, 1] into (knee, ceiling], so two flagged answers of different
+        // quality stay distinguishable instead of both landing on the constant.
+        knee + band * ((score - ceiling) / (1.0 - ceiling))
+    }
+}
+
 pub(crate) fn evaluate(
     question: &str,
     ground_truth_raw: &str,
@@ -3074,26 +3125,65 @@ pub(crate) fn evaluate(
         });
 
     let mut score = (0.55 * effective_semantic) + (0.30 * factual) + (0.15 * concision);
+    // Defects scale the score into a band rather than truncating it to the band's
+    // ceiling. `score.min(c)` collapses every value above `c` onto exactly `c`;
+    // `score *= c` maps [0, 1] onto [0, c] monotonically. Both guarantee a flagged
+    // answer never exceeds `c`, but only the second preserves ordering among
+    // flagged answers, and ordering is the entire scored property.
+    //
+    // Measured against a third-party benchmark before this change, this module
+    // produced 30 distinct values across 80 scores where the incumbent champion
+    // produced 75. 0.3000 appeared eighteen times and 0.4900 six times, both clamp
+    // constants rather than judgements. That one property accounts for a string of
+    // separately-recorded failures: a correct and a wrong answer tying at exactly
+    // 0.490000, three misspelling pairs tying at 0.000000, an argument-order swap
+    // tying at 0.8500, and five rule fixes moving Telegraph's per-case count by
+    // zero because they only shuffled answers between the same few buckets.
+    //
+    // Discounts compose by multiplication, so two defects compound rather than the
+    // tighter ceiling simply winning. Deliberately no hard zero here: registration
+    // 98 lost three cases to two rules that zeroed instead of capped, and a zero can
+    // only ever remove a win that a discount might have kept.
     if fact_assessment.is_some_and(|assessment| assessment.ambiguous_or_stuffed) {
         issues |= ISSUE_AMBIGUOUS_FACT_ANCHORS;
-        score = score.min(0.49);
+        score = cap_preserving_order(score, 0.49);
+    }
+    // A reassigned relation takes a tighter ceiling than vague phrasing, and takes
+    // it as a compression rather than a zero.
+    //
+    // Both readings were measured. Against the truth "Hamlet was written by
+    // Shakespeare.", the vague-but-correct "It is Shakespeare that is associated
+    // with Hamlet." and the wrong "Shakespeare and Marlowe were contemporaries, but
+    // Hamlet was written by Marlowe." both trip ambiguity, so a single shared
+    // ceiling cannot order them; pre-ceiling the wrong one actually scored higher,
+    // 0.795000 against 0.781250, which truncation hid as a tie. Only
+    // relation_mismatch separates them.
+    //
+    // Registration 98 made this a hard zero and lost three of Telegraph's cases,
+    // because a zero can only ever remove a win that a cap might have kept. A
+    // second compression composes with the first instead: the wrong answer lands
+    // near 0.30 while the correct one stays near 0.49, so the pool orders without
+    // anything being driven to zero.
+    if fact_assessment.is_some_and(|assessment| assessment.relation_mismatch) {
+        score = cap_preserving_order(score, 0.30);
     }
     if is_binary_question(question)
         && matches!(truth_polarity, Polarity::Positive | Polarity::Negative)
         && answer_polarity == Polarity::Unknown
     {
         issues |= ISSUE_MISSING_BINARY_ANSWER;
-        score = score.min(0.49);
+        score = cap_preserving_order(score, 0.49);
     }
     if numeric_quality(ground_truth, answer) == Some(0.0) {
-        score = score.min(if has_conflicting_numeric_facts(ground_truth, answer) {
+        let ceiling = if has_conflicting_numeric_facts(ground_truth, answer) {
             0.30
         } else {
             0.49
-        });
+        };
+        score = cap_preserving_order(score, ceiling);
     }
     if numeric_binding_conflict(ground_truth, answer) {
-        score = score.min(0.49);
+        score = cap_preserving_order(score, 0.49);
     }
     // Clamped to the same ceiling as has_conflicting_numeric_facts, because a rank
     // the truth does not support is the same kind of factual conflict as a number
@@ -3103,15 +3193,19 @@ pub(crate) fn evaluate(
     // rank the claim below a faithful paraphrase without being fatal.
     if introduces_unsupported_rank_modifier(ground_truth, answer) {
         issues |= ISSUE_RANK_MODIFIER_CONFLICT;
-        score = score.min(0.30);
+        score = cap_preserving_order(score, 0.30);
     }
     if let Some(expected_probability) = truth_probability {
-        score = match answer_probability {
+        // Already continuous in the data when a probability is present, so the
+        // agreement term multiplies; a missing probability takes the same discount
+        // as the other defects.
+        let ceiling = match answer_probability {
             Some(actual_probability) => {
-                score.min((1.0 - (expected_probability - actual_probability).abs()).clamp(0.0, 1.0))
+                (1.0 - (expected_probability - actual_probability).abs()).clamp(0.0, 1.0)
             }
-            None => score.min(0.49),
+            None => 0.49,
         };
+        score = cap_preserving_order(score, ceiling);
     }
     if !score.is_finite() {
         score = 0.0;

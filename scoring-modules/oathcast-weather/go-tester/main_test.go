@@ -90,9 +90,9 @@ func TestArtifactContract(t *testing.T) {
 	if !evidence.Artifact.RegistrationCandidate {
 		t.Fatal("rank-only artifact must be marked as a registration candidate")
 	}
-	if evidence.Artifact.ByteSize != 45394 ||
-		evidence.Artifact.SHA256 != "9183cbdee1f48b932a93fbd64e34a79ae9ad28295e2440474a18ec19f9100b36" ||
-		evidence.Artifact.Keccak256RawBytes != "0x628e5023d45827d0cfbea55da59f921c94310ffd5af306a728e91be821759f21" {
+	if evidence.Artifact.ByteSize != 45681 ||
+		evidence.Artifact.SHA256 != "d108532c673a3f94010b140333037af93e677ae54148d7f67c42fb2fd3ccef95" ||
+		evidence.Artifact.Keccak256RawBytes != "0x537bf9a7da427e292994ecce7f317e187996345a3a4503901b764ddadd9fbc5f" {
 		t.Fatalf("unexpected local candidate evidence: %+v", evidence.Artifact)
 	}
 	if evidence.Fixture.Path != "fixtures/wasm_scoring_cases.json" {
@@ -309,7 +309,7 @@ func TestArtifactContract(t *testing.T) {
 		evidence.Verification.PythonRepositoryTestsPassed != 498 ||
 		evidence.Verification.SyntheticFactualPairCount != 88 ||
 		evidence.Verification.SyntheticFactualMinimumMargin != 0.20625 ||
-		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.959566 {
+		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.956604 {
 		t.Fatalf("unexpected local factual-paraphrase verification: %+v", evidence.Verification)
 	}
 	postflight := evidence.Verification.HistoricalFirstRegistrationPostflight
@@ -578,7 +578,7 @@ func TestArtifactContract(t *testing.T) {
 		)
 	}
 	// The artifact is deterministic per platform but not across platforms: the
-	// same pinned rustc and target emit 45,394 bytes with different content on
+	// same pinned rustc and target emit 45,681 bytes with different content on
 	// darwin/arm64 and linux/amd64. evidence.Artifact.SHA256 names the registered
 	// bytes, which are the darwin/arm64 build, so asserting it unconditionally
 	// could never pass on CI's linux/amd64 runner. Assert the digest recorded for
