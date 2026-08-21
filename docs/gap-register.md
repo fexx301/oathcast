@@ -176,7 +176,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   probability-scan fix in `percent_probability`, which previously abandoned the
   scan on the first `%` carrying no parseable number and so discarded a real
   percentage later in the same answer. Its SHA-256 is
-  `6ac84661941de657980a2a88fa70f7f97891647ca69bedd99ade25f03c0861c5`
+  `fc1d45dfb9cf0c98be07d97903e2d177bd21515a1fa657534a6e16b645152f7a`
   and raw-byte Keccak-256
   `0xd75c3f264a3dc553fa3508ca4e4fe23a25330c11aad5a1e0ba8f1f31fcad1c3d`.
   The fixture SHA-256 is

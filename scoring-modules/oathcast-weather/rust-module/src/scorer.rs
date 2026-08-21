@@ -429,7 +429,11 @@ fn is_copula(token: &[u8]) -> bool {
 /// An ordered binding: this relation holds from `actor` to `target`.
 #[derive(Clone, Copy)]
 struct RolePair {
-    dimension: u8,
+    /// Relation key. A table relation uses its dimension id; a genitive uses the
+    /// hash of its head noun, so "capital of" and "author of" are distinct
+    /// relations without needing either in a word list. Dimension ids are 1..=16
+    /// and a semantic hash colliding with one of those is a 16-in-2^64 event.
+    relation: u64,
     actor: u64,
     target: u64,
 }
@@ -454,6 +458,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
     let mut raw: [Option<RoleRelation>; MAX_TRACKED_TOKENS] = [None; MAX_TRACKED_TOKENS];
     let mut copula: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
     let mut by_marker: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
+    let mut genitive: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
     let mut boundary: [bool; MAX_TRACKED_TOKENS] = [false; MAX_TRACKED_TOKENS];
     let mut count = 0usize;
     let mut previous_end = 0usize;
@@ -468,6 +473,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
         raw[count] = role_relation(token.bytes);
         copula[count] = is_copula(token.bytes);
         by_marker[count] = token_eq(token.bytes, b"by");
+        genitive[count] = token_eq(token.bytes, b"of") || token_eq(token.bytes, b"in");
         tokens[count] = (semantic_hash(token.bytes).unwrap_or(0), 0);
         count += 1;
     }
@@ -523,7 +529,102 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
             (actor, target)
         };
         out[len] = RolePair {
-            dimension: relation.dimension,
+            relation: relation.dimension as u64,
+            actor,
+            target,
+        };
+        len += 1;
+    }
+
+    // Genitive relations: "X is the capital of Y" and "the capital of Y is X".
+    //
+    // This is the pattern behind the third-party word-order-swap attack, where
+    // "Paris is the capital of France." and "France is the capital of Paris." differ
+    // only in argument order and scored identically at 0.8500, because every other
+    // signal here reads a token multiset. The head noun is the relation, so no word
+    // list is needed and "capital of", "author of" and "source of" are all distinct
+    // relations.
+    //
+    // Both phrasings must yield the same binding or the honest answer would look like
+    // the attack. "Paris is the capital of France." finds its actor before the head
+    // noun. "The capital of France is Paris." has nothing but an article before it, so
+    // the actor is recovered from the complement after the copula that follows the
+    // genitive object. Both produce (Paris, capital, France); only a real exchange
+    // produces (France, capital, Paris).
+    for index in 0..count {
+        if len == MAX_ROLE_PAIRS {
+            break;
+        }
+        // A head noun: ordinary content, not itself a relation word.
+        if tokens[index].0 == 0 || raw[index].is_some() || copula[index] {
+            continue;
+        }
+        // Followed closely by a genitive connector.
+        let mut connector = None;
+        for ahead in index + 1..(index + 3).min(count) {
+            if boundary[ahead] {
+                break;
+            }
+            if genitive[ahead] {
+                connector = Some(ahead);
+                break;
+            }
+        }
+        let Some(connector) = connector else {
+            continue;
+        };
+        // Object of the genitive: nearest content word after the connector.
+        let mut target = 0u64;
+        let mut target_at = connector;
+        for ahead in connector + 1..count {
+            if boundary[ahead] || ahead - connector > ROLE_WINDOW {
+                break;
+            }
+            if tokens[ahead].0 != 0 && raw[ahead].is_none() && !copula[ahead] {
+                target = tokens[ahead].0;
+                target_at = ahead;
+                break;
+            }
+        }
+        if target == 0 {
+            continue;
+        }
+        // Subject before the head noun, skipping articles and copulas.
+        let mut actor = 0u64;
+        let mut back = index;
+        while back > 0 && index - back < ROLE_WINDOW {
+            if boundary[back] {
+                break;
+            }
+            back -= 1;
+            if tokens[back].0 != 0 && raw[back].is_none() && !copula[back] && !genitive[back] {
+                actor = tokens[back].0;
+                break;
+            }
+        }
+        if actor == 0 {
+            // Fronted genitive: recover the subject from the complement, which is the
+            // first content word after a copula following the genitive object.
+            let mut seen_copula = false;
+            for ahead in target_at + 1..count {
+                if boundary[ahead] {
+                    break;
+                }
+                if copula[ahead] {
+                    seen_copula = true;
+                    continue;
+                }
+                if seen_copula && tokens[ahead].0 != 0 && raw[ahead].is_none() {
+                    actor = tokens[ahead].0;
+                    break;
+                }
+            }
+        }
+        if actor == 0 || actor == target || actor == tokens[index].0 {
+            continue;
+        }
+        out[len] = RolePair {
+            relation: tokens[index].0,
             actor,
             target,
         };
@@ -545,7 +646,7 @@ fn role_pairs(text: &str, out: &mut [RolePair; MAX_ROLE_PAIRS]) -> usize {
 /// something else.
 fn role_binding_reversed(ground_truth: &str, answer: &str) -> bool {
     let mut expected = [RolePair {
-        dimension: 0,
+        relation: 0,
         actor: 0,
         target: 0,
     }; MAX_ROLE_PAIRS];
@@ -557,7 +658,7 @@ fn role_binding_reversed(ground_truth: &str, answer: &str) -> bool {
     }
     for truth_pair in &expected[..expected_len] {
         for answer_pair in &observed[..observed_len] {
-            if answer_pair.dimension != truth_pair.dimension {
+            if answer_pair.relation != truth_pair.relation {
                 continue;
             }
             // Same binding: the answer agrees, so nothing to report for this pair.
@@ -568,7 +669,7 @@ fn role_binding_reversed(ground_truth: &str, answer: &str) -> bool {
     }
     for truth_pair in &expected[..expected_len] {
         for answer_pair in &observed[..observed_len] {
-            if answer_pair.dimension == truth_pair.dimension
+            if answer_pair.relation == truth_pair.relation
                 && answer_pair.actor == truth_pair.target
                 && answer_pair.target == truth_pair.actor
             {
