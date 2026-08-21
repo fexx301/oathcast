@@ -2796,6 +2796,11 @@ fn fact_anchor_assessment(
     let mut max_anchor_repeats = 0u8;
     let mut negation_scope = 0u8;
     let mut post_anchor_negation_scope = 0u8;
+    // A negation whose target is not yet known. 0 none, 1 would open the post-anchor
+    // scope, 2 the plain scope. Resolved on the next token, because what a negation
+    // governs is what decides whether it denies the ground truth or merely rejects an
+    // alternative candidate.
+    let mut pending_negation = 0u8;
     let mut pre_anchor_refutation_scope = 0u8;
     let mut prior_anchor_refutation_scope = 0u8;
     let mut last_anchor_age = u8::MAX;
@@ -2870,18 +2875,26 @@ fn fact_anchor_assessment(
             continue;
         }
         if is_fact_negation(answer, token) {
-            if last_anchor_age <= 3 {
-                post_anchor_negation_scope = 6;
-            } else {
-                negation_scope = 6;
-            }
+            // Deferred rather than opened here. A negation scoped to everything that
+            // follows reads "Paris (not Berlin) is the capital of France." as a denial:
+            // the scope survives past Berlin, reaches the question token "capital", and
+            // fires a contradiction that scores a correct answer 0.000000. Both that
+            // answer and "Berlin (not Paris) is the capital of France." scored zero, so
+            // the pool could not be ordered at all.
+            //
+            // What a negation governs decides its meaning. "not Berlin", naming an
+            // entity absent from both question and ground truth, rejects an
+            // alternative, which is what a careful correct answer does. "not Paris",
+            // naming the anchor, denies the truth. The next token settles which.
+            pending_negation = if last_anchor_age <= 3 { 1 } else { 2 };
             last_anchor_age = last_anchor_age.saturating_add(1);
             last_entity_age = last_entity_age.saturating_add(1);
             continue;
         }
         if is_fact_refutation(token.bytes) {
-            if negation_scope > 0 || post_anchor_negation_scope > 0 {
+            if negation_scope > 0 || post_anchor_negation_scope > 0 || pending_negation != 0 {
                 negation_scope = 0;
+                pending_negation = 0;
                 pre_anchor_refutation_scope = 0;
             } else if last_anchor_age <= 3 || prior_anchor_refutation_scope > 0 {
                 contradicted = true;
@@ -2896,6 +2909,26 @@ fn fact_anchor_assessment(
         }
 
         let hash = semantic_hash(token.bytes);
+        if pending_negation != 0 {
+            // Entity-like and named by neither the question nor the ground truth: the
+            // negation rejects a candidate rather than denying the answer, so no scope
+            // opens and nothing downstream reads it as a contradiction.
+            let governs_rejected_alternative = hash.is_some_and(|value| {
+                token_is_entity_like(token.bytes)
+                    && !anchors.values.contains(value)
+                    && !question_tokens.contains(value)
+                    && !truth_tokens.contains(value)
+                    && !is_fact_relation_or_filler(token.bytes)
+            });
+            if !governs_rejected_alternative {
+                if pending_negation == 1 {
+                    post_anchor_negation_scope = 6;
+                } else {
+                    negation_scope = 6;
+                }
+            }
+            pending_negation = 0;
+        }
         if post_anchor_negation_scope > 0
             && (is_fact_relation_token(token.bytes)
                 || hash.is_some_and(|value| question_tokens.contains(value)))
