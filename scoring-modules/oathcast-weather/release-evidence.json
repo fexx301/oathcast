@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 55089,
+    "byte_size": 56083,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
-    "keccak256_raw_bytes": "0x4c702e7e8c7d86dbfdf85403b2f0c647e8f7f9e6656dbc24a2213fd81a8f91d7",
+    "sha256": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
+    "keccak256_raw_bytes": "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956559. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -29,7 +29,10 @@
     "keccak256_raw_bytes": "0xea169bc97fc43c3de086d26765714a28c909d29a6d79181f93d2f9e236776ab8",
     "pinata_gateway_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
     "dropbox_url": "https://www.dropbox.com/scl/fi/27orv68frtedmkqq1t9wt/oathcast_weather_scorer.wasm?rlkey=9mrm44geuaejp1629zdntfng3&st=sigr9vji&dl=1",
-    "registration_ids": [7, 19],
+    "registration_ids": [
+      7,
+      19
+    ],
     "stage_2_registration_id": 19,
     "portal_hosted_bytes_verified": true,
     "portal_hosted_verification_method": "Portal client re-fetch of the gateway URL and matching raw-byte Keccak-256",
@@ -152,10 +155,30 @@
   },
   "overfitting_finding": {
     "series": [
-      {"registration_id": 19, "wins": "31/32", "candidate_margin": 0.31248063, "score_stddev": 0.26765382},
-      {"registration_id": 41, "wins": "31/32", "candidate_margin": 0.37852418, "score_stddev": 0.29563302},
-      {"registration_id": 96, "wins": "31/32", "candidate_margin": 0.37149292, "score_stddev": 0.29768366},
-      {"registration_id": 98, "wins": "28/32", "candidate_margin": 0.36663616, "score_stddev": 0.33863735}
+      {
+        "registration_id": 19,
+        "wins": "31/32",
+        "candidate_margin": 0.31248063,
+        "score_stddev": 0.26765382
+      },
+      {
+        "registration_id": 41,
+        "wins": "31/32",
+        "candidate_margin": 0.37852418,
+        "score_stddev": 0.29563302
+      },
+      {
+        "registration_id": 96,
+        "wins": "31/32",
+        "candidate_margin": 0.37149292,
+        "score_stddev": 0.29768366
+      },
+      {
+        "registration_id": 98,
+        "wins": "28/32",
+        "candidate_margin": 0.36663616,
+        "score_stddev": 0.33863735
+      }
     ],
     "what_the_series_shows": "Local ranking quality improved monotonically across these builds while the external measure went neutral, neutral, then down. Generated-pair inversions fell from 66 of 375 to 9 of 375 and all ten handwritten pools went from 7 separated with 1 tie and 2 inversions to 10 separated with none, and across the same span Telegraph's per-case win count went 31, 31, 31, 28. The entity-binding, ordinal and weather-classifier fixes were neutral against their fixtures. The two changes in registration 98 were actively harmful.",
     "leading_mechanism": "Both changes made after 96 convert a signal that previously capped a score into one that zeroes it: relation_mismatch was promoted from ambiguous_or_stuffed, which applies score.min(0.49), to contradicted, which returns zero, and question_entity_slot_substituted returns zero as well. A correct answer that trips either rule falls from a capped score that could still beat its paired wrong answer to zero, which loses the case. The score standard deviation rising from 0.29768366 to 0.33863735 is consistent with more answers being driven to zero.",
@@ -167,9 +190,24 @@
   "cross_registration_finding": {
     "observation": "Three structurally different scorer builds produced an identical 31 of 32 per-case ordering result against a champion that wins 32 of 32.",
     "series": [
-      {"registration_id": 19, "candidate_margin": 0.31248063, "candidate_wins": 31, "score_stddev": 0.26765382},
-      {"registration_id": 41, "candidate_margin": 0.37852418, "candidate_wins": 31, "score_stddev": 0.29563302},
-      {"registration_id": 96, "candidate_margin": 0.37149292, "candidate_wins": 31, "score_stddev": 0.29768366}
+      {
+        "registration_id": 19,
+        "candidate_margin": 0.31248063,
+        "candidate_wins": 31,
+        "score_stddev": 0.26765382
+      },
+      {
+        "registration_id": 41,
+        "candidate_margin": 0.37852418,
+        "candidate_wins": 31,
+        "score_stddev": 0.29563302
+      },
+      {
+        "registration_id": 96,
+        "candidate_margin": 0.37149292,
+        "candidate_wins": 31,
+        "score_stddev": 0.29768366
+      }
     ],
     "why_it_is_informative": "Registration 96 changed scoring behaviour substantially against 41: whole answer classes moved from 0.862500 to 0.000000 through question_entity_substituted, an inserted-ordinal penalty was added, and a weather-classifier over-trigger that was applying a probability ceiling to correct general-knowledge answers was removed. Local generated inversions fell from 66 of 375 to 9 of 375. None of that moved the per-case win count. The aggregate margin moved in both directions across the series while the win count never did, which is evidence that the single failing case is not an instance of any inversion class fixed so far.",
     "leading_hypothesis": "The failing case is a tie rather than an inversion. Telegraph's wording is that the scorer must rank the good answer *above* the bad one, so an equal score is not a win. The scorer applies hard ceilings via score.min(0.49) and score.min(0.30), and a hard ceiling collapses every answer above it onto one value. Measured on the local ranking pools, the authorship_entity_swap pool ties a correct answer against a wrong one at exactly 0.490000, and four distinct candidates share that value. Clamps are structural and were never touched by any of the three builds, which fits an invariant single-case failure.",
@@ -275,7 +313,11 @@
       "pairwise_ordering_accuracy": 0.9434,
       "pairwise_ordered_pairs": "100/106",
       "engine_independent": true,
-      "measured_on": ["darwin/arm64", "linux/amd64", "linux/arm64"]
+      "measured_on": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ]
     },
     "fixed_ranking_defects": [
       "negation_polarity: 'Yes, K2 is the tallest mountain on Earth' (wrong) scored 0.862500 while 'Everest is indeed Earth's highest peak' (correct) scored 0.370000, a separation of -0.4925. The wrong answer now scores 0.000000 and the pool separates. See entity_binding_fix."
@@ -301,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
+      "measured_on_artifact": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -442,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
+      "darwin/arm64": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
-      "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8"
+      "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
+      "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1"
     ]
   },
   "current_artifact_abi": {
@@ -472,7 +514,11 @@
       "commit": "cfe6fbda517f09d3097790778d2b9cbaa4d8f272",
       "source_path": "scoring/build-a-scoring-module.md",
       "commit_timestamp": "2026-08-15T10:06:53+05:00",
-      "required_functions": ["alloc", "dealloc", "rank_answer"],
+      "required_functions": [
+        "alloc",
+        "dealloc",
+        "rank_answer"
+      ],
       "rank_answer_signature": "(i32, i32, i32, i32, i32, i32) -> f32",
       "breakdown_answer_status": "deprecated_and_removed",
       "stage_1_checks": [
@@ -501,7 +547,9 @@
       "current_uploaded_gateway_url": "https://gateway.pinata.cloud/ipfs/QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
       "current_uploaded_ipfs_cid": "QmSww9z6Dp1LPitKj3HsTRY8pjNNzhwvDLiAufKxskA3P1",
       "current_portal_hosted_bytes_verified": true,
-      "current_selected_intents": ["WEATHER_FORECAST"],
+      "current_selected_intents": [
+        "WEATHER_FORECAST"
+      ],
       "current_connected_wallet": "0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE",
       "current_account_sign_in_completed": true,
       "current_account_wallet_linked": true,
@@ -531,7 +579,12 @@
       "register_wasm_selector": "0xfe1e40f7",
       "register_wasm_signature": "registerWasm(bytes32 wasmHash, string wasmUrl, string intent)",
       "portal_arguments": "[localHash, gatewayUrl, selectedIntent]",
-      "empty_whitelisted_urls_observed_registration_ids": [1, 2, 3, 4],
+      "empty_whitelisted_urls_observed_registration_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
       "empty_whitelisted_urls_registration_accepted": true,
       "empty_whitelisted_urls_indexed": true,
       "empty_whitelisted_urls_evidence_limit": "Shows that an empty allowlist is valid for registration and validator processing; it does not define non-empty URL behavior.",
@@ -555,7 +608,7 @@
       "get_wasm_7_contains_gateway_url": true,
       "get_wasm_7_contains_intent": true
     },
-      "portal_target_registry": {
+    "portal_target_registry": {
       "chain": "Base Sepolia",
       "chain_id": 84532,
       "address": "0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3",
@@ -579,7 +632,11 @@
       "updated_2026_08_15": {
         "provenance": "User-relayed Telegraph team response and independently verified official documentation commit.",
         "breakdown_answer_required": false,
-        "required_export_interface": ["alloc", "dealloc", "rank_answer"]
+        "required_export_interface": [
+          "alloc",
+          "dealloc",
+          "rank_answer"
+        ]
       },
       "follow_up_2026_08_15": {
         "provenance": "User-relayed Telegraph team response; permalink or screenshot not yet retained.",
@@ -628,7 +685,11 @@
         "champion_margin": 0.37360683,
         "historical_rows_evaluated": 0,
         "fixture_category": "factual paraphrase and lexical discrimination",
-        "excluded_fixture_categories": ["numeric", "time_window", "json"],
+        "excluded_fixture_categories": [
+          "numeric",
+          "time_window",
+          "json"
+        ],
         "reported_pair_margin_floor": 0.15,
         "reported_near_miss_cases": 6,
         "reported_promotion_rule": "promotion is automatic after all six near-miss cases pass; there is no direct candidate-margin-versus-champion-margin comparison",
@@ -797,7 +858,7 @@
       "evidence_artifact": "artifacts/registration-drafts/oathcast-weather-wasm-corrected-postflight-2026-08-16T034434Z.json",
       "evidence_limit": "At this postflight snapshot, the corrected registry contained ID 7 with the exact registered artifact and Intent while validator processing remained unobserved. User-relayed Telegraph team confirmation, corroborated by the artifact reaching champion comparison, says registration 19 passed Stage 1; the retained validator result is a 31-of-32 Stage 2 rejection. No live 0.60 Spearman result is retained because zero historical rows were evaluated."
     },
-      "historical_validator_observations": [
+    "historical_validator_observations": [
       {
         "source": "Telegraph live validator record inspected through the integration portal on 2026-08-14",
         "source_url": "https://integrate.telegraphprotocol.com/api/registrations/0xa5fdb69F410fF432b2033B01c45C794e1F5949D8",
@@ -1007,5 +1068,42 @@
       "The current portal source still displays an obsolete breakdown_answer requirement even though the official guide removes that export.",
       "No further registration is authorized; a future attempt requires a fresh complete decoded preflight and fresh explicit user authorization."
     ]
+  },
+  "weather_surface_finding": {
+    "date": "2026-08-22",
+    "why_this_was_measured": "Registration 496 reported comparable_cases of 12 where registrations 19, 41, 96 and 98 all reported 32, which confirms the WEATHER_FORECAST fixture set is a different set from the one those four were scored against. Every corpus in this repository was then counted for weather shape: ranking pools 1 of 10, structural dev 0 of 20, held-out 3 of 30. The probability, time-window and unit machinery in this module had therefore never been measured on near-miss weather cases, which is the only surface a WEATHER_FORECAST registration is scored on.",
+    "corpus": "fixtures/scorer_weather_nearmiss.json, 16 pairs across 11 categories: precipitation polarity, wrong hour, span mismatch, probability magnitude, wrong location, temperature magnitude, unit confusion, threshold boundary, hedged probability, stale window, evasive answer.",
+    "result_before_fixes": {
+      "ours": "13/16",
+      "telegraph_minilm_champion": "7/16",
+      "zkasuran_salience_champion": "11/16",
+      "note": "The first measurement on this surface put this module ahead of both published baselines, which is the reverse of its standing on the general paraphrase corpora. The weather machinery is the strongest part of the module and had never been measured."
+    },
+    "two_exact_ties_found": {
+      "wrong_hour__hour_shift_small": "Asked about 15:00 to 16:00 UTC, the correct answer about the 15:00 hour and the wrong answer about the 16:00 hour scored identically. has_time_outside_question cannot see this: 16:00 does appear in the question, as the window's closing boundary, so no time is outside it, yet the 16:00 hour runs to 17:00 and is a different window.",
+      "probability_magnitude__prob_direction_flip": "Against a ground truth of 20%, the correct 'Unlikely, around one chance in five' and the wrong 'Likely, around four chances in five' scored identically. The probability parser reads digits only, so neither answer parsed as stating a probability at all.",
+      "why_ties_matter": "A tie loses a fixture case exactly as an inversion does. Both categories, numeric and time_window, were explicitly excluded from the fixture set the earlier four registrations were scored against, so both plausibly became live only with the WEATHER_FORECAST set."
+    },
+    "fixes": {
+      "text::answer_binds_window_end_only": "Fires when a question names a window and the answer names its closing time without naming its opening time. Requires the opening time to be absent, so an answer spanning the window properly is untouched, and so is an answer naming no time.",
+      "scorer::qualitative_likelihood": "Reads likely/unlikely wording, with a negation within three tokens flipping the sense, and contradicts a numeric ground truth across the even-odds line. Applied only when the answer states no figure of its own, so the numeric agreement term is not doubled up on."
+    },
+    "result_after_fixes": {
+      "ours": "15/16, from 13/16",
+      "hour_shift_small": "+0.000 to +0.636",
+      "prob_direction_flip": "+0.000 to +0.085",
+      "regressions_on_this_corpus": "none",
+      "remaining_failure": "hedged_probability__hedge_vs_number, which all three modules fail. That row varies two things at once, a dropped figure and a swapped city, so it is a weak row rather than a clean finding."
+    },
+    "frozen_bar_after": {
+      "generated_pairs": "8 inverted, 9 below the 0.15 floor, unchanged",
+      "ranking_pools": "9 separated, 0 tied, 1 inverted; worst separation improved from -0.045833 to -0.037118",
+      "pairwise_accuracy": "0.9434, above the 0.9400 floor",
+      "held_out": "11/30, up from 9/30",
+      "length_behaviour": "4/4",
+      "engine_divergence": "0 of 375 pairs, 0 verdict flips",
+      "worst_self_match": "1.0000 across all 89 distinct ground truths in this repository plus 21 non-text and edge shapes, so registration 496's rejection reason stays fixed"
+    },
+    "registration_status": "No further registration is authorized. Registering requires fresh explicit approval from the repository owner, hosting of this artifact, and a signed transaction."
   }
 }

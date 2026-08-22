@@ -559,3 +559,34 @@ That is also the argument for the receipt chain, and the reason the anchor is
 described as a commitment rather than a proof. A system that scores forecasts has
 to be able to distinguish evidence from the absence of failure, starting with its
 own.
+
+## The strongest part of the module was the part nobody had measured
+
+Registration 496 came back with `comparable_cases` of 12. Registrations 19, 41, 96 and
+98 had all reported 32. That is not a smaller sample of the same fixtures, it is a
+different set, which is what Telegraph's evaluator fix was for: each WASM is now scored
+against its own registered intent, and ours is `WEATHER_FORECAST`.
+
+So I counted how weather-shaped our own corpora were. Ranking pools: 1 of 10. Structural
+development corpus: 0 of 20. Held-out: 3 of 30. Two days of work on ordinals, role
+bindings and genitive relations had been aimed at a general paraphrase set we are no
+longer scored against, while the probability, time-window and unit code that the
+registered intent actually exercises had never been measured on a near-miss case.
+
+The first measurement on that surface was the opposite of what I expected. Sixteen
+weather near-miss pairs: this module 13, the zkasuran salience champion 11, Telegraph's
+MiniLM baseline 7. The weather machinery is the best part of the module, and it was
+invisible because nobody had written a corpus for it.
+
+Two of our three failures were exact ties, and a tie loses a case as surely as an
+inversion. Asked about 15:00 to 16:00 UTC, an answer about "the 16:00 hour" scored
+identically to one about "the 15:00 hour", because `has_time_outside_question` looks for
+times absent from the question and 16:00 is right there in it, as the closing boundary.
+The 16:00 hour runs to 17:00. It is a different window, named entirely in the question's
+own vocabulary. And against a ground truth of 20%, "one chance in five" and "four chances
+in five" tied, because the probability parser reads digits and neither answer has any.
+
+Both are now fixed, 15 of 16, no regressions, and held-out went up rather than down.
+The lesson is not about either bug. It is that the corpus you never wrote is the one
+hiding your real defects, and the fixture set you are scored against is worth confirming
+before spending two days optimising for it.

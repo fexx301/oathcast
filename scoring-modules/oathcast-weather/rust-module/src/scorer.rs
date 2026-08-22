@@ -33,6 +33,8 @@ pub(crate) const ISSUE_ROLE_BINDING_REVERSED: u32 = 1 << 15;
 pub(crate) const ISSUE_TREND_CONTRADICTION: u32 = 1 << 16;
 pub(crate) const ISSUE_ROLE_BINDING_RECOMBINED: u32 = 1 << 17;
 pub(crate) const ISSUE_CLAUSE_CONTRADICTION: u32 = 1 << 18;
+pub(crate) const ISSUE_LIKELIHOOD_CONTRADICTION: u32 = 1 << 19;
+pub(crate) const ISSUE_WINDOW_END_ONLY: u32 = 1 << 20;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -3835,6 +3837,63 @@ fn any_clause_contradicts(ground_truth: &str, answer: &str) -> bool {
     false
 }
 
+/// Direction a text asserts qualitatively about likelihood: `Some(true)` for likely,
+/// `Some(false)` for unlikely, `None` when it says neither or says both.
+///
+/// Needed because the probability machinery only reads digits. Against a ground truth
+/// of "There is a 20% probability", the correct "Unlikely, around one chance in five."
+/// and the wrong "Likely, around four chances in five." both contain no digits at all,
+/// so both parsed as having no probability and scored identically. A tie loses a
+/// fixture case, and stating a forecast in words rather than figures is ordinary
+/// phrasing rather than an edge case.
+///
+/// A negation within three tokens flips the reading, so "not likely" is unlikely.
+fn qualitative_likelihood(text: &str) -> Option<bool> {
+    const LIKELY: &[&[u8]] = &[
+        b"likely",
+        b"probable",
+        b"probably",
+        b"expected",
+        b"anticipated",
+        b"forecast",
+    ];
+    const UNLIKELY: &[&[u8]] = &[b"unlikely", b"improbable", b"doubtful", b"dry", b"none"];
+    let mut likely = false;
+    let mut unlikely = false;
+    let mut negation_age = usize::MAX;
+    for token in TokenIter::new(text) {
+        if is_fact_negation(text, token) {
+            negation_age = 0;
+            continue;
+        }
+        let direction = if LIKELY.iter().any(|w| token_eq(token.bytes, w)) {
+            Some(true)
+        } else if UNLIKELY.iter().any(|w| token_eq(token.bytes, w)) {
+            Some(false)
+        } else {
+            None
+        };
+        if let Some(direction) = direction {
+            let flipped = if negation_age < 3 {
+                !direction
+            } else {
+                direction
+            };
+            if flipped {
+                likely = true;
+            } else {
+                unlikely = true;
+            }
+        }
+        negation_age = negation_age.saturating_add(1);
+    }
+    match (likely, unlikely) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
+}
+
 pub(crate) fn evaluate(
     question: &str,
     ground_truth_raw: &str,
@@ -4118,6 +4177,23 @@ pub(crate) fn evaluate(
     }
     // A contradiction inside one clause of a multi-clause answer, which the
     // whole-answer checks above cannot see because a correct clause masks it.
+    // A qualitative forecast that contradicts the ground truth's figure, applied only
+    // when the answer states no figure of its own so the numeric agreement term above
+    // is not doubled up on.
+    if let (Some(expected), None, Some(stated)) = (
+        truth_probability,
+        answer_probability,
+        qualitative_likelihood(answer),
+    ) && (expected >= 0.5) != stated
+    {
+        issues |= ISSUE_LIKELIHOOD_CONTRADICTION;
+        score = cap_preserving_order(score, 0.30);
+    }
+    // An answer that designates the requested window's closing hour as its own.
+    if crate::text::answer_binds_window_end_only(question, answer) {
+        issues |= ISSUE_WINDOW_END_ONLY;
+        score = cap_preserving_order(score, 0.30);
+    }
     if any_clause_contradicts(ground_truth, answer) {
         issues |= ISSUE_CLAUSE_CONTRADICTION;
         score = cap_preserving_order(score, 0.40);

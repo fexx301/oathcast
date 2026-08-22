@@ -678,6 +678,45 @@ fn contains_any_time(text: &str) -> bool {
     false
 }
 
+/// True when the question asks about a window and the answer designates the window's
+/// closing time as the hour it is about, without naming the opening time.
+///
+/// `has_time_outside_question` cannot see this. Asked "from 15:00 to 16:00 UTC", an
+/// answer about "the 16:00 UTC hour" names a time that does appear in the question, so
+/// nothing is outside it, yet "the 16:00 hour" runs from 16:00 to 17:00 and is a
+/// different window from the one requested. Measured before this check, the correct and
+/// the shifted answer scored identically, and an exact tie loses a fixture case as
+/// surely as an inversion.
+///
+/// Requires the answer to name the closing time and NOT the opening one, so an answer
+/// that spans the window properly, "between 15:00 and 16:00", is untouched, and so is
+/// an answer that names no time at all.
+pub(crate) fn answer_binds_window_end_only(question: &str, answer: &str) -> bool {
+    let mut times = [0u16; 8];
+    let mut count = 0usize;
+    let bytes = question.as_bytes();
+    let mut cursor = 0usize;
+    while cursor < bytes.len() && count < times.len() {
+        if let Some((value, end)) = parse_time_at(bytes, cursor) {
+            if !times[..count].contains(&value) {
+                times[count] = value;
+                count += 1;
+            }
+            cursor = end;
+        } else {
+            cursor += 1;
+        }
+    }
+    if count < 2 {
+        return false;
+    }
+    let start = times[0];
+    let end = times[count - 1];
+    if start == end {
+        return false;
+    }
+    contains_time(answer, end) && !contains_time(answer, start)
+}
 pub(crate) fn has_time_outside_question(question: &str, answer: &str) -> bool {
     if !contains_any_time(question) {
         return false;

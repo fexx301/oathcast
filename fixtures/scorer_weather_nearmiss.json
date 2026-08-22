@@ -1,0 +1,310 @@
+{
+  "schema": "oathcast_scorer_weather_nearmiss_v1",
+  "role": "DEVELOPMENT corpus for the surface we are actually scored on. Registration 496 returned comparable_cases of 12 against 32 for registrations 19, 41, 96 and 98, confirming the WEATHER_FORECAST fixture set differs from the general paraphrase set the earlier four were measured against. Our other corpora are 1 of 10 and 0 of 20 weather-shaped, so the probability, time-window and unit machinery in this module had never been measured on near-miss cases. Categories here are guesses at what a weather fixture set exercises, not knowledge of it.",
+  "pools": [
+    {
+      "pool_id": "precipitation_polarity__polarity_yes_no",
+      "shape": "precipitation_polarity",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "The truth says precipitation occurred; the wrong answer denies it.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, measurable rain fell in Lagos during that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "No, no measurable precipitation occurred in Lagos during that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "precipitation_polarity__polarity_no_yes",
+      "shape": "precipitation_polarity",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. No measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "The truth says the hour was dry; the wrong answer asserts rain.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "No, the hour stayed dry in Lagos.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, measurable precipitation occurred in Lagos during that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_hour__hour_shift",
+      "shape": "wrong_hour",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "Right outcome, wrong window: the question asks about 15:00 to 16:00.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, precipitation occurred in Lagos between 15:00 and 16:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, precipitation occurred in Lagos between 17:00 and 18:00 UTC.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_hour__hour_shift_small",
+      "shape": "wrong_hour",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "One hour late; the requested window begins at 15:00.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, rain fell during the 15:00 UTC hour in Lagos.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, rain fell during the 16:00 UTC hour in Lagos.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "span_mismatch__span_widened",
+      "shape": "span_mismatch",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "A 24-hour claim does not answer a one-hour question, and would be true on many dry hours.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, measurable precipitation occurred in that one-hour window.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, measurable precipitation occurred at some point in the 24 hours around it.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "probability_magnitude__prob_magnitude_far",
+      "shape": "probability_magnitude",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "65 percent against 5 percent is a different forecast, not a paraphrase of one.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Roughly a 65 percent chance of measurable rain in that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Roughly a 5 percent chance of measurable rain in that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "probability_magnitude__prob_magnitude_near",
+      "shape": "probability_magnitude",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "35 percent is on the other side of even from 65 percent, so it inverts the call.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "About 65 percent.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "About 35 percent.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "probability_magnitude__prob_direction_flip",
+      "shape": "probability_magnitude",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 20% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "The truth is a 20 percent chance; the wrong answer states the complement.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Unlikely, around one chance in five.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Likely, around four chances in five.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_location__location_swap",
+      "shape": "wrong_location",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "The question asks about Lagos, and Abuja is a different city.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, Lagos saw measurable precipitation in that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, Abuja saw measurable precipitation in that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "temperature_magnitude__temp_magnitude",
+      "shape": "temperature_magnitude",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "why_bad_is_wrong": "A ten degree error is a different measurement.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "About 29.4 C in Lagos at that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "About 19.4 C in Lagos at that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "unit_confusion__temp_units",
+      "shape": "unit_confusion",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "why_bad_is_wrong": "29.4 F is below freezing and is not the stated 29.4 C.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Around 29.4 C, which is roughly 85 F.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Around 29.4 degrees Fahrenheit.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "unit_confusion__temp_kelvin",
+      "shape": "unit_confusion",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 302.5 K.",
+      "why_bad_is_wrong": "29.4 K is near absolute zero; the stated value is 302.5 K.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "About 302.5 kelvin, so a little over 29 C.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "About 29.4 kelvin.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "threshold_boundary__threshold_below",
+      "shape": "threshold_boundary",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Precipitation in Lagos during the requested UTC hour measured 0.05 mm, below the 0.1 mm threshold.",
+      "why_bad_is_wrong": "0.05 mm is below the 0.1 mm threshold the question sets, so the answer is no.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "No, the 0.05 mm that fell is under the measurable threshold.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, 0.05 mm of precipitation was measured, so the threshold was met.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "hedged_probability__hedge_vs_number",
+      "shape": "hedged_probability",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "The wrong answer copies the truth's number and wording but reports a different city; the correct one paraphrases the probability without a figure.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "More likely than not, roughly two chances in three.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "There is a 65% probability of measurable precipitation in Abuja during the requested UTC hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "stale_window__stale_reference",
+      "shape": "stale_window",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "A date years outside the requested window does not answer the question asked.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, measurable precipitation occurred during the requested hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, measurable precipitation occurred during the requested hour on 2019-04-02.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "evasive_answer__no_commitment",
+      "shape": "evasive_answer",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "why_bad_is_wrong": "The evasive answer commits to nothing and would be equally true of a dry hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, it rained measurably in Lagos in that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Weather in Lagos is variable and precipitation is always possible at some point.",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
