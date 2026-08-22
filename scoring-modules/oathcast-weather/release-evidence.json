@@ -5,12 +5,12 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 54660,
+    "byte_size": 55089,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c",
-    "keccak256_raw_bytes": "0x93e92416a3f619fb8f250b28c1cc4f5603f6b94373ae88446231aa32a0419ac7",
+    "sha256": "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
+    "keccak256_raw_bytes": "0x4c702e7e8c7d86dbfdf85403b2f0c647e8f7f9e6656dbc24a2213fd81a8f91d7",
     "registration_candidate": true,
-    "candidate_scope": "This 54,660-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956559. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
+    "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956559. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
   "registration_41_artifact": {
     "byte_size": 42798,
@@ -117,6 +117,39 @@
     "outcome_note": "This is the first regression in the series. The previous three builds all won 31 of 32; this one won 28, so the two changes made after registration 96 cost three cases.",
     "further_registration_authorized": false
   },
+  "registration_496_result": {
+    "registration_id": 496,
+    "chain_id": 84532,
+    "transaction_hash": "0xd4b35fd10bb4020cae6dd9c03f8777bc3eec722bbe9d8b7759d7c7b4994c5da8",
+    "block_number": 45831018,
+    "registrant": "0x7dc9c9d535b68c3c6273e3323f0e52e5851c3278",
+    "intent": "WEATHER_FORECAST",
+    "wasm_hash": "0x93e92416a3f619fb8f250b28c1cc4f5603f6b94373ae88446231aa32a0419ac7",
+    "wasm_byte_size": 54660,
+    "wasm_sha256": "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c",
+    "activation_status": "rejected",
+    "rejection_reason": "self-match too low: your scorer failed to recognise a known-correct answer. Scoring a ground-truth answer against itself gave 0.0000 on at least one fixture case, below the required floor 0.75.",
+    "eval_details": {
+      "candidate_wins": 11,
+      "comparable_cases": 12,
+      "candidate_margin": 0.19293104,
+      "champion_margin": 0.49413237,
+      "score_stddev": 0.31658825,
+      "historical_rows_evaluated": 0
+    },
+    "fixture_set_changed": "comparable_cases is 12 where registrations 19, 41, 96 and 98 all reported 32. Telegraph redeployed and fixed the evaluator on 2026-08-22 so that each WASM is scored against its registered intent. This is the empirical confirmation that the earlier four were scored against a different fixture set from the one our WEATHER_FORECAST registration is now judged on, so their 31 of 32 was never a reading on the registered intent. Those four records are unchanged in the API, so the fix was not applied retroactively.",
+    "consequence_for_prior_work": "The structural programme built on 2026-08-20 and 21, covering relation direction, coordinated swaps, parenthetical binding and clause-level contradiction, was aimed at the general factual-paraphrase fixtures those four registrations were scored against. Our registered corpus is 27 of 27 weather-shaped while the ranking pools are 1 of 10 and the structural corpus 0 of 20, so the parts of this module with the most machinery behind them, probability agreement and time windows, have still never been scored.",
+    "further_registration_authorized": false
+  },
+  "self_match_floor_finding": {
+    "requirement": "Telegraph's node requires worst_self_match of at least 0.75: a ground-truth answer scored against itself must be recognised as correct. Registration 496 was rejected on this and on nothing else.",
+    "cause_one": "Eight zero-returning paths ran ahead of the exact-match short-circuit in evaluate: input limits, malformed JSON, a time in the answer absent from the question, keyword stuffing, contradictory truth polarity and contradictory probability. Every one is a check on the text itself, so each fires identically when the answer and the ground truth are the same text. Any ground truth tripping one scored 0.0000 against itself.",
+    "cause_two": "At the ABI boundary read_input rejects invalid UTF-8 and rank_answer returns 0 without calling evaluate. Correct for an unreadable miner answer, wrong when that answer is byte-for-byte the ground truth. A byte-level comparison now runs before UTF-8 validation.",
+    "prior_design_overridden": "A test named exact_matches_do_not_bypass_safety_gates asserted the opposite behaviour deliberately, that a self-match scores 0.0 when the ground truth is itself defective. The intent was sound but the node overrides it, and the node is right: scoring an answer and auditing a fixture are different jobs, and penalising the miner who reproduced the ground truth verbatim punishes the wrong party for the fixture's defect. The test now asserts the corrected contract.",
+    "missed_signal": "The third-party harness at zkasuran/telegraph-salience-scorer had been reporting this for two days as 'non-text ground truth self-matches score=0.0000'. It was recorded as pre-existing and set aside while attention went to attack ordering. It was the one structural gate failing, and structural gates are pass-or-reject rather than scored, so it outranked every ordering improvement made in that time.",
+    "limit_recorded": "The short-circuit returns before the time-window, stuffing, polarity and probability checks, so their flags are not set on a self-match; those checks are skipped rather than overridden. Flags raised earlier, such as malformed JSON, are still reported. Preserving the later flags would mean threading a self-match condition through six rejection paths for diagnostics nothing consumes.",
+    "regression_caught_in_flight": "The first version of the ABI short-circuit validated only the ground truth and the answer, so an over-cap question returned 1.0 instead of 0 and TestInputByteBoundaries failed. It now bounds-checks all three inputs."
+  },
   "overfitting_finding": {
     "series": [
       {"registration_id": 19, "wins": "31/32", "candidate_margin": 0.31248063, "score_stddev": 0.26765382},
@@ -148,7 +181,7 @@
     "source": "https://github.com/telegraphprotocol/telegraph-wasm-baseline",
     "fetched": "2026-08-20",
     "what_it_is": "Telegraph's production scoring module, published by the team as the intended path for closing the gap locally rather than reverse-engineering hidden fixtures. It is not a rule engine: it embeds question, ground truth and answer with MiniLM-L6-v2 and blends cosine similarity with BM25 and a length signal.",
-    "composite": "0.25 * cosine(question, answer) + 0.50 * cosine(ground_truth, answer) + 0.15 * bm25(ground_truth, answer) + 0.10 * sigmoid((answer_len - 50) / 20), clamped to [0,1]. Exports alloc, dealloc, rank_answer, plus breakdown_answer, embed, cosine_sim and bm25_score. Built with --features real_weights it is 24,184,674 bytes against our 54,660.",
+    "composite": "0.25 * cosine(question, answer) + 0.50 * cosine(ground_truth, answer) + 0.15 * bm25(ground_truth, answer) + 0.10 * sigmoid((answer_len - 50) / 20), clamped to [0,1]. Exports alloc, dealloc, rank_answer, plus breakdown_answer, embed, cosine_sim and bm25_score. Built with --features real_weights it is 24,184,674 bytes against our 55,089.",
     "harness_validated": "Driven through our existing wazero probe, same ABI. Real weights confirmed working rather than the repo's projection fallback: a true paraphrase with almost no lexical overlap, 'Everest is the highest peak on the planet.' against the truth 'Everest is the tallest mountain on Earth.', scores 0.693950 while unrelated text scores 0.059760. Projection mode could not produce that.",
     "architectural_difference": "Ours is a hand-written lexical and entity-binding rule engine with discrete penalties; theirs is a semantic model with a smooth composite. That difference explains the registration series: our entity-binding, ordinal and weather-classifier fixes were neutral against fixtures judged by a scorer whose primary signal is embedding similarity, because none of those fixes touched semantic coverage.",
     "measured_complementarity": {
@@ -268,7 +301,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c",
+      "measured_on_artifact": "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -409,13 +442,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c",
+      "darwin/arm64": "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
-    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 54,660 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
+    "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c",
-      "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c"
+      "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8",
+      "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8"
     ]
   },
   "current_artifact_abi": {

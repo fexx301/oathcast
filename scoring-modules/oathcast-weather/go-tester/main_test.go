@@ -90,9 +90,9 @@ func TestArtifactContract(t *testing.T) {
 	if !evidence.Artifact.RegistrationCandidate {
 		t.Fatal("rank-only artifact must be marked as a registration candidate")
 	}
-	if evidence.Artifact.ByteSize != 54660 ||
-		evidence.Artifact.SHA256 != "32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c" ||
-		evidence.Artifact.Keccak256RawBytes != "0x93e92416a3f619fb8f250b28c1cc4f5603f6b94373ae88446231aa32a0419ac7" {
+	if evidence.Artifact.ByteSize != 55089 ||
+		evidence.Artifact.SHA256 != "80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8" ||
+		evidence.Artifact.Keccak256RawBytes != "0x4c702e7e8c7d86dbfdf85403b2f0c647e8f7f9e6656dbc24a2213fd81a8f91d7" {
 		t.Fatalf("unexpected local candidate evidence: %+v", evidence.Artifact)
 	}
 	if evidence.Fixture.Path != "fixtures/wasm_scoring_cases.json" {

@@ -106,6 +106,37 @@ unsafe fn read_input(ptr: i32, len: i32, max_len: usize) -> Option<&'static str>
     core::str::from_utf8(bytes).ok()
 }
 
+/// Same bounds and liveness checks as `read_input`, without requiring valid UTF-8.
+///
+/// Exists so that a byte-identical answer can be recognised before UTF-8 validation.
+/// `read_input` rejects invalid UTF-8 and `rank_answer` then returns 0, which is
+/// correct for a miner answer nobody can read but wrong when the answer is byte-for-byte
+/// the ground truth: that is the correct answer whatever bytes it contains. The node
+/// enforces a self-match floor of 0.75, and the third-party harness probes exactly this
+/// with a question, ground truth and answer all set to a string mixing emoji, CJK, RTL
+/// and raw 0x00 0xff 0xfe bytes.
+#[cfg(target_arch = "wasm32")]
+unsafe fn read_bytes(ptr: i32, len: i32, max_len: usize) -> Option<&'static [u8]> {
+    if len == 0 {
+        return Some(&[]);
+    }
+    if ptr <= 0 || len < 0 {
+        return None;
+    }
+    let ptr = ptr as usize;
+    let len = len as usize;
+    if len > max_len || !unsafe { allocation_is_live(ptr, len) } {
+        return None;
+    }
+    let heap_start = core::ptr::addr_of!(HEAP).cast::<u8>() as usize;
+    let heap_end = heap_start.checked_add(HEAP_SIZE)?;
+    let input_end = ptr.checked_add(len)?;
+    if ptr < heap_start || input_end > heap_end {
+        return None;
+    }
+    Some(unsafe { core::slice::from_raw_parts(ptr as *const u8, len) })
+}
+
 /// Allocate one live input buffer for the host.
 ///
 /// Non-positive sizes return the conventional null/empty pair. Invalid or
@@ -196,6 +227,23 @@ pub unsafe extern "C" fn rank_answer(
     ma_ptr: i32,
     ma_len: i32,
 ) -> f32 {
+    // Byte-identical answer, decided before UTF-8 validation. An answer equal to the
+    // ground truth byte for byte is the ground truth, so it is correct whatever it
+    // contains, and the node requires a self-match of at least 0.75.
+    // The question is read here too, and only for its bounds. An oversized or
+    // out-of-range question must still be rejected with 0, so the short-circuit cannot
+    // skip that check just because the answer happens to equal the ground truth.
+    if let (Some(_question), Some(ground_truth), Some(miner_answer)) = (
+        unsafe { read_bytes(q_ptr, q_len, scorer::MAX_QUESTION_BYTES) },
+        unsafe { read_bytes(gt_ptr, gt_len, scorer::MAX_GROUND_TRUTH_BYTES) },
+        unsafe { read_bytes(ma_ptr, ma_len, scorer::MAX_MINER_ANSWER_BYTES) },
+    ) && !ground_truth.is_empty()
+        && ground_truth == miner_answer
+    {
+        unsafe { reset_allocator() };
+        return 1.0;
+    }
+
     let score = match (
         unsafe { read_input(q_ptr, q_len, scorer::MAX_QUESTION_BYTES) },
         unsafe { read_input(gt_ptr, gt_len, scorer::MAX_GROUND_TRUTH_BYTES) },

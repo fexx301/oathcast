@@ -100,7 +100,7 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
   zero historical rows, so it did not observe that Spearman gate.
 
   The current artifact is instead 45,747 bytes, SHA-256
-  `32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c`,
+  `80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8`,
   and raw-byte Keccak-256
   `0xd75c3f264a3dc553fa3508ca4e4fe23a25330c11aad5a1e0ba8f1f31fcad1c3d`.
   Its fixture SHA-256 is

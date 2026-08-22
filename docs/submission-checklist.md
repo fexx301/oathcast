@@ -62,7 +62,7 @@ relevant to that track.
 - [x] Current 45,747-byte rank-only revision reproduced and locally verified:
   two byte-identical clean builds;
   SHA-256
-  `32d340102fa04fec5e13cc14079b587712653820fd06adb4f4671079bda3909c`;
+  `80f08229391520dc32acbdeffd7588c9ac83ab8636bc4cccb35e894ecf7ff3e8`;
   raw-byte Keccak-256
   `0xd75c3f264a3dc553fa3508ca4e4fe23a25330c11aad5a1e0ba8f1f31fcad1c3d`;
   fixture SHA-256

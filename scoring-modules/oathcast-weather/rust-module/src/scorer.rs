@@ -3858,6 +3858,37 @@ pub(crate) fn evaluate(
             issues |= ISSUE_MALFORMED_JSON;
         }
     }
+    // An answer byte-identical to the ground truth IS the ground truth, so it is
+    // correct by definition and must score at the top. This has to be decided before
+    // any of the rejection paths below, and that ordering is the whole point.
+    //
+    // Eight `zero(...)` returns used to run ahead of the exact-match check further
+    // down: input limits, malformed JSON, a time in the answer absent from the
+    // question, keyword stuffing, contradictory truth polarity, contradictory
+    // probability. Every one of them fires identically when the answer and the ground
+    // truth are the same text, because they are checks on the text itself. So any
+    // ground truth that tripped one scored 0.0000 against itself.
+    //
+    // Telegraph's node enforces a self-match floor of 0.75 and rejected registration
+    // 496 on exactly this, saying a ground-truth answer scored against itself gave
+    // 0.0000 on at least one fixture. The same failure had been visible for two days
+    // in the third-party harness as "non-text ground truth self-matches score=0.0000",
+    // scoring `score(weird, weird, weird)` where weird mixes emoji, CJK, RTL and
+    // invalid UTF-8 bytes. I recorded it as pre-existing and moved on, which was the
+    // wrong call: a judge that cannot recognise the correct answer when handed it
+    // verbatim has no business ranking anything.
+    //
+    // Emptiness is still checked first, because an empty answer must score zero even
+    // when the ground truth is also empty.
+    if issues & (ISSUE_EMPTY_ANSWER | ISSUE_EMPTY_GROUND_TRUTH) == 0
+        && ground_truth_raw.trim() == miner_answer_raw.trim()
+    {
+        // Issues are still reported, so a defective ground truth is still visible to
+        // anything reading the flags. Only the score changes, because scoring the
+        // answer and auditing the fixture are different jobs and this module is asked
+        // to do the first.
+        return Evaluation { score: 1.0, issues };
+    }
     if issues != 0 {
         return zero(issues);
     }
@@ -4358,34 +4389,62 @@ mod tests {
     }
 
     #[test]
-    fn exact_matches_do_not_bypass_safety_gates() {
-        let wrong_time = "Rain occurred from 17:00 to 18:00 UTC.";
-        let wrong_time_evaluation = evaluate(
+    fn an_exact_self_match_scores_top() {
+        // This test previously asserted the opposite, that an exact self-match scores
+        // 0.0 whenever the ground truth is itself defective, and was named
+        // exact_matches_do_not_bypass_safety_gates. The intent was sound: do not award
+        // full marks to a fixture that answers a different window than it asks about,
+        // repeats one word forty times, or contradicts its own probability.
+        //
+        // Telegraph's node overrides that intent. It enforces a self-match floor of
+        // 0.75 and rejected registration 496 with "your scorer failed to recognise a
+        // known-correct answer. Scoring a ground-truth answer against itself gave
+        // 0.0000 on at least one fixture case." The third-party harness had been
+        // reporting the same failure for two days as "non-text ground truth
+        // self-matches score=0.0000".
+        //
+        // The node is right for a reason worth stating: scoring an answer and auditing
+        // a fixture are different jobs, and this module is asked to do the first.
+        // Penalising the miner who reproduced the ground truth verbatim punishes the
+        // wrong party for the fixture's defect.
+        //
+        // One honest limit. The short-circuit returns before the time-window, stuffing,
+        // polarity and probability checks run, so their flags are NOT set on a
+        // self-match: those checks are skipped rather than overridden. Flags raised
+        // before it, such as malformed JSON, are still reported. Preserving the later
+        // flags would mean threading a self-match condition through six separate
+        // rejection paths in the most sensitive function here, for diagnostics nothing
+        // currently consumes, so it is deliberately not done.
+        for (question, text) in [
+            (
+                "Did rain occur from 15:00 to 16:00 UTC?",
+                "Rain occurred from 17:00 to 18:00 UTC.",
+            ),
+            (
+                "What happened?",
+                "rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain",
+            ),
+            ("Will it rain?", "Rain is likely with a 20% probability."),
+        ] {
+            let evaluation = evaluate(question, text, text);
+            assert_eq!(evaluation.score, 1.0, "{text:?}: {evaluation:?}");
+        }
+
+        // A flag raised before the short-circuit is still reported alongside the 1.0.
+        let malformed = "{\"content\": unquoted}";
+        let malformed_evaluation = evaluate("q", malformed, malformed);
+        assert_eq!(malformed_evaluation.score, 1.0, "{malformed_evaluation:?}");
+        assert_ne!(malformed_evaluation.issues & ISSUE_MALFORMED_JSON, 0);
+
+        // The gates still bite for an answer that is not the ground truth, which is the
+        // case they exist for.
+        let not_self = evaluate(
             "Did rain occur from 15:00 to 16:00 UTC?",
-            wrong_time,
-            wrong_time,
+            "Rain occurred from 15:00 to 16:00 UTC.",
+            "Rain occurred from 17:00 to 18:00 UTC.",
         );
-        assert_eq!(
-            wrong_time_evaluation.score, 0.0,
-            "{wrong_time_evaluation:?}"
-        );
-        assert_ne!(wrong_time_evaluation.issues & ISSUE_WRONG_TIME_WINDOW, 0);
-
-        let stuffed = "rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain rain";
-        let stuffed_evaluation = evaluate("What happened?", stuffed, stuffed);
-        assert_eq!(stuffed_evaluation.score, 0.0, "{stuffed_evaluation:?}");
-        assert_ne!(stuffed_evaluation.issues & ISSUE_KEYWORD_STUFFING, 0);
-
-        let contradictory = "Rain is likely with a 20% probability.";
-        let contradictory_evaluation = evaluate("Will it rain?", contradictory, contradictory);
-        assert_eq!(
-            contradictory_evaluation.score, 0.0,
-            "{contradictory_evaluation:?}"
-        );
-        assert_ne!(
-            contradictory_evaluation.issues & ISSUE_CONTRADICTORY_PROBABILITY,
-            0
-        );
+        assert_eq!(not_self.score, 0.0, "{not_self:?}");
+        assert_ne!(not_self.issues & ISSUE_WRONG_TIME_WINDOW, 0);
     }
 
     #[test]
