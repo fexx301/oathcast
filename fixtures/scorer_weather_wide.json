@@ -1,0 +1,424 @@
+{
+  "schema": "oathcast_scorer_weather_wide_v1",
+  "role": "The first weather instrument that is not saturated. The near-miss corpus reached 16 of 16 with every pair separating by at least 0.227, and registration 523 then measured a 20 percent gain on it as zero change in the scored margin, so it can no longer guide anything. These 24 shapes are all absent from it: wrong variable, wrong direction, wrong sign, unit magnitude, aggregation swap, overconfidence, decimal against percent, missing data, a neighbouring city, the wrong day, fluent irrelevance, hedge reversal, distant rounding, source disagreement, a half-answered two-part question, a restated question with the outcome flipped, comparison without a value, the wrong threshold verdict, a plausible answer about another variable, a timezone shift, double negation, an order-of-magnitude slip, gust against sustained wind, and a correct answer with a wrong claim appended.",
+  "measured_2026_08_23": {
+    "ours": 0.3078,
+    "ordered": "15/24",
+    "inverted": 9,
+    "champion442": 0.117,
+    "champion_ordered": "15/24",
+    "note": "We separate more widely than the live champion on this corpus and order exactly as many cases correctly. Nine of our failures are real defects, and five are inversions of about 0.86 to 0.93 where the correct answer scores near 0.13 and the wrong one near 0.99."
+  },
+  "the_shared_mechanism": "Four of the five severe inversions have one cause. The counted context branch fires when the answer has exactly one novel candidate and no context overlap. A correct answer often has exactly one, because a paraphrase substitutes a single word: 'near 8 km/h' against a truth saying 'around 8 km/h'. The wrong answer has two, its own paraphrase word plus the wrong content, so the exact-one gate fails and it escapes untouched, then takes the positive evidence floor. Adding a wrong word protects the answer that contains it.",
+  "why_it_is_not_fixed_here": "Three attempts were measured and all were net negative. Adding positional function words to the candidate filter gained 0.07 on this corpus and cost 0.06 on the near-miss corpus, 0.04 on the ranking pools, and took the agreement proxy from 0.6296 to 0.6085 against a 0.60 floor. Changing the gate from exactly one to at least one gained 0.01 here and cost 0.23 on the core corpus. The gate is wrong but the counted branch is load-bearing for lowercase substitutions that the named-entity check cannot see, and retiring it once before cost 0.16 of margin. It needs a replacement, not a patch.",
+  "pools": [
+    {
+      "pool_id": "wrong_variable",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It was 29.4 C in Lagos at that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The humidity was 29.4 percent in Lagos at that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_direction",
+      "question": "What are the wind conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Light winds from the southwest, near 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Light winds from the northeast, near 8 km/h.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_sign",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "About 29.4 C.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "About -29.4 C.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "unit_magnitude",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Precipitation in Lagos during the requested UTC hour totalled 4 mm.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, about 4 mm of rain fell.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, about 4 cm of rain fell.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "aggregation_swap",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The reading at 14:00 UTC was 29.4 C.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The daily average for Lagos was 29.4 C.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "overconfident",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Around a 65 percent chance of measurable rain.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "It will certainly rain in that hour, without question.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "decimal_vs_percent",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The probability is 0.65.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The probability is 0.0065.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "no_data",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Lagos was at 29.4 C.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "No data is available for Lagos at that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_city_same_country",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, rain fell in Lagos in that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, rain fell in Ibadan in that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_day",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, rain fell during the requested hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, rain fell during the same hour the following day.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "fluent_irrelevant",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, measurable rain was recorded in that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Lagos has a tropical climate with a pronounced wet season from April to October.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "hedge_reversal",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Rain did fall in that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Rain was forecast but did not in fact fall in that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "rounding_far",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Close to 29 C.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Close to 35 C.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "source_disagreement",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "29.4 C, per the station reading.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "ECMWF puts it at 24.1 C.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "partial_two_part",
+      "question": "What were the temperature and wind in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature was 29.4 C and winds were light at 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It was 29.4 C with light southwesterly winds near 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "It was 29.4 C.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "question_restated_wrong",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Yes, measurable precipitation occurred in Lagos in the requested hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "No measurable precipitation occurred in Lagos in the requested hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "comparative_only",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "About 29.4 C.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Warmer than yesterday.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wrong_threshold",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Precipitation in Lagos during the requested UTC hour was 0.05 mm, below the 0.1 mm threshold.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "No, only 0.05 mm fell, under the threshold.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, 0.05 mm fell, which exceeds the threshold.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "plausible_but_unrelated",
+      "question": "What are the wind conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "A light southwesterly around 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Visibility was good at about 10 km.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "time_zone_shift",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "29.4 C at 14:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "29.4 C at 14:00 local time, which is 13:00 UTC.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "negated_double",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It is not true that the hour was dry.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "It is not true that rain fell in that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "magnitude_order",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Roughly 65 percent.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Roughly 650 percent.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "variable_confusion_wind",
+      "question": "What are the wind conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Southwesterly at about 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Gusting to 8 km/h from the southwest, with sustained winds near 40 km/h.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "correct_with_extra_wrong",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It was 29.4 C in Lagos at 14:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "It was 29.4 C in Lagos at 14:00 UTC, and it snowed heavily.",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}

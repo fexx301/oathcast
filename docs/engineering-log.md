@@ -991,3 +991,47 @@ At the transfer ratio measured between registrations 519 and 520, the weather co
 0.1370 since 520 projects to 0.4891 against a bar of 0.4561. The ratio is one observation and the
 projections here have been wrong in both directions. What is different this time is that it no
 longer needs the ratio to be generous.
+
+## A twenty percent gain that bought nothing, and the instrument that replaced it
+
+Registration 523 scored 0.4150. Registration 520 scored 0.4151. In between, the weather
+near-miss corpus went from +0.6929 to +0.8299, a twenty percent gain, and reached 16 of 16 with
+every pair separating by at least 0.227.
+
+So the transfer ratio of 0.54 I derived from the step between 519 and 520 was not a constant. It
+was a property of those two particular rules, unit scale and unfalsifiable answers, happening to
+match content in the fixture. My projection of 0.4891 was wrong by 0.074, and the honest summary
+of six registrations is that only two things ever moved the number: the output transform, which
+scales whatever ordering exists and is therefore indifferent to what the fixture contains, and two
+detection rules that happened to match it.
+
+The near-miss corpus is finished as a guide. It can catch regressions. It cannot find anything,
+because there is nothing left in it to find.
+
+The arithmetic says where the rest of the gap lives. 0.4150 across twelve cases totals 4.98, so if
+five or six separate near 0.90 the remainder average about zero. Roughly half the fixture has both
+answers on the same side of the transform's threshold.
+
+So I built a wider corpus, 24 weather shapes none of which the near-miss corpus contains, and it
+found nine failures including five inversions of 0.86 to 0.93. In every one of the five the correct
+answer scores near 0.13 and the wrong one near 0.99.
+
+Four of them share a cause, and it is worth stating precisely because it is the kind of defect that
+survives a long time. The counted context branch fires when an answer has exactly one novel
+candidate and no context overlap. A correct paraphrase usually has exactly one, because it
+substitutes a single word: "near 8 km/h" where the truth says "around 8 km/h". The wrong answer has
+two, its own paraphrase word plus the wrong content. So the exact-one gate fails on the wrong
+answer, it escapes untouched, and it takes the positive evidence floor. Adding a wrong word protects
+the answer that contains it.
+
+I could not fix it safely today. Three attempts, all measured, all reverted: adding positional
+function words to the candidate filter gained 0.07 on the wide corpus and cost 0.06 on the near-miss
+corpus, 0.04 on the ranking pools and took the agreement proxy to 0.6085 against a 0.60 floor;
+changing the gate to at least one gained 0.01 and cost 0.23 on the core corpus; and retiring the
+branch outright, tried earlier the same day, cost 0.16.
+
+The branch needs replacing rather than patching. Its job is to catch a substituted place that the
+named-entity check cannot see because the substitute is lowercase. Its implementation counts novel
+non-filler tokens, a proxy loose enough that the count is asymmetric between a correct paraphrase
+and a wrong answer. Something that compares what fills a role, instead of counting what is new,
+would not fail this way.

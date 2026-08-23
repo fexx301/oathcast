@@ -1611,5 +1611,50 @@
     },
     "projection": "0.4151 plus the weather gain of 0.1370 at the transfer ratio of 0.54 observed between 519 and 520 gives 0.4891, against a bar of 0.4561 as of 519. The ratio is one observation and projections here have been wrong in both directions, but this is the first submission that does not need the ratio to be generous.",
     "if_separation_clears": "The agreement gate binds next, requiring 0.60 correlation with the holder's ranking of real miner answers. Our proxy reads 0.6296 and is five requests written in this repository, scored against the real champion binary. It is the weakest instrument here and has never seen real traffic."
+  },
+  "registration_523_result": {
+    "date": "2026-08-23",
+    "registration_id": 523,
+    "activation_status": "REJECTED",
+    "rejection_reason": "lost to the current champion on separation: your average margin 0.4150 vs champion 0.4561.",
+    "candidate_margin": 0.415,
+    "champion_margin": 0.4561,
+    "the_result_that_matters": {
+      "scored": "0.4151 at 520 to 0.4150 at 523, a change of -0.0001",
+      "weather_corpus_over_the_same_span": "+0.6929 to +0.8299, a gain of 0.1370 or twenty percent",
+      "conclusion": "The three fixes in 523, worded probabilities, weather multi-relation scoping and relative pronouns, moved the scored margin by nothing. The transfer ratio of 0.54 derived from the step between 519 and 520 was a property of those two rules matching fixture content, not a constant. The projection of 0.4891 was wrong by 0.074.",
+      "what_this_retires": "The near-miss corpus as a guide. It now sits at 16 of 16 with every pair separating by at least 0.227, and a twenty percent gain on it bought zero. It can still catch regressions; it can no longer find anything."
+    },
+    "progression": {
+      "506": 0.1929,
+      "518": 0.203,
+      "519": 0.3578,
+      "520": 0.4151,
+      "523": 0.415,
+      "gap": 0.0411,
+      "what_moved_the_number": "Only two things in six registrations. The output transform, which scales whatever ordering exists and is therefore indifferent to fixture content, worth 0.1548. And two detection rules that happened to match fixture content, worth 0.0573. Everything else measured zero."
+    },
+    "arithmetic_of_the_remaining_gap": "0.4150 over twelve cases totals 4.98. If five or six cases separate near 0.90 the rest average near zero or slightly negative, so roughly half the fixture has both answers on the same side of the transform's threshold. That is either undetected wrong answers scoring high or correct answers being crushed, in shapes the near-miss corpus does not contain.",
+    "registration_status": "No further registration is authorized."
+  },
+  "wide_corpus_diagnostic": {
+    "date": "2026-08-23",
+    "why": "The near-miss corpus is saturated and stopped predicting. A wider corpus was built to find shapes it does not contain, since the arithmetic says about half the fixture's cases separate by nothing.",
+    "result": {
+      "ours": 0.3078,
+      "ordered": "15/24",
+      "inverted": 9,
+      "champion442": 0.117,
+      "champion_ordered": "15/24",
+      "severe_inversions": "variable_confusion_wind -0.9259, wrong_day -0.8601, unit_magnitude -0.8592, aggregation_swap -0.8581, wrong_direction -0.8559. In each the correct answer scores near 0.13 and the wrong one near 0.99."
+    },
+    "mechanism_identified": "The counted context branch fires when the answer has exactly one novel candidate and no context overlap. A correct paraphrase often has exactly one, because it substitutes a single word: 'near 8 km/h' against a truth saying 'around 8 km/h'. The wrong answer has two, its paraphrase word plus the wrong content, so the exact-one gate fails, it escapes untouched and takes the positive evidence floor. Adding a wrong word protects the answer containing it. Verified by printing the candidates for the wrong_direction pair, whose two answers differ by one word.",
+    "three_fixes_measured_and_all_reverted": {
+      "positional_function_words": "Gained 0.0715 on the wide corpus and cost 0.0599 on the near-miss corpus, 0.0390 on the ranking pools, and took the agreement proxy from 0.6296 to 0.6085 against a 0.60 floor.",
+      "gate_from_exactly_one_to_at_least_one": "Gained 0.0119 on the wide corpus and cost 0.2267 on the core corpus.",
+      "earlier_attempt_on_record": "Retiring the counted branch outright, tried on 2026-08-23 earlier in the day, cost 0.16 of margin on the weather corpus."
+    },
+    "what_this_needs": "A replacement for the counted branch rather than a patch to it. Its job is to catch a substituted place the named-entity check cannot see because the substitute is lowercase. Its implementation counts novel non-filler tokens, which is a proxy so loose that the count is asymmetric between a correct paraphrase and a wrong answer. A check that compares what fills a given role, rather than counting what is new, would not have this failure mode.",
+    "registration_status": "No further registration is authorized."
   }
 }
