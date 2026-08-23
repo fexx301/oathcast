@@ -5026,7 +5026,14 @@ pub(crate) fn evaluate(
         )
         && affirmed >= 2
     {
-        score = score.max(POSITIVE_EVIDENCE_FLOOR);
+        // Order-preserving, for the same reason every ceiling in this module compresses
+        // rather than truncating. A hard `max` puts every qualifying answer on exactly
+        // 0.90: measured across 80 graded miner answers, 0.9900 appeared sixteen times
+        // after the output transform and our distinct scores were 48 of 80 where the
+        // champion's were 80 of 80. The live agreement gate correlates our ranking of real
+        // answers against the holder's, and a block of ties correlates with nothing, so a
+        // clamp on the way up costs exactly what a clamp on the way down would.
+        score = POSITIVE_EVIDENCE_FLOOR + ((1.0 - POSITIVE_EVIDENCE_FLOOR) * score);
     }
     if !score.is_finite() {
         score = 0.0;

@@ -1035,3 +1035,37 @@ named-entity check cannot see because the substitute is lowercase. Its implement
 non-filler tokens, a proxy loose enough that the count is asymmetric between a correct paraphrase
 and a wrong answer. Something that compares what fills a role, instead of counting what is new,
 would not fail this way.
+
+## The gate we had not measured, and the gate that rewards being wrong
+
+Real traffic for this intent is not reachable. The node's root endpoint returns four finalised
+SubnetResponse events, all from one miner slug, none on WEATHER_FORECAST, one answer each and no
+question text. Every query parameter returns the same four. So the agreement gate can only be
+approximated, and the approximation I had been quoting was flattering us: it contained only
+plausible answers, and the gate ranks real answers, which are not all good.
+
+A graded corpus, ten requests with eight answers each spanning excellent to plainly wrong, reads
+0.4359 where the plausible-only corpus reads 0.6254. The floor is 0.60. It sits inside the range,
+which means agreement is plausibly the constraint that has been binding all along while I spent six
+registrations on separation.
+
+The graded corpus also found a defect I introduced earlier the same day. Our distinct scores were 48
+of 80 where the champion's were 80 of 80, with 0.9900 appearing sixteen times, because the positive
+evidence floor was a hard max at 0.90 and every qualifying answer landed on exactly that value. That
+is the same mistake `cap_preserving_order` exists to prevent, made in the opposite direction, and
+the champion's author names it as the thing that kept their agreement near 0.10 for a while. The
+floor now maps the score into the band it lifts to, so ordering inside the band survives.
+Distinctness went to 62 of 80 and all three separation corpora improved slightly.
+
+Agreement fell slightly when the ties broke, from 0.6296 to 0.6254 and from 0.4626 to 0.4359, and
+the reason is worth understanding rather than reverting. Breaking a tie resolves it in our order, and
+our order inside the top band disagrees with the champion's more than a tie does. Spearman scores a
+tie as average rank, which happened to correlate better than our actual ranking.
+
+Which leads to the thing I did not expect to find. On the temperature request the champion scores
+"It was warm in Lagos that afternoon." at 0.9948 and "It was 12.1 degrees Celsius in Lagos at 14:00
+UTC." at 0.9978, while scoring the correct "About 29.4 degrees Celsius." at 0.0098. Our ranking of
+that request is sensible and our correlation is -0.1522 as a direct result. The gate rewards
+resembling the holder, not being right, and where the holder is arbitrary a better judge is
+penalised for it. No amount of quality work fixes that, and it is worth knowing before deciding
+what to build next.

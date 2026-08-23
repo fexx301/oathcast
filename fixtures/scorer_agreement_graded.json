@@ -1,0 +1,490 @@
+{
+  "schema": "oathcast_scorer_agreement_graded_v1",
+  "role": "A stand-in for Telegraph's third gate, built after establishing that real multi-miner traffic for this intent is not reachable. The node's root endpoint returns four finalised SubnetResponse events, all from one miner slug, none on WEATHER_FORECAST, with no question text and one answer each. Query parameters change nothing. So the gate cannot be measured directly and this is the closest available substitute.",
+  "why_graded": "The earlier cluster corpus contained only plausible answers, which measures the wrong band: the gate ranks real miner answers, and real answers are not all good. Each request here carries eight answers spanning excellent, good, adequate, terse, hedged, mediocre, weak and plainly wrong.",
+  "two_proxies_and_what_they_bracket": {
+    "plausible_answers_40": "agreement 0.6254, above the 0.60 floor. Probably the closer model of real traffic, where several competent models answer the same request.",
+    "graded_answers_80": "agreement 0.4359, well below the floor. The pessimistic bound.",
+    "reading": "The gate's true value probably sits between them, and the floor sits inside that range, so agreement is plausibly the binding constraint rather than separation."
+  },
+  "the_finding_that_matters": "The gate rewards resembling the champion, not being right. On temp_hour the champion scores 'It was warm in Lagos that afternoon.' at 0.9948 and 'It was 12.1 degrees Celsius' at 0.9978, while scoring the correct 'About 29.4 degrees Celsius.' at 0.0098. Our ranking of that request is sensible and the correlation is -0.1522 as a result. Where the holder is arbitrary, being correct is penalised.",
+  "measured_2026_08_23": {
+    "pooled_graded": 0.4359,
+    "pooled_plausible": 0.6254,
+    "our_distinctness_before_the_floor_fix": "48 of 80",
+    "our_distinctness_after": "62 of 80",
+    "champion_distinctness": "80 of 80"
+  },
+  "pools": [
+    {
+      "pool_id": "rain_hour",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Yes, measurable rain fell in Lagos between 15:00 and 16:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "Yes, rain was recorded in Lagos in that hour, above the 0.1 mm threshold.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Yes.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Rain fell in Lagos during the window.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Probably yes, around a 70 percent chance.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Some precipitation may have occurred in Lagos at some point.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "No measurable precipitation occurred in Lagos during that hour.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "temp_hour",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Lagos recorded 29.4 C at 14:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "About 29.4 degrees Celsius.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "29.4 C.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Roughly 29 degrees.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Around 30 C, warm and humid.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "It was warm in Lagos that afternoon.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "It was 12.1 degrees Celsius in Lagos at 14:00 UTC.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "prob_hour",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "The chance of measurable rain in Lagos in that hour is 65 percent.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "About a 65% chance.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Roughly two chances in three.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "More likely than not.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Around 55 percent.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Rain is possible at some point.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "There is a 5% probability of measurable precipitation.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "wind_hour",
+      "question": "What are the wind conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Light southwesterly winds near 8 km/h over Lagos.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "A light breeze from the southwest, about 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "8 km/h SW.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Light winds.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Around 12 km/h from the southwest.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Winds were variable.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Strong northerly gales near 70 km/h.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "humidity_hour",
+      "question": "What was the relative humidity in Lagos at 14:00 UTC?",
+      "ground_truth": "Relative humidity in Lagos at 14:00 UTC was 82 percent.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Relative humidity in Lagos at 14:00 UTC was 82 percent.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Humidity in Lagos stood at 82 percent at that hour.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "About 82 percent.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "82%.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Very humid, over 80 percent.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Around 75 percent.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "The air was humid.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Relative humidity was 21 percent, very dry.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "rain_none",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "No, the hour passed without measurable rainfall in Lagos.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "Lagos stayed dry through the requested window.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "No.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "No rain was recorded, only a trace of 0.05 mm.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Unlikely to have rained.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Conditions were variable in Lagos.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Yes, measurable rain fell in Lagos during that hour.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "cloud_hour",
+      "question": "What were the cloud conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Skies over Lagos at 14:00 UTC were overcast.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Skies over Lagos at 14:00 UTC were overcast.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "It was overcast in Lagos at that hour.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "Fully clouded over.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Overcast.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Mostly cloudy.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Partly cloudy with some breaks.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Cloud cover varied through the day.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Skies were completely clear and sunny.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "threshold_hour",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Precipitation in Lagos during the requested UTC hour measured 0.05 mm, below the 0.1 mm threshold.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "No. Precipitation in Lagos during the requested UTC hour measured 0.05 mm, below the 0.1 mm threshold.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "No, only 0.05 mm fell, under the 0.1 mm threshold.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "No, the trace that fell was below the threshold.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "No.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Almost no rain, about 0.05 mm.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "A little rain fell.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Some moisture was present.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Yes, 0.05 mm fell, which exceeds the threshold.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "pressure_hour",
+      "question": "What was the atmospheric pressure in Lagos at 14:00 UTC?",
+      "ground_truth": "Atmospheric pressure in Lagos at 14:00 UTC was 1012 hPa.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Atmospheric pressure in Lagos at 14:00 UTC was 1012 hPa.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Pressure over Lagos was 1012 hectopascals at that hour.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "About 1012 hPa.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "1012.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Close to 1010 hPa.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Around 1020 hPa.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Pressure was near normal.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Pressure was 870 hPa.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "maxtemp_day",
+      "question": "What was the maximum temperature in Lagos that day?",
+      "ground_truth": "The maximum temperature in Lagos that day was 31.2 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "The maximum temperature in Lagos that day was 31.2 degrees Celsius.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Lagos peaked at 31.2 C that day.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "A high of about 31 C.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "31.2 C.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Just over 31 degrees.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Around 33 C.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "It was hot.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "The maximum was 18.5 degrees Celsius.",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

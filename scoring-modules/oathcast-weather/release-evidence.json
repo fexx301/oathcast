@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 65128,
+    "byte_size": 65129,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
-    "keccak256_raw_bytes": "0x58d58b885b774ba5467976ce81b688517c0d3322cdb0cacc8e04f116396f446a",
+    "sha256": "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
+    "keccak256_raw_bytes": "0x03114d40b726bc7989814c4da236d16a98ab757f4e7078bed1a581c18488aea9",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
+      "measured_on_artifact": "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
+      "darwin/arm64": "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
-      "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52"
+      "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
+      "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3"
     ]
   },
   "current_artifact_abi": {
@@ -1670,5 +1670,25 @@
     "why_it_fails": "A correct answer frequently fills a governed role with a word the ground truth does not contain, because that is what paraphrasing is: 'at about 10 kilometres' against 'to see roughly 10 km'. To tell that apart from a substitution the check would have to know that kilometres and km are the same thing while Lagos and Abuja are different things of the same kind. That is a judgement about types and synonyms, and there is nothing in 65 KB of rules that supplies it.",
     "the_architectural_conclusion": "This class of defect is where a rule-based judge structurally loses to an embedding model. The champion carries a twelve-layer sentence transformer quantised to four bits, 24 MB inside a 32 MB sandbox limit, and it gets synonym and type judgements for free from the vectors. We get them from word lists, which is why every attempt here trades one corpus against another. The sandbox budget is available to us, at 65 KB of 32 MB, so the option is open; it is a different project rather than a further increment.",
     "state": "Reverted. The scorer is byte-identical to what registration 523 submitted, 313a5e0b."
+  },
+  "agreement_gate_measured_properly": {
+    "date": "2026-08-23",
+    "real_traffic_is_not_reachable": "The node's root endpoint returns four finalised SubnetResponse events, all from the telegraph-assistant slug, none on WEATHER_FORECAST, each with one answer and no question text. Query parameters for limit, event, intent and slug change nothing, and /engine, /engine/validator, /engine/validator/v1, /openapi.json and /docs are all 404. The gate cannot be measured directly.",
+    "the_previous_proxy_was_flattering_us": "It contained only plausible answers. The gate ranks real miner answers, which are not all good, so a corpus of good answers measures the wrong band. A graded corpus of ten requests with eight answers each, spanning excellent to plainly wrong, reads 0.4626 where the plausible-only corpus read 0.6296.",
+    "the_range": {
+      "plausible_answers": 0.6254,
+      "graded_answers": 0.4359,
+      "floor": 0.6,
+      "reading": "The floor sits inside the range, so agreement is plausibly the binding gate rather than separation. Which end is closer depends on how homogeneous real traffic is, and several competent models answering one request looks more like the plausible corpus."
+    },
+    "the_tie_defect_and_its_fix": {
+      "found": "Our distinct scores were 48 of 80 where the champion's were 80 of 80, with 0.9900 appearing sixteen times. The cause was the positive evidence floor, added earlier the same day as a hard max at 0.90, so every qualifying answer landed on exactly that value and their ordering was destroyed. The same mistake `cap_preserving_order` exists to prevent, made in the opposite direction.",
+      "fix": "The floor now maps the score into the band it lifts to, 0.90 plus a tenth of the score, so ordering inside the band survives.",
+      "effect": "Distinctness 48 of 80 to 62 of 80. Weather near-miss +0.8299 to +0.8331, core +0.7615 to +0.7647, wide +0.3078 to +0.3093. Agreement on the plausible corpus 0.6296 to 0.6254, and on the graded corpus 0.4626 to 0.4359.",
+      "why_agreement_fell_slightly": "Breaking a tie resolves it in our order, and our order inside the top band disagrees with the champion's more than a tie does. Spearman treats ties as average rank, which happened to correlate better than our actual ranking. The fix is still right: ties cost distinctness with no compensating benefit, and separation improved on all three corpora."
+    },
+    "the_strategic_problem": "The gate rewards resembling the holder rather than being correct. On the temperature request the champion scores 'It was warm in Lagos that afternoon.' at 0.9948 and 'It was 12.1 degrees Celsius in Lagos at 14:00 UTC.' at 0.9978, while scoring the correct 'About 29.4 degrees Celsius.' at 0.0098. Our ranking there is sensible and the correlation is -0.1522 because of it. Where the holder is arbitrary, a better judge is penalised, and no amount of quality work fixes that.",
+    "what_this_changes": "Separation was assumed to be the binding constraint for six registrations. It may not be. Before more separation work, the cheapest informative step is a registration that clears separation, because the rejection message would then name agreement instead and give a real number for it. Until then the local reading is a range, not a value.",
+    "registration_status": "No further registration is authorized."
   }
 }
