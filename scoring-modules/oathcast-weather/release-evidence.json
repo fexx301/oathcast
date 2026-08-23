@@ -1185,5 +1185,43 @@
     },
     "honest_projection": "Not a claim that this build would beat the champion. Telegraph read 0.1929 when the local weather corpus read 0.2525, a ratio of 0.76. Applying that ratio to 0.4768 projects roughly 0.36 against the champion's 0.4941, still short. The ratio is one observation from one registration and the corpora are not their fixtures, so it is an estimate of the gap's direction rather than its size.",
     "registration_status": "No further registration is authorized. The margin has moved a long way but the projection still falls short of the champion, and resubmitting costs a registration to learn what the projection already suggests."
+  },
+  "telegraph_answers_2026_08_23": {
+    "source": "Telegraph team, in reply to the source and binaries sent for registrations 496 and 506.",
+    "margin_is_recomputed": "Recomputed fresh on every registration against the current champion. Identical values to that precision mean the same cases produced the same separation. This settles the question asked before 506 was sent: reading (a), not a caching bug. Our three changes affect paths the current fixture does not exercise.",
+    "average_margin_definition": "The average separation between the good and bad answers across the comparable case set. Cases where scoring fails for EITHER module are excluded from the comparison, not counted as zero.",
+    "fixture_categories": "Declined at category level. Stated only that the fixture is derived from the intent's available evaluation data, grows as that data grows, and 'right now it exercises the core discrimination paths for this intent'.",
+    "champion_margin": "Not fixed. It moves whenever a new champion is promoted, so 0.4941 is the bar as of registration 506 rather than a standing target.",
+    "guidance": "Improve separation on the cases actually being tested rather than edge cases the fixture does not currently include. Stated directly that we are optimising for the wrong things."
+  },
+  "core_discrimination_finding": {
+    "date": "2026-08-23",
+    "summary": "A corpus of plain paraphrase-versus-wrong weather cases reproduces Telegraph's measurement of our own binary. Registration 506 scores +0.1996 on it against the 0.1929 they reported, a difference of 0.007. The same binary scores +0.6055 on our weather near-miss corpus and +0.6055 on our real intent corpus, so neither of those was measuring the scored surface.",
+    "why_the_earlier_corpora_misled": "Both were built from defects. The near-miss corpus tests whether a subtly wrong answer is caught, and our rules are good at that. The fixture tests whether a plainly right answer outranks a plainly wrong one, and our rules fire on the right answer, because a paraphrase does not repeat the ground truth's wording and therefore looks to the anchor machinery like a missing anchor.",
+    "the_measurement": {
+      "ours_current": 0.2417,
+      "registration_506": 0.1996,
+      "telegraph_minilm_baseline": 0.0479,
+      "zkasuran_salience": 0.1774,
+      "ordering_ours": "8/12",
+      "ordering_minilm": "11/12",
+      "note": "MiniLM orders 11 of 12 correctly with an average separation of 0.0479. We order 8 of 12 with 0.2417. Ordering and separation are different properties and we are now measured on the second."
+    },
+    "where_the_margin_is_lost": {
+      "average_correct_answer_score": 0.5045,
+      "average_wrong_answer_score": 0.2628,
+      "worst_correct_answers": "wind 0.2479, max_temp 0.2772, temp_value 0.2866, humidity 0.4493, visibility 0.4534",
+      "exact_ties": "three pairs tie because the correct and the wrong answer land on the same clamp constant",
+      "conclusion": "The wrong answers are already low. The correct answers are the defect."
+    },
+    "projection_if_correct_paraphrases_were_not_capped": {
+      "at_0.90": 0.6372,
+      "at_0.95": 0.6872,
+      "at_1.00": 0.7372,
+      "against_champion_at_registration_506": 0.4941,
+      "caveat": "An upper bound that assumes wrong answers stay where they are. Lifting correct answers by relaxing rules will lift some wrong answers too, since the rules do not know which is which. The projection sizes the prize, it does not predict the result."
+    },
+    "direction_this_reverses": "Every change in this module since registration 19 has been about detecting defects and lowering the scores of wrong answers. On the scored surface the binding constraint is the opposite: correct answers are not scoring high enough. That is a reversal of direction, not an increment, which is why it is recorded here before any code is written against it.",
+    "registration_status": "No further registration is authorized."
   }
 }

@@ -1,0 +1,224 @@
+{
+  "schema": "oathcast_scorer_core_discrimination_v1",
+  "role": "The first corpus in this repository that reproduces Telegraph's own measurement. Registration 506's binary scores +0.1996 here against the 0.1929 Telegraph reported for it, a difference of 0.007, where the near-miss corpus put the same binary at +0.6055 and our own intent corpus at +0.6055 as well. Telegraph described their fixture as exercising 'the core discrimination paths for this intent', and this is what that appears to mean: the good answer is a fluent paraphrase of the ground truth, the bad answer is a fluent sentence that is plainly wrong. No near-misses, no edge cases.",
+  "how_to_read_it": "Average separation is the mean of score(good) minus score(bad) across all pairs, which is Telegraph's definition, with cases excluded rather than zeroed when either module fails to score. The champion bar was 0.4941 at registration 506 and moves whenever a new champion is promoted.",
+  "measured_2026_08_23": {
+    "ours_current": 0.2417,
+    "registration_506": 0.1996,
+    "telegraph_minilm_baseline": 0.0479,
+    "zkasuran_salience": 0.1774,
+    "ordering": {
+      "ours": "8/12",
+      "registration_506": "8/12",
+      "minilm": "11/12",
+      "salience": "10/12"
+    }
+  },
+  "what_it_shows": "Our correct answers are the problem, not our wrong ones. Average correct-answer score is 0.5045 against an average wrong-answer score of 0.2628. A fluent correct paraphrase scores 0.2479 on the wind case and 0.2866 on the temperature case, and three pairs tie exactly because correct and wrong land on the same clamp. Our anchor and ambiguity rules fire on the GOOD answer, because a paraphrase by construction does not repeat the ground truth's wording. If correct paraphrases scored 0.90 with wrong answers untouched, average separation would be +0.6372.",
+  "pools": [
+    {
+      "pool_id": "rain_yes",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Rain did fall in Lagos over that hour, enough to be measured.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Lagos stayed completely dry throughout that hour, with no rainfall at all.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "rain_no",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The hour passed without any measurable rainfall in Lagos.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Lagos saw steady measurable rain for the whole of that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "temp_value",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It was about 29 degrees Celsius in Lagos at that time.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "It was about 12 degrees Celsius in Lagos at that time.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "prob_value",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The chance of measurable rain in that hour is around 65 percent.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The chance of measurable rain in that hour is around 10 percent.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "wind",
+      "question": "What are the wind conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "A gentle southwesterly breeze of roughly 8 km/h was blowing over Lagos.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Strong northerly gales of roughly 70 km/h were blowing over Lagos.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "humidity",
+      "question": "What was the relative humidity in Lagos at 14:00 UTC?",
+      "ground_truth": "Relative humidity in Lagos at 14:00 UTC was 82 percent.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "The air was very humid, at roughly 82 percent.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "The air was very dry, at roughly 20 percent.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "cloud",
+      "question": "What were the cloud conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Skies over Lagos at 14:00 UTC were overcast.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It was fully clouded over in Lagos at that hour.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Skies were completely clear and sunny in Lagos at that hour.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "storm",
+      "question": "Was there a thunderstorm in Lagos between 15:00 and 16:00 UTC?",
+      "ground_truth": "Yes. A thunderstorm was recorded in Lagos during that hour.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Thunder and lightning were observed over Lagos in that window.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Conditions were calm in Lagos, with no thunderstorm activity at all.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "snow_no",
+      "question": "Did it snow in Lagos on that date?",
+      "ground_truth": "No. Snow did not fall in Lagos, where snowfall does not occur.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "There was no snow in Lagos, as it never snows there.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Yes, a light covering of snow fell across Lagos that day.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "visibility",
+      "question": "What was visibility in Lagos at 14:00 UTC?",
+      "ground_truth": "Visibility in Lagos at 14:00 UTC was good, at about 10 kilometres.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Conditions were clear enough to see roughly 10 km.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Thick fog cut visibility to under 100 metres.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "pressure",
+      "question": "What was the atmospheric pressure in Lagos at 14:00 UTC?",
+      "ground_truth": "Atmospheric pressure in Lagos at 14:00 UTC was 1012 hPa.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "Pressure stood at about 1012 hectopascals.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "Pressure stood at about 870 hectopascals.",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "pool_id": "max_temp",
+      "question": "What was the maximum temperature in Lagos that day?",
+      "ground_truth": "The maximum temperature in Lagos that day was 31.2 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "good",
+          "answer": "It peaked at a little over 31 degrees Celsius.",
+          "correct": true
+        },
+        {
+          "label": "bad",
+          "answer": "It peaked at a little over 5 degrees Celsius.",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
