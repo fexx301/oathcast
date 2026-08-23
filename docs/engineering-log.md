@@ -590,3 +590,47 @@ Both are now fixed, 15 of 16, no regressions, and held-out went up rather than d
 The lesson is not about either bug. It is that the corpus you never wrote is the one
 hiding your real defects, and the fixture set you are scored against is worth confirming
 before spending two days optimising for it.
+
+## The margin was identical to the last registration, to every digit
+
+Registration 506 was rejected for separation: average margin 0.1929 against the
+champion's 0.4941. Registration 496 reported 0.19293104 and 0.49413237. Nothing between
+those two builds moved the scored margin, not the self-match fix and not the two tie
+fixes.
+
+That killed a hypothesis I had put in writing before 506 was sent, that 496's low margin
+was being dragged down by a case scoring 0.0000 on the self-match floor. The floor is
+evaluated separately from the margin. The 0.1929 was always a clean reading of how
+narrowly this module separates, and I had offered a comforting explanation for it instead
+of a measurement.
+
+Then the rubric inverted a lesson recorded in this repository as settled. Registration 98
+had lost three cases to two rules that zeroed instead of capped, and the conclusion,
+written into ranking_test.go, was to prefer a cap because a zero can only remove a win a
+cap might have kept. That is correct when per-case wins are the metric. Under average
+separation it is backwards: a cap that shaves 0.03 keeps the win and earns almost no
+margin. A confident defect has to land low, not merely below its pair.
+
+Building a local average-margin metric took an afternoon and found four causes. The worst
+was that the entity machinery was inert on weather questions: a city swapped for another
+scored 0.3882 on a factual question and 0.9454 on a weather one, because on the weather
+path a place becomes a context constraint rather than a value anchor and the conflict test
+required the answer to match none of the constraints, so keeping the word "measurable" was
+enough to hide it. Days of entity work, on the only surface we are scored on, doing
+nothing.
+
+The others were smaller and more embarrassing. The probability parser scanned for the '%'
+byte, so "65 percent" and "5 percent" both parsed as no probability at all and scored
+0.4739 against 0.4714. The weather vocabulary held sixteen exact words and "rain" was not
+one of them, though "precipitation" was. And the score is an additive blend where
+concision is 1.0 for every short answer and factual never looks at entities, so a wholly
+wrong answer floors at 0.45 and the ceiling does all the separating.
+
+Weather margin went from +0.2525 to +0.4768 with the frozen bar unchanged. Two of the
+things I tried along the way made it worse while passing every unit test, and both are
+recorded in release-evidence.json rather than quietly dropped, because the useful part is
+that the unit tests could not see either one.
+
+The projection still falls short. Telegraph read 0.1929 where the local corpus read
+0.2525; at that ratio 0.4768 projects to about 0.36 against 0.4941. Close enough to be
+worth the next fix, not close enough to spend a registration on.

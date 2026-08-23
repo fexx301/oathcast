@@ -90,9 +90,9 @@ func TestArtifactContract(t *testing.T) {
 	if !evidence.Artifact.RegistrationCandidate {
 		t.Fatal("rank-only artifact must be marked as a registration candidate")
 	}
-	if evidence.Artifact.ByteSize != 56083 ||
-		evidence.Artifact.SHA256 != "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1" ||
-		evidence.Artifact.Keccak256RawBytes != "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625" {
+	if evidence.Artifact.ByteSize != 60355 ||
+		evidence.Artifact.SHA256 != "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110" ||
+		evidence.Artifact.Keccak256RawBytes != "0xbbceb8e30721ce1337a728155ddc7e1a6efa02d69c07b9bda633f2ebeeddbd44" {
 		t.Fatalf("unexpected local candidate evidence: %+v", evidence.Artifact)
 	}
 	if evidence.Fixture.Path != "fixtures/wasm_scoring_cases.json" {
@@ -309,7 +309,7 @@ func TestArtifactContract(t *testing.T) {
 		evidence.Verification.PythonRepositoryTestsPassed != 498 ||
 		evidence.Verification.SyntheticFactualPairCount != 88 ||
 		evidence.Verification.SyntheticFactualMinimumMargin != 0.20625 ||
-		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.956559 {
+		evidence.Verification.SyntheticFactualOrdinalSpearman != 0.956622 {
 		t.Fatalf("unexpected local factual-paraphrase verification: %+v", evidence.Verification)
 	}
 	postflight := evidence.Verification.HistoricalFirstRegistrationPostflight

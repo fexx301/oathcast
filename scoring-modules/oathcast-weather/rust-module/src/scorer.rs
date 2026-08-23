@@ -35,6 +35,9 @@ pub(crate) const ISSUE_ROLE_BINDING_RECOMBINED: u32 = 1 << 17;
 pub(crate) const ISSUE_CLAUSE_CONTRADICTION: u32 = 1 << 18;
 pub(crate) const ISSUE_LIKELIHOOD_CONTRADICTION: u32 = 1 << 19;
 pub(crate) const ISSUE_WINDOW_END_ONLY: u32 = 1 << 20;
+pub(crate) const ISSUE_CONTEXT_ENTITY_SUBSTITUTED: u32 = 1 << 21;
+pub(crate) const ISSUE_SPAN_WIDER_THAN_WINDOW: u32 = 1 << 22;
+pub(crate) const ISSUE_UNSUPPORTED_YEAR: u32 = 1 << 23;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -1074,7 +1077,6 @@ fn is_fact_relation_or_filler(token: &[u8]) -> bool {
         b"artist",
         b"author",
         b"authored",
-        b"based",
         b"became",
         b"been",
         b"being",
@@ -1753,7 +1755,6 @@ fn is_temporal_or_unit_anchor(token: &[u8]) -> bool {
 
 fn is_context_provenance_or_modal(token: &[u8]) -> bool {
     const VALUES: &[&[u8]] = &[
-        b"according",
         b"call",
         b"calls",
         b"could",
@@ -1919,6 +1920,68 @@ fn context_source_name_hashes(
     sources
 }
 
+/// True when the answer drops a named context constraint and names a different thing in
+/// its place.
+///
+/// The pre-existing `context_conflict` test required `context_overlap == 0`, meaning the
+/// answer had to match NONE of the context constraints. Asked about Lagos, the answer
+/// "Yes, Abuja saw measurable precipitation in that hour." keeps the benign constraint
+/// "measurable", so overlap was 1, the conflict never fired, support stayed at a vacuous
+/// 1.000, and a wrong city scored 0.9454. The same swap on a non-weather question scored
+/// 0.3882, because there the city becomes a value anchor rather than a context
+/// constraint. Registration 506 was scored entirely on weather fixtures, so the whole
+/// entity apparatus was effectively inert on the only surface that counted.
+///
+/// Both halves must hold, which is what keeps this off correct answers. A terse but
+/// right answer drops the constraint without naming anything else and is untouched, and
+/// an answer that keeps Lagos while mentioning some further name has no dropped
+/// constraint to pair the novel name with.
+/// Novel content words in the answer, excluding hedges, stance words and units.
+///
+/// This is the older, cruder companion to `context_entity_substituted`, and it earns its
+/// place by catching the one shape the precise test cannot: a substituted place at the
+/// start of a sentence, "Abuja should have rain tomorrow.", where capitalisation carries
+/// no information.
+///
+/// Its defect was never the counting, it was the vocabulary. "About 65 percent." is a
+/// correct, terse answer whose only novel token was the hedge "About", so it counted 1,
+/// tripped the conflict and scored 0.3038. Filtering the words that are never names
+/// leaves that answer with a count of 0 and keeps the shape this test exists for.
+/// Approximation adverbs only. This is the narrow list, used where over-filtering
+/// silently disables a working test rather than merely widening it: applying the broad
+/// `is_never_a_name` to `novel_context_candidate_count` suppressed counts that were
+/// firing correctly and cost 0.16 of average margin on the weather corpus.
+fn is_approximation_word(token: &[u8]) -> bool {
+    const VALUES: &[&[u8]] = &[
+        b"about",
+        b"almost",
+        b"approximately",
+        b"around",
+        b"barely",
+        b"broadly",
+        b"close",
+        b"essentially",
+        b"exactly",
+        b"nearly",
+        b"precisely",
+        b"roughly",
+        b"slightly",
+        b"somewhat",
+        b"virtually",
+        // Attribution markers. "Rain tomorrow according to the Met Office." is a correct
+        // sourced answer, and while "Met" and "Office" are both recognised as source
+        // names, "according" itself was not, leaving it as the single novel candidate.
+        // The count then hit exactly 1, the conflict fired, and the answer scored 0.4516
+        // against a required 0.7. The defect was one missing function word.
+        b"according",
+        b"citing",
+        b"per",
+        b"reportedly",
+        b"via",
+    ];
+    VALUES.iter().any(|value| token_eq(token, value))
+}
+
 fn novel_context_candidate_count(
     question_tokens: &HashSet<MAX_SEMANTIC_TOKENS>,
     truth_tokens: &HashSet<MAX_SEMANTIC_TOKENS>,
@@ -1929,11 +1992,154 @@ fn novel_context_candidate_count(
     for token in TokenIter::new(answer) {
         if let Some(hash) = context_candidate_hash(question_tokens, truth_tokens, token)
             && !source_names.contains(hash)
+            && !is_approximation_word(token.bytes)
         {
             candidates.insert(hash);
         }
     }
     candidates.len
+}
+
+fn context_entity_substituted(
+    question: &str,
+    ground_truth: &str,
+    answer: &str,
+    anchors: &FactAnchors,
+    response: &HashSet<MAX_SEMANTIC_TOKENS>,
+    question_tokens: &HashSet<MAX_SEMANTIC_TOKENS>,
+    truth_tokens: &HashSet<MAX_SEMANTIC_TOKENS>,
+) -> bool {
+    // English capitalises the first word of a sentence regardless of what it is, so
+    // titlecase alone does not make a token a name. "Roughly a 65 percent chance of
+    // measurable rain in that hour." is a correct answer whose leading hedge read as a
+    // proper noun, dropped it to the ambiguity ceiling, and cost separation on exactly
+    // the case this check was added to help. These are approximation and stance adverbs
+    // that open a forecast; none is ever a name. Kept local to this check rather than
+    // added to `is_fact_relation_or_filler`, which feeds anchor construction and
+    // relation detection across the module.
+    let named = |bytes: &[u8]| {
+        token_is_entity_like(bytes)
+            && !is_fact_relation_or_filler(bytes)
+            && !is_temporal_or_unit_anchor(bytes)
+            && !is_weather_anchor_signal(bytes)
+            && !is_approximation_word(bytes)
+    };
+    let mut dropped = false;
+    for source in [question, ground_truth] {
+        for token in TokenIter::new(source) {
+            let Some(hash) = semantic_hash(token.bytes) else {
+                continue;
+            };
+            if anchors.context_constraints.contains(hash)
+                && named(token.bytes)
+                && !response.contains(hash)
+            {
+                dropped = true;
+            }
+        }
+    }
+    if !dropped {
+        return false;
+    }
+    // Forecast providers are not substituted locations. "ECMWF expects rain tomorrow"
+    // and "Rain tomorrow according to the Met Office" both name something absent from
+    // the question and the truth while answering correctly, and the module already
+    // recognises that class through `context_source_name_hashes`. Reusing it rather than
+    // re-deriving it is what keeps this check off correct sourced answers; omitting it
+    // failed the existing weather-context test on the first run.
+    let sources = context_source_name_hashes(question_tokens, truth_tokens, answer);
+    // English capitalises the opening word of a sentence whatever it is, so titlecase
+    // there is no evidence of a name. Suppressing sentence-initial tokens wholesale was
+    // tried and is wrong in the other direction: it cannot tell "Expect showers
+    // tomorrow." from "Abuja should have rain tomorrow.", and the second is a genuine
+    // substitution that has to be caught. What separates them is what the token IS, not
+    // where it sits, so `named` excludes verbs and stance words and the following token
+    // decides attribution.
+    let bytes = answer.as_bytes();
+    let mut previous_end = 0usize;
+    let mut at_sentence_start = true;
+    let mut candidate: Option<u64> = None;
+    for token in TokenIter::new(answer) {
+        let start = token.end.saturating_sub(token.bytes.len());
+        if previous_end > 0 {
+            at_sentence_start = bytes
+                .get(previous_end..start)
+                .is_some_and(|gap| gap.iter().any(|byte| matches!(byte, b'.' | b'!' | b'?')));
+        }
+        previous_end = token.end;
+        let Some(hash) = semantic_hash(token.bytes) else {
+            continue;
+        };
+
+        // A name followed by a reporting verb is attributing the forecast, not being
+        // forecast about. "ECMWF expects rain tomorrow." names a provider absent from
+        // both question and truth, in the subject slot rather than after "according to",
+        // so `context_source_name_hashes` does not cover it and it read as a substituted
+        // location. Deciding on the FOLLOWING token is what separates "ECMWF expects"
+        // from "Abuja saw".
+        if let Some(pending) = candidate.take()
+            && !is_reporting_verb(token.bytes)
+        {
+            let _ = pending;
+            return true;
+        }
+        let novel = !question_tokens.contains(hash)
+            && !truth_tokens.contains(hash)
+            && !sources.contains(hash);
+        // Restored after measurement. Dropping this guard and relying on word lists
+        // instead moved the weather corpus from +0.4966 to +0.3396 and the ranking pools
+        // from +0.3200 to +0.2413, taking inversions from 9 to 12, while every unit test
+        // still passed. Sentence-initial titlecase really is uninformative, and the cost
+        // is that "Abuja should have rain tomorrow." is invisible here; the counted test
+        // below catches that shape instead.
+        if at_sentence_start && !token_is_all_uppercase(token.bytes) {
+            continue;
+        }
+        if named(token.bytes) && novel {
+            candidate = Some(hash);
+        }
+    }
+    candidate.is_some()
+}
+
+/// Verbs that mark the preceding name as the source of a forecast rather than its
+/// subject.
+fn is_reporting_verb(token: &[u8]) -> bool {
+    const VALUES: &[&[u8]] = &[
+        b"expects",
+        b"expect",
+        b"reports",
+        b"report",
+        b"reported",
+        b"forecasts",
+        b"forecast",
+        b"predicts",
+        b"predict",
+        b"predicted",
+        b"says",
+        b"said",
+        b"indicates",
+        b"indicate",
+        b"shows",
+        b"show",
+        b"showed",
+        b"estimates",
+        b"estimate",
+        b"projects",
+        b"project",
+        b"models",
+        b"warns",
+        b"warn",
+        b"notes",
+        b"observes",
+        b"anticipates",
+        b"suggests",
+        b"puts",
+        b"gives",
+        b"has",
+        b"had",
+    ];
+    VALUES.iter().any(|value| token_eq(token, value))
 }
 
 fn fact_anchors(question: &str, ground_truth: &str, weather_question: bool) -> FactAnchors {
@@ -3065,6 +3271,14 @@ fn fact_entity_pairs(
 struct FactAnchorAssessment {
     support: f32,
     contradicted: bool,
+    /// A named context constraint was dropped and a different named thing put in its
+    /// place. Separated from `ambiguous_or_stuffed` because the two deserve very
+    /// different ceilings: this one means "you answered about somewhere else", which is
+    /// a definite defect, where ambiguity only means "I cannot tell what you claimed".
+    /// Sharing the 0.49 ambiguity ceiling left a wrong-city answer at 0.4534 against a
+    /// correct 0.9784, and registration 506 was rejected for exactly this, separation
+    /// too narrow rather than ordering wrong.
+    context_entity_substituted: bool,
     /// The answer's entity pairing disagrees with the ground truth's, with a novel
     /// entity introduced after a contrast word. Exposed separately from
     /// `ambiguous_or_stuffed` because it means "you said someone else did it"
@@ -3413,10 +3627,36 @@ fn fact_anchor_assessment(
         && observed_entity_pairs.len > 0
         && expected_entity_pairs.overlap(&observed_entity_pairs) == 0;
 
+    let entity_substitution = weather_question
+        && anchors.context_constraints.len > 0
+        && context_entity_substituted(
+            question,
+            ground_truth,
+            answer,
+            &anchors,
+            &response,
+            &question_tokens,
+            &truth_tokens,
+        );
+    // Retired: `context_overlap == 0 && novel_context_candidate_count(..) == 1`. It was a
+    // proxy for "the answer talks about something else", and the exact-one count was
+    // there to spare paraphrases that introduce several new words. It fired on correct
+    // terse answers, "About 65 percent." among them, and missed a swapped city whenever
+    // the answer kept any one benign context word. `context_entity_substituted` tests the
+    // thing itself: a named or locative-slot constraint dropped and another put in place.
     let context_conflict = weather_question
         && anchors.context_constraints.len > 0
-        && context_overlap == 0
-        && novel_context_candidate_count(&question_tokens, &truth_tokens, answer) == 1;
+        && ((context_overlap == 0
+            && novel_context_candidate_count(&question_tokens, &truth_tokens, answer) == 1)
+            || context_entity_substituted(
+                question,
+                ground_truth,
+                answer,
+                &anchors,
+                &response,
+                &question_tokens,
+                &truth_tokens,
+            ));
 
     let support = if anchors.context_constraints.len == 0 {
         value_support.max(acronym_support)
@@ -3437,6 +3677,7 @@ fn fact_anchor_assessment(
     Some(FactAnchorAssessment {
         support,
         contradicted,
+        context_entity_substituted: entity_substitution,
         relation_mismatch,
         no_binding_anchors: anchors.values.len == 0 && anchors.context_constraints.len == 0,
         ambiguous_or_stuffed: connector_ambiguity
@@ -3625,8 +3866,15 @@ fn factual_quality(
     let mut signals = 0u8;
 
     if let Some(expected) = truth_probability {
+        // Twice the absolute error, not once. A forecast that says 35% where the truth
+        // is 65% is a different forecast, but the gentler curve scored it 0.70 against
+        // the correct answer's 1.00, and after averaging across four signals and a 0.30
+        // weight that became 0.02 of separation. At this slope 65 against 35 scores
+        // 0.40 and 65 against 5 scores 0.00, while an answer rounding 65 to 70 still
+        // scores 0.90. Registration 506 was rejected for separation, and a signal this
+        // flat on the quantity the question asks about is a direct cause.
         total += answer_probability
-            .map(|actual| (1.0 - (expected - actual).abs()).clamp(0.0, 1.0))
+            .map(|actual| (1.0 - (2.0 * (expected - actual).abs())).clamp(0.0, 1.0))
             .unwrap_or(0.0);
         signals += 1;
     }
@@ -4106,6 +4354,18 @@ pub(crate) fn evaluate(
         issues |= ISSUE_AMBIGUOUS_FACT_ANCHORS;
         score = cap_preserving_order(score, 0.49);
     }
+    // A definite substitution takes a far tighter ceiling than ambiguity. The additive
+    // composition floors a wrong answer at 0.45 before any cap, because `factual` reads
+    // polarity, probability, concepts and numbers but never entities, and `concision` is
+    // 1.0 for every answer under 240 bytes. So the ceiling is what actually separates
+    // here, and 0.49 is not a separation. Registration 506 lost on average margin,
+    // 0.1929 against the champion's 0.4941, while winning 11 of 12 on ordering: the
+    // ceilings were tuned when per-case wins were the metric, and under a separation
+    // rubric a confident defect has to land low rather than merely below its pair.
+    if fact_assessment.is_some_and(|assessment| assessment.context_entity_substituted) {
+        issues |= ISSUE_CONTEXT_ENTITY_SUBSTITUTED;
+        score = cap_preserving_order(score, 0.15);
+    }
     // A reassigned relation takes a tighter ceiling than vague phrasing, and takes
     // it as a compression rather than a zero.
     //
@@ -4188,6 +4448,24 @@ pub(crate) fn evaluate(
     {
         issues |= ISSUE_LIKELIHOOD_CONTRADICTION;
         score = cap_preserving_order(score, 0.30);
+    }
+    // An answer whose asserted span is wider than the window the question named. Asked
+    // about one hour, "at some point in the 24 hours around it" would be true of many
+    // dry hours and does not answer the question; it scored 0.9145 against a correct
+    // 0.9480 before this check. Requires a margin of more than double, so an answer
+    // rounding a 55 minute window to "about an hour" is untouched.
+    if let (Some(window), Some(asserted)) = (
+        crate::text::question_window_minutes(question),
+        crate::text::asserted_duration_minutes(answer),
+    ) && asserted > window.saturating_mul(2)
+    {
+        issues |= ISSUE_SPAN_WIDER_THAN_WINDOW;
+        score = cap_preserving_order(score, 0.30);
+    }
+    // A calendar year supported by neither the question nor the ground truth.
+    if crate::text::asserts_unsupported_year(question, ground_truth, answer) {
+        issues |= ISSUE_UNSUPPORTED_YEAR;
+        score = cap_preserving_order(score, 0.40);
     }
     // An answer that designates the requested window's closing hour as its own.
     if crate::text::answer_binds_window_end_only(question, answer) {

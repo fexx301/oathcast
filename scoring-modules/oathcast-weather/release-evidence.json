@@ -5,12 +5,12 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 56083,
+    "byte_size": 60355,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
-    "keccak256_raw_bytes": "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625",
+    "sha256": "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
+    "keccak256_raw_bytes": "0xbbceb8e30721ce1337a728155ddc7e1a6efa02d69c07b9bda633f2ebeeddbd44",
     "registration_candidate": true,
-    "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956559. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
+    "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
   "registration_41_artifact": {
     "byte_size": 42798,
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
+      "measured_on_artifact": "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -418,7 +418,7 @@
       "ranking_pools": "tied 1 to 0, separated 8 to 9, inverted unchanged at 1",
       "generated_pairs": "unchanged at 9 of 375 inverted",
       "weakest_synthetic_factual_margin": "unchanged at 0.206250",
-      "synthetic_ordinal_spearman": "0.956559 to 0.956559, a decrease of 0.000647",
+      "synthetic_ordinal_spearman": "0.956622 to 0.956622, a decrease of 0.000647",
       "pair_margins": "all 88 still clear their minimum margins under both wazero engines",
       "engine_divergence": "unchanged"
     },
@@ -438,7 +438,7 @@
       "ranking_pools": "separated 9 to 10, inverted 1 to 0, ties remain 0. Worst separation goes from -0.045833 to +0.048125, positive for the first time.",
       "generated_pairs": "unchanged at 9 of 375 inverted",
       "weakest_synthetic_factual_margin": "unchanged at 0.206250",
-      "synthetic_ordinal_spearman": "0.958919 to 0.956559",
+      "synthetic_ordinal_spearman": "0.958919 to 0.956622",
       "pair_margins": "all 88 still clear their minimum margins under both wazero engines",
       "engine_divergence": "unchanged"
     },
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
+      "darwin/arm64": "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
-      "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1"
+      "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
+      "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110"
     ]
   },
   "current_artifact_abi": {
@@ -717,7 +717,7 @@
     "wazero_host_suite_scope": "Current rank-only ABI, weather fixture ordering, 88 synthetic factual paraphrase and adversarial pairs with local margin and bad-score gates, synthetic ordinal Spearman, allocator safety, malformed input, exact byte limits, deterministic calls, and published Stage 1 behavior.",
     "synthetic_factual_pair_count": 88,
     "synthetic_factual_minimum_margin": 0.20625,
-    "synthetic_factual_ordinal_spearman": 0.956559,
+    "synthetic_factual_ordinal_spearman": 0.956622,
     "synthetic_factual_evidence_limit": "This local ordinal proxy measures exact > good > bad ordering on handcrafted factual and adversarial cases. It reflects user-relayed Telegraph guidance about the factual paraphrase category and 0.15 margin floor, but it does not contain Telegraph's hidden cases or champion historical-score series and is not comparable to the live 0.60 candidate-versus-champion Spearman result.",
     "published_stage_1_checks_passed": {
       "exact_required_function_exports": true,
@@ -1105,5 +1105,85 @@
       "worst_self_match": "1.0000 across all 89 distinct ground truths in this repository plus 21 non-text and edge shapes, so registration 496's rejection reason stays fixed"
     },
     "registration_status": "No further registration is authorized. Registering requires fresh explicit approval from the repository owner, hosting of this artifact, and a signed transaction."
+  },
+  "registration_506_submission": {
+    "date": "2026-08-22",
+    "registration_id": 506,
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "transaction_hash": "0x28ffef66e896a7c7d974aa2f0634861f2a44af99f0824e12761869e6371aee49",
+    "chain_id": 84532,
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "wasm_hash": "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625",
+    "wasm_sha256": "bc7fb1d13dba0dca6dfa99e1ef24a59436730cb9165ac77c0b32af7654703ae1",
+    "wasm_byte_size": 56083,
+    "authorized_by": "Repository owner, who registered directly. The preceding commit stated that no registration was authorized by it; the owner made the call.",
+    "preflight_verification": {
+      "on_chain_hash_read_from_registry_event": "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625",
+      "hosted_url_keccak": "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625",
+      "local_build_keccak": "0x70749c1e48f37140eb1f90c4b346cd480544873380507fa3e376930736dcf625 (the build as registered; the tree has moved on since)",
+      "all_three_agree": true,
+      "hosted_bytes_byte_identical_to_local_build": true,
+      "hosted_artifact_loads_and_scores": "verified through wazero on both the optimising compiler and the interpreter"
+    },
+    "what_changed_since_496": "The self-match floor fix that 496 was rejected for, plus two exact ties broken on the weather surface: an answer naming the requested window's closing hour as its own, and a probability stated in words rather than digits. See weather_surface_finding.",
+    "what_to_read_from_the_result": {
+      "primary": "wins out of comparable_cases. 496 took 11 of 12.",
+      "secondary": "candidate_margin against champion_margin. 496 gave 0.19293104 against 0.49413237, but one case scoring 0.0000 on the self-match floor would drag the candidate mean down on its own, so that gap is not yet a clean reading.",
+      "structural": "worst_self_match must be at or above 0.75. It is 1.0000 locally across all 89 ground truths in this repository plus 21 non-text shapes.",
+      "caution": "Whether the two tie fixes touch the scored surface at all depends on whether numeric and time_window categories are in the WEATHER_FORECAST set. Both were excluded from the set the earlier registrations faced. That question was drafted for Telegraph and is unanswered."
+    },
+    "concurrent_registrations_seen_in_the_same_block_window": {
+      "note": "Read from registry events, not from any private source.",
+      "zkasuran_salience_scorer": "registered against WEATHER_CHECK, intent 0xd251c16276e1be4d14890135533b6417bd3c71d94d1deaa76215690dd1f149e0, a different intent from ours",
+      "telegraph_sentinel_fraud_scorer": "registered against FRAUD_DETECTION",
+      "champion_identity_for_our_intent": "unknown to us. The champion_margin in 496's report is not attributed to a named module, so no assumption is recorded here about which module holds WEATHER_FORECAST."
+    }
+  },
+  "registration_506_result": {
+    "date": "2026-08-22",
+    "registration_id": 506,
+    "intent": "WEATHER_FORECAST",
+    "activation_status": "REJECTED",
+    "rejection_reason": "lost to the current champion on separation: your scorer did not separate good from bad answers more clearly than the champion (your average margin 0.1929 vs champion 0.4941). To replace it, you must beat its separation, not just tie it.",
+    "candidate_margin": 0.1929,
+    "champion_margin": 0.4941,
+    "decisive_observation": "Identical to registration 496's 0.19293104 and 0.49413237 at every digit reported. Nothing changed between the two builds moved the scored margin: not the self-match fix, not the two tie fixes. This refutes the hypothesis recorded before 506 was sent, that 496's low margin was depressed by a case scoring 0.0000 on the self-match floor. The self-match floor is evaluated separately from the margin, so 0.1929 was always a clean reading of this module's separation.",
+    "what_it_also_implies": "The two tie fixes in registration 506 touched no scored case, which is weak evidence that the numeric and time_window categories remain outside this fixture set. Weak because a margin can be unchanged for other reasons; it is consistent with, not proof of, the exclusion that applied to the earlier set."
+  },
+  "separation_rubric_finding": {
+    "date": "2026-08-23",
+    "summary": "The rubric changed and inverted a lesson this repository had recorded as settled. Under per-case wins, a cap was strictly safer than a zero, because a zero can only remove a win a cap might have kept; registration 98 lost three cases proving it. Under average separation, a cap that shaves 0.03 keeps the win and earns almost no margin, so a confident defect has to land low rather than merely below its pair.",
+    "local_instrument": "An average-margin metric over the pool corpora, min(correct) - max(wrong) per pool. It read +0.2444 across all pools and +0.2525 on the weather corpus when Telegraph read 0.1929, so it tracks their measurement in character if not in scale.",
+    "root_causes_measured": {
+      "entity_machinery_inert_on_weather": "The same defect, a city swapped for another, scored 0.3882 on a factual question and 0.9454 on a weather one. On the weather path a place becomes a context constraint rather than a value anchor, and the conflict test required context_overlap == 0, so one benign shared word such as 'measurable' satisfied the constraint and the swap was never noticed. Support stayed at a vacuous 1.000. Registration 506 was scored entirely on weather fixtures, so the bulk of the entity work was inert on the only surface that counted.",
+      "probability_magnitude_unscored": "percent_probability scanned for the '%' byte only. 'Roughly a 65 percent chance' and 'Roughly a 5 percent chance' both parsed as stating no probability, contributing 0.0 alike, and scored 0.4739 against 0.4714. A separation of 0.0025 between a correct forecast and one off by sixty points.",
+      "weather_vocabulary_missing_rain": "weather_concept_mask held sixteen canonical words matched by exact token. 'rain' was not among them though 'precipitation' was, and no unit abbreviation was. So the commonest way to answer a weather question scored zero concept agreement, which pulls factual down on correct answers. An exact temperature match scored 0.4712.",
+      "additive_floor": "score = 0.55*semantic + 0.30*factual + 0.15*concision. concision is 1.0 for every answer under 240 bytes and factual reads polarity, probability, concepts and numbers but never entities, so a wholly wrong answer floors at 0.45 before any cap and the ceiling does all the separating. 0.49 is not a separation."
+    },
+    "changes": {
+      "spelled_percent": "percent, per cent and pct recognised alongside '%'",
+      "probability_curve": "agreement steepened from 1-|d| to 1-2|d| clamped, so 65 against 35 scores 0.40 rather than 0.70 and 65 against 5 scores 0.00 rather than 0.40, while 65 against 70 still scores 0.90",
+      "context_entity_substituted": "a named context constraint dropped and another named thing put in its place, with forecast providers excluded via the existing context_source_name_hashes and via a following reporting verb, which is what separates 'ECMWF expects' from 'Abuja saw'",
+      "tiered_ceiling": "substitution takes 0.15 where ambiguity keeps 0.49",
+      "weather_vocabulary": "16 canonical words to 78 surface forms including rain, showers, degrees, celsius and the unit abbreviations",
+      "span_wider_than_window": "an asserted duration more than double the question's window takes 0.30",
+      "unsupported_year": "a calendar year in neither question nor truth takes 0.40",
+      "attribution_markers": "according, per, via, citing and reportedly filtered from the novel-candidate count"
+    },
+    "measured_result": {
+      "weather_corpus_average_margin": "+0.2525 to +0.4768",
+      "all_pools_average_margin": "+0.2444 to +0.3224",
+      "weather_ordering": "15/16 to 16/16 at one point, settling at 15/16 with inversions unchanged at 1",
+      "frozen_bar": "unchanged: generated 8 inverted and 9 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, length 4/4, engine divergence 0",
+      "worst_self_match": "1.0000 across 89 ground truths plus 21 non-text shapes",
+      "synthetic_spearman": "0.956559 to 0.956622"
+    },
+    "two_wrong_turns_worth_recording": {
+      "locative_slot_rule": "A rule treating a novel token after a locative preposition as a substituted place passed every unit test and cost 0.16 of average margin on the weather corpus, taking inversions from 9 to 12. Removed. Unit tests cannot see this class of regression; only the corpora can.",
+      "positional_name_guard_removal": "Suppressing sentence-initial titlecase tokens is needed, because English capitalises openers regardless, but removing that guard in favour of word lists cost the same 0.16 and the same three inversions. Both directions were measured rather than argued."
+    },
+    "honest_projection": "Not a claim that this build would beat the champion. Telegraph read 0.1929 when the local weather corpus read 0.2525, a ratio of 0.76. Applying that ratio to 0.4768 projects roughly 0.36 against the champion's 0.4941, still short. The ratio is one observation from one registration and the corpora are not their fixtures, so it is an estimate of the gap's direction rather than its size.",
+    "registration_status": "No further registration is authorized. The margin has moved a long way but the projection still falls short of the champion, and resubmitting costs a registration to learn what the projection already suggests."
   }
 }

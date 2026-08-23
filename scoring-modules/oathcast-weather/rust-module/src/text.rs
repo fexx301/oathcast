@@ -188,21 +188,96 @@ pub(crate) fn semantic_hash(token: &[u8]) -> Option<u64> {
     Some(hash_lower(canonical))
 }
 
+/// Weather concepts, each listed with the everyday words and unit abbreviations that
+/// express it.
+///
+/// The canonical sixteen were matched by exact token, so "rain" scored no agreement at
+/// all against a ground truth saying "precipitation", and "29.4 C" scored none against
+/// "29.4 degrees Celsius". Both are the plain way to answer a weather question, and both
+/// pulled `concept_quality` to 0.0, which drags `factual` down and costs separation on
+/// correct answers. An exact temperature match measured 0.4712 this way.
+///
+/// Morphological variants are spelled out rather than stemmed, because the token
+/// comparison is an exact hash and a stemmer is a great deal of machinery for a closed
+/// vocabulary.
 pub(crate) fn weather_concept_mask(text: &str) -> u32 {
+    const PRECIPITATION: u32 = 1 << 0;
+    const TEMPERATURE: u32 = 1 << 1;
     const CONCEPTS: &[(&[u8], u32)] = &[
-        (b"precipitation", 1 << 0),
-        (b"temperature", 1 << 1),
+        (b"precipitation", PRECIPITATION),
+        (b"rain", PRECIPITATION),
+        (b"rains", PRECIPITATION),
+        (b"rained", PRECIPITATION),
+        (b"raining", PRECIPITATION),
+        (b"rainfall", PRECIPITATION),
+        (b"rainy", PRECIPITATION),
+        (b"drizzle", PRECIPITATION),
+        (b"shower", PRECIPITATION),
+        (b"showers", PRECIPITATION),
+        (b"wet", PRECIPITATION),
+        (b"mm", PRECIPITATION),
+        (b"temperature", TEMPERATURE),
+        (b"temperatures", TEMPERATURE),
+        (b"degrees", TEMPERATURE),
+        (b"degree", TEMPERATURE),
+        (b"celsius", TEMPERATURE),
+        (b"centigrade", TEMPERATURE),
+        (b"fahrenheit", TEMPERATURE),
+        (b"kelvin", TEMPERATURE),
+        (b"warm", TEMPERATURE),
+        (b"warmer", TEMPERATURE),
+        (b"cold", TEMPERATURE),
+        (b"colder", TEMPERATURE),
+        (b"cool", TEMPERATURE),
+        (b"cooler", TEMPERATURE),
+        (b"hot", TEMPERATURE),
+        (b"hotter", TEMPERATURE),
+        (b"mild", TEMPERATURE),
+        (b"c", TEMPERATURE),
+        (b"f", TEMPERATURE),
+        (b"k", TEMPERATURE),
         (b"wind", 1 << 2),
+        (b"winds", 1 << 2),
+        (b"windy", 1 << 2),
+        (b"breeze", 1 << 2),
+        (b"breezy", 1 << 2),
         (b"gust", 1 << 3),
+        (b"gusts", 1 << 3),
+        (b"gusting", 1 << 3),
         (b"cloud", 1 << 4),
+        (b"clouds", 1 << 4),
+        (b"cloudy", 1 << 4),
+        (b"overcast", 1 << 4),
         (b"clear", 1 << 5),
+        (b"sunny", 1 << 5),
+        (b"sun", 1 << 5),
+        (b"sunshine", 1 << 5),
         (b"snow", 1 << 6),
+        (b"snowfall", 1 << 6),
+        (b"snowing", 1 << 6),
+        (b"sleet", 1 << 6),
         (b"storm", 1 << 7),
+        (b"storms", 1 << 7),
+        (b"stormy", 1 << 7),
+        (b"thunderstorm", 1 << 7),
+        (b"thunder", 1 << 7),
+        (b"squall", 1 << 7),
         (b"humidity", 1 << 8),
+        (b"humid", 1 << 8),
         (b"fog", 1 << 9),
+        (b"foggy", 1 << 9),
+        (b"mist", 1 << 9),
+        (b"misty", 1 << 9),
+        (b"haze", 1 << 9),
         (b"pressure", 1 << 10),
+        (b"hpa", 1 << 10),
+        (b"millibar", 1 << 10),
+        (b"millibars", 1 << 10),
         (b"visibility", 1 << 11),
         (b"ice", 1 << 12),
+        (b"icy", 1 << 12),
+        (b"frost", 1 << 12),
+        (b"freezing", 1 << 12),
         (b"hail", 1 << 13),
         (b"maximum", 1 << 14),
         (b"minimum", 1 << 15),
@@ -570,10 +645,43 @@ fn find_json_number_field(text: &str, key: &[u8]) -> Option<f32> {
     None
 }
 
+/// True when a spelled-out percent marker starts at `at`, on a word boundary:
+/// "percent", "per cent" and "pct". Registration 506 lost on separation, and this is
+/// one measured reason. Only the '%' byte was recognised, so against a ground truth of
+/// "There is a 65% probability", the answers "Roughly a 65 percent chance" and "Roughly
+/// a 5 percent chance" both parsed as stating no probability at all, contributing 0.0
+/// to the agreement term alike. The two scored 0.4739 and 0.4714, a separation of
+/// 0.0025 between a correct forecast and one off by sixty points.
+fn spelled_percent_len(bytes: &[u8], at: usize) -> Option<usize> {
+    if at > 0 && (bytes[at - 1].is_ascii_alphabetic() || bytes[at - 1] == b'_') {
+        return None;
+    }
+    for marker in [
+        b"percent".as_slice(),
+        b"per cent".as_slice(),
+        b"pct".as_slice(),
+    ] {
+        let Some(window) = bytes.get(at..at + marker.len()) else {
+            continue;
+        };
+        if window
+            .iter()
+            .zip(marker)
+            .all(|(left, right)| left.to_ascii_lowercase() == *right)
+            && !bytes
+                .get(at + marker.len())
+                .is_some_and(|next| next.is_ascii_alphabetic())
+        {
+            return Some(marker.len());
+        }
+    }
+    None
+}
+
 fn percent_probability(text: &str) -> Option<f32> {
     let bytes = text.as_bytes();
     for percent in 0..bytes.len() {
-        if bytes[percent] != b'%' {
+        if bytes[percent] != b'%' && spelled_percent_len(bytes, percent).is_none() {
             continue;
         }
         let mut end = percent;
@@ -716,6 +824,122 @@ pub(crate) fn answer_binds_window_end_only(question: &str, answer: &str) -> bool
         return false;
     }
     contains_time(answer, end) && !contains_time(answer, start)
+}
+/// Minutes between the first and last clock time a question names, when it names at
+/// least two. This is the window the question asks about.
+pub(crate) fn question_window_minutes(question: &str) -> Option<u32> {
+    let bytes = question.as_bytes();
+    let mut first: Option<u16> = None;
+    let mut last: Option<u16> = None;
+    let mut cursor = 0usize;
+    while cursor < bytes.len() {
+        if let Some((value, end)) = parse_time_at(bytes, cursor) {
+            if first.is_none() {
+                first = Some(value);
+            } else {
+                last = Some(value);
+            }
+            cursor = end;
+        } else {
+            cursor += 1;
+        }
+    }
+    let (first, last) = (first?, last?);
+    if last <= first {
+        return None;
+    }
+    Some(u32::from(last - first))
+}
+
+/// The longest duration the text asserts, in minutes, from a figure followed by a unit
+/// of time. Digits only; a spelled-out "twenty four hours" is not read.
+pub(crate) fn asserted_duration_minutes(text: &str) -> Option<u32> {
+    const UNITS: &[(&[u8], u32)] = &[
+        (b"minute", 1),
+        (b"minutes", 1),
+        (b"hour", 60),
+        (b"hours", 60),
+        (b"day", 1440),
+        (b"days", 1440),
+        (b"week", 10080),
+        (b"weeks", 10080),
+    ];
+    let mut longest: Option<u32> = None;
+    let mut pending: Option<f32> = None;
+    for token in TokenIter::new(text) {
+        if let Some(value) = parse_decimal(token.bytes) {
+            pending = Some(value);
+            continue;
+        }
+        if let Some(value) = pending.take()
+            && let Some((_, per)) = UNITS
+                .iter()
+                .find(|(unit, _)| token_eq_lower(token.bytes, unit))
+        {
+            let minutes = (value * *per as f32) as u32;
+            if longest.is_none_or(|current| minutes > current) {
+                longest = Some(minutes);
+            }
+        }
+    }
+    longest
+}
+
+/// True when the answer asserts a calendar year that neither the question nor the ground
+/// truth mentions.
+///
+/// A forecast question fixes its own window, so a date from outside it is unsupported by
+/// anything the scorer was given. The wrong answer "Yes, measurable precipitation
+/// occurred during the requested hour on 2019-04-02." scored 0.9278 against a correct
+/// 0.9776, because nothing looked at the date at all. This mirrors the existing
+/// treatment of unsupported rank modifiers rather than inventing a new principle.
+pub(crate) fn asserts_unsupported_year(question: &str, ground_truth: &str, answer: &str) -> bool {
+    let known = |year: u32| {
+        [question, ground_truth]
+            .iter()
+            .any(|source| text_contains_year(source, year))
+    };
+    for token in TokenIter::new(answer) {
+        if let Some(year) = years_in(token.bytes)
+            && !known(year)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn years_in(token: &[u8]) -> Option<u32> {
+    let mut index = 0usize;
+    while index + 4 <= token.len() {
+        if token[index..index + 4].iter().all(u8::is_ascii_digit)
+            && (index == 0 || !token[index - 1].is_ascii_digit())
+            && token
+                .get(index + 4)
+                .is_none_or(|next| !next.is_ascii_digit())
+        {
+            let year = token[index..index + 4]
+                .iter()
+                .fold(0u32, |total, digit| total * 10 + u32::from(digit - b'0'));
+            if (1800..=2200).contains(&year) {
+                return Some(year);
+            }
+        }
+        index += 1;
+    }
+    None
+}
+
+fn text_contains_year(text: &str, year: u32) -> bool {
+    TokenIter::new(text).any(|token| years_in(token.bytes) == Some(year))
+}
+
+fn token_eq_lower(token: &[u8], other: &[u8]) -> bool {
+    token.len() == other.len()
+        && token
+            .iter()
+            .zip(other)
+            .all(|(left, right)| left.to_ascii_lowercase() == *right)
 }
 pub(crate) fn has_time_outside_question(question: &str, answer: &str) -> bool {
     if !contains_any_time(question) {
