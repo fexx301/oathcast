@@ -1656,5 +1656,19 @@
     },
     "what_this_needs": "A replacement for the counted branch rather than a patch to it. Its job is to catch a substituted place the named-entity check cannot see because the substitute is lowercase. Its implementation counts novel non-filler tokens, which is a proxy so loose that the count is asymmetric between a correct paraphrase and a wrong answer. A check that compares what fills a given role, rather than counting what is new, would not have this failure mode.",
     "registration_status": "No further registration is authorized."
+  },
+  "role_comparison_attempt": {
+    "date": "2026-08-23",
+    "goal": "Replace the counted context branch, whose exact-one gate is asymmetric between a correct paraphrase and a wrong answer, with a comparison of what fills a governed role. Counting how many tokens are new cannot separate 'Light winds from the southwest, near 8 km/h.' from 'Light winds from the northeast, near 8 km/h.', because both introduce the same number of new words. Comparing role fillers can: both say 'from X' and only one says 'from the southwest'.",
+    "implemented": "role_fillers pairs each governing preposition with the first content word it governs, stepping over function words so 'in the city of abuja' reaches the place name. role_filler_conflict compares only roles the ground truth also fills, and reports a conflict when the answer fills one with a head the truth never mentions.",
+    "four_variants_measured_all_net_negative": {
+      "replace_the_counted_branch": "Fixed the prepositional cases including 'in the city of abuja', but lost the subject-position substitution 'Abuja should have rain tomorrow.', which has no governing preposition to compare and which the counted branch had been catching. An existing test covers it.",
+      "also_allow_sentence_initial_names": "Recovered the subject case. Wide corpus +0.3078 to +0.5253, but the core corpus fell +0.7615 to +0.3875 and the near-miss corpus +0.8299 to +0.7474 with an inversion appearing.",
+      "restrict_that_to_the_answers_first_token": "Identical numbers to the previous variant, because most answers begin with a capitalised word that is not a name. The damage is concentrated exactly where the exception was meant to be narrow.",
+      "role_comparison_alongside_the_counted_branch": "All 50 native tests pass. Wide corpus +0.3078 to +0.3539 and wrong_direction fixed, but the core corpus fell +0.7615 to +0.4676 and the near-miss corpus +0.8299 to +0.7491."
+    },
+    "why_it_fails": "A correct answer frequently fills a governed role with a word the ground truth does not contain, because that is what paraphrasing is: 'at about 10 kilometres' against 'to see roughly 10 km'. To tell that apart from a substitution the check would have to know that kilometres and km are the same thing while Lagos and Abuja are different things of the same kind. That is a judgement about types and synonyms, and there is nothing in 65 KB of rules that supplies it.",
+    "the_architectural_conclusion": "This class of defect is where a rule-based judge structurally loses to an embedding model. The champion carries a twelve-layer sentence transformer quantised to four bits, 24 MB inside a 32 MB sandbox limit, and it gets synonym and type judgements for free from the vectors. We get them from word lists, which is why every attempt here trades one corpus against another. The sandbox budget is available to us, at 65 KB of 32 MB, so the option is open; it is a different project rather than a further increment.",
+    "state": "Reverted. The scorer is byte-identical to what registration 523 submitted, 313a5e0b."
   }
 }
