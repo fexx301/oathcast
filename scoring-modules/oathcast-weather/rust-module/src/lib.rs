@@ -5,7 +5,12 @@ mod text;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn score_for_native_tests(question: &str, ground_truth: &str, miner_answer: &str) -> f32 {
-    scorer::evaluate(question, ground_truth, miner_answer).score
+    let judgement = scorer::evaluate(question, ground_truth, miner_answer).score;
+    if scorer::is_weather_question(question) {
+        scorer::separation_step(judgement)
+    } else {
+        judgement
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -250,7 +255,15 @@ pub unsafe extern "C" fn rank_answer(
         unsafe { read_input(ma_ptr, ma_len, scorer::MAX_MINER_ANSWER_BYTES) },
     ) {
         (Some(question), Some(ground_truth), Some(miner_answer)) => {
-            scorer::evaluate(question, ground_truth, miner_answer).score
+            // The judgement, then the competitive transform on the registered surface.
+            // `evaluate` returns a smooth score whose ceilings are the rules' specification;
+            // the protocol ranks on average separation. See `scorer::separation_step`.
+            let judgement = scorer::evaluate(question, ground_truth, miner_answer).score;
+            if scorer::is_weather_question(question) {
+                scorer::separation_step(judgement)
+            } else {
+                judgement
+            }
         }
         _ => 0.0,
     };

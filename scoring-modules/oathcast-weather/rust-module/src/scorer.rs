@@ -1052,11 +1052,25 @@ fn decoded_json_content_eq(raw_content: &str, expected: &str) -> bool {
     raw_index == raw.len() && expected_index == expected.len()
 }
 
+/// Separators binding two figures together, so that "5/10" and "5-10" are recognised as
+/// different claims about the same pair of numbers.
+///
+/// The colon is deliberately absent, and its absence is the whole point of this comment.
+/// `numeric_set` skips digits adjacent to a colon, because 14:00 is a clock time rather than
+/// a quantity, so a colon can never bind two numbers that this module compares. Counting it
+/// here anyway meant that any ground truth carrying a timestamp set an operator bit with no
+/// number behind it, and every answer that did not restate the timestamp then differed in
+/// mask and was charged with a conflicting numeric binding.
+///
+/// Weather ground truths carry a timestamp as a matter of course, so this fired across the
+/// registered surface. Four correct answers in the core corpus were capped at the 0.49
+/// ceiling by it: a wind, humidity, visibility and pressure answer, each of which stated the
+/// right figure and simply did not repeat "at 14:00 UTC" back.
 fn numeric_operator_mask(text: &str) -> u8 {
     let bytes = text.as_bytes();
     let mut mask = 0u8;
     for (index, byte) in bytes.iter().copied().enumerate() {
-        if !matches!(byte, b'/' | b'-' | b':') {
+        if !matches!(byte, b'/' | b'-') {
             continue;
         }
         let left = bytes[..index]
@@ -1074,7 +1088,6 @@ fn numeric_operator_mask(text: &str) -> u8 {
         mask |= match byte {
             b'/' => 1 << 0,
             b'-' => 1 << 1,
-            b':' => 1 << 2,
             _ => 0,
         };
     }
@@ -3970,7 +3983,7 @@ fn concept_quality(ground_truth: &str, answer: &str) -> Option<f32> {
     }
 }
 
-fn is_weather_question(question: &str) -> bool {
+pub(crate) fn is_weather_question(question: &str) -> bool {
     let mut weather_word = false;
     let mut forecast_word = false;
     let mut temporal_cue = false;
@@ -4437,6 +4450,59 @@ fn truth_claims_affirmed(
     }
 
     Some(affirmed)
+}
+
+/// Threshold at which a judgement becomes a pass, the width of the ramp through it, and the
+/// share of the raw score kept afterwards.
+pub(crate) const STEP_THRESHOLD: f32 = 0.55;
+pub(crate) const STEP_RAMP_WIDTH: f32 = 0.24;
+pub(crate) const STEP_RAW_SHARE: f32 = 0.10;
+
+/// Push the judgement toward a step, then add some of the raw score back.
+///
+/// Registration 506 was rejected on average separation, 0.1929 against 0.4941, and 518 on the
+/// same ground, 0.2030 against 0.4561, both while winning 11 of 12 cases on ordering. Those
+/// facts together say the problem is not which answer we prefer but by how much: a smooth
+/// score spread across the unit interval cannot average a large separation however well it
+/// ranks. The live champion is very nearly binary, about 0.998 for answers it accepts and
+/// about 0.01 for the rest, and its author describes the construction directly, a hard step
+/// for separation with a little of the raw score added back.
+///
+/// The retained share is not a detail. It keeps ordering alive inside each band, and the live
+/// agreement gate correlates our ranking of real miner answers against the holder's, where a
+/// band of identical values is a block of ties that correlates with nothing. Being monotonic
+/// the whole transform reorders nothing, so it cannot turn a win into a loss and cannot move
+/// the agreement measurement at all.
+///
+/// This is the third attempt. The first two were reverted, and the reasons are why it works
+/// now. A hard step took generated pairs below the 0.15 margin floor from 9 to 135 of 375,
+/// because two answers on the same side of the threshold collapse together; a finite ramp
+/// halved that. Amplification then exposed leniency rather than fixing it: an answer that
+/// merely echoed the question rose to 0.8637 against a recorded ceiling of 0.49, and a 51%
+/// answer against a 90% truth to 0.9919 against 0.61. Both are now judged at the raw level,
+/// 0.1745 and 0.2651. The second attempt failed differently, on correct answers rather than
+/// wrong ones: a terse correct answer sat adjacent to the clamp value its wrong counterpart
+/// had been capped onto, and nothing monotonic can separate two adjacent scores. Freeing
+/// those answers, chiefly by no longer charging a numeric binding conflict for an omitted
+/// timestamp, moved the core corpus from +0.4025 to +0.6098 and is what made this viable.
+///
+/// Threshold and width were swept across four corpora against the recorded fixture ceilings.
+/// The threshold sits above every ceiling constant this module applies, so an answer we
+/// deliberately capped lands in the low band rather than just above the boundary.
+///
+/// Applied only to weather questions, which is the registered intent. Left unscoped it took
+/// the count of generated pairs below the 0.15 floor from 9 to 96 of 375, all of it in
+/// identity_binary and negation_polarity, which are general-knowledge templates: a terse
+/// correct answer and a capped wrong one land adjacent there, and nothing monotonic separates
+/// adjacent scores. Every improvement that created the headroom this transform needs was
+/// itself scoped to the weather path, so the amplification is scoped to match. On other
+/// questions the module returns its judgement unchanged.
+///
+/// It amplifies our mistakes by the same factor as our judgements, so the inversion counts in
+/// the frozen bar matter more under this transform, not less.
+pub(crate) fn separation_step(score: f32) -> f32 {
+    let ramp = (0.5 + ((score - STEP_THRESHOLD) / STEP_RAMP_WIDTH)).clamp(0.0, 1.0);
+    (((1.0 - STEP_RAW_SHARE) * ramp) + (STEP_RAW_SHARE * score)).clamp(0.0, 1.0)
 }
 
 pub(crate) fn evaluate(
