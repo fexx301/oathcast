@@ -3724,7 +3724,16 @@ fn fact_anchor_assessment(
         && directed_relation_overlap < expected_directed_pairs.len
         && !single_relation_alias;
     // Predicate-free replies have no edges, so compare canonical answer-entity spans instead.
-    let incomplete_predicate_free_multi_answer = expected_directed_pairs.len > 1
+    // Not applied to weather questions. A weather ground truth such as "Precipitation in Lagos
+    // during the requested UTC hour measured 0.05 mm, below the 0.1 mm threshold." has the
+    // syntax of two directed relations and the content of one assertion with an apposition, so a
+    // correct answer that states the measurement and refers to the threshold without repeating
+    // its value read as a partially answered multi-relation truth and was capped at 0.4524. The
+    // rest of the entity and relation machinery has been scoped away from the weather path for
+    // the same reason: weather truths carry the question's own figures as context, not as
+    // separate claims the answer must each restate.
+    let incomplete_predicate_free_multi_answer = !weather_question
+        && expected_directed_pairs.len > 1
         && observed_directed_pairs.len == 0
         && has_multiple_directed_fact_syntax(ground_truth, &anchors.values, &question_entities)
         && required_answer_entity_overlap > 0

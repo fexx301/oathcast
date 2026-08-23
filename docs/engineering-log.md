@@ -930,3 +930,35 @@ with different arguments; that detector is load-bearing and worth more care than
 The agreement proxy slipped from 0.6504 to 0.6275 on the worded-probability change. Still above
 the 0.60 floor, but that is the gate which binds the moment separation clears, and the margin is
 thinning rather than growing.
+
+## One of the two was a scoping problem, and the other is still unexplained
+
+Two weather cases had a correct answer capped near zero after the transform, and the probe named
+different rules for each. The threshold answer tripped a directed-relation test; the unit
+conversion tripped the context conflict.
+
+The threshold one is fixed and the reason is the day's recurring theme. A weather ground truth
+reading "Precipitation in Lagos during the requested UTC hour measured 0.05 mm, below the 0.1 mm
+threshold." has the syntax of two directed relations and the content of one assertion with an
+apposition. So the correct "No, the 0.05 mm that fell is under the measurable threshold." looked
+like a partially answered multi-relation truth and took the ambiguity ceiling. The sub-rule no
+longer applies to weather questions, which is where nearly every piece of the entity and relation
+machinery has ended up over the past two days: a weather truth carries the question's own figures
+as context, not as separate claims the answer must each read back. That took the case from +0.1292
+to +0.9900 and the weather corpus from +0.7199 to +0.7737.
+
+The unit conversion is not fixed, and I want to be plain about the shape of the failure rather
+than the failure itself. I guessed twice. First that C and F were reading as substituted place
+names, and wrote a single-character guard into the substitution path; the probe then showed that
+path clear and the counted branch firing instead. Second that the same guard belonged in the
+counted branch; it also changed nothing. So the single novel candidate in that answer is neither
+C nor F, and I still do not know what it is. Both guards were deleted rather than kept, because
+keeping an unmeasured change because it sounds correct is how a codebase fills up with rules
+nobody can account for.
+
+Also deleted: a guard requiring every missing required entity to be present in the question. Too
+strict to ever fire, because a weather truth contains words like measured and requested that the
+question does not.
+
+Weather corpus +0.7737 with zero inversions and one weak case left, core +0.7615 against the live
+champion's +0.1823, agreement 0.6275, frozen bar untouched, self-match 1.0000.
