@@ -645,6 +645,107 @@ fn find_json_number_field(text: &str, key: &[u8]) -> Option<f32> {
     None
 }
 
+/// Small cardinal written as a word, plus the articles that stand for one.
+fn number_word(token: &[u8]) -> Option<f32> {
+    const VALUES: &[(&[u8], f32)] = &[
+        (b"a", 1.0),
+        (b"an", 1.0),
+        (b"one", 1.0),
+        (b"two", 2.0),
+        (b"three", 3.0),
+        (b"four", 4.0),
+        (b"five", 5.0),
+        (b"six", 6.0),
+        (b"seven", 7.0),
+        (b"eight", 8.0),
+        (b"nine", 9.0),
+        (b"ten", 10.0),
+        (b"eleven", 11.0),
+        (b"twelve", 12.0),
+    ];
+    VALUES
+        .iter()
+        .find(|(word, _)| token_eq_lower(token, word))
+        .map(|(_, value)| *value)
+}
+
+/// Denominator written as an ordinal or a fraction noun.
+fn denominator_word(token: &[u8]) -> Option<f32> {
+    const VALUES: &[(&[u8], f32)] = &[
+        (b"half", 2.0),
+        (b"halves", 2.0),
+        (b"third", 3.0),
+        (b"thirds", 3.0),
+        (b"quarter", 4.0),
+        (b"quarters", 4.0),
+        (b"fourth", 4.0),
+        (b"fourths", 4.0),
+        (b"fifth", 5.0),
+        (b"fifths", 5.0),
+        (b"sixth", 6.0),
+        (b"sixths", 6.0),
+        (b"eighth", 8.0),
+        (b"eighths", 8.0),
+        (b"tenth", 10.0),
+        (b"tenths", 10.0),
+    ];
+    VALUES
+        .iter()
+        .find(|(word, _)| token_eq_lower(token, word))
+        .map(|(_, value)| *value)
+}
+
+/// A probability written in words rather than digits.
+///
+/// Recognises "one chance in five", "two chances in three", "one in five", "two thirds" and a
+/// bare "half". Without this, a correct qualitative forecast states no probability at all as
+/// far as the scorer is concerned, and `evaluate` applies the missing-probability ceiling of
+/// 0.49 to it. Against a ground truth of "There is a 20% probability", the correct "Unlikely,
+/// around one chance in five." was capped at 0.3272 and, once the output transform was
+/// applied, landed at 0.0327 against a wrong answer's 0.0242: a pair separated by eight
+/// thousandths where the answer is exactly right.
+fn worded_probability(text: &str) -> Option<f32> {
+    let mut pending: Option<f32> = None;
+    let mut saw_chance = false;
+    let mut best: Option<f32> = None;
+    for token in TokenIter::new(text) {
+        if let Some(denominator) = denominator_word(token.bytes) {
+            // "two thirds", or a bare "half".
+            let numerator = pending.unwrap_or(1.0);
+            if denominator > 0.0 && numerator < denominator {
+                best = Some(numerator / denominator);
+            }
+            pending = None;
+            saw_chance = false;
+            continue;
+        }
+        if token_eq_lower(token.bytes, b"chance") || token_eq_lower(token.bytes, b"chances") {
+            saw_chance = true;
+            continue;
+        }
+        if token_eq_lower(token.bytes, b"in") || token_eq_lower(token.bytes, b"of") {
+            continue;
+        }
+        if let Some(value) = number_word(token.bytes) {
+            match pending {
+                // A second cardinal after the first closes the pattern: "one ... five".
+                Some(numerator) if numerator < value => {
+                    best = Some(numerator / value);
+                    pending = None;
+                    saw_chance = false;
+                }
+                _ => pending = Some(value),
+            }
+            continue;
+        }
+        // Any other content word breaks the pattern, unless a "chance" is still open.
+        if !saw_chance {
+            pending = None;
+        }
+    }
+    best
+}
+
 /// True when a spelled-out percent marker starts at `at`, on a word boundary:
 /// "percent", "per cent" and "pct". Registration 506 lost on separation, and this is
 /// one measured reason. Only the '%' byte was recognised, so against a ground truth of
@@ -726,7 +827,7 @@ pub(crate) fn probability(text: &str) -> Option<f32> {
             }
         }
     }
-    percent_probability(text)
+    percent_probability(text).or_else(|| worded_probability(text))
 }
 
 fn parse_time_at(bytes: &[u8], start: usize) -> Option<(u16, usize)> {

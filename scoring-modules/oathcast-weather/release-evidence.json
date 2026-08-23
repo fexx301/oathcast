@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 63981,
+    "byte_size": 64949,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
-    "keccak256_raw_bytes": "0x8b5ee8d865fe15d23623af7fa6773f557c75d3f726a1aca2a7ac5d5195ca62c9",
+    "sha256": "88bfd05988b83ff4b6767489f827bac4836eff08210f3b139d8da7b8eea7f203",
+    "keccak256_raw_bytes": "0xa1272e5e19d7b7d93f266e3d8d2ea5616a2471c19c9377d55291aa06ceb8eb29",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
+      "measured_on_artifact": "88bfd05988b83ff4b6767489f827bac4836eff08210f3b139d8da7b8eea7f203",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
+      "darwin/arm64": "88bfd05988b83ff4b6767489f827bac4836eff08210f3b139d8da7b8eea7f203",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
-      "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213"
+      "88bfd05988b83ff4b6767489f827bac4836eff08210f3b139d8da7b8eea7f203",
+      "88bfd05988b83ff4b6767489f827bac4836eff08210f3b139d8da7b8eea7f203"
     ]
   },
   "current_artifact_abi": {
@@ -1507,5 +1507,40 @@
       "what_would_be_informative": "519 established that the transform reaches the fixture, moving the scored margin 76 percent. This submission changes no scaling and only two detection rules, so a large gain would mean the fixture contains unit-confusion or evasive shapes, and a small one would mean it does not. Either way it narrows what the remaining 0.0983 is made of.",
       "calibration_warning": "506 moved the scored number by zero and 518 by five percent, both while local corpora improved substantially. Only 519 moved it materially. Local numbers remain weak predictors."
     }
+  },
+  "registration_520_result": {
+    "date": "2026-08-23",
+    "activation_status": "REJECTED",
+    "transaction_hash": "0xb0fc830382e9446a4db7ce854be427ad10c4227f24e871ad80222cc932ab6a6c",
+    "rejection_reason": "lost to the current champion on separation: your average margin 0.4151 vs champion 0.4561.",
+    "candidate_margin": 0.4151,
+    "champion_margin": 0.4561,
+    "progression": {
+      "registration_506": 0.1929,
+      "registration_518": 0.203,
+      "registration_519": 0.3578,
+      "this_one": 0.4151,
+      "gap_to_bar": 0.041,
+      "reading": "519 carried the output transform and moved the number 76 percent, which established that amplification reaches the fixture. This one changed no scaling and only two detection rules, unit scale and unfalsifiable answers, and moved it a further 0.0573. So the fixture does contain shapes of that kind, and detection work on the weather surface transfers. The transfer ratio from this step was about 0.54 of the weather corpus gain."
+    }
+  },
+  "worded_probability": {
+    "date": "2026-08-23",
+    "defect": "The probability parser read digits and percent markers only, so a correct qualitative forecast stated no probability at all as far as the scorer was concerned and took the missing-probability ceiling of 0.49. Against a ground truth of 20%, the correct 'Unlikely, around one chance in five.' was capped at 0.3272 and, once the transform applied, landed at 0.0327 against a wrong answer's 0.0242.",
+    "fix": "worded_probability reads 'one chance in five', 'two chances in three', 'one in five', 'two thirds' and a bare 'half', with cardinals one through twelve and the articles that stand for one.",
+    "effect": {
+      "weather_near_miss": "+0.6929 to +0.7199, same-side pairs 4 to 2, inversions still zero",
+      "prob_direction_flip": "+0.0085 to +0.2349",
+      "hedge_vs_number": "+0.0208 to +0.2269",
+      "core_corpus": "+0.7615 unchanged",
+      "agreement_proxy": "0.6504 to 0.6275, still above the 0.60 floor but thinner"
+    },
+    "one_change_dropped": "Excluding weather-signal tokens from the novel context candidate count was written to stop 'C' and 'F' reading as substituted place names in a correct unit conversion. It had no measured effect, because single letters are not recognised as weather concepts in the first place, so it was removed rather than kept on principle.",
+    "two_cases_still_capped": {
+      "temp_units_correct": "+0.0403. The correct 'Around 29.4 C, which is roughly 85 F.' trips context_conflict through the substitution path, since C and F are single uppercase letters absent from question and truth.",
+      "threshold_below_correct": "+0.1292. Trips directed_relation_mismatch, because 'under the measurable threshold' and 'below the 0.1 mm threshold' are the same relation with different arguments. Riskier to touch: that detector is load-bearing."
+    },
+    "honest_expectation": "This increment is smaller than the last two. At the observed transfer ratio the weather gain of 0.027 projects to roughly 0.015 scored, which would land near 0.43 against a bar of 0.4561. Probably not enough on its own, and the projection has been wrong before in both directions.",
+    "registration_status": "No further registration is authorized."
   }
 }

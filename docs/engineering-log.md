@@ -893,3 +893,40 @@ against the live champion's +0.1823, agreement 0.6504, frozen bar untouched.
 And the snapshot guard added after the third hash-clobbering earned its place immediately: the
 pin update tried to overwrite registration 519's recorded hash, since 519 registered the
 previous artifact, and the guard restored it without being asked.
+
+## Four registrations, and the gap is 0.0410
+
+  506   0.1929
+  518   0.2030   +0.0101   raw fixes, local corpora doubled
+  519   0.3578   +0.1548   the output transform
+  520   0.4151   +0.0573   two detection rules, no scaling change
+  bar   0.4561
+
+520 answered the question 519 raised. 519 established that amplification reaches the fixture;
+520 changed no scaling at all and moved the number a further 0.0573 on two detection rules
+alone, unit scale and unfalsifiable answers. So the fixture does contain shapes of that kind,
+and detection work on the weather surface transfers at roughly 0.54 of the weather corpus gain.
+That ratio is the first usable conversion factor this project has had.
+
+Then the worded-probability fix, which is the same defect twice over. The parser read digits and
+percent markers only, so "Unlikely, around one chance in five." stated no probability as far as
+the scorer was concerned and took the missing-probability ceiling of 0.49, even though one
+chance in five is exactly the 20 percent the ground truth asserts. Under the transform that
+correct answer sat at 0.0327 against a wrong answer's 0.0242. Reading worded fractions took the
+pair to +0.2349 and its sibling to +0.2269, and the weather corpus from +0.6929 to +0.7199.
+
+One change was written and then removed for having no measured effect: excluding weather-signal
+tokens from the novel context candidate count, meant to stop C and F reading as substituted
+place names in a correct unit conversion. It does nothing, because single letters are not
+recognised as weather concepts in the first place. Keeping it would have been keeping a change
+on principle rather than on evidence, which is the habit this log exists to resist.
+
+Two weather cases remain capped, and they are honest about what is left. The unit conversion
+answer trips the context conflict through the substitution path because C and F are uppercase
+letters absent from question and truth. The threshold answer trips directed_relation_mismatch,
+because "under the measurable threshold" and "below the 0.1 mm threshold" are the same relation
+with different arguments; that detector is load-bearing and worth more care than a quick patch.
+
+The agreement proxy slipped from 0.6504 to 0.6275 on the worded-probability change. Still above
+the 0.60 floor, but that is the gate which binds the moment separation clears, and the margin is
+thinning rather than growing.
