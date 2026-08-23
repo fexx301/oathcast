@@ -1478,5 +1478,34 @@
     },
     "what_is_left": "Four weather cases still have a correct answer below the transform's threshold and so score near zero: a probability stated as a worded fraction, a hedged probability against a copied figure, the correct half of the unit conversion pair, and a threshold-boundary answer. Each is a separate cause. Lifting all four is worth roughly 0.22 on the weather corpus.",
     "registration_status": "No further registration is authorized."
+  },
+  "registration_520_submission": {
+    "date": "2026-08-23",
+    "registration_id": "pending; the node had not indexed an id at the time of writing, so the transaction hash is the identifier",
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "transaction_hash": "0xb0fc830382e9446a4db7ce854be427ad10c4227f24e871ad80222cc932ab6a6c",
+    "block_number": 45850013,
+    "transaction_status": 1,
+    "chain_id": 84532,
+    "wasm_hash": "0x8b5ee8d865fe15d23623af7fa6773f557c75d3f726a1aca2a7ac5d5195ca62c9",
+    "wasm_sha256": "cad688559eb7455c",
+    "wasm_byte_size": 63981,
+    "preflight": "On-chain event hash, hosted URL and local build all agree, and the hosted bytes are byte-identical to the local build. The hosted artifact loads and scores identically on both wazero engines. Checked because the hosting path is the one 506, 518 and 519 all used with a fresh token, so serving stale bytes is the standing stage-1 risk.",
+    "note_on_this_record": "These are the bytes registered under this transaction and must not be updated when the working artifact changes.",
+    "what_changed_since_519": "Two defects found by reading the weather corpus per case with the transform applied. A temperature figure on the wrong scale is now a contradiction rather than a match, which fixes an inversion of 0.9214 where a 29.4 Fahrenheit answer took the positive evidence floor against a 29.4 Celsius truth. And an unfalsifiable answer now takes a ceiling rather than merely being denied the floor, which fixes an evasive answer scoring 0.9919 against a correct answer's 0.9923.",
+    "local_state_at_submission": {
+      "weather_near_miss": "+0.6929, zero inversions, up from +0.5864 with one",
+      "core_corpus_ours": "+0.7615, against the live champion's +0.1823 on the same twelve cases",
+      "agreement_proxy": "0.6504 against a 0.60 floor",
+      "held_out": "11 of 30",
+      "worst_self_match": "1.0000"
+    },
+    "what_to_read_from_the_result": {
+      "bar": "0.4561 at registration 519, and it moves when a champion is promoted.",
+      "last_reading": "519 scored 0.3578, so the gap is 0.0983.",
+      "what_would_be_informative": "519 established that the transform reaches the fixture, moving the scored margin 76 percent. This submission changes no scaling and only two detection rules, so a large gain would mean the fixture contains unit-confusion or evasive shapes, and a small one would mean it does not. Either way it narrows what the remaining 0.0983 is made of.",
+      "calibration_warning": "506 moved the scored number by zero and 518 by five percent, both while local corpora improved substantially. Only 519 moved it materially. Local numbers remain weak predictors."
+    }
   }
 }
