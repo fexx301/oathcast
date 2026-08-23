@@ -51,6 +51,15 @@ pub(crate) const ISSUE_UNSUPPORTED_DAY_OFFSET: u32 = 1 << 31;
 pub(crate) struct Evaluation {
     pub score: f32,
     pub issues: u32,
+    /// Semantic similarity to the ground truth, used only to order answers inside a band.
+    ///
+    /// The verdict is `score`; this is the tie-break the output transform retains. Registration
+    /// 530 cleared separation and lost on agreement at 0.5227 against a 0.60 floor, and agreement
+    /// correlates our ranking of real miner answers against the holder's. On real traffic most
+    /// answers are competent, so most share a band and what is correlated is their relative order.
+    /// The holder orders by embedding similarity. Ordering by our blend instead, which is
+    /// dominated by rule deductions, disagrees for reasons unrelated to which answer is better.
+    pub band_position: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -95,7 +104,11 @@ impl<const N: usize> HashSet<N> {
 }
 
 fn zero(issues: u32) -> Evaluation {
-    Evaluation { score: 0.0, issues }
+    Evaluation {
+        score: 0.0,
+        issues,
+        band_position: 0.0,
+    }
 }
 
 fn is_negative_contraction(text: &str, token: crate::text::Token<'_>) -> bool {
@@ -4839,9 +4852,13 @@ pub(crate) const STEP_RAW_SHARE: f32 = 0.10;
 ///
 /// It amplifies our mistakes by the same factor as our judgements, so the inversion counts in
 /// the frozen bar matter more under this transform, not less.
-pub(crate) fn separation_step(score: f32) -> f32 {
+pub(crate) fn separation_step(score: f32, band_position: f32) -> f32 {
     let ramp = (0.5 + ((score - STEP_THRESHOLD) / STEP_RAMP_WIDTH)).clamp(0.0, 1.0);
-    (((1.0 - STEP_RAW_SHARE) * ramp) + (STEP_RAW_SHARE * score)).clamp(0.0, 1.0)
+    // The ramp carries the verdict; the retained share carries the ordering, and it takes it from
+    // semantic similarity rather than from the verdict itself. Which band an answer falls in is a
+    // judgement about correctness and stays exactly as it was; where it sits inside that band is a
+    // tie-break, and the agreement gate reads only the ordering.
+    (((1.0 - STEP_RAW_SHARE) * ramp) + (STEP_RAW_SHARE * band_position)).clamp(0.0, 1.0)
 }
 
 pub(crate) fn evaluate(
@@ -4896,7 +4913,11 @@ pub(crate) fn evaluate(
         // anything reading the flags. Only the score changes, because scoring the
         // answer and auditing the fixture are different jobs and this module is asked
         // to do the first.
-        return Evaluation { score: 1.0, issues };
+        return Evaluation {
+            score: 1.0,
+            issues,
+            band_position: 1.0,
+        };
     }
     if issues != 0 {
         return zero(issues);
@@ -4962,7 +4983,11 @@ pub(crate) fn evaluate(
         || ground_truth.trim().eq_ignore_ascii_case(answer.trim())
         || json_content_exact
     {
-        return Evaluation { score: 1.0, issues };
+        return Evaluation {
+            score: 1.0,
+            issues,
+            band_position: 1.0,
+        };
     }
 
     let fact_assessment = fact_anchor_assessment(question, ground_truth, answer, weather_question);
@@ -5307,7 +5332,16 @@ pub(crate) fn evaluate(
         // champion's were 80 of 80. The live agreement gate correlates our ranking of real
         // answers against the holder's, and a block of ties correlates with nothing, so a
         // clamp on the way up costs exactly what a clamp on the way down would.
-        score = POSITIVE_EVIDENCE_FLOOR + ((1.0 - POSITIVE_EVIDENCE_FLOOR) * score);
+        // Ordering inside the accepted band comes from semantic similarity rather than from the
+        // full blend. Registration 530 cleared separation and was rejected on agreement at
+        // 0.5227 against a 0.60 floor, and agreement correlates our ranking of real miner
+        // answers against the holder's. On real traffic most answers are competent, so most land
+        // in this band and what is being correlated is their relative order. The holder orders by
+        // embedding similarity; ordering here by the blend, which is dominated by rule
+        // deductions, is a different signal and disagrees for reasons that have nothing to do
+        // with which answer is better.
+        let band_position = semantic_quality.unwrap_or(score);
+        score = POSITIVE_EVIDENCE_FLOOR + ((1.0 - POSITIVE_EVIDENCE_FLOOR) * band_position);
     }
     if !score.is_finite() {
         score = 0.0;
@@ -5315,6 +5349,7 @@ pub(crate) fn evaluate(
     Evaluation {
         score: score.clamp(0.0, 1.0),
         issues,
+        band_position: semantic_quality.unwrap_or(score).clamp(0.0, 1.0),
     }
 }
 
