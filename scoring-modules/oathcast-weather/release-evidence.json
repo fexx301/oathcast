@@ -1581,5 +1581,35 @@
       "caveat": "The ratio is one observation from one step, and projections here have been wrong in both directions. What is different is that it no longer needs the ratio to be generous."
     },
     "registration_status": "No further registration is authorized."
+  },
+  "registration_523_submission": {
+    "date": "2026-08-23",
+    "registration_id": 523,
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "transaction_hash": "0x963dda981f348d0e4a3825c81941ddfc85ad2a631f383a8d02b03d8e4245415a",
+    "chain_id": 84532,
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "wasm_hash": "0x58d58b885b774ba5467976ce81b688517c0d3322cdb0cacc8e04f116396f446a",
+    "wasm_sha256": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
+    "wasm_byte_size": 65128,
+    "preflight": "On-chain event hash, hosted URL and local build all agree, and the hosted bytes are byte-identical to the local build. The hosted artifact loads and scores identically on both wazero engines. Checked because the hosting path has now served five different registrations and stale bytes would fail stage 1 on a hash mismatch with no obvious cause.",
+    "note_on_this_record": "These are the bytes registered as 523 and must not be updated when the working artifact changes.",
+    "what_changed_since_520": {
+      "worded_probability": "The parser read digits and percent markers only, so 'Unlikely, around one chance in five.' stated no probability and took the missing-probability ceiling, though one in five is exactly the 20 percent the truth asserts.",
+      "weather_multi_relation_scoping": "A weather truth with the syntax of two directed relations and the content of one assertion no longer makes a correct partial-coverage answer look incomplete. threshold_below went +0.1292 to +0.9900.",
+      "relative_pronouns": "'which' counted as a novel named thing, so a correct unit conversion tripped the context conflict and took the ambiguity ceiling."
+    },
+    "local_state_at_submission": {
+      "weather_near_miss": "+0.8299, zero inversions and zero same-side pairs, all sixteen cases separating by at least 0.227",
+      "core_corpus_ours": "+0.7615 against the live champion's +0.1823 on the same twelve cases",
+      "ranking_pools": "+0.5620",
+      "structural_dev": "+0.2000",
+      "agreement_proxy": "0.6296 against a 0.60 floor",
+      "held_out": "11 of 30",
+      "worst_self_match": "1.0000"
+    },
+    "projection": "0.4151 plus the weather gain of 0.1370 at the transfer ratio of 0.54 observed between 519 and 520 gives 0.4891, against a bar of 0.4561 as of 519. The ratio is one observation and projections here have been wrong in both directions, but this is the first submission that does not need the ratio to be generous.",
+    "if_separation_clears": "The agreement gate binds next, requiring 0.60 correlation with the holder's ranking of real miner answers. Our proxy reads 0.6296 and is five requests written in this repository, scored against the real champion binary. It is the weakest instrument here and has never seen real traffic."
   }
 }
