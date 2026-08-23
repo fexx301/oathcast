@@ -962,3 +962,32 @@ question does not.
 
 Weather corpus +0.7737 with zero inversions and one weak case left, core +0.7615 against the live
 champion's +0.1823, agreement 0.6275, frozen bar untouched, self-match 1.0000.
+
+## It was the word "which"
+
+The last weak weather case is fixed, and the way it was found is worth more than the fix.
+
+The correct answer "Around 29.4 C, which is roughly 85 F." was being capped at the ambiguity
+ceiling. I guessed twice that C and F were reading as substituted place names, wrote a
+single-character guard into the substitution path, measured nothing, moved the same guard to the
+counted branch, measured nothing again, and deleted both. Then I printed the candidate the branch
+actually saw. It was "which".
+
+Relative pronouns were not classified as function words, so a clause-introducing word counted as
+a novel named thing. One candidate, no context overlap, conflict fires, ceiling applies. The
+answer sat at 0.4367 while the wrong answer it was paired against sat at 0.0283.
+
+Printing the value took two minutes. The two guesses took an hour, and both were plausible
+readings of a symptom formed before the symptom had been measured. That is the whole pattern, and
+it has repeated often enough in this log to be the main thing worth carrying forward.
+
+With which, that, this, those, there, it, they and their relatives excluded, the weather corpus
+reaches +0.8299 with zero inversions and, for the first time, zero same-side pairs: all sixteen
+cases separate by at least 0.227. Nothing else moved. Core stays +0.7615 against the live
+champion's +0.1823, the ranking pools and structural corpus are untouched, the frozen bar is
+identical in every measure, self-match is 1.0000, and the agreement proxy ticked up to 0.6296.
+
+At the transfer ratio measured between registrations 519 and 520, the weather corpus gain of
+0.1370 since 520 projects to 0.4891 against a bar of 0.4561. The ratio is one observation and the
+projections here have been wrong in both directions. What is different this time is that it no
+longer needs the ratio to be generous.

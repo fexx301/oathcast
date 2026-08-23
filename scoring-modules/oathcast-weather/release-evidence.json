@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 64932,
+    "byte_size": 65128,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "39a8746e8c6c2f6ce9833ecf933b8bcbb6ccb7a2692ab112af0b049060d70c0a",
-    "keccak256_raw_bytes": "0xb7526e96f7562f701bda25df86e8f5d21508e01d9b9a0b140bd88a7c812ee122",
+    "sha256": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
+    "keccak256_raw_bytes": "0x58d58b885b774ba5467976ce81b688517c0d3322cdb0cacc8e04f116396f446a",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "39a8746e8c6c2f6ce9833ecf933b8bcbb6ccb7a2692ab112af0b049060d70c0a",
+      "measured_on_artifact": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "39a8746e8c6c2f6ce9833ecf933b8bcbb6ccb7a2692ab112af0b049060d70c0a",
+      "darwin/arm64": "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "39a8746e8c6c2f6ce9833ecf933b8bcbb6ccb7a2692ab112af0b049060d70c0a",
-      "39a8746e8c6c2f6ce9833ecf933b8bcbb6ccb7a2692ab112af0b049060d70c0a"
+      "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52",
+      "313a5e0b0dc23a5baafc3519ec72f294653ee816217e3d72d527e8180bb0fe52"
     ]
   },
   "current_artifact_abi": {
@@ -1557,6 +1557,29 @@
       "question_supplied_entities_are_not_required": "A guard requiring every missing required entity to be present in the question was too strict to fire, because a weather truth also contains words such as measured and requested that the question lacks. Replaced by scoping the sub-rule instead."
     },
     "one_case_still_capped": "unit_confusion__temp_units at +0.0403. The correct answer converts between scales and trips the counted context branch for a reason not yet identified. Worth roughly 0.06 on the weather corpus.",
+    "registration_status": "No further registration is authorized."
+  },
+  "relative_pronoun_defect": {
+    "date": "2026-08-23",
+    "found_by": "Printing the candidate the counted context branch actually saw, after two guesses at the cause measured at zero effect and were deleted.",
+    "defect": "The correct answer 'Around 29.4 C, which is roughly 85 F.' had exactly one novel context candidate and it was the relative pronoun 'which'. Relative pronouns were not classified as function words, so a clause-introducing word counted as a novel named thing, the count hit exactly one with no context overlap, the context conflict fired, and the answer took the ambiguity ceiling at 0.4367 while its wrong counterpart sat at 0.0283.",
+    "fix": "which, who, whom, whose, what, where, when, why, how, this, that, these, those, there, here, it, its, they, them and their are excluded from context candidacy. The filter's doc comment now names what it is for rather than describing it as approximation adverbs only.",
+    "effect": {
+      "temp_units": "+0.0403 to a separated pair; the case is no longer weak",
+      "weather_near_miss": "+0.7737 to +0.8299, and for the first time zero inversions AND zero same-side pairs: every one of the sixteen cases separates by at least 0.227",
+      "everything_else": "unchanged: core +0.7615, ranking pools +0.5620, structural +0.2000, frozen bar untouched, self-match 1.0000",
+      "agreement_proxy": "0.6275 to 0.6296"
+    },
+    "what_the_two_wrong_guesses_cost": "An hour, and they are recorded because the pattern is the lesson: both were plausible readings of a symptom, both were written before the symptom was measured, and both changed nothing. Printing the candidate took two minutes and named it immediately.",
+    "projection": {
+      "weather_corpus_at_registration_520": 0.6929,
+      "weather_corpus_now": 0.8299,
+      "observed_transfer_ratio": 0.54,
+      "scored_at_520": 0.4151,
+      "projected": "0.4151 + 0.1370 x 0.54 = 0.4891",
+      "bar_at_519": 0.4561,
+      "caveat": "The ratio is one observation from one step, and projections here have been wrong in both directions. What is different is that it no longer needs the ratio to be generous."
+    },
     "registration_status": "No further registration is authorized."
   }
 }

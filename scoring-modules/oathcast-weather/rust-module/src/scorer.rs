@@ -2048,10 +2048,19 @@ fn context_source_name_hashes(
 /// correct, terse answer whose only novel token was the hedge "About", so it counted 1,
 /// tripped the conflict and scored 0.3038. Filtering the words that are never names
 /// leaves that answer with a count of 0 and keeps the shape this test exists for.
-/// Approximation adverbs only. This is the narrow list, used where over-filtering
-/// silently disables a working test rather than merely widening it: applying the broad
-/// `is_never_a_name` to `novel_context_candidate_count` suppressed counts that were
-/// firing correctly and cost 0.16 of average margin on the weather corpus.
+/// Words that never name a thing: approximation adverbs, attribution markers, and the
+/// pronouns and interrogatives that introduce a clause.
+///
+/// Deliberately narrow. Applying the broad `is_never_a_name` here once suppressed counts that
+/// were firing correctly and cost 0.16 of average margin on the weather corpus, so this list
+/// grows only when a specific word is measured doing damage.
+///
+/// The relative pronouns were the last of them, and they were found by printing what the
+/// candidate actually was rather than guessing. The correct answer "Around 29.4 C, which is
+/// roughly 85 F." had exactly one novel candidate and it was "which". That tripped the context
+/// conflict and took the answer to the ambiguity ceiling at 0.4367 while its wrong counterpart
+/// sat at 0.0283. Two earlier guesses, both that C and F were reading as substituted place
+/// names, were written, measured at zero effect, and deleted.
 fn is_approximation_word(token: &[u8]) -> bool {
     const VALUES: &[&[u8]] = &[
         b"about",
@@ -2079,6 +2088,27 @@ fn is_approximation_word(token: &[u8]) -> bool {
         b"per",
         b"reportedly",
         b"via",
+        // Pronouns and interrogatives. These introduce a clause; they do not name anything.
+        b"which",
+        b"who",
+        b"whom",
+        b"whose",
+        b"what",
+        b"where",
+        b"when",
+        b"why",
+        b"how",
+        b"this",
+        b"that",
+        b"these",
+        b"those",
+        b"there",
+        b"here",
+        b"it",
+        b"its",
+        b"they",
+        b"them",
+        b"their",
     ];
     VALUES.iter().any(|value| token_eq(token, value))
 }
