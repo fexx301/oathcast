@@ -1069,3 +1069,40 @@ that request is sensible and our correlation is -0.1522 as a direct result. The 
 resembling the holder, not being right, and where the holder is arbitrary a better judge is
 penalised for it. No amount of quality work fixes that, and it is worth knowing before deciding
 what to build next.
+
+## The table the embeddings would have been for
+
+Four attempts at comparing role fillers all failed for one reason: the comparison is undecidable
+without knowing that kilometres and km are the same thing while southwest and northeast are
+different things of one kind. Without that, every variant fired on correct paraphrases. The widest
+gained 0.2175 on the wide corpus and lost 0.3740 on the core corpus.
+
+That judgement is exactly what an embedding model supplies, and it is why the champion carries 24 MB
+of one. But a weather scorer does not need a general answer. Directions, units, aggregations and
+precipitation kinds are closed sets. Enumerating them is exact where a vector is approximate, and it
+costs three kilobytes.
+
+Seventy eight terms, seven types, each term a (type, value) pair so synonyms share a value and
+alternatives differ. Three rules on top: same type with disjoint values is a conflict; every figure
+the answer states in a unit the truth also uses must have a counterpart within tolerance; and an
+aggregation or a relative day the question never mentions is unsupported.
+
+Two details mattered more than the table. A text naming two values of one type is converting rather
+than asserting, so that type is skipped, which is what lets "Around 29.4 C, which is roughly 85 F."
+through. And the figure comparison has to key on the exact unit, not the type: keying on the type put
+Celsius, Fahrenheit and Kelvin in one bucket, so the correct "About 302.5 kelvin, so a little over 29
+C." read as two conflicting temperatures and fell from 0.9683 to 0.0282. Both were found by
+measurement, not by reading the code.
+
+  wide corpus        +0.3093 -> +0.5140, inversions 8 -> 3
+  weather near-miss  +0.8331 -> +0.8338, still 16 of 16
+  core corpus        +0.7647 -> +0.7693, inversions 2 -> 1
+  frozen bar         unchanged in every measure
+
+All five severe inversions on the wide corpus are gone: unit_magnitude, aggregation_swap,
+wrong_direction, wrong_day and variable_confusion_wind were each around -0.86 and are now positive.
+
+This is the first clearly net positive change since registration 520. Everything between either
+measured flat on the scored surface or traded one corpus against another. Whether it reaches the
+fixture is a separate question that only a registration answers, and 523 is a standing reminder that
+a twenty percent corpus gain can be worth nothing at all.

@@ -42,6 +42,10 @@ pub(crate) const ISSUE_PROBABILITY_DISAGREEMENT: u32 = 1 << 24;
 pub(crate) const ISSUE_ANSWERS_NOTHING: u32 = 1 << 25;
 pub(crate) const ISSUE_UNIT_SCALE_CONFLICT: u32 = 1 << 26;
 pub(crate) const ISSUE_UNFALSIFIABLE_ANSWER: u32 = 1 << 27;
+pub(crate) const ISSUE_TYPED_TERM_CONFLICT: u32 = 1 << 28;
+pub(crate) const ISSUE_UNSUPPORTED_AGGREGATION: u32 = 1 << 29;
+pub(crate) const ISSUE_UNIT_FIGURE_CONFLICT: u32 = 1 << 30;
+pub(crate) const ISSUE_UNSUPPORTED_DAY_OFFSET: u32 = 1 << 31;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -2150,6 +2154,253 @@ fn novel_context_candidate_count(
 /// was written for.
 fn answer_answers_nothing(answer: &str) -> bool {
     answer.trim_end().ends_with('?')
+}
+
+/// Weather terms as (type, value) pairs: the type says what kind of thing a word denotes, the
+/// value says which one. Synonyms share a value; alternatives within a type differ.
+///
+/// This is what four attempts at a role comparison were missing. Comparing what fills a role is
+/// the right idea, but undecidable without knowing that kilometres and km are the same thing
+/// while southwest and northeast are different things of one kind. Without that, every variant
+/// fired on correct paraphrases and traded one corpus against another: the widest attempt gained
+/// 0.2175 on the wide corpus and lost 0.3740 on the core corpus.
+///
+/// A general answer needs embeddings, which is how the champion gets it, at 24 MB. A weather
+/// scorer does not need a general answer: directions, units, aggregations and precipitation kinds
+/// are closed sets, and enumerating them costs a few kilobytes and is exact rather than
+/// approximate.
+///
+/// Only types where disagreement is unambiguous are listed. Wind strength and sky state are
+/// deliberately absent: "light winds gusting to 40 km/h" and "partly cloudy" name two values of
+/// one type without contradicting anything, so a disjointness test on them would fire on correct
+/// answers.
+fn typed_term(token: &[u8]) -> Option<(u8, u8)> {
+    const TERMS: &[(&[u8], u8, u8)] = &[
+        // 1: temperature scale
+        (b"celsius", 1, 1),
+        (b"centigrade", 1, 1),
+        (b"c", 1, 1),
+        (b"fahrenheit", 1, 2),
+        (b"f", 1, 2),
+        (b"kelvin", 1, 3),
+        (b"k", 1, 3),
+        // 2: length and depth unit
+        (b"mm", 2, 1),
+        (b"millimetre", 2, 1),
+        (b"millimetres", 2, 1),
+        (b"millimeter", 2, 1),
+        (b"millimeters", 2, 1),
+        (b"cm", 2, 2),
+        (b"centimetre", 2, 2),
+        (b"centimetres", 2, 2),
+        (b"centimeter", 2, 2),
+        (b"centimeters", 2, 2),
+        (b"km", 2, 3),
+        (b"kilometre", 2, 3),
+        (b"kilometres", 2, 3),
+        (b"kilometer", 2, 3),
+        (b"kilometers", 2, 3),
+        (b"metre", 2, 4),
+        (b"metres", 2, 4),
+        (b"meter", 2, 4),
+        (b"meters", 2, 4),
+        // 3: compass direction
+        (b"north", 3, 1),
+        (b"northerly", 3, 1),
+        (b"northeast", 3, 2),
+        (b"northeasterly", 3, 2),
+        (b"ne", 3, 2),
+        (b"east", 3, 3),
+        (b"easterly", 3, 3),
+        (b"southeast", 3, 4),
+        (b"southeasterly", 3, 4),
+        (b"se", 3, 4),
+        (b"south", 3, 5),
+        (b"southerly", 3, 5),
+        (b"southwest", 3, 6),
+        (b"southwesterly", 3, 6),
+        (b"sw", 3, 6),
+        (b"west", 3, 7),
+        (b"westerly", 3, 7),
+        (b"northwest", 3, 8),
+        (b"northwesterly", 3, 8),
+        (b"nw", 3, 8),
+        // 4: aggregation
+        (b"average", 4, 1),
+        (b"mean", 4, 1),
+        (b"maximum", 4, 2),
+        (b"max", 4, 2),
+        (b"peak", 4, 2),
+        (b"highest", 4, 2),
+        (b"minimum", 4, 3),
+        (b"min", 4, 3),
+        (b"lowest", 4, 3),
+        (b"total", 4, 4),
+        (b"accumulated", 4, 4),
+        (b"cumulative", 4, 4),
+        // 5: speed unit
+        (b"kmh", 5, 1),
+        (b"kph", 5, 1),
+        (b"mph", 5, 2),
+        (b"knots", 5, 3),
+        (b"kt", 5, 3),
+        (b"kts", 5, 3),
+        // 6: pressure unit
+        (b"hpa", 6, 1),
+        (b"hectopascal", 6, 1),
+        (b"hectopascals", 6, 1),
+        (b"millibar", 6, 1),
+        (b"millibars", 6, 1),
+        (b"mb", 6, 1),
+        (b"inhg", 6, 2),
+        // 7: precipitation kind
+        (b"rain", 7, 1),
+        (b"rainfall", 7, 1),
+        (b"drizzle", 7, 1),
+        (b"shower", 7, 1),
+        (b"showers", 7, 1),
+        (b"snow", 7, 2),
+        (b"snowfall", 7, 2),
+        (b"sleet", 7, 2),
+        (b"hail", 7, 3),
+    ];
+    TERMS
+        .iter()
+        .find(|(word, _, _)| token_eq(token, word))
+        .map(|(_, kind, value)| (*kind, *value))
+}
+
+/// Values of each type a text names, as a bitmask per type.
+fn typed_term_mask(text: &str) -> [u16; 8] {
+    let mut mask = [0u16; 8];
+    for token in TokenIter::new(text) {
+        if let Some((kind, value)) = typed_term(token.bytes)
+            && (kind as usize) < mask.len()
+            && value < 16
+        {
+            mask[kind as usize] |= 1 << value;
+        }
+    }
+    mask
+}
+
+/// True when the answer and the ground truth each name a value of the same type and the values
+/// are disjoint.
+///
+/// A text naming two values of one type is converting or enumerating rather than asserting, so
+/// that type is skipped: "Around 29.4 C, which is roughly 85 F." names two temperature scales and
+/// contradicts nothing.
+fn typed_term_conflict(ground_truth: &str, answer: &str) -> bool {
+    let truth = typed_term_mask(ground_truth);
+    let response = typed_term_mask(answer);
+    for kind in 0..truth.len() {
+        let (expected, actual) = (truth[kind], response[kind]);
+        if expected == 0 || actual == 0 {
+            continue;
+        }
+        if expected.count_ones() > 1 || actual.count_ones() > 1 {
+            continue;
+        }
+        if expected & actual == 0 {
+            return true;
+        }
+    }
+    false
+}
+
+/// True when the answer asserts an aggregation that neither the question nor the ground truth
+/// does, so it is answering about a different quantity.
+///
+/// Asked for a reading, "The daily average for Lagos was 29.4 C." is not the reading. The
+/// disjointness test above cannot see this, because the ground truth names no aggregation at all
+/// for it to disagree with.
+fn asserts_unsupported_aggregation(question: &str, ground_truth: &str, answer: &str) -> bool {
+    let answer_mask = typed_term_mask(answer)[4];
+    if answer_mask == 0 {
+        return false;
+    }
+    let supported = typed_term_mask(question)[4] | typed_term_mask(ground_truth)[4];
+    answer_mask & !supported != 0
+}
+
+/// A figure and the exact unit it is stated in, as ((type, value), figure).
+type UnitFigure = ((u8, u8), f32);
+
+/// Figures paired with the unit they are stated in.
+///
+/// A bare comparison of figures cannot see that "sustained winds near 40 km/h" contradicts a
+/// ground truth of "around 8 km/h", because the answer also contains the supported 8 and set
+/// overlap is therefore non-empty. Scoping each figure to its unit makes the comparison
+/// per-quantity: every speed the answer states must be a speed the truth supports.
+///
+/// The key is the specific unit, not the type. Keying on the type alone put Celsius, Fahrenheit
+/// and Kelvin in one bucket, so the correct "About 302.5 kelvin, so a little over 29 C." looked
+/// like two conflicting temperatures and fell from 0.9683 to 0.0282. A conversion states the same
+/// quantity twice in different units, and only figures in the SAME unit are comparable.
+fn unit_scoped_figures(text: &str) -> ([UnitFigure; 12], usize) {
+    let mut pairs: [UnitFigure; 12] = [((0u8, 0u8), 0.0f32); 12];
+    let mut count = 0usize;
+    let mut pending: Option<f32> = None;
+    let mut distance = 0u8;
+    for token in TokenIter::new(text) {
+        if let Some(value) = parse_decimal(token.bytes) {
+            pending = Some(value);
+            distance = 0;
+            continue;
+        }
+        if let Some(value) = pending {
+            distance += 1;
+            if distance > 2 {
+                pending = None;
+                continue;
+            }
+            if let Some(unit) = typed_term(token.bytes)
+                && count < pairs.len()
+            {
+                pairs[count] = (unit, value);
+                count += 1;
+                pending = None;
+            }
+        }
+    }
+    (pairs, count)
+}
+
+/// True when the answer states a figure in a unit the ground truth also uses, and the truth
+/// supports no such figure within tolerance.
+fn unit_scoped_figure_conflict(ground_truth: &str, answer: &str) -> bool {
+    let (truth, truth_len) = unit_scoped_figures(ground_truth);
+    if truth_len == 0 {
+        return false;
+    }
+    let (response, response_len) = unit_scoped_figures(answer);
+    response[..response_len].iter().any(|(kind, value)| {
+        let truth_uses_this_unit = truth[..truth_len].iter().any(|(other, _)| other == kind);
+        truth_uses_this_unit
+            && !truth[..truth_len].iter().any(|(other, expected)| {
+                other == kind && numeric_within_tolerance(*expected, *value)
+            })
+    })
+}
+
+/// Relative day offsets, which shift a forecast to a window nobody asked about. Callers scope this
+/// to weather questions, because the same words are ordinary context elsewhere.
+fn asserts_unsupported_day_offset(question: &str, ground_truth: &str, answer: &str) -> bool {
+    const OFFSETS: &[&[u8]] = &[
+        b"tomorrow",
+        b"yesterday",
+        b"following",
+        b"next",
+        b"previous",
+        b"preceding",
+        b"earlier",
+        b"later",
+        b"overnight",
+    ];
+    let names = |text: &str| {
+        TokenIter::new(text).any(|token| OFFSETS.iter().any(|word| token_eq(token.bytes, word)))
+    };
+    names(answer) && !names(question) && !names(ground_truth)
 }
 
 fn context_entity_substituted(
@@ -4520,7 +4771,8 @@ fn truth_claims_affirmed(
         }
     }
 
-    if temperature_scale_conflict(ground_truth, answer) {
+    if temperature_scale_conflict(ground_truth, answer) || typed_term_conflict(ground_truth, answer)
+    {
         return None;
     }
 
@@ -4892,6 +5144,28 @@ pub(crate) fn evaluate(
     if answer_answers_nothing(answer) {
         issues |= ISSUE_ANSWERS_NOTHING;
         score = cap_preserving_order(score, 0.20);
+    }
+    // A figure in a unit the truth also uses, with no counterpart the truth supports.
+    if unit_scoped_figure_conflict(ground_truth, answer) {
+        issues |= ISSUE_UNIT_FIGURE_CONFLICT;
+        score = cap_preserving_order(score, 0.30);
+    }
+    // A day the question did not ask about. Scoped to weather questions: a forecast is about a
+    // window, so a relative day shifts it, but in "Yesterday Alice defeated Bob." the same word is
+    // harmless leading context on a factual answer.
+    if weather_question && asserts_unsupported_day_offset(question, ground_truth, answer) {
+        issues |= ISSUE_UNSUPPORTED_DAY_OFFSET;
+        score = cap_preserving_order(score, 0.30);
+    }
+    // A term of the same kind but a different value is a different claim: cm against mm,
+    // northeast against southwest, snow against rain, an average against a reading.
+    if typed_term_conflict(ground_truth, answer) {
+        issues |= ISSUE_TYPED_TERM_CONFLICT;
+        score = cap_preserving_order(score, 0.30);
+    }
+    if asserts_unsupported_aggregation(question, ground_truth, answer) {
+        issues |= ISSUE_UNSUPPORTED_AGGREGATION;
+        score = cap_preserving_order(score, 0.30);
     }
     // A figure on the wrong scale is the wrong figure.
     if temperature_scale_conflict(ground_truth, answer) {

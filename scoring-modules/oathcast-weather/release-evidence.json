@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 65129,
+    "byte_size": 68457,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
-    "keccak256_raw_bytes": "0x03114d40b726bc7989814c4da236d16a98ab757f4e7078bed1a581c18488aea9",
+    "sha256": "94bb7845723c8d0edcc117336efec69243fe9007d8ab8888d5cdb893f5b69001",
+    "keccak256_raw_bytes": "0xd2c69d8e0038be06afa3f2c26c1468d83fae811dc2c566cfefca1b85367e43cb",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
+      "measured_on_artifact": "94bb7845723c8d0edcc117336efec69243fe9007d8ab8888d5cdb893f5b69001",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
+      "darwin/arm64": "94bb7845723c8d0edcc117336efec69243fe9007d8ab8888d5cdb893f5b69001",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3",
-      "d28b9ede6621f606ba7c35bc553685f6dbf8e85bf33c57ba75402f322a1ac8c3"
+      "94bb7845723c8d0edcc117336efec69243fe9007d8ab8888d5cdb893f5b69001",
+      "94bb7845723c8d0edcc117336efec69243fe9007d8ab8888d5cdb893f5b69001"
     ]
   },
   "current_artifact_abi": {
@@ -1689,6 +1689,31 @@
     },
     "the_strategic_problem": "The gate rewards resembling the holder rather than being correct. On the temperature request the champion scores 'It was warm in Lagos that afternoon.' at 0.9948 and 'It was 12.1 degrees Celsius in Lagos at 14:00 UTC.' at 0.9978, while scoring the correct 'About 29.4 degrees Celsius.' at 0.0098. Our ranking there is sensible and the correlation is -0.1522 because of it. Where the holder is arbitrary, a better judge is penalised, and no amount of quality work fixes that.",
     "what_this_changes": "Separation was assumed to be the binding constraint for six registrations. It may not be. Before more separation work, the cheapest informative step is a registration that clears separation, because the rejection message would then name agreement instead and give a real number for it. Until then the local reading is a range, not a value.",
+    "registration_status": "No further registration is authorized."
+  },
+  "weather_type_table": {
+    "date": "2026-08-23",
+    "what": "78 weather terms as (type, value) pairs across seven types: temperature scale, length unit, compass direction, aggregation, speed unit, pressure unit, precipitation kind. Synonyms share a value; alternatives within a type differ.",
+    "why_it_works_where_four_role_attempts_failed": "Comparing what fills a role is the right idea and is undecidable without knowing that kilometres and km are the same thing while southwest and northeast are different things of one kind. Every role variant fired on correct paraphrases as a result, the widest gaining 0.2175 on the wide corpus and losing 0.3740 on the core corpus. A general answer needs embeddings, which is how the champion gets it at 24 MB. A weather scorer does not need a general answer: these are closed sets, and enumerating them is exact rather than approximate and costs a few kilobytes.",
+    "three_rules_built_on_it": {
+      "typed_term_conflict": "Same type, disjoint values, in both texts. A text naming two values of one type is converting or enumerating and is skipped.",
+      "unit_scoped_figure_conflict": "Every figure the answer states in a unit the truth also uses must have a counterpart within tolerance. Keyed on the exact unit rather than the type: keying on the type put Celsius, Fahrenheit and Kelvin in one bucket and made the correct 'About 302.5 kelvin, so a little over 29 C.' look like two conflicting temperatures, dropping it from 0.9683 to 0.0282.",
+      "asserts_unsupported_aggregation": "An average or maximum the question and truth never mention, because the disjointness test cannot see a claim the truth makes no counterpart to.",
+      "asserts_unsupported_day_offset": "A relative day the question did not ask about. Scoped to weather questions, because 'Yesterday Alice defeated Bob.' is harmless leading context on a factual answer and an existing test says so."
+    },
+    "types_deliberately_omitted": "Wind strength and sky state. 'Light winds gusting to 40 km/h' and 'partly cloudy' each name two values of one type without contradicting anything, so a disjointness test on them would fire on correct answers.",
+    "measured": {
+      "wide_corpus": "+0.3093 to +0.5140, inversions 8 to 3",
+      "wide_corpus_inversions_fixed": "unit_magnitude, aggregation_swap, wrong_direction, wrong_day and variable_confusion_wind all moved from about -0.86 to positive",
+      "weather_near_miss": "+0.8331 to +0.8338, still 16 of 16 with zero inversions",
+      "core_corpus": "+0.7647 to +0.7693, inversions 2 to 1",
+      "ranking_pools": "+0.5620 to +0.5571",
+      "structural_dev": "+0.2000 unchanged",
+      "agreement_graded": "0.4359 to 0.4374",
+      "agreement_plausible": "0.6254 to 0.6243",
+      "frozen_bar": "unchanged: generated 8 inverted and 12 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, weakest synthetic margin 0.206250, Spearman 0.954137, worst_self_match 1.0000"
+    },
+    "the_first_clearly_net_positive_change_since_520": "Every attempt between 520 and this one either measured flat on the scored surface or traded one corpus against another. This one improves the wide corpus by 0.2047, fixes an inversion on the core corpus, and costs nothing measurable anywhere.",
     "registration_status": "No further registration is authorized."
   }
 }
