@@ -1787,5 +1787,37 @@
       "contradicted_anchors_take_a_ceiling_instead_of_a_zero": "Would have required changing four tests that assert an exact 0.0, and measured a gain of one distinct score out of eighty with agreement slightly worse. Not worth a specification change, so reverted."
     },
     "registration_status": "No further registration is authorized."
+  },
+  "registration_533_submission": {
+    "date": "2026-08-23",
+    "registration_id": 533,
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "transaction_hash": "0x47677d8e6fc21056785b5f2ba49515fb39eb761b494a4b0e54045434fab9d306",
+    "chain_id": 84532,
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "wasm_hash": "0x26f2281cd994ae759584872312938e10739200d4c53c93e0d35c82d86286c2bd",
+    "wasm_sha256": "2b867f04a69eb1f88f209c7a67e81ee94f4c8ea1391004f674595cab9501ad0a",
+    "wasm_byte_size": 68887,
+    "preflight": "On-chain event hash, hosted URL and local build all agree, hosted bytes byte-identical to the build, and the hosted artifact loads on both wazero engines. The hosting path has now served seven registrations, so stale bytes remain the standing stage-1 risk and are checked every time.",
+    "note_on_this_record": "These are the bytes registered as 533 and must not be updated when the working artifact changes.",
+    "what_changed_since_530": "Answers are ordered inside a band by semantic similarity rather than by the blend. The transform's ramp still decides which band an answer falls in, so the verdict is unchanged and only the tie-break moved. This is the first submission aimed at the agreement gate rather than at separation.",
+    "first_submission_aimed_at_agreement": "530 cleared separation and was rejected on agreement at 0.5227 against a 0.60 floor. Every earlier registration was rejected on separation, so every earlier change was aimed at the wrong gate for this point in the climb.",
+    "local_state_at_submission": {
+      "agreement_graded": 0.5613,
+      "agreement_plausible": 0.674,
+      "real_reading_at_530": 0.5227,
+      "floor": 0.6,
+      "wide_corpus": "+0.4941, inversions 4",
+      "weather_near_miss": "+0.7872, inversions 0",
+      "core_corpus": "+0.7360, inversions 1",
+      "ordering_invariants": "unchanged: 8 inverted generated, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11 of 30, worst_self_match 1.0000"
+    },
+    "three_outcomes_and_what_each_means": {
+      "agreement_clears": "The slot changes hands.",
+      "agreement_improves_but_falls_short": "The lever works and is worth pushing: band ordering can be made purely similarity-driven and the blend curve at 0.5 and 0.75 is already measured.",
+      "rejected_on_separation_again": "The trade cost too much. maxBelowFloorGeneratedPairs going back from 14 to 12 is the first thing to undo, and that instruction is written into exposure_test.go rather than held in memory. We still do not know what margin 530 had above 0.4561, only that it cleared, which is why this needed measuring rather than guessing."
+    },
+    "projection": "A gain between 0.05 and 0.12 applied to the real 0.5227 lands between 0.57 and 0.64, straddling the 0.60 floor. The proxies have been wrong in both directions before and bracketed correctly once."
   }
 }
