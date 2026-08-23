@@ -38,6 +38,8 @@ pub(crate) const ISSUE_WINDOW_END_ONLY: u32 = 1 << 20;
 pub(crate) const ISSUE_CONTEXT_ENTITY_SUBSTITUTED: u32 = 1 << 21;
 pub(crate) const ISSUE_SPAN_WIDER_THAN_WINDOW: u32 = 1 << 22;
 pub(crate) const ISSUE_UNSUPPORTED_YEAR: u32 = 1 << 23;
+pub(crate) const ISSUE_PROBABILITY_DISAGREEMENT: u32 = 1 << 24;
+pub(crate) const ISSUE_ANSWERS_NOTHING: u32 = 1 << 25;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -2020,6 +2022,27 @@ fn novel_context_candidate_count(
         }
     }
     candidates.len
+}
+
+/// True when the answer is a question rather than an answer.
+///
+/// From a miner's point of view nothing was answered, and until now such a response fell
+/// only to the missing-binary-answer ceiling of 0.49, which is where the fixture's
+/// `adversarial_question_copy` case sat at 0.4891. That single value blocked the output
+/// transform this module needs in order to compete on separation, since amplifying 0.49
+/// pushes it to 0.86.
+///
+/// A second branch was tried and removed: an answer whose content is drawn almost entirely
+/// from the question, carrying none of the ground truth's own vocabulary. It read as a
+/// restatement test and behaved as a correct-answer test. Asked about 15:00 to 16:00 UTC,
+/// the correct "Yes, precipitation occurred in Lagos between 15:00 and 16:00 UTC." draws
+/// almost every token from the question, because that is what answering a question about
+/// Lagos at that hour looks like, and its contribution, "occurred", was being filtered as a
+/// relation word before the check ever saw it. That branch cost 0.7192 of margin on that
+/// single pool and 0.4407 on another. The interrogative test alone catches the case this
+/// was written for.
+fn answer_answers_nothing(answer: &str) -> bool {
+    answer.trim_end().ends_with('?')
 }
 
 fn context_entity_substituted(
@@ -4530,6 +4553,30 @@ pub(crate) fn evaluate(
     }
     // A contradiction inside one clause of a multi-clause answer, which the
     // whole-answer checks above cannot see because a correct clause masks it.
+    // An answer that answers nothing takes a ceiling far below a partial answer's.
+    if answer_answers_nothing(answer) {
+        issues |= ISSUE_ANSWERS_NOTHING;
+        score = cap_preserving_order(score, 0.20);
+    }
+    // A probability materially different from the ground truth's is a different forecast,
+    // and until now it was only ever averaged into `factual` alongside three other
+    // signals at a combined weight of 0.30, so a 39 point error moved the total by a few
+    // hundredths. Against "Rain is expected with 90% probability.", the answer "Rain is
+    // expected with 51% probability." scored 0.5807 where a correct paraphrase of the same
+    // truth scores 0.8221. That gap is too small to survive amplification: the output
+    // transform this module needs in order to compete on separation was measured and
+    // reverted precisely because wrong answers sit at 0.5 to 0.6 while right ones sit at
+    // 0.85, leaving no room to push the two apart.
+    //
+    // A quarter of the scale is the threshold. Twenty five points is past rounding, past
+    // the difference between two honest forecasts, and on the far side of even odds from
+    // most references.
+    if let (Some(expected), Some(actual)) = (truth_probability, answer_probability)
+        && (expected - actual).abs() > 0.25
+    {
+        issues |= ISSUE_PROBABILITY_DISAGREEMENT;
+        score = cap_preserving_order(score, 0.30);
+    }
     // A qualitative forecast that contradicts the ground truth's figure, applied only
     // when the answer states no figure of its own so the numeric agreement term above
     // is not doubled up on.

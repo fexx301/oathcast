@@ -712,3 +712,48 @@ One hypothesis died on the way, that forgiving the omission of question-supplied
 would move us toward the champion. It moved us from 0.5190 to 0.4032. I had read a terse
 answer at the champion's rank three as a signal, when its ranks three through eight all sit
 within 0.005 of each other.
+
+## A doubling locally bought five percent scored
+
+Registration 518 was the calibration attempt, and it worked as an experiment while failing
+as a submission. Our average margin went from 0.1929 to 0.2030. Over the same set of
+changes the core corpus went from 0.1996 to 0.4025.
+
+A hundred percent locally, five percent scored. And this is the second reading of the same
+kind: the two tie fixes in 506 moved the scored margin by exactly zero while improving
+every local number. So the discrepancy is not noise, it is the normal relationship between
+our corpora and the fixture, and it is now measured rather than suspected. Any sentence of
+the form "this build is probably around X against the bar" is worthless here unless X came
+back from a registration.
+
+The champion's margin also moved, 0.4941 down to 0.4561, which Telegraph had told us can
+happen when a new champion is promoted or when the fixture grows. So of the 0.048 the gap
+closed, our own work accounts for 0.010.
+
+The transform got a second attempt on the strength of two raw fixes that were named as its
+blockers when it was first reverted. A probability off by more than a quarter of the scale
+now takes a ceiling, so a 51 percent answer against a 90 percent truth fell from 0.5807 to
+0.2651, and an answer that is a question rather than an answer takes a tighter one, so the
+question-copy case fell from 0.4891 to 0.1745. With those in, a ramp respected all three
+recorded fixture ceilings for the first time and lifted every corpus, the weather one from
++0.4962 to +0.6722.
+
+It still went back. It pushes 96 of 375 generated pairs under the margin floor, all of it in
+two categories, and neither a wider raw share nor a higher threshold moved that number. The
+reason is worth writing down: our ceilings are constants, 0.20, 0.30, 0.40, 0.49, so an
+answer we deliberately cap lands on a clamp value. In identity_binary the wrong answer is
+the truth with its subject swapped, which we catch and cap, and the correct answer is a
+terse indirect restatement that also scores modestly. They end up adjacent. A monotonic
+transform cannot separate two scores that our own judgement placed next to each other, and
+no placement of the ramp changes that.
+
+Which points at the same thing the core discrimination corpus pointed at a day earlier. Our
+wrong answers are now reasonably low. Our correct answers are not high enough. A terse
+correct answer scoring near 0.6 where it should score near 0.9 is the whole remaining
+problem, and amplification is not a way around it.
+
+One process note. Updating the artifact pins overwrote registration 518's recorded hash,
+because 518 registered the previous build and so its hash was the string being replaced.
+That is the third time a blind hash replacement has clobbered a registration record in this
+file. Each time the assertion that checks all recorded identities caught it. The assertion
+is the only reason this file is still trustworthy.

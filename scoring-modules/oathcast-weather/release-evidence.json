@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 61388,
+    "byte_size": 61744,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "64220c7058919ec09ba1c6d83584dfd2966226d00079813842b14a9bd4076076",
-    "keccak256_raw_bytes": "0x52201a2e7e618c9eae0408cf62cd8473560e1c33eb3d16eb5b37f709462aed78",
+    "sha256": "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
+    "keccak256_raw_bytes": "0x57c69309b698a09a7a99de0f6f186a743faf3558664b62040fd35150b655766b",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "64220c7058919ec09ba1c6d83584dfd2966226d00079813842b14a9bd4076076",
+      "measured_on_artifact": "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "64220c7058919ec09ba1c6d83584dfd2966226d00079813842b14a9bd4076076",
+      "darwin/arm64": "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "64220c7058919ec09ba1c6d83584dfd2966226d00079813842b14a9bd4076076",
-      "64220c7058919ec09ba1c6d83584dfd2966226d00079813842b14a9bd4076076"
+      "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
+      "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94"
     ]
   },
   "current_artifact_abi": {
@@ -1291,5 +1291,56 @@
       "frozen_bar": "unchanged in every measure"
     },
     "registration_status": "No further registration is authorized."
+  },
+  "registration_518_submission": {
+    "date": "2026-08-23",
+    "registration_id": 518,
+    "intent": "WEATHER_FORECAST",
+    "transaction_hash": "0xa70978cdbb0b733bdf48fb535b59962981e32fa82c2115ce351e7000e36f5bbc",
+    "block_number": 45846283,
+    "transaction_status": 1,
+    "chain_id": 84532,
+    "wasm_hash": "0x52201a2e7e618c9eae0408cf62cd8473560e1c33eb3d16eb5b37f709462aed78",
+    "wasm_sha256": "64220c7058919ec09ba1c6d83584dfd2966226d00079813842b14a9bd4076076",
+    "wasm_byte_size": 61388,
+    "preflight": "On-chain event hash, hosted URL and local build all agree, and the hosted bytes are byte-identical to the local build. Checked specifically because the hosting URL is the same path registration 506 used with a new token, so serving stale bytes was the live stage-1 risk.",
+    "purpose": "Calibration, not a promotion attempt. Every corpus in this repository has misled us about the fixture: the near-miss and intent corpora put registration 506 at +0.6055 where Telegraph read 0.1929, and the core corpus matched our number while missing the champion's by a factor of three. There is no calibrated instrument here, so the estimate that this build sits near 0.37 is a guess built on instruments already shown wrong. What this registration buys is one calibration point: how much the negation vocabulary and the numeric tolerance moved the SCORED margin. That number decides whether the output transform, worth an estimated 1.5 to 1.7 times, is enough to clear the bar or whether something structurally larger is needed.",
+    "expected_outcome": "Rejection on separation. The value is the reported candidate_margin, not the verdict.",
+    "cost": "Bond is zero on this registry, verified across all 268 of the champion author's registrations, so the cost is gas. The champion reached 45 intents through 191 rejections; in this system registrations are the measurement instrument.",
+    "what_changed_since_506": "Negation vocabulary including without, neither, nor, none, absent, nil, dry, hardly, scarcely, lacking, devoid, failed. Numeric tolerance at ten percent of the reference with a floor of one unit. Plus the earlier separation work: context entity substitution on the weather path, a tiered ceiling, the weather vocabulary expansion, span and year checks, and a steepened probability curve.",
+    "note_on_this_record": "These are the bytes registered as 518 and must not be updated when the working artifact changes. A pin update overwrote them once, the third time a blind hash replacement has clobbered a registration record in this file; the others were caught by the same assertion."
+  },
+  "registration_518_result": {
+    "date": "2026-08-23",
+    "registration_id": 518,
+    "activation_status": "REJECTED",
+    "rejection_reason": "lost to the current champion on separation: your scorer did not separate good from bad answers more clearly than the champion (your average margin 0.2030 vs champion 0.4561). To replace it, you must beat its separation, not just tie it.",
+    "candidate_margin": 0.203,
+    "champion_margin": 0.4561,
+    "the_calibration_this_bought": {
+      "scored_margin": "0.1929 to 0.2030, a gain of 0.0101 or five percent",
+      "local_margin_over_the_same_change": "core corpus 0.1996 to 0.4025, a gain of 102 percent",
+      "transfer_ratio": "a doubling locally bought five percent on the scored surface",
+      "prior_data_point": "the two tie fixes in registration 506 moved the scored margin by zero while improving local corpora",
+      "conclusion": "Local corpora do not predict the scored margin, and now the size of the discrepancy is measured rather than suspected. Two consecutive rounds of substantial local gains produced almost nothing scored. Any future estimate of where a build sits relative to the bar should be treated as uninformative unless it comes from a registration."
+    },
+    "champion_margin_moved_down": "0.4941 to 0.4561. Telegraph confirmed champion_margin moves when a new champion is promoted, and that the fixture grows as the intent's evaluation data grows, so either could explain it. The gap narrowed from 0.3012 to 0.2531, of which our own improvement accounts for 0.0101 and the champion's decline for the rest.",
+    "cost": "Gas only. Bond is zero on this registry."
+  },
+  "output_transform_second_attempt": {
+    "date": "2026-08-23",
+    "what_changed_first": "Two raw-headroom fixes made the transform viable where it had been impossible. A material probability disagreement, more than a quarter of the scale, now takes a 0.30 ceiling: against a 90 percent truth, a 51 percent answer fell from 0.5807 to 0.2651. An answer that is a question rather than an answer now takes a 0.20 ceiling: the fixture's question-copy case fell from 0.4891 to 0.1745. Both were named as the specific blockers when the first attempt was reverted.",
+    "swept_and_measured": "With those in place a ramp at threshold 0.48, width 0.24 respected all three recorded fixture ceilings for the first time, and lifted the core corpus from +0.4025 to +0.5535, the ranking pools from +0.5373 to +0.8564, the structural corpus from +0.2000 to +0.3037 and the weather corpus from +0.4962 to +0.6722.",
+    "why_it_is_still_not_shipped": "It took the count of generated pairs below the 0.15 margin floor from 9 to 96 of 375, concentrated entirely in two categories, identity_binary at 42 of 45 and negation_polarity at 42 of 45. Raising the retained raw share from 2 percent to 30 percent did not move that count. Raising the threshold above the ceiling constants did not move it either, and took identity_binary to 45 of 45.",
+    "the_interaction_that_causes_it": "Our ceiling constants are 0.20, 0.30, 0.40 and 0.49, and a deliberately capped answer therefore lands on a clamp value. In identity_binary the wrong answer is the ground truth with its subject swapped, which we detect and cap; the correct answer is a terse indirect restatement which also scores modestly. The two end up adjacent and on the same side of any threshold, so the ramp maps them to nearly the same value however it is placed. The transform cannot separate answers that our raw judgement places next to each other, and on these two categories it does not.",
+    "what_would_make_it_work": "The correct terse answer in those categories has to score high, not merely higher. That is the same finding as the core discrimination work: our wrong answers are now reasonably low and our correct answers are not high enough. Until a terse correct answer scores near 0.9 rather than near 0.6, amplification has nothing to amplify.",
+    "status": "Reverted for the second time. Both attempts, their measurements and the reasons are recorded rather than dropped, because the shape of the failure is the useful part."
+  },
+  "kept_from_this_round": {
+    "probability_disagreement_ceiling": "0.30 when the answer's probability differs from the truth's by more than a quarter of the scale. It was only ever averaged into factual alongside three other signals at a combined weight of 0.30, so a 39 point error moved the total by a few hundredths.",
+    "non_answer_ceiling": "0.20 when the answer ends in a question mark. A second branch, detecting an answer whose content is drawn almost entirely from the question, was written and removed: it read as a restatement test and behaved as a correct-answer test, costing 0.7192 of margin on one weather pool and 0.4407 on another, because a correct answer about Lagos at a given hour legitimately draws almost every token from the question.",
+    "weather_corpus": "+0.4795 to +0.4962",
+    "core_corpus": "+0.3856 to +0.4025, against the live champion's +0.1823",
+    "frozen_bar": "unchanged: generated 8 inverted and 9 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, weakest synthetic margin 0.206250, Spearman 0.956622, worst_self_match 1.0000"
   }
 }
