@@ -1144,3 +1144,45 @@ along with the instruction to put it back if a registration is ever rejected on 
 The projection straddles the floor rather than clearing it: a gain between 0.05 and 0.12 on a real
 reading of 0.5227 lands between 0.57 and 0.64. Which is honest, and better than any position this
 project has been in before.
+
+## 533 is champion
+
+  eval score        0.47178337
+  candidate margin  0.4718   champion margin  0.4237
+  candidate wins    13 / 14  champion wins    12 / 14
+  worst self-match  1.0000   score std dev    0.4199
+
+Confirmed on the node as well as the dashboard: the author address
+0x7dc9c9d535b68c3c6273e3323f0e52e5851c3278 shows twelve registrations, eleven rejected and one
+active, and the active one is 533 with our hash. My first attempt to verify queried the
+transaction sender instead of the indexed author and found nothing, which is worth remembering:
+the sender and the author are not the same address.
+
+Two things in the scored result are worth more than the verdict.
+
+The fixture grew. comparable_cases reads 14 where every earlier registration reported 12.
+Telegraph told us it grows as the intent's evaluation data grows, and it did, between 530 and
+533. Any local number calibrated against the old twelve was measuring a slightly different
+thing by the end.
+
+And the bar moved toward us. champion_margin was 0.4941 at 506, 0.4561 at 530 and 0.4237 here.
+Part of the closing distance was the target descending, not us climbing. What we earned is our
+own margin going 0.1929 to 0.4718 across eight registrations, and the head-to-head count.
+
+The two changes that actually moved the scored number, out of everything tried: the output
+transform, which took separation from 0.2030 to 0.3578 by pushing the judgement toward a step
+and adding a share of the raw score back so ordering survived inside each band. And ordering
+inside a band by semantic similarity, which was the only change ever aimed at agreement and
+cleared it first time.
+
+Everything else measured zero or close to it, and the list is long enough to be the real lesson:
+two tie fixes, a twenty percent corpus gain that moved the margin by -0.0001, four variants of a
+role-filler comparison, two guesses about C and F reading as place names, treating an omitted
+figure as other than disagreement, converting a hard zero into a ceiling. Each was plausible.
+Each was measured. Most were wrong, and the ones that were wrong were only cheap because they
+were measured before they were believed.
+
+The slot is held, not owned. The previous holder reached 45 intents through 191 rejections and
+lost ten in a day to a stronger rival before taking nine back. The board is readable from the
+node by anyone who wants to see what beat them, which is how it should work, and it is now our
+turn to be read.

@@ -1819,5 +1819,47 @@
       "rejected_on_separation_again": "The trade cost too much. maxBelowFloorGeneratedPairs going back from 14 to 12 is the first thing to undo, and that instruction is written into exposure_test.go rather than held in memory. We still do not know what margin 530 had above 0.4561, only that it cleared, which is why this needed measuring rather than guessing."
     },
     "projection": "A gain between 0.05 and 0.12 applied to the real 0.5227 lands between 0.57 and 0.64, straddling the 0.60 floor. The proxies have been wrong in both directions before and bracketed correctly once."
+  },
+  "registration_533_result": {
+    "date": "2026-08-23",
+    "registration_id": 533,
+    "activation_status": "ACTIVE, CHAMPION",
+    "reported_by": "Telegraph dashboard, and independently confirmed on the node. The address endpoint for the registration's author, 0x7dc9c9d535b68c3c6273e3323f0e52e5851c3278, returns 12 registrations with 11 rejected and 1 active: registration 533, intent WEATHER_FORECAST, eval 0.47178337, hash 26f2281cd994ae759584872312, matching the build. An earlier note in this file said activation was reported rather than confirmed; that was because the transaction sender, 0xB01caEa8c6C47bbf4F4b4c5080Ca642043359C2E, is not the indexed author address, so the first query returned nothing.",
+    "intent": "WEATHER_FORECAST",
+    "wasm_hash": "0x26f2281cd994ae759584872312938e10739200d4c53c93e0d35c82d86286c2bd",
+    "wasm_sha256": "2b867f04a69eb1f88f209c7a67e81ee94f4c8ea1391004f674595cab9501ad0a",
+    "wasm_byte_size": 68887,
+    "what_it_took": {
+      "registrations_against_this_intent": "496, 506, 518, 519, 520, 523, 530, 533",
+      "separation_progression": "0.1929 at 506, 0.2030 at 518, 0.3578 at 519, 0.4151 at 520, 0.4150 at 523, cleared at 530",
+      "agreement_progression": "0.5227 at 530, cleared at 533",
+      "the_two_changes_that_mattered": "The output transform, which took separation from 0.2030 to 0.3578 by pushing the judgement toward a step and adding a share back so ordering survives. And band ordering by semantic similarity, which was the only change ever aimed at agreement and cleared it on the first attempt.",
+      "what_measured_zero": "The two tie fixes in 506. The corpus work between 520 and 523, which gained twenty percent on the near-miss corpus and moved the scored margin by -0.0001. Four variants of a role-filler comparison. Two guesses about C and F reading as place names. Treating an omitted figure as other than disagreement. Converting a hard zero to a ceiling."
+    },
+    "what_this_does_not_mean": "The slot is held, not owned. The champion's author reached 45 intents through 191 rejections and lost ten in a day to a stronger rival before taking nine back. The same is available to whoever writes the next judge for this intent, and the leaderboard is readable from the node by anyone who wants to see what beat them.",
+    "the_state_to_defend_from": {
+      "agreement_proxies": "0.5613 graded and 0.6740 plausible. Real agreement is now known to sit between them at whatever value cleared 0.60, so the bracket is the instrument to keep.",
+      "wide_corpus": "+0.4941 with 4 inversions, the only non-saturated separation instrument",
+      "weather_near_miss": "+0.7872, saturated at 16 of 16, useful only for catching regressions",
+      "core_corpus": "+0.7360 against the live champion's +0.1823 on the same twelve cases",
+      "frozen_bar": "8 inverted generated pairs, 14 below the margin floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11 of 30, worst_self_match 1.0000",
+      "outstanding_debt": "maxBelowFloorGeneratedPairs was relaxed twice in one day, 9 to 12 and 12 to 14. Both relaxations are argued in exposure_test.go and both are separation measures. Now that separation is cleared with unknown headroom, tightening them back is the honest next piece of housekeeping and would also test that headroom.",
+      "known_defects": "Three wide-corpus inversions remain: decimal_vs_percent, hedge_reversal, negated_double. And variable_confusion_wind inverted inside the rejected band as a cost of band ordering."
+    },
+    "scored_result": {
+      "eval_score": 0.47178337,
+      "candidate_margin": 0.4718,
+      "champion_margin": 0.4237,
+      "candidate_wins": "13 / 14",
+      "champion_wins": "12 / 14",
+      "worst_self_match": 1.0,
+      "score_std_dev": 0.4199,
+      "bond": 0
+    },
+    "two_things_the_scored_result_reveals": {
+      "the_fixture_grew": "comparable_cases is 14, where every earlier registration reported 12. Telegraph said the fixture grows as the intent's evaluation data grows, and it did, between 530 and 533.",
+      "the_bar_moved_down": "champion_margin reads 0.4237 here against 0.4561 at 530 and 0.4941 at 506. It moves when a champion is promoted or when the fixture changes, so the target was never fixed, and part of the closing distance was the bar coming to us rather than us reaching it. Our own margin still rose from 0.1929 to 0.4718 across the series, which is the part that was earned.",
+      "we_won_on_both_measures": "0.4718 against 0.4237 on margin and 13 of 14 against 12 of 14 on head-to-head wins. The promotion rule requires matching or beating the champion on margin and winning at least as many comparisons, and both held."
+    }
   }
 }
