@@ -1715,5 +1715,35 @@
     },
     "the_first_clearly_net_positive_change_since_520": "Every attempt between 520 and this one either measured flat on the scored surface or traded one corpus against another. This one improves the wide corpus by 0.2047, fixes an inversion on the core corpus, and costs nothing measurable anywhere.",
     "registration_status": "No further registration is authorized."
+  },
+  "registration_530_submission": {
+    "date": "2026-08-23",
+    "registration_id": 530,
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "transaction_hash": "0x9c87fcf21bc3edc7d09200f241ca625c09223bdb61bc6f335a1902ddd81985e8",
+    "chain_id": 84532,
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "wasm_hash": "0xd2c69d8e0038be06af",
+    "wasm_sha256": "94bb7845723c8d0e",
+    "wasm_byte_size": 68457,
+    "preflight": "On-chain event hash, hosted URL and local build all agree, hosted bytes byte-identical to the build, and the hosted artifact scores identically on both wazero engines. The hosting path has now served six registrations, so stale bytes remain the standing stage-1 risk and are checked every time.",
+    "note_on_this_record": "These are the bytes registered as 530 and must not be updated when the working artifact changes.",
+    "what_changed_since_523": "The weather type table and the four rules built on it, plus an order-preserving positive evidence floor. The floor had been a hard max at 0.90, which put sixteen of eighty graded answers on exactly that value and cost distinctness the agreement gate depends on.",
+    "local_state_at_submission": {
+      "wide_corpus": "+0.5140 from +0.3078, ordered 21 of 24, inversions 9 to 3",
+      "weather_near_miss": "+0.8338, 16 of 16, zero inversions",
+      "core_corpus": "+0.7693 against the live champion's +0.1823, inversions 2 to 1",
+      "agreement_graded": 0.4374,
+      "agreement_plausible": 0.6243,
+      "distinctness": "62 of 80 graded answers, from 48",
+      "worst_self_match": "1.0000"
+    },
+    "what_to_read_from_the_result": {
+      "bar": "0.4561 as of 519, and it moves when a champion is promoted.",
+      "last_reading": "523 scored 0.4150, so the gap is 0.0411.",
+      "why_this_one_is_worth_a_registration": "Unlike the previous build, whose only change moved separation by rounding error, this carries a 0.2047 gain on the wide corpus and removes five inversions of about 0.86 each. The wide corpus has never been tested against the fixture, so this also measures whether it predicts anything, which the near-miss corpus has stopped doing.",
+      "calibration_warning": "523 gained 0.1370 on the near-miss corpus and moved the scored margin by -0.0001. A corpus gain is not a prediction."
+    }
   }
 }
