@@ -40,6 +40,8 @@ pub(crate) const ISSUE_SPAN_WIDER_THAN_WINDOW: u32 = 1 << 22;
 pub(crate) const ISSUE_UNSUPPORTED_YEAR: u32 = 1 << 23;
 pub(crate) const ISSUE_PROBABILITY_DISAGREEMENT: u32 = 1 << 24;
 pub(crate) const ISSUE_ANSWERS_NOTHING: u32 = 1 << 25;
+pub(crate) const ISSUE_UNIT_SCALE_CONFLICT: u32 = 1 << 26;
+pub(crate) const ISSUE_UNFALSIFIABLE_ANSWER: u32 = 1 << 27;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Evaluation {
@@ -4344,6 +4346,48 @@ pub(crate) const POSITIVE_EVIDENCE_FLOOR: f32 = 0.90;
 /// possible at some point." names the right concept, carries the right polarity, contradicts
 /// nothing, and would be equally true of a dry hour. The floor lifted it from 0.4836 to
 /// 0.9189 before this check, past a correct answer's paired score.
+/// Temperature scale a text names, when it names exactly one.
+///
+/// A figure means nothing without its unit, and `truth_claims_affirmed` compared figures
+/// while ignoring units entirely. Against a ground truth of "29.4 degrees Celsius", the wrong
+/// answer "Around 29.4 degrees Fahrenheit." matched the figure, matched the temperature
+/// concept, contradicted nothing the check knew how to test, and took the positive floor to
+/// 0.9900 while the correct answer sat at 0.0686. Under the output transform that pair
+/// inverted by 0.9214, the largest single error in any corpus here.
+fn temperature_scale(text: &str) -> Option<u8> {
+    let mut scale = None;
+    for token in TokenIter::new(text) {
+        let found = if token_eq(token.bytes, b"celsius")
+            || token_eq(token.bytes, b"centigrade")
+            || token.bytes == b"C"
+        {
+            Some(1u8)
+        } else if token_eq(token.bytes, b"fahrenheit") || token.bytes == b"F" {
+            Some(2)
+        } else if token_eq(token.bytes, b"kelvin") || token.bytes == b"K" {
+            Some(3)
+        } else {
+            None
+        };
+        if let Some(value) = found {
+            if scale.is_some_and(|current| current != value) {
+                // Two scales named, as in a correct answer that converts between them.
+                return None;
+            }
+            scale = Some(value);
+        }
+    }
+    scale
+}
+
+/// True when the answer states a temperature on a different scale from the ground truth.
+fn temperature_scale_conflict(ground_truth: &str, answer: &str) -> bool {
+    match (temperature_scale(ground_truth), temperature_scale(answer)) {
+        (Some(expected), Some(actual)) => expected != actual,
+        _ => false,
+    }
+}
+
 fn answer_is_unfalsifiable(answer: &str) -> bool {
     const MARKERS: &[&[u8]] = &[
         b"possible",
@@ -4435,6 +4479,10 @@ fn truth_claims_affirmed(
         if matched > 0 {
             affirmed += 1;
         }
+    }
+
+    if temperature_scale_conflict(ground_truth, answer) {
+        return None;
     }
 
     let truth_concepts = crate::text::weather_concept_mask(ground_truth);
@@ -4805,6 +4853,21 @@ pub(crate) fn evaluate(
     if answer_answers_nothing(answer) {
         issues |= ISSUE_ANSWERS_NOTHING;
         score = cap_preserving_order(score, 0.20);
+    }
+    // A figure on the wrong scale is the wrong figure.
+    if temperature_scale_conflict(ground_truth, answer) {
+        issues |= ISSUE_UNIT_SCALE_CONFLICT;
+        score = cap_preserving_order(score, 0.30);
+    }
+    // An answer that cannot be wrong should not outrank one that can. The evasive
+    // "Weather in Lagos is variable and precipitation is always possible at some point."
+    // was already denied the positive floor, but its own blend saturated the output
+    // transform anyway and it scored 0.9919 against a correct answer's 0.9923.
+    if answer_is_unfalsifiable(answer)
+        && matches!(truth_polarity, Polarity::Positive | Polarity::Negative)
+    {
+        issues |= ISSUE_UNFALSIFIABLE_ANSWER;
+        score = cap_preserving_order(score, 0.49);
     }
     // A probability materially different from the ground truth's is a different forecast,
     // and until now it was only ever averaged into `factual` alongside three other

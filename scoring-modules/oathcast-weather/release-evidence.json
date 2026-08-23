@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 63361,
+    "byte_size": 63981,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "ce906dd937810b7e6967f2e6f9c64d941b53c3db285aade2bc71887e3206e658",
-    "keccak256_raw_bytes": "0x3e90332c32657a401d4803195fd790d22740d5748d20c37aaf686d240d5104f6",
+    "sha256": "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
+    "keccak256_raw_bytes": "0x8b5ee8d865fe15d23623af7fa6773f557c75d3f726a1aca2a7ac5d5195ca62c9",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "ce906dd937810b7e6967f2e6f9c64d941b53c3db285aade2bc71887e3206e658",
+      "measured_on_artifact": "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "ce906dd937810b7e6967f2e6f9c64d941b53c3db285aade2bc71887e3206e658",
+      "darwin/arm64": "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "ce906dd937810b7e6967f2e6f9c64d941b53c3db285aade2bc71887e3206e658",
-      "ce906dd937810b7e6967f2e6f9c64d941b53c3db285aade2bc71887e3206e658"
+      "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213",
+      "cad688559eb7455cba479a73569e0a3e121890ef6ae78d63ae2ac47d9a72c213"
     ]
   },
   "current_artifact_abi": {
@@ -1441,5 +1441,42 @@
       "secondary": "If separation clears, the agreement gate binds next. It has never been measured against real traffic, only against five requests written here, and it sits at 0.6504 against a 0.60 floor.",
       "calibration_warning": "518 measured a doubling of the core corpus as a five percent scored gain, and 506 measured local gains as zero. The local numbers above are not a prediction."
     }
+  },
+  "registration_519_result": {
+    "date": "2026-08-23",
+    "registration_id": 519,
+    "activation_status": "REJECTED",
+    "rejection_reason": "lost to the current champion on separation: your average margin 0.3578 vs champion 0.4561.",
+    "candidate_margin": 0.3578,
+    "champion_margin": 0.4561,
+    "this_is_the_first_change_that_moved_the_scored_number": {
+      "scored_margin": "0.2030 to 0.3578, a gain of 0.1548 or 76 percent",
+      "gap": "0.2531 to 0.0983",
+      "champion": "unchanged at 0.4561",
+      "contrast": "Registration 506's changes moved the scored margin by zero. Registration 518's moved it five percent while doubling the core corpus. 519 moved it 76 percent. The output transform reaches the fixture, which the two corpora that predicted nothing could not have told us."
+    },
+    "what_it_rules_out": "That the scored cases sit on one side of the transform's threshold. They do not, so amplification is a live lever on this intent rather than a dead end.",
+    "what_it_does_not_buy": "Tightening the transform's dials was swept afterwards and yields almost nothing: the core corpus moves from +0.7897 to at most +0.8233 as the ramp narrows, and the weather corpus gets slightly worse. The scores are already saturated. The remaining 0.0983 has to come from detection, not scaling: any wrong answer scoring above roughly 0.67 raw lands on the same side of the threshold as the right one and contributes nothing."
+  },
+  "unit_scale_and_unfalsifiable_answers": {
+    "date": "2026-08-23",
+    "found_by": "Reading the weather corpus per case with the transform applied, which turns small raw differences into large visible ones and made two defects obvious that had been buried in the middle of the range.",
+    "unit_scale_conflict": {
+      "defect": "truth_claims_affirmed compared figures and ignored units, so against a ground truth of 29.4 degrees Celsius the wrong answer 'Around 29.4 degrees Fahrenheit.' matched the figure, matched the temperature concept, contradicted nothing the check could test, and took the positive evidence floor.",
+      "cost": "good 0.0686 against bad 0.9900, an inversion of 0.9214, the largest single error in any corpus here.",
+      "fix": "temperature_scale reads celsius, centigrade, C, fahrenheit, F, kelvin and K, and returns None when a text names two, so a correct answer converting between scales is untouched. A conflict disqualifies the floor and takes a 0.30 ceiling."
+    },
+    "unfalsifiable_answers": {
+      "defect": "The evasive 'Weather in Lagos is variable and precipitation is always possible at some point.' was already denied the positive floor, but its own blend saturated the transform and it scored 0.9919 against a correct answer's 0.9923.",
+      "fix": "An answer carrying an unfalsifiability marker takes a 0.49 ceiling when the ground truth's polarity is determinate. Being denied a floor is not enough; an answer that cannot be wrong needs an actual ceiling."
+    },
+    "result": {
+      "weather_near_miss": "+0.5864 to +0.6929, inversions 1 to 0",
+      "core_corpus": "+0.7615 unchanged, against the live champion's +0.1823",
+      "agreement_proxy": "0.6504 unchanged",
+      "frozen_bar": "unchanged: generated 8 inverted and 12 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, weakest synthetic margin 0.206250, Spearman 0.954137"
+    },
+    "what_is_left": "Four weather cases still have a correct answer below the transform's threshold and so score near zero: a probability stated as a worded fraction, a hedged probability against a copied figure, the correct half of the unit conversion pair, and a threshold-boundary answer. Each is a separate cause. Lifting all four is worth roughly 0.22 on the weather corpus.",
+    "registration_status": "No further registration is authorized."
   }
 }

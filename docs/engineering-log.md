@@ -848,3 +848,48 @@ a guard and this one did not. Updating the Spearman pin replaced the value in ni
 eight of which were historical records of what the number had been at the time of an earlier
 change. Rewriting those is rewriting the log. It was caught by reading the diff, not by any
 assertion. Pin updates should target a named field.
+
+## Seventy six percent, and the first honest signal from the fixture
+
+Registration 519 was rejected, and it is the best result this project has had. Average margin
+went from 0.2030 to 0.3578 with the champion unchanged at 0.4561. The gap closed from 0.2531
+to 0.0983.
+
+The contrast is the whole point. 506's changes moved the scored number by zero. 518's moved it
+five percent while doubling the core corpus. 519 moved it 76 percent. What separates them is
+that 519 carried the output transform, and a transform does not depend on which defect
+categories the fixture happens to contain. It scales whatever ordering is already there, and
+our ordering was already 11 of 12.
+
+It also rules something out. If the twelve scored cases had sat on one side of the transform's
+threshold, the margin would not have moved at all, and amplification would have been dead on
+this intent. It moved, so the lever is real.
+
+What it does not buy is more of the same. Sweeping the transform's dials afterwards gains
+almost nothing: narrowing the ramp takes the core corpus from +0.7897 to at most +0.8233 and
+makes the weather corpus slightly worse. The scores are already saturated. The remaining
+0.0983 has to come from detection, because any wrong answer scoring above about 0.67 raw lands
+on the same side of the threshold as the right one and contributes nothing at all.
+
+Reading the weather corpus case by case with the transform applied is a much better
+instrument than reading it without, because it turns small raw differences into visible ones.
+Two defects had been sitting in the middle of the range unnoticed.
+
+The first was mine, from earlier the same day. truth_claims_affirmed compared figures and
+ignored units, so against a ground truth of 29.4 degrees Celsius the answer "Around 29.4
+degrees Fahrenheit." matched the figure, matched the concept, contradicted nothing the check
+knew how to test, and took the positive evidence floor. Correct answer 0.0686, wrong answer
+0.9900, an inversion of 0.9214, the largest single error in any corpus here. A figure without
+its unit is not a figure.
+
+The second is that being denied a floor is not the same as being capped. The evasive "Weather
+in Lagos is variable and precipitation is always possible at some point." was correctly
+refused the floor and still scored 0.9919, because its own blend saturated the transform. An
+answer that cannot be wrong needs a ceiling of its own.
+
+Weather corpus +0.5864 to +0.6929 with inversions down to zero, core unchanged at +0.7615
+against the live champion's +0.1823, agreement 0.6504, frozen bar untouched.
+
+And the snapshot guard added after the third hash-clobbering earned its place immediately: the
+pin update tried to overwrite registration 519's recorded hash, since 519 registered the
+previous artifact, and the guard restored it without being asked.
