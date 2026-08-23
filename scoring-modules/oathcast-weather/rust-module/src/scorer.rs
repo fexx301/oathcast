@@ -111,7 +111,45 @@ fn is_negative_contraction(text: &str, token: crate::text::Token<'_>) -> bool {
     suffix.starts_with(b"'t") || suffix.starts_with(&[0xe2, 0x80, 0x99, b't'])
 }
 
-fn explicit_polarity(text: &str) -> Polarity {
+/// True when any negation appears anywhere in the text.
+///
+/// Needed because polarity is read in a single forward pass while English routinely puts
+/// the negation after the subject. "Rain is not expected." names a weather concept first,
+/// so treating that concept as an affirmative set a positive reading before the "not" was
+/// reached, and the two together produced Unknown where the answer plainly means Negative.
+fn text_has_negation(text: &str) -> bool {
+    TokenIter::new(text).any(|token| {
+        token_eq(token.bytes, b"no")
+            || token_eq(token.bytes, b"not")
+            || token_eq(token.bytes, b"never")
+            || token_eq(token.bytes, b"cannot")
+            || token_eq(token.bytes, b"without")
+            || token_eq(token.bytes, b"neither")
+            || token_eq(token.bytes, b"nor")
+            || token_eq(token.bytes, b"none")
+            || token_eq(token.bytes, b"absent")
+            || token_eq(token.bytes, b"nil")
+            || token_eq(token.bytes, b"dry")
+            || token_eq(token.bytes, b"hardly")
+            || token_eq(token.bytes, b"scarcely")
+            || token_eq(token.bytes, b"lacking")
+            || token_eq(token.bytes, b"devoid")
+            || token_eq(token.bytes, b"failed")
+            || token_eq(token.bytes, b"unlikely")
+            || is_negative_contraction(text, token)
+    })
+}
+
+fn explicit_polarity(text: &str, weather_question: bool) -> Polarity {
+    // An interrogative asserts nothing. Without this, the fixture's question-copy case,
+    // "Will measurable precipitation occur in Lagos during the requested UTC hour?", read as
+    // a positive answer purely because it names precipitation, and so stopped tripping the
+    // missing-binary-answer ceiling it is supposed to trip.
+    if text.trim_end().ends_with('?') {
+        return Polarity::Unknown;
+    }
+    // A weather concept counts as an affirmative only in text that negates nothing.
+    let concepts_imply_polarity = weather_question && !text_has_negation(text);
     let mut negative = false;
     let mut explicit_positive = false;
     let mut inferred_positive = false;
@@ -175,6 +213,30 @@ fn explicit_polarity(text: &str) -> Polarity {
         } else if token_eq(current, b"likely")
             || token_eq(current, b"expected")
             || token_eq(current, b"occurred")
+            // Gated for the same reason as the concept rule, and the measurement that
+            // forced it is worth keeping. Left ungated, the ground truth "No. Precipitation
+            // in Lagos during the requested UTC hour measured 0.05 mm, below the 0.1 mm
+            // threshold." read as both negative and positive, because "measured" sits far
+            // enough past "No" that the negation scope has lapsed. The truth collapsed to
+            // Unknown, which disabled the polarity check altogether and let a wrong "Yes"
+            // answer rise from 0.0000 to 0.4724.
+            || (concepts_imply_polarity
+                && (token_eq(current, b"fell")
+                    || token_eq(current, b"fall")
+                    || token_eq(current, b"observed")
+                    || token_eq(current, b"recorded")
+                    || token_eq(current, b"measured")
+                    || token_eq(current, b"detected")
+                    || token_eq(current, b"reported")))
+            // A weather concept asserted with no negation over it is an affirmative. Asked
+            // "Was there a thunderstorm?", the correct "Thunder and lightning were observed
+            // over Lagos in that window." read as Unknown and took the missing-binary-answer
+            // ceiling of 0.49 from a blend of 0.8029. "Rain did fall in Lagos over that
+            // hour." took the same ceiling from 0.9362. Neither contains the word yes, and
+            // neither needs to: naming the phenomenon is how a forecast says it happened.
+            // Inside a negation scope the existing branch below reads it as a denial, so
+            // "no measurable rainfall" is unaffected.
+            || (concepts_imply_polarity && is_weather_anchor_signal(current))
             || (token_eq(current, b"occur")
                 && (negation_scope > 0 || previous.is_some_and(|value| token_eq(value, b"will"))))
         {
@@ -4258,6 +4320,125 @@ fn qualitative_likelihood(text: &str) -> Option<bool> {
     }
 }
 
+/// Floor for an answer that affirms what the ground truth asserts and contradicts none of
+/// it.
+pub(crate) const POSITIVE_EVIDENCE_FLOOR: f32 = 0.90;
+
+/// True when the answer is hedged so far that it cannot be wrong.
+///
+/// The positive-evidence floor reads agreement on claims, and an answer can agree with every
+/// claim while asserting nothing. "Weather in Lagos is variable and precipitation is always
+/// possible at some point." names the right concept, carries the right polarity, contradicts
+/// nothing, and would be equally true of a dry hour. The floor lifted it from 0.4836 to
+/// 0.9189 before this check, past a correct answer's paired score.
+fn answer_is_unfalsifiable(answer: &str) -> bool {
+    const MARKERS: &[&[u8]] = &[
+        b"possible",
+        b"possibly",
+        b"variable",
+        b"always",
+        b"sometimes",
+        b"usually",
+        b"often",
+        b"occasionally",
+        b"may",
+        b"might",
+        b"could",
+        b"unpredictable",
+        b"changeable",
+    ];
+    TokenIter::new(answer).any(|token| MARKERS.iter().any(|word| token_eq(token.bytes, word)))
+}
+
+/// Whether the answer affirms the ground truth's claims without contradicting any, and how
+/// many distinct claims it affirms.
+///
+/// Every other rule in this module is a deduction, so a correct answer earns nothing for
+/// being correct: it only avoids some of the penalties, and it fails others by construction.
+/// A paraphrase does not repeat the truth's wording, so the anchor machinery reads a missing
+/// anchor; a terse answer omits the location and the timestamp the question already supplied,
+/// so coverage is charged for the omission. Measured on the core discrimination corpus, our
+/// correct answers averaged 0.6483 while the live champion places its accepted answers at
+/// about 0.998, and on the generated corpus a correct terse answer lands adjacent to the
+/// clamp value its wrong counterpart was capped onto. That adjacency is why two attempts at
+/// an output transform could not separate them: a monotonic transform cannot pull apart two
+/// scores the judgement placed side by side.
+///
+/// Claims are the things a ground truth actually asserts and a scorer can check: its
+/// polarity, its figures within tolerance, its weather concepts, its probability, and the
+/// entity binding the anchor machinery already computes. Repeating the truth's phrasing is
+/// not one of them.
+///
+/// Contradicting any claim disqualifies the answer outright. Affirming fewer than two leaves
+/// it alone, so a bare "Yes." to a question whose truth asserts a figure and a concept does
+/// not reach the floor on polarity alone.
+fn truth_claims_affirmed(
+    ground_truth: &str,
+    answer: &str,
+    truth_polarity: Polarity,
+    answer_polarity: Polarity,
+    truth_probability: Option<f32>,
+    answer_probability: Option<f32>,
+    support: Option<f32>,
+) -> Option<u8> {
+    let mut affirmed = 0u8;
+
+    if matches!(truth_polarity, Polarity::Positive | Polarity::Negative) {
+        match answer_polarity {
+            Polarity::Positive | Polarity::Negative if answer_polarity == truth_polarity => {
+                affirmed += 1;
+            }
+            Polarity::Positive | Polarity::Negative => return None,
+            _ => {}
+        }
+    }
+
+    if let Some(expected) = truth_probability
+        && let Some(actual) = answer_probability
+    {
+        if (expected - actual).abs() > 0.10 {
+            return None;
+        }
+        affirmed += 1;
+    }
+
+    // Every figure the answer states must be one the truth supports. Figures the truth
+    // states and the answer omits are not held against it, because the question supplies
+    // most of them and a miner has no reason to read them back.
+    let (_, truth_numbers, truth_len) = numeric_scan(ground_truth);
+    let (_, answer_numbers, answer_len) = numeric_scan(answer);
+    if answer_len > 0 && truth_len > 0 {
+        let mut matched = 0usize;
+        for candidate in &answer_numbers[..answer_len] {
+            if truth_numbers[..truth_len]
+                .iter()
+                .any(|expected| numeric_within_tolerance(*expected, *candidate))
+            {
+                matched += 1;
+            } else {
+                return None;
+            }
+        }
+        if matched > 0 {
+            affirmed += 1;
+        }
+    }
+
+    let truth_concepts = crate::text::weather_concept_mask(ground_truth);
+    if truth_concepts != 0 {
+        let answer_concepts = crate::text::weather_concept_mask(answer);
+        if answer_concepts & truth_concepts != 0 {
+            affirmed += 1;
+        }
+    }
+
+    if support.is_some_and(|value| value >= 0.75) {
+        affirmed += 1;
+    }
+
+    Some(affirmed)
+}
+
 pub(crate) fn evaluate(
     question: &str,
     ground_truth_raw: &str,
@@ -4331,8 +4512,9 @@ pub(crate) fn evaluate(
         return zero(ISSUE_KEYWORD_STUFFING);
     }
 
-    let truth_polarity = explicit_polarity(ground_truth);
-    let explicit_answer_polarity = explicit_polarity(answer);
+    let weather_question = is_weather_question(question);
+    let truth_polarity = explicit_polarity(ground_truth, weather_question);
+    let explicit_answer_polarity = explicit_polarity(answer, weather_question);
     if truth_polarity == Polarity::Contradictory {
         return zero(ISSUE_AMBIGUOUS_GROUND_TRUTH);
     }
@@ -4378,7 +4560,6 @@ pub(crate) fn evaluate(
         return Evaluation { score: 1.0, issues };
     }
 
-    let weather_question = is_weather_question(question);
     let fact_assessment = fact_anchor_assessment(question, ground_truth, answer, weather_question);
     if fact_assessment.is_some_and(|assessment| assessment.contradicted) {
         return zero(ISSUE_CONTRADICTORY_FACT_ANCHOR);
@@ -4447,6 +4628,7 @@ pub(crate) fn evaluate(
         });
 
     let mut score = (0.55 * effective_semantic) + (0.30 * factual) + (0.15 * concision);
+    let blended = score;
     // Defects scale the score into a band rather than truncating it to the band's
     // ceiling. `score.min(c)` collapses every value above `c` onto exactly `c`;
     // `score *= c` maps [0, 1] onto [0, c] monotonically. Both guarantee a flagged
@@ -4648,6 +4830,35 @@ pub(crate) fn evaluate(
             None => 0.49,
         };
         score = cap_preserving_order(score, ceiling);
+    }
+    // Scoped to weather questions, which is the registered surface and the only place the
+    // claim types below are meaningful. Unscoped it lifted a WRONG answer to the floor on
+    // "Which mountain is the highest above sea level?", inverting a pair that had been
+    // ordered correctly, because nothing objected to that answer and it affirmed two claims.
+    // Any mechanism that raises correct answers also raises the wrong ones we fail to
+    // detect, which is the same reason two output transforms were reverted.
+    //
+    // The positive path. Deliberately sets no issue bit: `issues` records defects, and
+    // several tests assert it is exactly zero for a correct answer. Applied only when no
+    // ceiling fired, which is what keeps it off
+    // answers the rules have already judged: every ceiling routes through
+    // `cap_preserving_order`, which lowers the value whenever it applies, so an untouched
+    // score is proof that nothing objected.
+    if weather_question
+        && score >= blended
+        && !answer_is_unfalsifiable(answer)
+        && let Some(affirmed) = truth_claims_affirmed(
+            ground_truth,
+            answer,
+            truth_polarity,
+            answer_polarity,
+            truth_probability,
+            answer_probability,
+            fact_assessment.map(|assessment| assessment.support),
+        )
+        && affirmed >= 2
+    {
+        score = score.max(POSITIVE_EVIDENCE_FLOOR);
     }
     if !score.is_finite() {
         score = 0.0;

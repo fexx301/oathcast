@@ -757,3 +757,48 @@ because 518 registered the previous build and so its hash was the string being r
 That is the third time a blind hash replacement has clobbered a registration record in this
 file. Each time the assertion that checks all recorded identities caught it. The assertion
 is the only reason this file is still trustworthy.
+
+## The correct answers were not underpaid, they were being fined
+
+The plan was a positive path: derive what the ground truth actually asserts, and floor the
+score when an answer affirms it and contradicts none of it. Every rule in this module is a
+deduction, so a correct answer earns nothing for being correct, and on the core corpus ours
+averaged 0.6483 where the champion places accepted answers near 0.998.
+
+Implemented, it changed nothing. Average correct-answer score identical to four decimal
+places. So the premise was wrong, and instrumenting the blend against the final score showed
+why: those answers were not missing credit, they were being capped. They blended at 0.79,
+0.72, 0.71 and 0.94 and came out at 0.25, 0.45, 0.47 and 0.49.
+
+Two of them were capped for not answering a yes/no question. Asked whether there was a
+thunderstorm, "Thunder and lightning were observed over Lagos in that window." was treated as
+giving no answer, because polarity was inferred only from yes, true, likely, expected and
+occurred. Naming the phenomenon is how a forecast says it happened, and we did not read it.
+
+Fixing that produced three regressions, each of which taught something.
+
+Unscoped, the floor lifted a wrong answer about mountains to 0.90 and inverted a pair we had
+been getting right. Any mechanism that raises correct answers raises the wrong ones we fail
+to detect, which is the third time this week that the same sentence has explained a failure.
+Scoping the floor to weather questions, our registered surface, resolved it.
+
+"Rain is not expected." broke, because it names a concept before its negation, so a positive
+reading was set before the "not" arrived and the two collapsed to Unknown. English puts the
+negation after the subject and a single forward pass cannot see it coming.
+
+And the affirmative verbs, left ungated, broke a ground truth. "No. Precipitation in Lagos
+during the requested UTC hour measured 0.05 mm, below the 0.1 mm threshold." read as both
+negative and positive, because "measured" sits far enough past "No" that the negation scope
+had lapsed. The truth collapsed to Unknown, the polarity check switched itself off, and a
+wrong "Yes" answer rose from 0.0000 to 0.4724. A defect in reading the reference is worse
+than a defect in reading the answer, and it was invisible until a corpus caught it.
+
+The floor also needed a guard against answers that cannot be wrong. "Weather in Lagos is
+variable and precipitation is always possible at some point." affirms the concept, carries
+the right polarity, contradicts nothing, and would be equally true of a dry hour. It reached
+0.9189 before that guard, above the correct answer it was paired against.
+
+Net: core margin +0.4025 to +0.5145, correct answers 0.6483 to 0.7214, weather corpus +0.4962
+to +0.5018, agreement 0.6092 to 0.6254, frozen bar untouched. Four correct answers are still
+being fined, one on an ambiguity ceiling and three on ceilings that set no issue bit at all,
+and those are the next ones to free.

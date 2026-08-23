@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 61744,
+    "byte_size": 63304,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
-    "keccak256_raw_bytes": "0x57c69309b698a09a7a99de0f6f186a743faf3558664b62040fd35150b655766b",
+    "sha256": "b7f468867366767adca38d37c91d7fe84bc07deab984db45fdfb66524c708b06",
+    "keccak256_raw_bytes": "0x11bd1baa3bb2221c613a610e86684f6c47b1b467ccfa84a9774f3b944c411e3a",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
+      "measured_on_artifact": "b7f468867366767adca38d37c91d7fe84bc07deab984db45fdfb66524c708b06",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
+      "darwin/arm64": "b7f468867366767adca38d37c91d7fe84bc07deab984db45fdfb66524c708b06",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94",
-      "476113169ac6a44f14954de1222de2b8ee64ea24b9672fb4c86caa6e9eeecf94"
+      "b7f468867366767adca38d37c91d7fe84bc07deab984db45fdfb66524c708b06",
+      "b7f468867366767adca38d37c91d7fe84bc07deab984db45fdfb66524c708b06"
     ]
   },
   "current_artifact_abi": {
@@ -1342,5 +1342,32 @@
     "weather_corpus": "+0.4795 to +0.4962",
     "core_corpus": "+0.3856 to +0.4025, against the live champion's +0.1823",
     "frozen_bar": "unchanged: generated 8 inverted and 9 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, weakest synthetic margin 0.206250, Spearman 0.956622, worst_self_match 1.0000"
+  },
+  "positive_evidence_path": {
+    "date": "2026-08-23",
+    "why": "Every rule in this module was a deduction, so a correct answer earned nothing for being correct. On the core discrimination corpus our correct answers averaged 0.6483 where the live champion places accepted answers near 0.998, and on the generated corpus a terse correct answer landed adjacent to the clamp value its wrong counterpart had been capped onto. That adjacency is why two output transforms could not separate them: a monotonic transform cannot pull apart two scores the judgement placed side by side.",
+    "first_hypothesis_was_wrong": "The plan was a floor for answers that affirm the truth's claims. Implemented alone it changed nothing, average correct-answer score identical to four decimal places, because the low-scoring correct answers were not missing credit, they were being actively capped. Instrumenting the blend against the final score showed correct answers blending at 0.79, 0.72, 0.71 and 0.94 and being cut to 0.25, 0.45, 0.47 and 0.49.",
+    "the_real_defect": "Two correct answers were capped for MISSING_BINARY_ANSWER. Asked whether there was a thunderstorm, the correct answer 'Thunder and lightning were observed over Lagos in that window.' was treated as not answering, because polarity was inferred only from yes, true, likely, expected and occurred. Naming the phenomenon is how a forecast says it happened.",
+    "changes": {
+      "concept_implies_polarity": "A weather concept asserted with no negation anywhere in the text reads as affirmative, along with fell, fall, observed, recorded, measured, detected and reported. Scoped to weather questions.",
+      "interrogatives_assert_nothing": "explicit_polarity returns Unknown for text ending in a question mark, so the fixture's question copy keeps tripping the ceiling it is meant to trip rather than reading as a positive answer because it names precipitation.",
+      "positive_evidence_floor": "0.90 when the answer contradicts none of the truth's claims and affirms at least two of polarity, figures within tolerance, weather concepts, probability and anchor support. Applied only on weather questions, only when no ceiling fired, and only when the answer is falsifiable.",
+      "unfalsifiable_guard": "The floor is withheld from answers containing possible, variable, always, sometimes, may, might, could and similar. Without it the evasive 'Weather in Lagos is variable and precipitation is always possible at some point.' rose from 0.4836 to 0.9189, above a correct answer's paired score."
+    },
+    "three_regressions_measured_and_fixed": {
+      "wrong_answer_lifted_on_a_non_weather_case": "Unscoped, the floor lifted a wrong answer on 'Which mountain is the highest above sea level?' to 0.90 and inverted a pair that had been ordered correctly. Any mechanism that raises correct answers also raises the wrong ones we fail to detect. Fixed by scoping to weather questions.",
+      "negation_ordering": "'Rain is not expected.' names a concept before its negation, so a positive reading was set before the not was reached and the two collapsed to Unknown. Fixed by requiring the text to negate nothing before a concept counts as affirmative.",
+      "truth_polarity_corrupted": "Ungated, the affirmative verbs broke a ground truth: 'No. Precipitation in Lagos during the requested UTC hour measured 0.05 mm, below the 0.1 mm threshold.' read as both negative and positive, because measured sits past the negation scope. The truth collapsed to Unknown, which disabled the polarity check and lifted a wrong Yes answer from 0.0000 to 0.4724. Fixed by the same gate."
+    },
+    "result": {
+      "core_average_correct_answer": "0.6483 to 0.7214",
+      "core_average_margin": "+0.4025 to +0.5145, against the live champion's +0.1823 on the same corpus",
+      "weather_corpus": "+0.4962 to +0.5018",
+      "agreement_proxy": "0.6092 to 0.6254, floor 0.60",
+      "frozen_bar": "unchanged: generated 8 inverted and 9 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, weakest synthetic margin 0.206250, Spearman 0.956622, worst_self_match 1.0000",
+      "still_capped": "wind 0.2479 on an ambiguity ceiling, and humidity 0.4493, visibility 0.4534 and pressure 0.4671 on ceilings that set no issue bit. These are the next correct answers to free, and freeing them is what would make a third attempt at the output transform worth running."
+    },
+    "caveat": "Registration 518 measured a doubling of the core corpus as five percent on the scored surface. Nothing here is a prediction about the bar.",
+    "registration_status": "No further registration is authorized."
   }
 }
