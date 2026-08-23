@@ -634,3 +634,44 @@ that the unit tests could not see either one.
 The projection still falls short. Telegraph read 0.1929 where the local corpus read
 0.2525; at that ratio 0.4768 projects to about 0.36 against 0.4941. Close enough to be
 worth the next fix, not close enough to spend a registration on.
+
+## The champion published how they did it, and two paragraphs of it were our bugs
+
+The author who holds our intent wrote the whole thing up and included a node endpoint to
+check the claim. It checks out: 45 active registrations across 45 intents, from 268
+attempts, 191 of them rejected. Bond is zero on every one, so an attempt costs gas.
+That is a different posture from ours. We have made six registrations and treated each
+one as expensive.
+
+Reading the validator's list for our intent settled something we had been guessing at.
+Registration 442, active, is theirs, and it is the 24 MB twelve-layer embedding model
+from the write-up. Their route there was 12 registrations and 10 rejections, and two of
+those rejections were for a gate we did not know existed: where an intent has real
+traffic, your ranking of real miner answers has to correlate with the holder's at 0.60 or
+better. WEATHER_FORECAST has traffic. That gate will bind for us the moment we clear
+separation, and we have never measured it.
+
+Then I downloaded the champion and ran it on our corpora, which is the first time this
+project has measured the thing it is actually competing against rather than a stand-in.
+Its profile is lopsided. On attribute cases it is at zero: cloud -0.000, pressure +0.000,
+temperature +0.000, visibility +0.003. On polarity it is enormous: rain yes/no +0.984,
+storm +0.708, negated rain +0.448. For that to average 0.4941 on the fixture, the fixture
+has to be weighted toward polarity and contradiction, which is exactly the two holes the
+write-up says the default judge has.
+
+Which made two of our own defects obvious. Our polarity vocabulary had no word for
+"without". Against a ground truth of "precipitation did not occur", the correct paraphrase
+"the hour passed without any measurable rainfall" came back Unknown, matched the truth no
+better than a wrong positive answer, and the pair scored 0.4869 against 0.4863. The
+champion separates that same pair by 0.448.
+
+And our numeric check had no tolerance, which the write-up names as the change that won
+them this intent. Real forecast traffic differs by a degree or two, so an intolerant check
+punishes honest forecasts. Against "29.4 degrees Celsius", the correct "about 29 degrees"
+and the wrong "about 12 degrees" both scored 0.2866. Tied on a clamp.
+
+Two vocabulary-sized fixes took the core corpus from 0.1996 to 0.3856 and broke three
+ties, with the frozen bar unchanged. I also had to correct an overclaim from earlier the
+same day: I had said that corpus reproduced Telegraph's measurement because our binary
+scored 0.1996 against their 0.1929. The champion scores 0.1823 on it against a reported
+0.4941. One number matching out of two is a coincidence.

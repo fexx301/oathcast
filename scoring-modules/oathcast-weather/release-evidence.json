@@ -5,10 +5,10 @@
   "status": "quantisation_diagnosed_rebuilding_scorer_signals",
   "artifact": {
     "path": "scoring-modules/oathcast-weather/rust-module/target/wasm32-unknown-unknown/release/oathcast_weather_scorer.wasm",
-    "byte_size": 60355,
+    "byte_size": 61388,
     "maximum_allowed_bytes": 33554432,
-    "sha256": "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
-    "keccak256_raw_bytes": "0xbbceb8e30721ce1337a728155ddc7e1a6efa02d69c07b9bda633f2ebeeddbd44",
+    "sha256": "b1f537a47f7cac9396e51c0517b95fb5efa82629f718d0b720c230cc59ff7564",
+    "keccak256_raw_bytes": "0xe6e1c0b32c4312a3d1abaf43538cda4a216a67e8ecf622abc99d31a3fcd2d1af",
     "registration_candidate": true,
     "candidate_scope": "This 55,089-byte rank-only build is a local, unuploaded revision. It is NOT the artifact that was registered: registration 41 registered the earlier 42,798-byte build, whose bytes and digests are retained unchanged under registration_41_artifact. It carries three changes on top of that build. First, the probability-scan fix in percent_probability, which previously returned from the whole function on the first '%' carrying no parseable number and so discarded a real percentage later in the same answer. Second, question_entity_substituted, described under entity_binding_fix. Third, the two changes described under ordinal_and_classifier_fix: a penalty for an ordinal the ground truth does not support, and a narrowing of the weather-question classifier so a capitalised proper noun colliding with a weather synonym group no longer routes a general-knowledge question down the weather path. All are measured rather than asserted: 50 native Rust tests, the wazero ABI and adversarial suite, the 27-case fixture corpus and all 88 factual pairs pass, every pair still clears its minimum margin under both wazero engines, and the weakest synthetic factual margin and ordinal Spearman are unchanged at 0.206250 and 0.956622. These bytes have not been uploaded, hosted, signed, registered, or evaluated by Telegraph, and no further registration is authorized."
   },
@@ -343,7 +343,7 @@
     "affected_inputs": {
       "count": 1,
       "of_total_scored": 256,
-      "measured_on_artifact": "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
+      "measured_on_artifact": "b1f537a47f7cac9396e51c0517b95fb5efa82629f718d0b720c230cc59ff7564",
       "detail": [
         "negation_polarity/affirmative_paraphrase: amd64 compiler 0.490000, every other configuration 0.370000"
       ],
@@ -484,13 +484,13 @@
     "isolated_clean_builds": 2,
     "byte_identical": true,
     "platform_digests": {
-      "darwin/arm64": "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
+      "darwin/arm64": "b1f537a47f7cac9396e51c0517b95fb5efa82629f718d0b720c230cc59ff7564",
       "linux/amd64": "5ec500617f5e91e5ce714911e35874e3e8f9af64158c2576005eeb7077871122"
     },
     "platform_reproducibility": "Deterministic per platform, NOT byte-identical across platforms. Two isolated clean builds on each host reproduce that host's digest exactly, and the two hosts differ: darwin/arm64 and linux/amd64 both emit 55,089 bytes with different content under the same pinned rustc 1.95.0, wasm32-unknown-unknown target and release profile. The registered bytes are the darwin/arm64 build, because those are the bytes that were hosted and registered; registration identity is a specific artifact, not whatever a given machine compiles. CI builds on linux/amd64 and therefore asserts the linux/amd64 digest.",
     "isolated_build_sha256": [
-      "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110",
-      "a7b839272f5923625389eb03696f38890a8dd9140c15ce20904721f213657110"
+      "b1f537a47f7cac9396e51c0517b95fb5efa82629f718d0b720c230cc59ff7564",
+      "b1f537a47f7cac9396e51c0517b95fb5efa82629f718d0b720c230cc59ff7564"
     ]
   },
   "current_artifact_abi": {
@@ -1223,5 +1223,46 @@
     },
     "direction_this_reverses": "Every change in this module since registration 19 has been about detecting defects and lowering the scores of wrong answers. On the scored surface the binding constraint is the opposite: correct answers are not scoring high enough. That is a reversal of direction, not an increment, which is why it is recorded here before any code is written against it.",
     "registration_status": "No further registration is authorized."
+  },
+  "champion_identified": {
+    "date": "2026-08-23",
+    "how": "The champion's author published a write-up and gave a node endpoint to verify it. Reading the validator's per-intent registration list settled who holds WEATHER_FORECAST.",
+    "author_address": "0x8b224783FE5b3c52B7DB0cb9B1754f8812b75287",
+    "holds": "45 active registrations across 45 intents, verified from the node rather than taken on trust. 268 registrations total: 191 rejected, 30 superseded, 45 active. BondAmount is 0 on every one of them, so an attempt costs gas alone.",
+    "champion_for_our_intent": {
+      "registration_id": 442,
+      "activation_status": "active",
+      "eval_score": 0.9524174,
+      "wasm_hash": "4bbceaf31e807cea639377b31b6c6895b22c17503b3a9a489afbd98bc22b4a55",
+      "wasm_url": "https://raw.githubusercontent.com/zkasuran/telegraph-salience-scorer/d99a83ff795c41f3c8da84d5944d5ee65f17e573/dist/xfmr/wfc_t66.wasm",
+      "byte_size": 23986507,
+      "downloaded_and_hash_verified": true,
+      "what_it_is": "The 24 MB build described in the author's write-up: a twelve layer sentence embedding model compiled in with no network and no libraries, word vectors quantised to four bits to fit the sandbox's 32 MB limit."
+    },
+    "their_path_on_our_intent": "12 registrations, 10 rejected. Two, 135 and 139, were rejected for disagreeing with the champion on real traffic; the rest lost on separation. EvalScores ranged 0.2244 to 0.9524.",
+    "the_third_gate_we_did_not_know_about": "Where an intent has real traffic, a candidate's ranking of real miner answers must correlate with the holder's at 0.60 or better. WEATHER_FORECAST has traffic and this gate bound for them twice, so it will bind for us the moment we clear separation. We have never measured it. We can now, because we hold the champion binary and can compare rankings directly.",
+    "their_eval_score_is_not_our_candidate_margin": "The champion's EvalScore is 0.9524 while the champion_margin quoted in our rejection was 0.4941. Different quantities, so EvalScore is not the number we were compared on and should not be treated as the bar."
+  },
+  "champion_measured_locally": {
+    "date": "2026-08-23",
+    "correction": "An earlier entry claimed the core discrimination corpus reproduced Telegraph's measurement. It reproduced OURS, 0.1996 against their 0.1929, but the champion scores 0.1823 on it against the 0.4941 they reported. One of two numbers matching is a coincidence, not a calibration, and the corpus is not the fixture's shape. Corrected here rather than left standing.",
+    "champion_profile_on_the_core_corpus": "Near zero on attribute cases: cloud -0.000, humidity +0.001, pressure +0.000, prob_value +0.001, snow_no -0.000, temp_value +0.000, visibility +0.003. Very large on polarity: rain_yes +0.984, storm +0.708, rain_no +0.448. For that module to reach 0.4941 on the fixture, the fixture is weighted toward polarity and contradiction rather than attribute recall, which matches the author's description of the default judge's two holes: an answer that borrows the right words and means the opposite, and a right answer in different words.",
+    "two_fixes_taken_from_that_reading": {
+      "polarity_vocabulary": "without, neither, nor, none, absent, nil, dry as firm negations, plus hardly, scarcely, lacking, devoid, failed in the scoped form. The correct paraphrase 'The hour passed without any measurable rainfall in Lagos.' returned Unknown against a Negative ground truth, so it matched no better than a wrong positive answer and the pair scored 0.4869 against 0.4863. The champion separates that pair by 0.448.",
+      "numeric_tolerance": "Five percent of the reference with a floor of half a unit. The champion's author names this as the change that took the weather intent: real forecast traffic differs by a degree or two, so an intolerant numeric check punishes honest forecasts. We had none. Against '29.4 degrees Celsius', the correct 'about 29 degrees Celsius' and the wrong 'about 12 degrees Celsius' both scored 0.2866, tied on a clamp."
+    },
+    "result_on_the_core_corpus": {
+      "ours_before": 0.1996,
+      "ours_after": 0.3856,
+      "champion442": 0.1823,
+      "ordering_before": "8/12",
+      "ordering_after": "10/12",
+      "champion_ordering": "10/12",
+      "ties_broken": "max_temp +0.000 to +0.624, temp_value +0.000 to +0.629, rain_no +0.001 to +0.474",
+      "average_correct_answer_score": "0.5045 to 0.6483",
+      "caveat": "This corpus is not calibrated to the fixture, as recorded above. Leading on it is not evidence of leading on the scored surface."
+    },
+    "frozen_bar_after": "unchanged: generated 8 inverted and 9 below floor, ranking 9 separated 0 tied 1 inverted, worst separation -0.037118, pairwise 0.9434, held-out 11/30, weather near-miss +0.4768 to +0.4795, synthetic Spearman 0.956622, worst_self_match 1.0000",
+    "registration_status": "No further registration is authorized. The separation gate now looks reachable, but the agreement gate has never been measured and binds on this intent."
   }
 }

@@ -129,10 +129,32 @@ fn explicit_polarity(text: &str) -> Polarity {
             continue;
         }
 
-        if token_eq(current, b"no") || token_eq(current, b"false") {
+        // "without", "neither" and their relatives negate as firmly as "not", and their
+        // absence here was measured. Against the ground truth "No. Measurable
+        // precipitation did not occur in Lagos during the requested UTC hour.", the
+        // correct paraphrase "The hour passed without any measurable rainfall in Lagos."
+        // came back Unknown rather than Negative, so it matched the truth's polarity no
+        // better than the wrong "Lagos saw steady measurable rain", and the two scored
+        // 0.4869 and 0.4863. The current champion separates that same pair by 0.448, and
+        // polarity is the axis it wins on.
+        if token_eq(current, b"no")
+            || token_eq(current, b"false")
+            || token_eq(current, b"without")
+            || token_eq(current, b"neither")
+            || token_eq(current, b"nor")
+            || token_eq(current, b"none")
+            || token_eq(current, b"absent")
+            || token_eq(current, b"nil")
+            || token_eq(current, b"dry")
+        {
             negative = true;
             negation_scope = 6;
         } else if token_eq(current, b"not")
+            || token_eq(current, b"hardly")
+            || token_eq(current, b"scarcely")
+            || token_eq(current, b"lacking")
+            || token_eq(current, b"devoid")
+            || token_eq(current, b"failed")
             || token_eq(current, b"never")
             || token_eq(current, b"cannot")
             || is_negative_contraction(text, token)
@@ -3689,8 +3711,11 @@ fn fact_anchor_assessment(
     })
 }
 
-fn numeric_set(text: &str) -> HashSet<MAX_NUMERIC_FACTS> {
+#[allow(clippy::type_complexity)]
+fn numeric_scan(text: &str) -> (HashSet<MAX_NUMERIC_FACTS>, [f32; MAX_NUMERIC_FACTS], usize) {
     let mut set = HashSet::new();
+    let mut values = [0.0f32; MAX_NUMERIC_FACTS];
+    let mut count = 0usize;
     let bytes = text.as_bytes();
     let mut cursor = 0usize;
 
@@ -3749,13 +3774,62 @@ fn numeric_set(text: &str) -> HashSet<MAX_NUMERIC_FACTS> {
             && value.is_finite()
         {
             let normalized = if value == 0.0 { 0.0 } else { value };
+            if let Some(slot) = values.get_mut(count) {
+                *slot = normalized;
+                count += 1;
+            }
             set.insert(normalized.to_bits() as u64);
         }
     }
-    set
+    (set, values, count)
+}
+
+fn numeric_set(text: &str) -> HashSet<MAX_NUMERIC_FACTS> {
+    numeric_scan(text).0
+}
+
+/// True when `candidate` is close enough to `expected` to be the same claim.
+///
+/// The champion's author describes this as the change that took the weather intent:
+/// real forecast traffic is a pile of valid forecasts differing by a degree or two, so a
+/// numeric check without tolerance punishes every honest forecast that says 23 where the
+/// reference said 24. We had no tolerance at all. Against a ground truth of "29.4 degrees
+/// Celsius", the correct "It was about 29 degrees Celsius" shared no exact value, so it
+/// scored 0.2866, which is precisely what the wrong "about 12 degrees Celsius" scored.
+/// The pair tied on a clamp.
+///
+/// Five percent of the reference with a floor of half a unit, so 29.4 accepts 29 and
+/// rejects 12, and 1012 hPa accepts 1010 and rejects 870.
+fn numeric_within_tolerance(expected: f32, candidate: f32) -> bool {
+    let tolerance = (expected.abs() * 0.05).max(0.5);
+    (expected - candidate).abs() <= tolerance
+}
+
+/// Fraction of the truth's figures the answer states within tolerance.
+fn numeric_agreement(ground_truth: &str, answer: &str) -> Option<f32> {
+    let (_, truth, truth_len) = numeric_scan(ground_truth);
+    if truth_len == 0 {
+        return None;
+    }
+    let (_, response, response_len) = numeric_scan(answer);
+    if response_len == 0 {
+        return Some(0.0);
+    }
+    let matched = truth[..truth_len]
+        .iter()
+        .filter(|expected| {
+            response[..response_len]
+                .iter()
+                .any(|candidate| numeric_within_tolerance(**expected, *candidate))
+        })
+        .count();
+    Some(matched as f32 / truth_len as f32)
 }
 
 fn numeric_quality(ground_truth: &str, answer: &str) -> Option<f32> {
+    if let Some(agreement) = numeric_agreement(ground_truth, answer) {
+        return Some(agreement);
+    }
     let truth = numeric_set(ground_truth);
     if truth.len == 0 {
         return None;
@@ -3768,9 +3842,17 @@ fn numeric_quality(ground_truth: &str, answer: &str) -> Option<f32> {
 }
 
 fn has_conflicting_numeric_facts(ground_truth: &str, answer: &str) -> bool {
-    let truth = numeric_set(ground_truth);
-    let response = numeric_set(answer);
-    truth.len > 0 && response.len > 0 && truth.overlap(&response) == 0
+    // Tolerant, for the same reason as `numeric_agreement`: a forecast a degree off the
+    // reference is a plausible forecast, not a conflicting fact.
+    let (_, truth, truth_len) = numeric_scan(ground_truth);
+    let (_, response, response_len) = numeric_scan(answer);
+    truth_len > 0
+        && response_len > 0
+        && !truth[..truth_len].iter().any(|expected| {
+            response[..response_len]
+                .iter()
+                .any(|candidate| numeric_within_tolerance(*expected, *candidate))
+        })
 }
 
 fn concept_quality(ground_truth: &str, answer: &str) -> Option<f32> {
