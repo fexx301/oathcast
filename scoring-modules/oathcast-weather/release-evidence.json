@@ -1406,5 +1406,40 @@
     "date": "2026-08-23",
     "what_happened": "Updating the synthetic Spearman pin replaced the value in nine places, of which eight were historical records describing what the number was at the time of an earlier change. Only one, verification.synthetic_factual_ordinal_spearman, is a live pin. The history was restored and only the live pin moved, 0.956622 to 0.954137.",
     "why_it_matters": "This is the second class of blind-replacement damage in this file. Registration hashes are protected by an assertion that checks all eight recorded identities, which has caught three attempts. Historical measurements had no such guard, so this one was found only by reading the diff. Any future pin update should target a named field rather than replace a string."
+  },
+  "registration_519_submission": {
+    "date": "2026-08-23",
+    "registration_id": 519,
+    "intent": "WEATHER_FORECAST",
+    "intent_id": "0x9eefcfc9ee9243dea613f4a518d6a4602dfacbd6ad1efe17f9239824a69a034e",
+    "transaction_hash": "0x7489884fd80def7c8eaf84d86d405436afa9578bad70c8c827f62f331bbe6a7c",
+    "chain_id": 84532,
+    "registry_address": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "wasm_hash": "0x3e90332c32657a401d4803195fd790d22740d5748d20c37aaf686d240d5104f6",
+    "wasm_sha256": "ce906dd937810b7e6967f2e6f9c64d941b53c3db285aade2bc71887e3206e658",
+    "wasm_byte_size": 63361,
+    "preflight": "On-chain event hash, hosted URL and local build all agree, and the hosted bytes are byte-identical to the local build. Checked because the hosting path is the same one registrations 506 and 518 used with a fresh token, so serving stale bytes is the standing stage-1 risk. The hosted artifact was also loaded and scored through wazero on both the optimising compiler and the interpreter.",
+    "note_on_this_record": "These are the bytes registered as 519 and must not be updated when the working artifact changes.",
+    "what_changed_since_518": {
+      "timestamp_binding_defect": "numeric_operator_mask counted the colon in a clock time as an operator binding two figures while numeric_set excluded those digits, so every weather ground truth carrying a timestamp charged a conflicting numeric binding against any answer that did not restate it. Four correct answers in the core corpus were capped at 0.49 by this alone.",
+      "affirmation_read": "A weather concept asserted with no negation reads as affirmative, so 'Thunder and lightning were observed over Lagos in that window.' is no longer treated as failing to answer a yes/no question. Interrogatives now assert nothing.",
+      "positive_evidence_floor": "0.90 for an answer that contradicts none of the truth's claims and affirms at least two, on weather questions, when no ceiling fired, and when the answer is falsifiable.",
+      "separation_transform": "Shipped at threshold 0.55, ramp width 0.24, retained raw share 0.10, at the ABI boundary, weather questions only. This is the change aimed squarely at the rejection reason for 506 and 518."
+    },
+    "local_state_at_submission": {
+      "core_corpus_ours": "+0.7615, correct-answer average 0.8779, ordered 10 of 12",
+      "core_corpus_live_champion": "+0.1823, correct-answer average 0.5847, ordered 10 of 12",
+      "weather_near_miss": "+0.5864",
+      "ranking_pools": "+0.5620",
+      "agreement_proxy": "0.6504 against a 0.60 floor",
+      "held_out": "11 of 30",
+      "worst_self_match": "1.0000"
+    },
+    "what_to_read_from_the_result": {
+      "primary": "candidate_margin against champion_margin. 518 gave 0.2030 against 0.4561.",
+      "the_question_this_answers": "Whether an output transform moves the scored margin at all. It is monotonic, so wins should stay at 11 of 12; if the margin does not move either, then the scored cases sit on one side of the threshold and the whole amplification approach is dead on this fixture.",
+      "secondary": "If separation clears, the agreement gate binds next. It has never been measured against real traffic, only against five requests written here, and it sits at 0.6504 against a 0.60 floor.",
+      "calibration_warning": "518 measured a doubling of the core corpus as a five percent scored gain, and 506 measured local gains as zero. The local numbers above are not a prediction."
+    }
   }
 }
