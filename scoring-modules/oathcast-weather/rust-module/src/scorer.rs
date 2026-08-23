@@ -3680,6 +3680,14 @@ fn fact_anchor_assessment(
                 &truth_tokens,
             ));
 
+    // Kept, against an attempt to remove it. Forgiving the omission of question-supplied
+    // context looked right: a miner asked about Lagos need not repeat Lagos. Measured, it
+    // took the agreement proxy against the live champion from 0.5190 to 0.4032. The
+    // champion rewards completeness, scoring the answers that do carry the location and
+    // the hour at 0.998 and everything else at about 0.01, so forgiving omission moves our
+    // ranking away from theirs rather than toward it. The reading that led to the change,
+    // that the champion ranked a terse answer third, was noise: its ranks three through
+    // eight all sit within 0.005 of each other.
     let support = if anchors.context_constraints.len == 0 {
         value_support.max(acronym_support)
     } else if context_conflict {
@@ -3801,7 +3809,10 @@ fn numeric_set(text: &str) -> HashSet<MAX_NUMERIC_FACTS> {
 /// Five percent of the reference with a floor of half a unit, so 29.4 accepts 29 and
 /// rejects 12, and 1012 hPa accepts 1010 and rejects 870.
 fn numeric_within_tolerance(expected: f32, candidate: f32) -> bool {
-    let tolerance = (expected.abs() * 0.05).max(0.5);
+    // Ten percent with a floor of one unit. Five percent with a floor of half a unit was
+    // too tight for small integer quantities: a wind of 9 km/h against a reference of 8
+    // was charged as a conflicting fact, where the champion ranks that same answer first.
+    let tolerance = (expected.abs() * 0.10).max(1.0);
     (expected - candidate).abs() <= tolerance
 }
 

@@ -1,0 +1,256 @@
+{
+  "schema": "oathcast_scorer_agreement_clusters_v1",
+  "role": "A local stand-in for Telegraph's third gate. Where an intent has real traffic, a candidate's ranking of real miner answers must correlate with the holder's at 0.60 or better. WEATHER_FORECAST has traffic and the holder was rejected on this gate twice before winning, so it binds for us the moment separation is cleared. Each pool is one request with eight plausible miner answers, differing in verbosity, precision, hedging and rounding, as several fluent models would differ. Scored by both this module and the live champion, registration 442, and compared by Spearman correlation.",
+  "not_real_traffic": "These answers were written here, not observed. The champion side is real, so a disagreement is a real disagreement with the actual holder, but the case distribution is a guess.",
+  "measured_2026_08_23": {
+    "pooled_spearman_ours_vs_champion": 0.6092,
+    "before_the_numeric_tolerance_change": 0.519,
+    "with_context_omission_also_forgiven": 0.4032,
+    "per_request": {
+      "rain_none": 0.8982,
+      "rain_hour": 0.9048,
+      "temp_hour": 0.6108,
+      "prob_hour": 0.5714,
+      "wind_hour": 0.4048
+    },
+    "our_distinct_scores": "37 of 40",
+    "champion_distinct_scores": "40 of 40"
+  },
+  "pools": [
+    {
+      "pool_id": "rain_hour",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "Yes. Measurable precipitation occurred in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Yes.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Yes, measurable precipitation occurred in Lagos during that hour.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "Yes — rain was recorded in Lagos between 15:00 and 16:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Yes, there was measurable rainfall in Lagos in the requested window, above the 0.1 mm threshold.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Measurable rain did fall in Lagos during the hour in question.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Likely yes, roughly a 70 percent chance, and observations confirm rain fell.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Yes, precipitation of about 1.2 mm was measured in Lagos during that hour.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "Rain occurred.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "temp_hour",
+      "question": "What was the temperature in Lagos at 14:00 UTC?",
+      "ground_truth": "The temperature in Lagos at 14:00 UTC was 29.4 degrees Celsius.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "29.4 C.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "The temperature was 29.4 degrees Celsius.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "It was around 29 degrees Celsius in Lagos at 14:00 UTC.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Lagos recorded 29.4 C at 14:00 UTC, a warm and humid afternoon.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "About 29.5 C.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Roughly 30 degrees Celsius.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "The reading was 29.4 degrees Celsius, which is 84.9 Fahrenheit.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "29 C, give or take half a degree.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "prob_hour",
+      "question": "What is the probability of measurable precipitation in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "There is a 65% probability of measurable precipitation in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "65%.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "There is a 65 percent probability of measurable precipitation.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "About a 65% chance of measurable rain in that hour.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Roughly two chances in three, so around 65 percent.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "The probability is 0.65 for measurable precipitation in Lagos in that window.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "62 percent.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Around 70 percent, so more likely than not.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "High, close to two thirds.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "wind_hour",
+      "question": "What are the wind conditions in Lagos at 14:00 UTC?",
+      "ground_truth": "Winds in Lagos at 14:00 UTC were light, around 8 km/h from the southwest.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "Light southwesterly winds, about 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "Winds were light at roughly 8 kilometres per hour from the southwest.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "A gentle breeze from the southwest, near 8 km/h.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Around 7 km/h, southwesterly, so light.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "Light winds.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Southwest at 9 km/h, light and steady over Lagos.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "Calm to light, under 10 km/h from the southwest.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "8 km/h SW.",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "pool_id": "rain_none",
+      "question": "Will measurable precipitation > 0.1 mm occur in Lagos from 15:00 to 16:00 UTC?",
+      "ground_truth": "No. Measurable precipitation did not occur in Lagos during the requested UTC hour.",
+      "candidates": [
+        {
+          "label": "m0",
+          "answer": "No.",
+          "correct": true
+        },
+        {
+          "label": "m1",
+          "answer": "No, no measurable precipitation occurred in Lagos during that hour.",
+          "correct": true
+        },
+        {
+          "label": "m2",
+          "answer": "The hour passed without measurable rainfall in Lagos.",
+          "correct": true
+        },
+        {
+          "label": "m3",
+          "answer": "Lagos stayed dry through the requested window.",
+          "correct": true
+        },
+        {
+          "label": "m4",
+          "answer": "No rain was recorded, the total stayed below the 0.1 mm threshold.",
+          "correct": true
+        },
+        {
+          "label": "m5",
+          "answer": "Unlikely, and observations show it stayed dry.",
+          "correct": true
+        },
+        {
+          "label": "m6",
+          "answer": "No measurable precipitation, though a trace of 0.05 mm was logged.",
+          "correct": true
+        },
+        {
+          "label": "m7",
+          "answer": "It did not rain.",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

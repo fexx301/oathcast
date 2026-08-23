@@ -675,3 +675,40 @@ ties, with the frozen bar unchanged. I also had to correct an overclaim from ear
 same day: I had said that corpus reproduced Telegraph's measurement because our binary
 scored 0.1996 against their 0.1929. The champion scores 0.1823 on it against a reported
 0.4941. One number matching out of two is a coincidence.
+
+## The champion's trick does not transfer, and the reason is our own scores
+
+The champion's output is nearly binary: about 0.998 for answers it accepts, about 0.01 for
+the rest, with a hundredth of spread inside the low band. Its author explains why. A hard
+step maximises separation; two percent of the raw score added back keeps the ranking alive
+inside each band, which matters because a band of identical values is a block of ties and
+ties correlate with nothing.
+
+That looked like our whole problem. Registration 506 won 11 of 12 cases on ordering and
+still averaged 0.1929, which is exactly the signature of a smooth score: you can be right
+about every pair and still separate them by very little. Simulating the step on recorded
+scores took the core corpus from +0.3856 to +0.6610 and the ranking pools from +0.5373 to
++0.8927, with inversions unchanged, because a monotonic transform cannot reorder anything
+and therefore cannot affect the agreement gate either.
+
+It broke on our own leniency. A hard step took the count of generated pairs below the 0.15
+margin floor from 9 to 135 of 375, since a good and a bad answer on the same side of the
+threshold end up a hundredth apart. Softening it to a ramp of width 0.24 halved that, and
+then failed three cases in our published fixture contract: an answer that merely echoes the
+question rose to 0.8637 where we had recorded a ceiling of 0.49, a 51% answer against a 90%
+truth rose to 0.9919 against 0.61, and a partial answer rose to 0.7637 against 0.70.
+
+That is not a threshold I can tune. Those answers score about 0.50, 0.60 and 0.55 raw, and
+a good answer scores about 0.85. Holding 0.60 under 0.61 while pushing 0.85 high needs a
+ramp wide enough that no amplification is left. The champion can be binary because its raw
+judgement already separates cleanly. Ours overlaps: correct answers from 0.25 to 0.98,
+wrong ones from 0.10 to 0.62. Amplifying an overlap amplifies the overlap.
+
+So it is reverted, and the honest read is that it is the right idea in the wrong order.
+What survives from the day is smaller and real: a negation vocabulary that now includes
+"without", a numeric tolerance of ten percent, and the first local measurement of the third
+gate, 0.6092 against a floor of 0.60 using the champion's actual binary as the reference.
+One hypothesis died on the way, that forgiving the omission of question-supplied context
+would move us toward the champion. It moved us from 0.5190 to 0.4032. I had read a terse
+answer at the champion's rank three as a signal, when its ranks three through eight all sit
+within 0.005 of each other.
