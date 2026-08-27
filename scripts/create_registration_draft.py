@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a non-submitting registration snapshot from the canonical YAML.
+"""Create a non-submitting registration snapshot from an approved local draft.
 
 This is a local dry-run artifact. It records the exact raw-YAML digest and
 the current candidate mapping, but never contacts Telegraph, signs a wallet,
@@ -21,11 +21,17 @@ from oathcast.registration import (
 from oathcast.artifacts import atomic_write_text
 
 try:
-    from scripts.validate_miner_drafts import validate_draft
+    from scripts.validate_miner_drafts import (
+        VERSIONED_REGISTRATION_CANDIDATE_PATHS,
+        validate_draft,
+    )
 except ModuleNotFoundError as exc:
     if exc.name not in {"scripts", "scripts.validate_miner_drafts"}:
         raise
-    from validate_miner_drafts import validate_draft
+    from validate_miner_drafts import (  # type: ignore[no-redef]
+        VERSIONED_REGISTRATION_CANDIDATE_PATHS,
+        validate_draft,
+    )
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +74,7 @@ def _supported_intents(lines: list[str]) -> tuple[str, ...]:
 def _candidate_miner_id(lines: list[str]) -> str:
     miner_id = _scalar(lines, r"^id:\s*(.*?)\s*$")
     if miner_id is None or not miner_id.isdigit() or int(miner_id) <= 0:
-        raise ValueError("canonical YAML must define a positive numeric candidate id")
+        raise ValueError("Miner YAML must define a positive numeric candidate id")
     return miner_id
 
 
@@ -100,20 +106,27 @@ def build_registration_draft(
     yaml_path = yaml_path.resolve()
     if not yaml_path.exists():
         raise FileNotFoundError(yaml_path)
-    local_validation = validate_draft(yaml_path, canonical=True)
+    is_versioned_candidate = yaml_path in {
+        candidate.resolve() for candidate in VERSIONED_REGISTRATION_CANDIDATE_PATHS
+    }
+    local_validation = validate_draft(
+        yaml_path,
+        canonical=not is_versioned_candidate,
+        registration_candidate=is_versioned_candidate,
+    )
     if not local_validation["valid"]:
         raise ValueError(
-            "canonical YAML failed local validation: "
+            "Miner YAML failed local validation: "
             + "; ".join(local_validation["errors"])
         )
     raw_lines = yaml_path.read_text(encoding="utf-8").splitlines()
     slug = _scalar(raw_lines, r"^slug:\s*(.*?)\s*$")
     if not slug:
-        raise ValueError("canonical YAML must define slug")
+        raise ValueError("Miner YAML must define slug")
     miner_id = _candidate_miner_id(raw_lines)
     intents = _supported_intents(raw_lines)
     if intents != CANONICAL_INTENTS:
-        raise ValueError("canonical YAML must support exactly WEATHER_FORECAST")
+        raise ValueError("Miner YAML must support exactly WEATHER_FORECAST")
     if (
         isinstance(min_price_micro_usdc, bool)
         or not isinstance(min_price_micro_usdc, int)
@@ -176,8 +189,8 @@ def build_registration_draft(
             "encoded_calldata": None,
         },
         "registration_input_sources": {
-            "candidate_id": "canonical YAML id",
-            "supported_intents": "canonical YAML semantics.supported_intents",
+            "candidate_id": "validated Miner YAML id",
+            "supported_intents": "validated Miner YAML semantics.supported_intents",
             "yaml_hash_bytes32": "SHA-256 of the exact raw YAML bytes",
             "yaml_uri": (
                 "explicit --yaml-uri operator/portal input"
@@ -219,7 +232,7 @@ def main() -> None:
         "--yaml",
         type=Path,
         default=ROOT / "miners" / "oathcast-weather.yaml",
-        help="canonical Miner YAML draft",
+        help="canonical or recognized versioned Miner YAML draft",
     )
     parser.add_argument(
         "--output",

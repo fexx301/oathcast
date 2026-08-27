@@ -31,8 +31,14 @@ WINDOW_CANDIDATE_PATH = (
     ROOT / "miners" / "candidates" / "oathcast-weather-window-unregistered.yaml"
 )
 WINDOW_CANDIDATE_SLUG = "oathcast-weather-window-unregistered"
-VERSIONED_REGISTRATION_CANDIDATE_PATH = (
-    ROOT / "miners" / "candidates" / "oathcast-weather-cutoff-v2.yaml"
+VERSIONED_REGISTRATION_CANDIDATE_PATHS = frozenset(
+    {
+        ROOT / "miners" / "candidates" / "oathcast-weather-cutoff-v2.yaml",
+        ROOT / "miners" / "candidates" / "oathcast-weather-window-v3.yaml",
+    }
+)
+WINDOW_REGISTRATION_CANDIDATE_PATH = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-window-v3.yaml"
 )
 
 EXPECTED_INPUT_PROPERTIES = {
@@ -555,6 +561,64 @@ def _canonical_contract_errors(document: dict[Any, Any]) -> list[str]:
     return errors
 
 
+def _window_registration_description_errors(
+    document: dict[Any, Any],
+) -> list[str]:
+    """Validate the v3 dispatch guidance without freezing exact prose."""
+
+    errors: list[str] = []
+    endpoints = document.get("endpoints")
+    endpoint = (
+        _mapping(endpoints[0])
+        if isinstance(endpoints, list) and endpoints
+        else None
+    )
+    params = _mapping(endpoint.get("params")) if endpoint is not None else None
+    query = _mapping(params.get("query")) if params is not None else None
+    required_params = query.get("required") if query is not None else None
+    endpoint_descriptions = {
+        item.get("name"): str(item.get("description", "")).lower()
+        for item in required_params or []
+        if isinstance(item, dict)
+    }
+    input_schema = _mapping(document.get("input_schema")) or {}
+    properties = _mapping(input_schema.get("properties")) or {}
+    schema_descriptions = {
+        name: str((_mapping(properties.get(name)) or {}).get("description", "")).lower()
+        for name in ("start", "end", "cutoff")
+    }
+
+    for source, descriptions in (
+        ("endpoint", endpoint_descriptions),
+        ("input_schema", schema_descriptions),
+    ):
+        start = descriptions.get("start", "")
+        end = descriptions.get("end", "")
+        if not all(term in start for term in ("absolute", "rfc 3339", "explicit timezone")):
+            errors.append(
+                f"window registration candidate {source}.start must require an absolute RFC 3339 timestamp with an explicit timezone"
+            )
+        if not all(term in start for term in ("relative", "invalid", "reference time")):
+            errors.append(
+                f"window registration candidate {source}.start must reject relative API values and require a reference time"
+            )
+        if not all(term in end for term in ("exclusive", "1", "168", "whole number of hours")):
+            errors.append(
+                f"window registration candidate {source}.end must declare the exclusive inclusive-bound 1-to-168-hour contract"
+            )
+        if not all(term in end for term in ("24*n", "seven", "168 hours")):
+            errors.append(
+                f"window registration candidate {source}.end must define N days as 24*N hours and seven days as 168 hours"
+            )
+
+    cutoff = schema_descriptions.get("cutoff", "")
+    if not all(term in cutoff for term in ("absolute", "rfc 3339", "at or before start", "omit")):
+        errors.append(
+            "window registration candidate input_schema.cutoff must document absolute timestamps, cutoff <= start, and omission guidance"
+        )
+    return errors
+
+
 def _window_candidate_contract_errors(document: dict[Any, Any]) -> list[str]:
     errors: list[str] = []
     input_schema = _schema_contract(document, "input_schema")
@@ -690,7 +754,7 @@ def validate_draft(
     )
     is_registration_candidate = not canonical and not is_window_candidate and (
         registration_candidate
-        or path == VERSIONED_REGISTRATION_CANDIDATE_PATH.resolve()
+        or path in {candidate.resolve() for candidate in VERSIONED_REGISTRATION_CANDIDATE_PATHS}
     )
 
     if version != "1":
@@ -748,6 +812,8 @@ def validate_draft(
                 'versioned registration candidate auth.value_prefix must be omitted or "Bearer "'
             )
         errors.extend(_canonical_contract_errors(document))
+        if path == WINDOW_REGISTRATION_CANDIDATE_PATH.resolve():
+            errors.extend(_window_registration_description_errors(document))
     elif is_window_candidate:
         if not lines or lines[0] != "# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.":
             errors.append("window candidate must retain the unregistered compatibility marker")
@@ -836,7 +902,11 @@ def validate_paths(paths: Iterable[Path], canonical: Path) -> dict[str, Any]:
             canonical=path.resolve() == canonical,
             window_candidate=path.resolve() == WINDOW_CANDIDATE_PATH.resolve(),
             registration_candidate=(
-                path.resolve() == VERSIONED_REGISTRATION_CANDIDATE_PATH.resolve()
+                path.resolve()
+                in {
+                    candidate.resolve()
+                    for candidate in VERSIONED_REGISTRATION_CANDIDATE_PATHS
+                }
             ),
         )
         for path in paths

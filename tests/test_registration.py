@@ -3,6 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import yaml
+
 from oathcast.registration import (
     BASE_SEPOLIA_NETWORK,
     MINIMUM_PRICE_MICRO_USDC,
@@ -29,6 +31,21 @@ REGISTERED_YAML_SHA256 = "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a32784
 REREGISTRATION_CANDIDATE = (
     ROOT / "miners" / "candidates" / "oathcast-weather-cutoff-v2.yaml"
 )
+WINDOW_REREGISTRATION_CANDIDATE = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-window-v3.yaml"
+)
+
+
+def _without_dispatch_guidance(value):
+    if isinstance(value, dict):
+        return {
+            key: _without_dispatch_guidance(child)
+            for key, child in value.items()
+            if key not in {"description", "example"}
+        }
+    if isinstance(value, list):
+        return [_without_dispatch_guidance(child) for child in value]
+    return value
 
 
 class RegistrationDeclarationTests(unittest.TestCase):
@@ -274,6 +291,46 @@ on_chain:
         result = validate_paths([CANONICAL_MINER, REREGISTRATION_CANDIDATE], CANONICAL_MINER)
         self.assertTrue(result["valid"], result["errors"])
         self.assertFalse(any("duplicate Miner slugs" in error for error in result["errors"]))
+
+    def test_window_reregistration_candidate_changes_dispatch_guidance_only(self):
+        result = validate_draft(WINDOW_REREGISTRATION_CANDIDATE)
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertTrue(result["registration_candidate"])
+
+        active_source = yaml.safe_load(REREGISTRATION_CANDIDATE.read_text(encoding="utf-8"))
+        candidate_source = yaml.safe_load(
+            WINDOW_REREGISTRATION_CANDIDATE.read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            _without_dispatch_guidance(candidate_source),
+            _without_dispatch_guidance(active_source),
+        )
+
+        candidate_text = WINDOW_REREGISTRATION_CANDIDATE.read_text(encoding="utf-8")
+        self.assertNotIn("one-hour forecast window", candidate_text)
+        self.assertNotIn("Forecast one UTC hour", candidate_text)
+
+        result = validate_paths(
+            [
+                CANONICAL_MINER,
+                REREGISTRATION_CANDIDATE,
+                WINDOW_REREGISTRATION_CANDIDATE,
+            ],
+            CANONICAL_MINER,
+        )
+        self.assertTrue(result["valid"], result["errors"])
+
+    def test_registration_draft_accepts_the_recognized_window_candidate(self):
+        artifact = build_registration_draft(WINDOW_REREGISTRATION_CANDIDATE)
+
+        self.assertEqual(
+            artifact["source"]["path"],
+            "miners/candidates/oathcast-weather-window-v3.yaml",
+        )
+        self.assertEqual(artifact["registration"]["miner_slug"], "oathcast-weather")
+        self.assertEqual(artifact["registration"]["miner_id"], "64173")
+        self.assertFalse(artifact["registration_call"]["ready_to_encode"])
+        self.assertFalse(artifact["official_registration"]["submitted"])
 
     def test_registration_draft_validates_operator_supplied_inputs(self):
         artifact = build_registration_draft(

@@ -35,6 +35,20 @@ deregistered. Current registration evidence is retained in
 Full Python discovery passes `526/526`, focused canary tests pass `44/44`, and
 the v17 evidence identity loader accepts the retained bundle.
 
+On 2026-08-27, production logs correlated Telegraph epochs 286 and 287 with
+authenticated dispatcher requests from `13.237.89.59`. The requests reached
+`/v1/forecast/point` but returned HTTP 400: epoch 286 encoded a seven-day prompt
+as a 191-hour interval, and epoch 287 supplied a non-ISO `horizon_start`. The
+score timestamps lagged the corresponding HTTP requests by about 62 minutes.
+The inactive
+`miners/candidates/oathcast-weather-window-v3.yaml` candidate corrects the
+dispatch guidance: absolute RFC 3339 timestamps with explicit timezones,
+exclusive `end`, an inclusive 1-to-168-whole-hour duration bound, seven days as
+exactly 168 hours, and no relative API values. Its local raw SHA-256 is
+`f7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164`.
+It has not been uploaded, portal-validated, pinned, signed, deployed, or
+registered; registration ID `245` and the v17 runtime remain unchanged.
+
 This register separates work we can complete now that Miner registration is
 live from work that still depends on external participants, independent
 observations, or explicit payment/publication authorization. Telegraph's

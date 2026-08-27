@@ -331,6 +331,37 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertIn("between 1 and 168 hours", payload["error"])
         self.assertEqual(calls, [])
 
+    def test_predict_refuses_the_observed_one_hundred_ninety_one_hour_dispatch(self):
+        calls = []
+        service = _service(
+            fetcher=lambda url: calls.append(url) or _window_payload(),
+        )
+        status, payload, _, _ = _handler_request(
+            service,
+            "/v1/forecast/point?"
+            + urlencode(_query_params(hours=191), doseq=True),
+        )
+
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+        self.assertEqual(calls, [])
+
+    def test_predict_refuses_relative_start_as_an_api_value(self):
+        calls = []
+        params = _query_params()
+        params["start"] = ["tomorrow"]
+        service = _service(
+            fetcher=lambda url: calls.append(url) or _window_payload(),
+        )
+        status, payload, _, _ = _handler_request(
+            service,
+            "/v1/forecast/point?" + urlencode(params, doseq=True),
+        )
+
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+        self.assertEqual(calls, [])
+
     def test_registered_paths_normalize_unaligned_windows_to_provider_hours(self):
         """Telegraph's arbitrary ISO bounds are rounded before provider access."""
 
