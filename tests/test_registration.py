@@ -2,7 +2,6 @@ import hashlib
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import yaml
 
@@ -293,7 +292,7 @@ on_chain:
         self.assertTrue(result["valid"], result["errors"])
         self.assertFalse(any("duplicate Miner slugs" in error for error in result["errors"]))
 
-    def test_window_reregistration_candidate_changes_dispatch_guidance_and_bearer_prefix_only(self):
+    def test_window_reregistration_candidate_changes_dispatch_guidance_only(self):
         result = validate_draft(WINDOW_REREGISTRATION_CANDIDATE)
         self.assertTrue(result["valid"], result["errors"])
         self.assertTrue(result["registration_candidate"])
@@ -302,30 +301,14 @@ on_chain:
         candidate_source = yaml.safe_load(
             WINDOW_REREGISTRATION_CANDIDATE.read_text(encoding="utf-8")
         )
-        candidate_contract = _without_dispatch_guidance(candidate_source)
-        active_contract = _without_dispatch_guidance(active_source)
-        self.assertNotIn("value_prefix", active_contract["auth"])
-        self.assertEqual(candidate_contract["auth"].pop("value_prefix"), "Bearer ")
-        self.assertEqual(candidate_contract, active_contract)
+        self.assertEqual(
+            _without_dispatch_guidance(candidate_source),
+            _without_dispatch_guidance(active_source),
+        )
 
         candidate_text = WINDOW_REREGISTRATION_CANDIDATE.read_text(encoding="utf-8")
         self.assertNotIn("one-hour forecast window", candidate_text)
         self.assertNotIn("Forecast one UTC hour", candidate_text)
-
-        without_prefix = candidate_text.replace('  value_prefix: "Bearer "\n', "", 1)
-        with tempfile.TemporaryDirectory() as temp_dir:
-            mutated = Path(temp_dir) / WINDOW_REREGISTRATION_CANDIDATE.name
-            mutated.write_text(without_prefix, encoding="utf-8")
-            with patch(
-                "scripts.validate_miner_drafts.WINDOW_REGISTRATION_CANDIDATE_PATH",
-                mutated,
-            ):
-                result = validate_draft(mutated, registration_candidate=True)
-        self.assertFalse(result["valid"])
-        self.assertIn(
-            'window registration candidate auth.value_prefix must be "Bearer "',
-            result["errors"],
-        )
 
         result = validate_paths(
             [
