@@ -1,0 +1,168 @@
+# VERSIONED RE-REGISTRATION CANDIDATE - NOT ACTIVE.
+# This candidate preserves the current registered contract and changes only
+# cutoff documentation. It must be portal-validated, pinned, and explicitly
+# authorized before upload, signing, or registration.
+version: "1"
+kind: miner
+id: 64173
+slug: oathcast-weather
+protocol: generic
+name: OathCast Weather Forecast Miner
+description: One-hour UTC measurable-precipitation forecasts with provider provenance and deterministic text output.
+base_url: https://oathcastcourt.duckdns.org
+
+auth:
+  type: bearer
+  header_name: Authorization
+  env_var: OATHCAST_MINER_API_KEY
+
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+endpoints:
+  - path: /predict
+    external_path: /v1/forecast/point
+    method: GET
+    description: Forecast one UTC hour and return a short semantic response.
+    intents: [WEATHER_FORECAST]
+    params:
+      query:
+        required:
+          - name: lat
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point latitude in decimal degrees (-90 to 90).
+            example: 6.5244
+          - name: lon
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point longitude in decimal degrees (-180 to 180).
+            example: 3.3792
+          - name: start
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Inclusive UTC start of the one-hour forecast window.
+            example: "2026-08-17T15:00:00Z"
+          - name: end
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Exclusive UTC end of the one-hour forecast window.
+            example: "2026-08-17T16:00:00Z"
+        optional:
+          - name: cutoff
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: >
+              Optional ISO 8601 UTC timestamp deadline for issuing a new
+              forecast. It is mapped to forecast_cutoff and MUST be at or before
+              start (horizon_start). For this one-hour point contract, omit it
+              unless overriding the default; omission is interpreted as one hour
+              before start. Values after start are rejected.
+          - name: threshold_mm
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Fixed measurable precipitation threshold.
+            default: 0.1
+          - name: operator
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Fixed precipitation comparison operator.
+            default: ">"
+          - name: event_id
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Stable event identifier.
+          - name: location_name
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Human-readable point name.
+          - name: provider
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Optional provider selector.
+    param_map:
+      lat: latitude
+      lon: longitude
+      start: horizon_start
+      end: horizon_end
+      cutoff: forecast_cutoff
+
+input_schema:
+  type: object
+  properties:
+    event_id:
+      type: string
+      description: Stable event identifier; defaults to a request-derived identifier when omitted.
+    location_name:
+      type: string
+      description: Human-readable point name; defaults to requested location when omitted.
+    lat:
+      type: number
+      description: Point latitude in decimal degrees.
+      minimum: -90
+      maximum: 90
+    lon:
+      type: number
+      description: Point longitude in decimal degrees.
+      minimum: -180
+      maximum: 180
+    start:
+      type: string
+      description: Inclusive UTC start of the one-hour forecast window.
+      format: date-time
+    end:
+      type: string
+      description: Exclusive UTC end of the one-hour forecast window.
+      format: date-time
+    cutoff:
+      type: string
+      description: >
+        Optional ISO 8601 UTC timestamp deadline for issuing a new forecast. It
+        is mapped to forecast_cutoff and MUST be at or before start
+        (horizon_start). For this one-hour point contract, omit it unless
+        overriding the default; omission is interpreted as one hour before
+        start. Values after start are rejected.
+      format: date-time
+    threshold_mm:
+      type: number
+      description: Measurable precipitation threshold supported by this service.
+      enum:
+        - 0.1
+    operator:
+      type: string
+      description: Provider-native precipitation comparison supported by this service.
+      enum:
+        - ">"
+    provider:
+      type: string
+      description: Optional provider selector; the service still applies its configured provider allowlist.
+  required:
+    - lat
+    - lon
+    - start
+    - end
+
+output_schema:
+  type: object
+  properties:
+    content:
+      type: string
+      description: Deterministic human-readable forecast sentence.
+    probability:
+      type: number
+      description: Probability of the declared measurable-precipitation event.
+      minimum: 0
+      maximum: 1
+  required:
+    - content
+    - probability
+
+semantics:
+  signal_mapping:
+    label_field: content
+    confidence_field: probability
+    reason_field: content
+  supported_intents:
+    - WEATHER_FORECAST
