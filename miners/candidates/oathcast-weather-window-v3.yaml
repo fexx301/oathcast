@@ -1,5 +1,6 @@
 # VERSIONED RE-REGISTRATION CANDIDATE - NOT ACTIVE.
-# This candidate preserves the active runtime contract and corrects the public
+# This candidate preserves the active runtime contract, restores the explicit
+# Bearer header prefix required by the portal sandbox, and corrects the public
 # descriptions for absolute 1-to-168-hour forecast windows. It must be
 # portal-validated, pinned, and explicitly authorized before upload, signing,
 # deregistration, or registration.
@@ -15,6 +16,7 @@ base_url: https://oathcastcourt.duckdns.org
 auth:
   type: bearer
   header_name: Authorization
+  value_prefix: "Bearer "
   env_var: OATHCAST_MINER_API_KEY
 
 rate_limit_per_sec: 2

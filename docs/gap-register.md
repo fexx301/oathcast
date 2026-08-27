@@ -44,10 +44,15 @@ The inactive
 `miners/candidates/oathcast-weather-window-v3.yaml` candidate corrects the
 dispatch guidance: absolute RFC 3339 timestamps with explicit timezones,
 exclusive `end`, an inclusive 1-to-168-whole-hour duration bound, seven days as
-exactly 168 hours, and no relative API values. Its local raw SHA-256 is
-`f7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164`.
-It has not been uploaded, portal-validated, pinned, signed, deployed, or
-registered; registration ID `245` and the v17 runtime remain unchanged.
+exactly 168 hours, and no relative API values. The first portal sandbox attempt
+returned HTTP 401 because the imported candidate omitted `auth.value_prefix`;
+a direct production check returned 401 for a bare key and 200 for
+`Authorization: Bearer <key>`, so the candidate now explicitly restores
+`value_prefix: "Bearer "`. Its corrected local raw SHA-256 is
+`7d664093851da9a53d8a17070bfb03a17e1fb3cd2f753835e20db65951fd35e4`.
+The corrected bytes have not yet passed portal validation or been pinned,
+signed, deployed, or registered; registration ID `245` and the v17 runtime
+remain unchanged.
 
 This register separates work we can complete now that Miner registration is
 live from work that still depends on external participants, independent

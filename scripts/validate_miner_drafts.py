@@ -813,6 +813,10 @@ def validate_draft(
             )
         errors.extend(_canonical_contract_errors(document))
         if path == WINDOW_REGISTRATION_CANDIDATE_PATH.resolve():
+            if value_prefix != "Bearer ":
+                errors.append(
+                    'window registration candidate auth.value_prefix must be "Bearer "'
+                )
             errors.extend(_window_registration_description_errors(document))
     elif is_window_candidate:
         if not lines or lines[0] != "# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.":
