@@ -1,0 +1,17 @@
+{
+  "content_bytes": 272,
+  "db_integrity": "ok",
+  "db_rows": 190,
+  "end": "2026-08-30T04:00:00Z",
+  "event_id": "production-v17-168-20260823T0400z",
+  "hours_contiguous": true,
+  "ok": true,
+  "receipt_hours": 168,
+  "receipt_sha256": "06b2dbb49a1704418a252b2f9877a343de50cde5961bfebfb9f9f4f44adb8fed",
+  "request_id": "production-v17-168",
+  "response_bytes": 610,
+  "response_sha256": "ddc8d95f296fa3d7752b91071365615a3fb43232da0d682037a80f676031d809",
+  "schema_version": 2,
+  "start": "2026-08-23T04:00:00Z",
+  "status": 200
+}

@@ -312,9 +312,11 @@ class CanaryWorkflowIntegrityTests(unittest.TestCase):
             evidence_path.is_file(),
             f"canary pins {match.group(1)}, which does not exist",
         )
+        identity = release_identity_from_evidence(evidence_path)
         evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
         release_id = evidence.get("release_id")
         self.assertIsInstance(release_id, str)
+        self.assertEqual(identity["release_id"], release_id)
         self.assertIn(
             release_id,
             evidence_path.name,
@@ -327,6 +329,15 @@ class CanaryWorkflowIntegrityTests(unittest.TestCase):
             evidence["source_sha256"],
             "the host must have reproduced the manifest digest for this release",
         )
+
+        if "evidence_capture_sha256" in evidence:
+            drifted = json.loads(json.dumps(evidence))
+            drifted["evidence_capture_sha256"]["restart_replay"] = "0" * 64
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / evidence_path.name
+                path.write_text(json.dumps(drifted), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "digest mismatch"):
+                    release_identity_from_evidence(path)
 
         self.assertIn("--require-receipt-capacity", workflow)
         self.assertNotIn("--expected-release-id", workflow)

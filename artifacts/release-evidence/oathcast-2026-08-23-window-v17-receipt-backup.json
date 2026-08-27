@@ -1,0 +1,15 @@
+{
+  "backup": {
+    "backup_row_count": 188,
+    "bytes": 1699840,
+    "integrity_check": "ok",
+    "path": "/home/ec2-user/oathcast/releases/2026-08-23-window-v17/backups/receipts-v16-final-pre-v17.sqlite3",
+    "restore_check": true,
+    "sha256": "69e87081f142abd805ab61b7d960f6bf719db2d816cd720d71e673b376d04b77",
+    "source_open_mode": "ro",
+    "source_row_count": 188
+  },
+  "database": "/home/ec2-user/oathcast/data/receipts.sqlite3",
+  "source_integrity_check": "ok",
+  "verified_at": "2026-08-23T02:59:18.053344Z"
+}

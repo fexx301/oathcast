@@ -1,0 +1,16 @@
+{
+  "after": {
+    "integrity_check": "ok",
+    "public_response_sha256": "f445dda5ea3b53a6119e8bbed49a62f103cdd1659d442abe78a27b0c680c20b4",
+    "receipt_sha256": "d96601bf1c609855e168e1f4387ca6801393d0b65614348d3ed0d6e906ff799a",
+    "rows": 74,
+    "status": 200
+  },
+  "before": {
+    "public_response_sha256": "f445dda5ea3b53a6119e8bbed49a62f103cdd1659d442abe78a27b0c680c20b4",
+    "receipt_sha256": "d96601bf1c609855e168e1f4387ca6801393d0b65614348d3ed0d6e906ff799a",
+    "rows": 74,
+    "status": 200
+  },
+  "ok": true
+}

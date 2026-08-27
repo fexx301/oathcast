@@ -1,0 +1,11 @@
+{
+  "after_release_id": "2026-08-23-window-v17",
+  "before_release_id": "2026-08-19-window-v16",
+  "errors": [],
+  "fingerprints": {
+    "event_id": "canary-lagos-20260820T1200z",
+    "public_response_sha256": "00d714b463811bced47e197e0d06a4d58c0eba25eb6627f34849458fcff82f8a",
+    "receipt_sha256": "3841a15f9b69ff48e5c04569f771c416a944185c67bf7d98df575244579dd514"
+  },
+  "ok": true
+}

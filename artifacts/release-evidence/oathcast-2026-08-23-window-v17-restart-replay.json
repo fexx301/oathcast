@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "ok": true,
+  "comparison": {
+    "method": "Field-level comparison of the two retained sanitized standard-smoke captures.",
+    "release_identity_identical": true,
+    "event_id_identical": true,
+    "public_response_sha256_identical": true,
+    "receipt_sha256_identical": true,
+    "status_identical": true,
+    "byte_identical_capture_files": false,
+    "note": "The captures differ only in a dynamic receipt-capacity headroom value. This proves the standard canary fingerprints survived the restart sequence; it is not a retained pre/post-restart capture of the separate 168-hour event."
+  },
+  "before": {
+    "capture": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-public-smoke.json",
+    "release_id": "2026-08-23-window-v17",
+    "source_sha256": "9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f",
+    "image_digest": "sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c",
+    "event_id": "canary-lagos-20260820T1200z",
+    "public_response_sha256": "00d714b463811bced47e197e0d06a4d58c0eba25eb6627f34849458fcff82f8a",
+    "receipt_sha256": "3841a15f9b69ff48e5c04569f771c416a944185c67bf7d98df575244579dd514",
+    "status": 200
+  },
+  "after": {
+    "capture": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-postrestart-smoke.json",
+    "release_id": "2026-08-23-window-v17",
+    "source_sha256": "9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f",
+    "image_digest": "sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c",
+    "event_id": "canary-lagos-20260820T1200z",
+    "public_response_sha256": "00d714b463811bced47e197e0d06a4d58c0eba25eb6627f34849458fcff82f8a",
+    "receipt_sha256": "3841a15f9b69ff48e5c04569f771c416a944185c67bf7d98df575244579dd514",
+    "status": 200
+  },
+  "production_168_hour_restart": {
+    "capture": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-168-hour-smoke.json",
+    "retained_raw_pre_restart_capture": false,
+    "retained_raw_post_restart_capture": false,
+    "persistence_comparison_available": false,
+    "note": "The 168-hour production smoke is retained as a separate successful artifact. No pre/post-restart pair for that event was retained, so this record makes no persistence claim for its receipt or response hash."
+  },
+  "evidence_sources": {
+    "before_capture": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-public-smoke.json",
+    "after_capture": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-postrestart-smoke.json"
+  }
+}

@@ -138,6 +138,22 @@ def release_identity_from_evidence(path: Path) -> dict[str, str]:
     manifest_ref = source_verification.get("manifest_path")
     if manifest_ref != linked_evidence.get("manifest"):
         raise ValueError("release evidence manifest references disagree")
+
+    def linked_path(reference: object) -> Path:
+        if not isinstance(reference, str) or not reference:
+            raise ValueError("release evidence contains an invalid linked evidence path")
+        path = Path(reference)
+        if not path.is_absolute():
+            path = ROOT / path
+        path = path.resolve()
+        try:
+            path.relative_to(ROOT.resolve())
+        except ValueError as exc:
+            raise ValueError(
+                f"linked release evidence escapes the repository: {reference}"
+            ) from exc
+        return path
+
     linked_identities: tuple[tuple[object, tuple[str, ...]], ...] = (
         (manifest_ref, ("release_id", "source_sha256")),
         (
@@ -150,20 +166,9 @@ def release_identity_from_evidence(path: Path) -> dict[str, str]:
         ),
     )
     for reference, fields in linked_identities:
-        if not isinstance(reference, str) or not reference:
-            raise ValueError("release evidence contains an invalid linked evidence path")
-        linked_path = Path(reference)
-        if not linked_path.is_absolute():
-            linked_path = ROOT / linked_path
-        linked_path = linked_path.resolve()
+        path = linked_path(reference)
         try:
-            linked_path.relative_to(ROOT.resolve())
-        except ValueError as exc:
-            raise ValueError(
-                f"linked release evidence escapes the repository: {reference}"
-            ) from exc
-        try:
-            linked = json.loads(linked_path.read_text(encoding="utf-8"))
+            linked = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ValueError(f"cannot read linked release evidence {reference}: {exc}") from exc
         if not isinstance(linked, dict):
@@ -177,6 +182,32 @@ def release_identity_from_evidence(path: Path) -> dict[str, str]:
                 raise ValueError(
                     f"linked release evidence identity mismatch at {reference}:{field}"
                 )
+
+    capture_hashes = evidence.get("evidence_capture_sha256")
+    if capture_hashes is not None:
+        if not isinstance(capture_hashes, dict):
+            raise ValueError("release evidence capture hashes must be a JSON object")
+        for label, reference in linked_evidence.items():
+            expected_digest = capture_hashes.get(label)
+            if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+                raise ValueError(
+                    f"release evidence is missing a valid capture digest for {label}"
+                )
+            path = linked_path(reference)
+            try:
+                actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError as exc:
+                raise ValueError(
+                    f"cannot hash linked release evidence {reference}: {exc}"
+                ) from exc
+            if actual_digest != expected_digest:
+                raise ValueError(
+                    f"linked release evidence digest mismatch at {reference}"
+                )
+
+        manifest_digest = capture_hashes.get("manifest")
+        if source_verification.get("manifest_file_sha256") != manifest_digest:
+            raise ValueError("release evidence manifest capture digests disagree")
 
     return identity
 

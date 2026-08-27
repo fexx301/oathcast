@@ -37,7 +37,7 @@ jobs:
           OATHCAST_MINER_API_KEY: ${{ secrets.OATHCAST_MINER_API_KEY }}
         run: |
           PYTHONPATH=src python3 scripts/public_canary.py \
-            --release-evidence artifacts/release-evidence/oathcast-2026-08-19-window-v11-runtime-evidence.json \
+            --release-evidence artifacts/release-evidence/oathcast-2026-08-23-window-v17-runtime-evidence.json \
             --require-receipt-capacity \
             --require-receipt-write-probe \
             --require-temperature-window

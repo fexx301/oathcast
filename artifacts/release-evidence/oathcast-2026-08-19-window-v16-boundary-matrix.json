@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-08-19T19:25:36.376820Z",
+  "integrity_check": "ok",
+  "ok": true,
+  "results": [
+    {
+      "case": "00",
+      "event_id": "v16-public-boundary-9e0125fdc325-00",
+      "receipt_sha256": null,
+      "status": 200
+    },
+    {
+      "case": "15",
+      "event_id": "v16-public-boundary-9e0125fdc325-15",
+      "receipt_sha256": null,
+      "status": 200
+    },
+    {
+      "case": "29_59",
+      "event_id": "v16-public-boundary-9e0125fdc325-29_59",
+      "receipt_sha256": null,
+      "status": 200
+    },
+    {
+      "case": "30",
+      "event_id": "v16-public-boundary-9e0125fdc325-30",
+      "receipt_sha256": null,
+      "status": 200
+    },
+    {
+      "case": "45",
+      "event_id": "v16-public-boundary-9e0125fdc325-45",
+      "receipt_sha256": null,
+      "status": 200
+    },
+    {
+      "case": "59_59",
+      "event_id": "v16-public-boundary-9e0125fdc325-59_59",
+      "receipt_sha256": null,
+      "status": 200
+    }
+  ],
+  "row_delta": 6,
+  "rows_after": 75,
+  "rows_before": 69,
+  "run": "9e0125fdc325"
+}

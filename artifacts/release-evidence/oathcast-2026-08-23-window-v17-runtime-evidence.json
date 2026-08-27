@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-23T03:16:57Z",
+  "release_id": "2026-08-23-window-v17",
+  "source_sha256": "9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f",
+  "source_verification": {
+    "build_root": "/home/ec2-user/oathcast/releases/2026-08-23-window-v17/source-clean",
+    "clean_source_bundle_bytes": 744448,
+    "clean_source_bundle_sha256": "9338335a0d135197587acd1c8370ab5f28c428054283b6eb91cb385ec9af0efa",
+    "expected_source_sha256": "9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f",
+    "file_count": 68,
+    "host_recomputed_source_sha256": "9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f",
+    "manifest_bytes": 11307,
+    "manifest_file_sha256": "48bfeeb9bd21b9b89eae7561b8851f04a4a7d0c2db92576989a2d7701eb74e5d",
+    "manifest_path": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-manifest.json",
+    "verified": true
+  },
+  "source_archive": {
+    "local_capture_path": "/tmp/oathcast-2026-08-23-window-v17-source.tar",
+    "bytes": 744448,
+    "sha256": "9338335a0d135197587acd1c8370ab5f28c428054283b6eb91cb385ec9af0efa",
+    "retained_in_repository": false
+  },
+  "image": {
+    "name": "oathcast:2026-08-23-window-v17",
+    "image_id": "sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c",
+    "image_digest": "sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c",
+    "labels": {
+      "org.opencontainers.image.title": "OathCast Miner",
+      "org.opencontainers.image.version": "2026-08-23-window-v17",
+      "org.opencontainers.image.revision": "9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f"
+    }
+  },
+  "runtime": {
+    "public_base_url": "https://oathcastcourt.duckdns.org",
+    "container": "oathcast",
+    "status": "running",
+    "port_binding": "127.0.0.1:8080:8080",
+    "receipt_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "restart_policy": "unless-stopped",
+    "user": "1000:1000",
+    "rollback_container": "oathcast-v16-rollback-20260823",
+    "candidate_container": "oathcast-v17-candidate-20260823",
+    "candidate_status_at_capture": "retained pending cleanup; loopback-only port 18080",
+    "candidate_status_after_cleanup": "stopped after evidence capture"
+  },
+  "edge": {
+    "caddyfile_sha256": "29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1",
+    "config_changed": false,
+    "request_body_cap": "64KB on both handles",
+    "security_headers": [
+      "Strict-Transport-Security",
+      "X-Content-Type-Options",
+      "Referrer-Policy"
+    ]
+  },
+  "verification": {
+    "candidate_release_smoke": "12/12",
+    "candidate_credentials_passed": true,
+    "candidate_schema_receipts_replayed": [1, 2, 3],
+    "candidate_168_hour_restart": {
+      "passed": true,
+      "event_id": "candidate-v17-168-20260823T2300z",
+      "hours": 168,
+      "receipt_sha256": "3582e9a7818d210f70ffe0f6a55f327a81bf06854894f59c4d8f18fc6751a50f",
+      "database_rows": 187,
+      "database_integrity": "ok",
+      "database_sha256": "a0ce178446d2e95f367a2a04fdbff4019840579fb5d179e8e70eff004bef3f47",
+      "retained_postrestart_state": true,
+      "retained_pre_post_comparison": false,
+      "note": "The deployment verification observed successful persistence across restart and the remote release directory retains the post-restart receipt state. It does not retain two independent pre/post captures, so no byte-equality comparison is claimed here."
+    },
+    "candidate_169_hour_request_rejected": true,
+    "production_public_smoke": "12/12",
+    "production_postrestart_smoke": "12/12",
+    "production_168_hour_smoke": {
+      "passed": true,
+      "hours": 168,
+      "contiguous": true,
+      "evidence": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-168-hour-smoke.json"
+    },
+    "v16_to_v17_replay": true,
+    "receipt_integrity": "ok"
+  },
+  "database": {
+    "backup_evidence": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-receipt-backup.json",
+    "backup_rows": 188,
+    "backup_sha256": "69e87081f142abd805ab61b7d960f6bf719db2d816cd720d71e673b376d04b77",
+    "backup_integrity": "ok",
+    "production_rows_after_168_hour_request": 190,
+    "production_integrity_after_168_hour_request": "ok"
+  },
+  "registered_contract": {
+    "manifest_changed": false,
+    "path": "miners/oathcast-weather.yaml",
+    "bytes": 4960,
+    "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+  },
+  "boundaries": {
+    "registered_yaml_changed": false,
+    "miner_reregistered": false,
+    "wasm_uploaded": false,
+    "wallet_or_signing_action": false,
+    "scorer_included_in_release_manifest": false,
+    "git_commit_or_push": false
+  },
+  "evidence": {
+    "manifest": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-manifest.json",
+    "public_smoke": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-public-smoke.json",
+    "postrestart_smoke": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-postrestart-smoke.json",
+    "replay": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-replay.json",
+    "restart_replay": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-restart-replay.json",
+    "window_168_hour_smoke": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-168-hour-smoke.json",
+    "receipt_backup": "artifacts/release-evidence/oathcast-2026-08-23-window-v17-receipt-backup.json"
+  },
+  "evidence_capture_sha256": {
+    "manifest": "48bfeeb9bd21b9b89eae7561b8851f04a4a7d0c2db92576989a2d7701eb74e5d",
+    "public_smoke": "44932f5c1d5dd29c0ca74e43146cdcaa635ee1f1d9e6817df66902d0d7bf8e11",
+    "postrestart_smoke": "09c89a40c7e2267e296c330f95302ad32e525ac40fdf9bf71bd61f9e5b5f174d",
+    "replay": "5e3739b21640f4a1b52fbe4f20fcf03741b468ea728ef6eff45c8f829125b9d3",
+    "restart_replay": "004d0d2507413a962fe33b5a68e016271128fc067865caae905b419ca90fe91f",
+    "window_168_hour_smoke": "fac983c07946736c99934d2c4a56d2ae7e585151cba99fc58592e7d72fd9cd41",
+    "receipt_backup": "d0e1a9075a6be85b90f71f91209d85f40e075558a1b0670aface054fb1bee6eb"
+  },
+  "scope": "Runtime-only 1-to-168-hour timestamp normalization and cutoff compatibility. The registered YAML and Track 2 scorer are unchanged."
+}

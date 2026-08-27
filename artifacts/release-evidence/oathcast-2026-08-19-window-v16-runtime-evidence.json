@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-19T19:27:10.047204934Z",
+  "release_id": "2026-08-19-window-v16",
+  "source_sha256": "a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1",
+  "source_verification": {
+    "build_root": "/home/ec2-user/oathcast/releases/2026-08-19-window-v16/source-clean",
+    "clean_source_bundle_bytes": 175243,
+    "clean_source_bundle_sha256": "845b1715ecd47d4805c1bbbe78b154ba70b715c028fb29f5bb1104e2956cdfb3",
+    "expected_source_sha256": "a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1",
+    "file_count": 68,
+    "host_recomputed_source_sha256": "a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1",
+    "manifest_path": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-manifest.json",
+    "verified": true
+  },
+  "image": {
+    "name": "oathcast:2026-08-19-window-v16",
+    "image_id": "sha256:7ac7f6f81cac9e66e33187e140ae21f76d6e7ab4b3e6fc6c9d6944312aaedc28",
+    "image_digest": "sha256:7ac7f6f81cac9e66e33187e140ae21f76d6e7ab4b3e6fc6c9d6944312aaedc28",
+    "labels": {
+      "org.opencontainers.image.title": "OathCast Miner",
+      "org.opencontainers.image.version": "2026-08-19-window-v16",
+      "org.opencontainers.image.revision": "a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1"
+    }
+  },
+  "runtime": {
+    "container": "oathcast",
+    "status": "running",
+    "port_binding": "127.0.0.1:8080:8080",
+    "receipt_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "restart_policy": "unless-stopped",
+    "rollback_container": "oathcast-v12-rollback-20260819",
+    "disposable_container_removed": true,
+    "receipt_integrity_check": "ok",
+    "receipt_rows_after_postrestart_smoke": 75,
+    "receipt_rows_after_authenticated_dispatcher_request": 76,
+    "temperature_window_enabled": true,
+    "user": "1000:1000"
+  },
+  "edge": {
+    "caddyfile_sha256": "29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1",
+    "config_changed": false,
+    "request_body_cap": "64KB on both handles",
+    "security_headers": [
+      "Strict-Transport-Security",
+      "X-Content-Type-Options",
+      "Referrer-Policy"
+    ]
+  },
+  "public_smoke": {
+    "ok": true,
+    "checks_passed": 12,
+    "checks_total": 12,
+    "post_restart": true,
+    "path": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-public-smoke.json"
+  },
+  "replay": {
+    "before_release_id": "2026-08-19-window-v12",
+    "after_release_id": "2026-08-19-window-v16",
+    "byte_identical": true,
+    "event_id_identical": true,
+    "receipt_sha256_identical": true,
+    "public_response_sha256_identical": true,
+    "path": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-replay.json"
+  },
+  "verification": {
+    "focused_python_tests": "94/94",
+    "full_python_tests": "515/515",
+    "restart_replay_byte_identical": true,
+    "restart_replay_row_delta": 0,
+    "boundary_successes_recorded": 6,
+    "boundary_rejections_asserted": 2,
+    "boundary_artifact_complete": false
+  },
+  "boundaries": {
+    "registered_yaml_changed": false,
+    "miner_reregistered": false,
+    "wallet_or_signing_action": false,
+    "scorer_included_in_release_manifest": false
+  },
+  "evidence": {
+    "manifest": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-manifest.json",
+    "public_smoke": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-public-smoke.json",
+    "replay": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-replay.json",
+    "restart_replay": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-restart-replay.json",
+    "boundary_matrix": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-boundary-matrix.json",
+    "rollback_replay": "artifacts/release-evidence/oathcast-2026-08-19-window-v16-rollback-replay.json"
+  },
+  "scope": "Runtime-only multi-hour timestamp normalization and cutoff compatibility. Registered YAML and Track 2 scorer are unchanged."
+}
