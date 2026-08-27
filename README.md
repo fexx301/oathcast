@@ -4,12 +4,14 @@
 
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
-publicly on release `2026-08-19-window-v16`. The registered `GET /predict`
+publicly on release `2026-08-23-window-v17`. The registered `GET /predict`
 route and canonical `GET /v1/forecast/point` route share the same authenticated
-forecast and receipt path. V16 accepts aware multi-hour ISO/RFC3339 bounds,
-normalizes their start to the nearest whole UTC hour using half-up rounding,
-and retains the additive, unregistered temperature compatibility route without
-changing the protected registered YAML. The
+forecast and receipt path. V17 supports 1-to-168-hour window requests. For
+multi-hour aware ISO/RFC3339 bounds it normalizes the start to the nearest whole
+UTC hour using half-up rounding; the registered one-hour point behavior remains
+unchanged. It also retains the additive, unregistered temperature compatibility
+route without changing the v17 runtime. The YAML description re-registration on
+2026-08-27 is documented separately and changed no runtime behavior. The
 separate public UI exposes a truthful read-only status surface and client-only
 development fixture. Its live decision endpoint remains degraded and returns
 503 because no reviewed paid Application runner is configured.
@@ -67,15 +69,15 @@ Provider model names, retrieval timestamps, raw hashes, and native event
 definitions remain internal. All three adapters require an exact native hourly
 point; they refuse to choose a nearest point or invent a max/mean aggregation.
 The registered precipitation contract remains a one-hour UTC window. The
-deployed v8 service also exposes an additive, unregistered temperature-only
+deployed v17 service also exposes an additive, unregistered temperature-only
 contract for `/predict?lat=...&lon=...&forecast_hours=24&hourly=2t`:
 `forecast_hours`
 accepts `1..24`, the window starts at the next complete UTC hour, and the
 response contains RFC3339 `time` values plus Kelvin `2t` values. The same
 shape is available at `/v1/forecast/point`. The legacy
 `/v1/forecast/window` path is not publicly exposed and returns 404. This work is
-served additively in v8 and has not been substituted into, uploaded as, or
-re-registered through the protected YAML.
+served additively since v8 and remains enabled in v17; it has not been
+substituted into, uploaded as, or re-registered through the protected YAML.
 
 Open-Meteo is the only adapter currently marked as a documented event match.
 WeatherAPI and OpenWeather are intentionally marked unverified until their
@@ -151,7 +153,7 @@ It exposes `/healthz`, `/readyz`, the registered `/predict` route, and the
 canonical `/v1/forecast/point` route. The two forecast paths are exact aliases;
 near-miss paths return 404 and both aliases share authentication, rate limits,
 responses, and receipt identity. With
-`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true` (enabled by the deployed v8 service),
+`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true` (enabled by the deployed v17 service),
 they also accept the additive, unregistered 1-to-24-hour
 `forecast_hours`/`hourly=2t` temperature contract. The legacy
 `/v1/forecast/window` route is not publicly exposed and returns 404. The service
@@ -175,7 +177,7 @@ of an already-issued receipt always succeeds, even at capacity. Defaults are
 200,000 rows and 512 MiB, overridable with `OATHCAST_RECEIPT_MAX_ROWS` and
 `OATHCAST_RECEIPT_MAX_BYTES` (`none` disables a cap).
 
-The deployed v8 release retains v6's deliberately fail-closed replay contract.
+The deployed v17 release retains v6's deliberately fail-closed replay contract.
 New receipts freeze the exact digest-covered `public_response`; replay serves
 those stored bytes rather than invoking a newer renderer. If a legacy receipt
 lacks `public_response`, the current service returns HTTP 503
@@ -194,14 +196,16 @@ release/request headers. `compare_release_replay.py` compares two smoke reports
 and proves a stored event's receipt and public response survived a release
 cutover unchanged.
 
-The current public identity is release `2026-08-19-window-v16`, source
-SHA-256 `a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1`,
+The current public identity is release `2026-08-23-window-v17`, source
+SHA-256 `9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f`,
 and image digest
-`sha256:7ac7f6f81cac9e66e33187e140ae21f76d6e7ab4b3e6fc6c9d6944312aaedc28`.
-The exact manifest, strict post-restart public smoke, v12-to-v16 replay, and
-runtime evidence are retained under
-`artifacts/release-evidence/oathcast-2026-08-19-window-v16-*`; stopped
-`oathcast-v12-rollback-20260819` is the immediate Miner rollback target.
+`sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c`.
+The v17 manifest, public smoke, v16-to-v17 replay, post-restart smoke, 168-hour
+public smoke, receipt-backup metadata, and linked runtime evidence are retained
+under `artifacts/release-evidence/oathcast-2026-08-23-window-v17-*`; stopped
+`oathcast-v16-rollback-20260823` is the immediate Miner rollback target.
+Full Python discovery passes `526/526`, focused canary tests pass `44/44`, and
+the v17 evidence identity loader accepts the retained bundle.
 
 `create_registration_draft.py` first requires that local check to pass, then
 records an unsigned registration snapshot. It hashes the exact YAML bytes and
@@ -212,8 +216,10 @@ or submits `registerMiner`.
 `public_canary.py` is the same no-state check intended to run from an
 independent scheduler such as GitHub Actions; `.github/workflows/oathcast-canary.yml`
 contains the no-cost scheduled path and expects the API key in a repository
-secret. The v16 canary requires the 24-hour temperature response and alias
-parity, and resolves release identity from the checked-in v16 evidence bundle.
+secret. The local v17 canary configuration requires the 24-hour temperature
+response and alias parity, and resolves release identity from the checked-in v17
+evidence bundle. The remote GitHub schedule remains on its last pushed v11
+configuration until a separately authorized commit and push.
 See `docs/repository-and-canary.md` for the safe repository/secret
 setup. `backup_receipts.py` uses SQLite's online backup API, runs integrity
 checks on both copies, and verifies that the row count survives restoration.
@@ -490,20 +496,26 @@ store, never in the repository.
 ## Miner registration
 
 The three provider-specific YAMLs under miners/ remain adapter experiments. The
-single `oathcast-weather.yaml` service was registered on Base Sepolia on
-2026-08-13 and is active in Telegraph's dispatcher:
+single `oathcast-weather` service is active in Telegraph's dispatcher after its
+2026-08-27 Base Sepolia re-registration:
 
 - keep the provider adapters behind the one public service and verify their event semantics;
 - keep upstream API keys in the host secret store;
 - retain the dedicated Telegraph credential validated by the portal until a documented rotation path replaces it;
-- use the exact pinned URI `ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F` and confirm its raw-byte SHA-256 remains `9ad11f06…56ee0e`;
-- on-chain registration ID is `78`; YAML routing ID `64173` is a separate identifier;
-- transaction `0x937d45d8108b905a551608707755e47899a41046436038a315a859d2f497b5d2` confirmed with zero native value;
-- `getMiner(78)`, the portal registration API, and the dispatcher all match the approved fee address, `10000` micro-USDC price, and `WEATHER_FORECAST` intent;
+- use the active pinned URI `https://gateway.pinata.cloud/ipfs/QmRSBA6ig48TVq15UWEwdiYq8HYr6woWRPam961j1q1oMu`, whose retrieved 3,018-byte representation has SHA-256 `0f66aa0679328afb0f53a0d83b846d2e8407ea062189814e455136121ac90d18`;
+- on-chain registration ID is `245`; YAML routing ID `64173` is a separate identifier;
+- transaction `0x43748dcaac584be466d32d96a45f4293816295579ffa17ee1c20ec4aa288184c` confirmed with receipt status `1`;
+- `getMiner(245)`, the portal registration API, and the dispatcher match the approved fee address, `10000` micro-USDC price, and `WEATHER_FORECAST` intent;
+- the earlier portal registration ID `78` is deregistered;
 - dispatcher slug `oathcast-weather` is active at `GET /predict`.
 
-The sanitized post-submit record is
-`artifacts/registration-drafts/oathcast-weather-registration-confirmation-2026-08-13T1940Z.json`.
+The sanitized current post-submit record is
+`artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
+The committed `miners/candidates/oathcast-weather-cutoff-v2.yaml` is the local
+source snapshot used for the registration attempt. Its 5,389-byte raw hash is
+`a639611848c484fa035f33f9ef336e0abb943b8ce3a908ae66aa4fa80f160679`, which is
+not the portal's 3,018-byte canonicalized pin; the postflight record preserves
+both identities.
 Current official x402 docs offer Base Sepolia USDC and Solana Devnet USDC; the
 received 402 challenge is authoritative for a specific request. These testnet
 tokens have no monetary value. Registration price is supplied to the contract,

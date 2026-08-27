@@ -18,27 +18,44 @@ relevant to that track.
 - [x] Frozen canonical YAML plus explicit `10000` micro-USDC registration price.
 - [x] Provider-native event contract and exact-hour validation.
 - [x] Local chronological benchmark with coverage and end-to-end utility.
-- [x] Exact 4,960-byte YAML passed the official portal's aggregate validation
+- [x] The historical 4,960-byte YAML passed the official portal's aggregate validation
   (`valid: true`); durable per-endpoint sandbox cases were not retained.
-- [x] Canonical Miner registered and discoverable: on-chain ID `78`, routing ID `64173`.
+- [x] Canonical Miner registered and discoverable: current on-chain ID `245`, routing ID `64173`.
+- [x] The 2026-08-27 cutoff-description re-registration is active at the portal
+  pin `https://gateway.pinata.cloud/ipfs/QmRSBA6ig48TVq15UWEwdiYq8HYr6woWRPam961j1q1oMu`
+  with SHA-256
+  `0f66aa0679328afb0f53a0d83b846d2e8407ea062189814e455136121ac90d18`.
+  The prior ID `78` is deregistered; the local source snapshot and its deliberate
+  byte difference from the active pin are recorded in
+  `artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
 - [x] Registered `GET /predict` route introduced in `2026-08-16-route-v7` and
-  retained in deployed `2026-08-17-temperature-v8`; it is verified through
+  retained in deployed `2026-08-23-window-v17`; it is verified through
   public HTTPS and shares authentication, rate limits, semantic JSON, and
   receipt identity with `/v1/forecast/point`; near-miss paths remain 404.
-- [x] Additive v8 compatibility for the team-requested
+- [x] Additive temperature compatibility introduced in v8 and retained in v17 for the team-requested
   `forecast_hours=1..24&hourly=2t` temperature request is deployed on
   `/predict` and `/v1/forecast/point`, with next-complete-hour UTC alignment and
   RFC3339/Kelvin output. The strict public smoke checks the 24-hour response and
-  exact alias/receipt parity. The candidate remains unregistered and this route
-  does not change the protected registered YAML. The legacy
+  exact alias/receipt parity. The temperature compatibility manifest remains an
+  unregistered additive route and does not change the registered YAML. The legacy
   `/v1/forecast/window` path is not publicly exposed and returns 404. This is
   runtime compatibility evidence, not an official Telegraph evaluation.
+- [x] V17 accepts timezone-aware 1-to-168-hour `start`/`end` windows, applying
+  nearest-hour half-up normalization only to multi-hour requests. Candidate,
+  public, and post-restart smokes passed 12/12; v16-to-v17 replay preserved
+  event, receipt, and public-response identity; a dispatcher-shaped 168-hour
+  request persisted 168 contiguous hours; and 169 hours returned HTTP 400.
+  Stopped `oathcast-v16-rollback-20260823` is retained, but the current database
+  must be preserved because v16 may not replay v17's 168-hour receipt.
+- [x] V17 local verification: full Python discovery `526/526`, focused canary
+  tests `44/44`, and the retained evidence identity bundle loads successfully.
 - [x] At least three active `WEATHER_FORECAST` Miners observed in the live catalog on 2026-08-13. Recheck at submission; this does not satisfy the separate 100-request condition.
 - [~] Telegraph confirmed the earlier leaderboard zero came from `/predict`
   returning 404, which produced `miner_answer=""`. Release v7 fixed that route,
   but an epoch-202 observation still scored OathCast `0`, rank `6/6`; that is a
-  historical result. V8 now serves the diagnosed 24-hour request shape, but no
-  corrected official Telegraph evaluation or score has been observed.
+  historical result. V17 now serves the diagnosed request family through 168
+  hours, but no post-v17 official Telegraph evaluation or score has been
+  retained.
 - [ ] Official Miner performance evidence from live evaluation.
 - [ ] X update evidence tagged `@Telegraphprotoc`.
 

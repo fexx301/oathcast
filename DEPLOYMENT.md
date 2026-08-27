@@ -1,26 +1,35 @@
 # Deployment and payment boundary
 
 The repository packages one public HTTPS OathCast Miner. The
-`2026-08-17-temperature-v8` release is running in Docker on AWS EC2
+`2026-08-23-window-v17` release is running in Docker on AWS EC2
 behind private host port 8080, with Caddy terminating HTTPS at
 `https://oathcastcourt.duckdns.org`.
 Set the environment variables from `.env.example`. Registration is complete and
-the registered YAML is frozen; validate a new canonical YAML only before a
-separately authorized update or re-registration. The exact deployed release,
-public smoke output, and runtime details are archived under
+the active portal-pinned YAML is frozen; the repository also retains the
+historical canonical source and the separately recorded re-registration source
+snapshot. Validate any new YAML before a separately authorized update or
+re-registration. The exact deployed release, public smoke output, and runtime
+details are archived under
 `artifacts/release-evidence/`.
 
 ## Current deployment status
 
-The deployed Miner is v11; stopped `oathcast-v10-rollback-20260819` is the
-immediate Miner rollback target. Caddy configuration did not change for v8 and
-remains pinned by its retained hash. The v7, v6, v5, and v4 sections below are
+The deployed Miner is v17; stopped `oathcast-v16-rollback-20260823` is the
+immediate Miner rollback target. Caddy configuration did not change for v17 and
+remains pinned by its retained hash. The v16 and earlier sections below are
 historical release records. The public decision UI is deployed separately. Its
 safe public surface is a read-only release/status page plus a client-only
 development fixture. It
 has no Telegraph-backed runner, accepts no live Planning Desk intake, and
 returns 503 for decision requests. Live decisions must not be enabled until the
 authenticated, budgeted payment path has been reviewed and deployed.
+
+V17 has persisted a 168-hour receipt that v16 could not originally parse. If a
+rollback becomes necessary, preserve the current production database unchanged
+and do **not** restore the pre-v17 backup over it. Starting v16 may restore
+short-window availability while leaving that new event temporarily unreplayable;
+retain v17 and the current database until the 168-hour receipt can be served
+again.
 
 UI-only replacements must override the Dockerfile health check, which targets
 the Miner on port 8080. Run the UI on Docker bridge networking, publish only
@@ -120,15 +129,15 @@ Create a source manifest before each deployment:
 
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
-      --release-id 2026-08-17-temperature-v8 \
+      --release-id 2026-08-23-window-v17 \
       --output /tmp/oathcast-release-manifest.json
 
 Build the image with the manifest's `source_sha256` and a unique release ID:
 
     docker build \
-      --build-arg OATHCAST_RELEASE_ID=2026-08-17-temperature-v8 \
+      --build-arg OATHCAST_RELEASE_ID=2026-08-23-window-v17 \
       --build-arg OATHCAST_SOURCE_SHA256=<manifest-source-sha256> \
-      -t oathcast:2026-08-17-temperature-v8 .
+      -t oathcast:2026-08-23-window-v17 .
 
 Run the production container with
 `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. The Dockerfile and `.env.example`
@@ -145,9 +154,9 @@ After deployment, verify the exact release without printing secrets:
 
     PYTHONPATH=src python3 scripts/smoke_miner.py \
       --base-url https://oathcastcourt.duckdns.org \
-      --expected-release-id 2026-08-17-temperature-v8 \
-      --expected-source-sha256 edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c \
-      --expected-image-digest sha256:ae1fff9db3317cd0f6a9d23772df62d93195bd814359e9a3c8d9b21aa0850672 \
+      --expected-release-id 2026-08-23-window-v17 \
+      --expected-source-sha256 9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f \
+      --expected-image-digest sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c \
       --require-receipt-write-probe \
       --require-temperature-window
 
@@ -157,8 +166,8 @@ create paid demand. Record its JSON output with the release manifest.
 
 For a cutover, freeze one old-release question and its safe fingerprints before
 replacing the container, then replay that exact question after the new release
-starts. The current v7-to-v8 comparison is retained at
-`artifacts/release-evidence/oathcast-2026-08-17-temperature-v8-replay.json`.
+starts. The current v16-to-v17 comparison is retained at
+`artifacts/release-evidence/oathcast-2026-08-23-window-v17-replay.json`.
 The earlier v6-to-v7 comparison remains historical evidence at
 `artifacts/release-evidence/oathcast-2026-08-16-route-v7-replay.json`.
 
@@ -191,33 +200,32 @@ rerun. The comparator never needs or records the Bearer token.
 Before changing the live container, treat these as hard gates rather than
 follow-up checks:
 
-1. Transfer the complete candidate file set; reproduce source digest
-   `edeeaacf470b2207f6bbd8439e0720eff0459d9ca5fe214bc3a09d48ae0c639c`
-   across the manifest's exact 66-file set on the host and abort on any extra,
+1. Transfer the complete candidate file set; reproduce the candidate manifest's
+   source digest across its exact file set on the host and abort on any extra,
    missing, or mismatched file.
 2. Back up the live database with SQLite's online backup mechanism, opening the
    source in read-only URI mode. Verify source and backup integrity plus
    row-count equality without printing receipt content. Preserve and hash the
    deployed Caddyfile separately.
-3. Build v8, record its image digest, and enable
-   `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. Start a disposable candidate
-   container on loopback with a copy of the receipt database; require health,
-   readiness, the transactional write probe, `/predict` authentication,
-   canonical-path parity, the 24-hour temperature response and parity, exactly
-   one expected new temperature receipt, restart replay, non-root UID, and
-   durable-volume behavior to pass before replacing v7.
-4. Capture the v7 replay question/fingerprints and preserve the stopped v7
-   container as the immediate rollback target. Validate the production Caddyfile
-   with the exact production Caddy image; v8 does not require a Caddy change.
+3. Build a uniquely named image, record its image digest and required feature
+   flags, then start a disposable loopback-only candidate with a copy of the
+   receipt database. Require health, readiness, the transactional write probe,
+   `/predict` authentication, canonical-path parity, every enabled compatibility
+   contract and duration boundary, the expected receipt delta, restart replay,
+   non-root UID, and durable-volume behavior to pass before cutover.
+4. Capture the current release's replay question and safe fingerprints, preserve
+   its stopped container as the immediate rollback target, and validate the
+   production Caddyfile with the exact production Caddy image. Record explicitly
+   whether proxy configuration changes.
 
-After cutover, require the strict v8 smoke including
-`--require-temperature-window`, the exact replay comparator, a
-second persistence/restart check against the real host volume, and a manual
-canary pass. Roll back immediately on any identity, replay, readiness, or
-persistence mismatch. Stop/remove v8, then restore/start the preserved
-`oathcast-v7-rollback-20260817` container on port 8080; restore Caddy only if its
-retained hash or routing has changed. Update canary release/source/image pins
-only after the real v8 image digest exists.
+After cutover, require the strict smoke against the new release identity, the
+exact replay comparator, a second persistence/restart check against the real
+host volume, and a manual canary pass. Roll back immediately on any identity,
+replay, readiness, boundary, or persistence mismatch. A rollback must respect
+receipt-schema compatibility: preserve the newest database and do not overwrite
+it with an older backup merely to start the previous container. Restore Caddy
+only if its retained hash or routing changed. Update canary identity/evidence
+pins only after the real image digest and sanitized release bundle exist.
 
 Live execution remains gated on a dedicated faucet-funded Solana-devnet wallet.
 The unpaid Miner-18 preflight passed on 2026-08-09 and is archived under
@@ -249,19 +257,114 @@ The staging host is an Amazon Linux 2023 `t3.micro` in `eu-north-1`
 key pair `oathcast-ec2`. Region matters operationally: the security group,
 the instance, and the key pair are all regional objects, so the console must
 be switched to `eu-north-1` before any of them is visible. The
-`oathcast:2026-08-17-temperature-v8` runs as container `oathcast` with restart
-policy `unless-stopped`; stopped container `oathcast-v7-rollback-20260817`
+`oathcast:2026-08-23-window-v17` image runs as container `oathcast` with restart
+policy `unless-stopped`; stopped container `oathcast-v16-rollback-20260823`
 preserves the immediate previous release. `/healthz`, `/readyz`, authenticated
 `/predict`, canonical-path parity, the additive 24-hour temperature contract and
 parity, transactional write, and restart/replay smoke tests have passed. The
 Miner is bound to loopback port 8080 and the `oathcast-caddy`
 container uses host networking to terminate HTTPS and redirect HTTP to it. The
-security group exposes only ports 80 and 443. DuckDNS currently maps
+temporary widened SSH rule used for evidence capture has been removed; the
+security group retains its restricted administrative SSH rule. Host port 8080
+remains loopback-only, and public HTTPS was rechecked after the rule cleanup.
+DuckDNS currently maps
 `oathcastcourt.duckdns.org` to `13.49.229.253`. An EC2-side DuckDNS updater is
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-08-19 - window release rebuilt from a clean bundle (CURRENT)
+## Release 2026-08-23 - seven-day timestamp-normalizing window release (CURRENT)
+
+Release v17 supersedes v16 as the live runtime. It keeps v16's dispatcher
+timestamp normalization and extends the `start`/`end` window implementation to
+1 through 168 hours. Normalization still applies only to multi-hour requests;
+the registered one-hour point behavior is unchanged. The separate additive
+`forecast_hours=1..24&hourly=2t` temperature compatibility contract remains
+unchanged. At v17 deployment time the registered YAML, Caddy configuration, and
+Miner registration were unchanged. The later 2026-08-27 YAML re-registration
+updated the portal-pinned registration representation; the v17 runtime, Caddy
+configuration, and image were not rebuilt.
+
+- Release ID: `2026-08-23-window-v17`
+- Source SHA-256:
+  `9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f`
+- Runtime image ID:
+  `sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c`
+- The exact deploy manifest is 11,307 bytes with file SHA-256
+  `48bfeeb9bd21b9b89eae7561b8851f04a4a7d0c2db92576989a2d7701eb74e5d`.
+  The retained local 744,448-byte source archive has SHA-256
+  `9338335a0d135197587acd1c8370ab5f28c428054283b6eb91cb385ec9af0efa`;
+  the archive itself is not checked into the repository.
+- Caddy configuration was unchanged; retained Caddy SHA-256:
+  `29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1`.
+- Candidate release smoke passed 12/12, including both production credentials.
+  Schema 1, 2, and 3 receipts replayed exactly. A candidate 168-hour receipt
+  survived restart with 168 contiguous hours and SQLite integrity `ok`; only
+  its post-restart state was retained, so the repository does not claim an
+  independently reproducible pre/post hash comparison. A 169-hour request
+  correctly returned HTTP 400.
+- Production public smoke passed 12/12, including post-restart smoke. The
+  v16-to-v17 replay preserved event ID, receipt SHA-256, and public-response
+  SHA-256. A dispatcher-shaped 168-hour request returned HTTP 200, persisted
+  168 contiguous hours, and left SQLite integrity `ok`.
+- Local full Python discovery passed `526/526`; focused canary tests passed
+  `44/44`; and the v17 evidence identity loader accepted the retained bundle.
+- Stopped `oathcast-v16-rollback-20260823` is the immediate rollback target.
+  The disposable candidate `oathcast-v17-candidate-20260823` was stopped after
+  evidence capture. Caddy and the registered YAML were unchanged.
+- The definitive pre-v17 receipt backup has 188 source and 188 backup rows,
+  SQLite integrity `ok`, and SHA-256
+  `69e87081f142abd805ab61b7d960f6bf719db2d816cd720d71e673b376d04b77`.
+- Release evidence is retained under:
+  `artifacts/release-evidence/oathcast-2026-08-23-window-v17-manifest.json`,
+  `oathcast-2026-08-23-window-v17-public-smoke.json`,
+  `oathcast-2026-08-23-window-v17-replay.json`,
+  `oathcast-2026-08-23-window-v17-postrestart-smoke.json`,
+  `oathcast-2026-08-23-window-v17-restart-replay.json`,
+  `oathcast-2026-08-23-window-v17-168-hour-smoke.json`,
+  `oathcast-2026-08-23-window-v17-receipt-backup.json`, and
+  `oathcast-2026-08-23-window-v17-runtime-evidence.json`.
+
+The scheduled canary must resolve identity from the v17 runtime-evidence file
+and verify its linked manifest and public smoke before relying on scheduled
+runs. This release involved no YAML replacement, upload, signing, wallet
+action, registration, commit, or push.
+
+## Release 2026-08-19 - timestamp-normalizing window release (HISTORICAL; SUPERSEDED BY V17)
+
+Release v16 makes the registered multi-hour route robust to dispatcher timestamp
+choice without changing the registered YAML. It accepts timezone-aware
+ISO/RFC3339 bounds, rounds the start to the nearest whole UTC hour using
+deterministic half-up rounding, and preserves the original integral 1-to-24-hour
+duration. Omitted cutoffs receive an auditable first-hour implicit grace window;
+explicit cutoffs remain exact.
+
+- Release ID: `2026-08-19-window-v16`
+- Source manifest digest:
+  `a1902dce6ff550a5aa2a28899ce5a01e7cd483d7e6484bde5327a0a2e743f2e1`
+- Runtime image ID:
+  `sha256:7ac7f6f81cac9e66e33187e140ae21f76d6e7ab4b3e6fc6c9d6944312aaedc28`
+- The exact deploy manifest is 11,307 bytes; its file SHA-256 is
+  `ee13deff7b84825b2367428ff4f6fc86d06002900dd14eb15259a34c2eec0dc8`.
+  The 175,243-byte clean source bundle has SHA-256
+  `845b1715ecd47d4805c1bbbe78b154ba70b715c028fb29f5bb1104e2956cdfb3`.
+- Final public and disposable smokes passed 12/12. V12-to-v16 replay and
+  post-restart replay preserved event, receipt, and public-response identity;
+  six accepted boundary offsets passed. The retained boundary artifact records
+  those six successes only and is not presented as a complete rejection matrix.
+- Stopped `oathcast-v12-rollback-20260819` is the immediate rollback target.
+  The disposable v16 container was removed; Caddy and the registered YAML were
+  unchanged.
+- Evidence:
+  `artifacts/release-evidence/oathcast-2026-08-19-window-v16-manifest.json`,
+  `oathcast-2026-08-19-window-v16-public-smoke.json`,
+  `oathcast-2026-08-19-window-v16-replay.json`, and
+  `oathcast-2026-08-19-window-v16-runtime-evidence.json`.
+
+The scheduled canary is pinned to the v16 runtime evidence and uses the same
+evidence loader in its repository integrity test. This repin changed no live
+runtime, YAML, Miner registration, signer, or wallet state.
+
+## Release 2026-08-19 - window release rebuilt from a clean bundle (HISTORICAL; SUPERSEDED BY V16)
 
 Release v11 is v10's routing change rebuilt so its evidence is reproducible. The
 v10 image was built from the host working directory, which carries data, backups
@@ -298,9 +401,10 @@ v10 manifest was written.
   `oathcast-2026-08-19-window-v11-replay.json`, and
   `oathcast-2026-08-19-window-v11-runtime-evidence.json`.
 
-The canary is pinned to this release's runtime evidence. A release that does not
-repin it leaves the canary asserting a stale identity and failing every 15
-minutes, which is what happened between the v10 cutover and this one.
+The canary was pinned to this release's runtime evidence. A later release that
+does not repin it leaves the canary asserting a stale identity and failing every
+15 minutes, which happened between the v10 and v11 cutovers and again until the
+v16 evidence bundle was retained.
 
 ## Release 2026-08-18 - 1-to-24-hour window, first cut (HISTORICAL; SUPERSEDED BY V11)
 
@@ -770,14 +874,15 @@ not asserted, so results resolved against it are not evidence of provider qualit
 
 ## Deployment gate
 
-The Miner registration gate is complete. Transaction
-`0x937d45d8108b905a551608707755e47899a41046436038a315a859d2f497b5d2`
-confirmed on Base Sepolia, emitted sequential registration ID `78`, and
-`getMiner(78)` returns the exact approved record. Telegraph's portal and
-dispatcher both report `oathcast-weather` active under routing ID `64173`; do
-not confuse that YAML routing ID with the on-chain registration ID. The
-post-submit evidence is
-`artifacts/registration-drafts/oathcast-weather-registration-confirmation-2026-08-13T1940Z.json`.
+The Miner registration gate is complete. The 2026-08-27 transaction
+`0x43748dcaac584be466d32d96a45f4293816295579ffa17ee1c20ec4aa288184c`
+confirmed on Base Sepolia with receipt status `1`, emitted current registration
+ID `245`, and `getMiner(245)` returns the approved record. Telegraph's portal
+and dispatcher report `oathcast-weather` active under routing ID `64173`; do
+not confuse that YAML routing ID with the on-chain registration ID. The former
+registration ID `78` is deregistered. The sanitized current post-submit
+evidence is
+`artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
 
 A paid request remains a separate consumption/demand milestone, not a Miner-
 registration prerequisite. The

@@ -821,7 +821,7 @@ def _render_page(*, result: DecisionResult | None = None, error: str | None = No
           </div>
           <div class="status-item">
             <strong class="available">Telegraph registration</strong>
-            <p>Active as on-chain registration ID 78 and dispatcher routing ID 64173 under WEATHER_FORECAST.</p>
+            <p>Active as on-chain registration ID 245 and dispatcher routing ID 64173 under WEATHER_FORECAST.</p>
           </div>
           <div class="status-item">
             <strong class="unavailable">Paid Application requests</strong>

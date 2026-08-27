@@ -273,7 +273,7 @@ class DecisionUITests(unittest.TestCase):
         self.assertIn('class="brand-mark"', rendered)
         self.assertNotIn(".brand::before", rendered)
         self.assertIn("registered and active", rendered)
-        self.assertIn("registration ID 78", rendered)
+        self.assertIn("registration ID 245", rendered)
         self.assertIn("routing ID 64173", rendered)
         self.assertIn("Development fixture", rendered)
         self.assertIn("Not Telegraph-routed", rendered)

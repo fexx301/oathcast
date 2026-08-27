@@ -31,6 +31,9 @@ WINDOW_CANDIDATE_PATH = (
     ROOT / "miners" / "candidates" / "oathcast-weather-window-unregistered.yaml"
 )
 WINDOW_CANDIDATE_SLUG = "oathcast-weather-window-unregistered"
+VERSIONED_REGISTRATION_CANDIDATE_PATH = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-cutoff-v2.yaml"
+)
 
 EXPECTED_INPUT_PROPERTIES = {
     "event_id": "string",
@@ -650,6 +653,7 @@ def validate_draft(
     *,
     canonical: bool = False,
     window_candidate: bool = False,
+    registration_candidate: bool = False,
 ) -> dict[str, Any]:
     path = path.resolve()
     errors: list[str] = []
@@ -684,6 +688,10 @@ def validate_draft(
         or path == WINDOW_CANDIDATE_PATH.resolve()
         or slug == WINDOW_CANDIDATE_SLUG
     )
+    is_registration_candidate = not canonical and not is_window_candidate and (
+        registration_candidate
+        or path == VERSIONED_REGISTRATION_CANDIDATE_PATH.resolve()
+    )
 
     if version != "1":
         errors.append('version must be "1"')
@@ -709,30 +717,36 @@ def validate_draft(
         except InvalidOperation:
             errors.append("on_chain.min_price_usdc must be numeric")
 
-    if canonical:
+    if canonical or is_registration_candidate:
+        profile = "canonical" if canonical else "versioned registration candidate"
         if slug != "oathcast-weather":
-            errors.append("canonical draft must use slug oathcast-weather")
+            errors.append(f"{profile} draft must use slug oathcast-weather")
         if not base_url or not base_url.startswith("https://"):
-            errors.append("canonical base_url must use HTTPS")
+            errors.append(f"{profile} base_url must use HTTPS")
         if base_url and "REPLACE" in base_url:
-            errors.append("canonical base_url still contains a placeholder")
+            errors.append(f"{profile} base_url still contains a placeholder")
         if integration_id is not None and integration_id.isdigit():
             if int(integration_id) <= 0:
-                errors.append("canonical id must be a positive numeric routing ID")
-            else:
+                errors.append(f"{profile} id must be a positive numeric routing ID")
+            elif canonical:
                 warnings.append(
                     "canonical numeric ID is only a local routing candidate; it is not the sequential on-chain registrationId"
                 )
-        if integration_id is not None and integration_id.isdigit() and int(integration_id) > 0:
+        if canonical and integration_id is not None and integration_id.isdigit() and int(integration_id) > 0:
             warnings.append(
                 "official portal validation and endpoint sandbox testing were not run"
             )
         if _nested_scalar(document, "auth", "type") != "bearer":
-            errors.append("canonical auth.type must be bearer")
+            errors.append(f"{profile} auth.type must be bearer")
         if _nested_scalar(document, "auth", "header_name") != "Authorization":
-            errors.append("canonical auth.header_name must be Authorization")
-        if _nested_scalar(document, "auth", "value_prefix") != "Bearer ":
+            errors.append(f"{profile} auth.header_name must be Authorization")
+        value_prefix = _nested_scalar(document, "auth", "value_prefix")
+        if canonical and value_prefix != "Bearer ":
             errors.append('canonical auth.value_prefix must be "Bearer "')
+        elif is_registration_candidate and value_prefix not in {None, "Bearer "}:
+            errors.append(
+                'versioned registration candidate auth.value_prefix must be omitted or "Bearer "'
+            )
         errors.extend(_canonical_contract_errors(document))
     elif is_window_candidate:
         if not lines or lines[0] != "# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.":
@@ -803,6 +817,7 @@ def validate_draft(
         "min_price_usdc": price_text,
         "canonical": canonical,
         "window_candidate": is_window_candidate,
+        "registration_candidate": is_registration_candidate,
         "validation_scope": VALIDATION_SCOPE,
         "local_validation": local_validation,
         "official_portal_validation": official_portal_validation,
@@ -820,14 +835,27 @@ def validate_paths(paths: Iterable[Path], canonical: Path) -> dict[str, Any]:
             path,
             canonical=path.resolve() == canonical,
             window_candidate=path.resolve() == WINDOW_CANDIDATE_PATH.resolve(),
+            registration_candidate=(
+                path.resolve() == VERSIONED_REGISTRATION_CANDIDATE_PATH.resolve()
+            ),
         )
         for path in paths
     ]
     errors: list[str] = []
     slugs = [draft["slug"] for draft in drafts if draft["slug"]]
     duplicates = sorted({slug for slug in slugs if slugs.count(slug) > 1})
-    if duplicates:
-        errors.append(f"duplicate Miner slugs: {', '.join(duplicates)}")
+    for slug in duplicates:
+        matching = [draft for draft in drafts if draft["slug"] == slug]
+        allowed_versioned_snapshot = (
+            slug == "oathcast-weather"
+            and sum(draft["canonical"] for draft in matching) == 1
+            and all(
+                draft["canonical"] or draft["registration_candidate"]
+                for draft in matching
+            )
+        )
+        if not allowed_versioned_snapshot:
+            errors.append(f"duplicate Miner slugs: {slug}")
     if not any(draft["canonical"] for draft in drafts):
         errors.append(f"canonical draft not found: {canonical}")
     errors.extend(

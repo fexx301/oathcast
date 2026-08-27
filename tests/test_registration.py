@@ -16,13 +16,19 @@ from scripts.create_registration_draft import (
     build_registration_draft,
 )
 from scripts.read_leaderboard import DECLARED_INTENTS
-from scripts.validate_miner_drafts import validate_draft
+from scripts.validate_miner_drafts import (
+    validate_draft,
+    validate_paths,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_MINER = ROOT / "miners" / "oathcast-weather.yaml"
 REGISTERED_YAML_SIZE = 4_960
 REGISTERED_YAML_SHA256 = "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+REREGISTRATION_CANDIDATE = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-cutoff-v2.yaml"
+)
 
 
 class RegistrationDeclarationTests(unittest.TestCase):
@@ -258,6 +264,16 @@ on_chain:
         self.assertTrue(any("slug availability" in item for item in pending))
         self.assertTrue(any("not the on-chain registrationId" in item for item in pending))
         self.assertFalse(any("ID and slug are unique" in item for item in pending))
+
+    def test_versioned_reregistration_candidate_is_valid_and_slug_collision_is_scoped(self):
+        result = validate_draft(REREGISTRATION_CANDIDATE)
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertFalse(result["canonical"])
+        self.assertTrue(result["registration_candidate"])
+
+        result = validate_paths([CANONICAL_MINER, REREGISTRATION_CANDIDATE], CANONICAL_MINER)
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertFalse(any("duplicate Miner slugs" in error for error in result["errors"]))
 
     def test_registration_draft_validates_operator_supplied_inputs(self):
         artifact = build_registration_draft(

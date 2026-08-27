@@ -5,29 +5,31 @@ source; updated 2026-08-13 against the live Telegraph documentation and launch
 email, 2026-08-15 against the revised scoring-module guide and corrected WASM
 portal deployment, and 2026-08-16 against the confirmed current-registry
 registration and postflight reads, then 2026-08-17 against registration `19`'s
-historical validator result and registration `41`'s current artifact postflight.
+historical validator result and registration `41`'s current artifact postflight,
+and 2026-08-27 against the current YAML re-registration as ID `245`.
 
 This began as a compatibility audit. On 2026-08-13 the exact canonical YAML was
 validated by the official portal with a dedicated Telegraph credential, pinned
-through the portal to IPFS, registered on Base Sepolia, and activated in the
-Telegraph dispatcher.
+through the portal to IPFS, registered on Base Sepolia as historical ID `78`, and
+activated in the Telegraph dispatcher. On 2026-08-27, the cutoff-description
+candidate was authorized and re-registered as current ID `245`.
 
 ## Result
 
-The frozen registered YAML at
+The original frozen registration input at
 [`miners/oathcast-weather.yaml`](../miners/oathcast-weather.yaml) matches the
 required shape used by the published portal wizard:
 
 | Portal area | Draft status | Notes |
 | --- | --- | --- |
-| Basics | Passed | `kind`, `slug`, and `name` are present. Routing ID `64173` is active and distinct from on-chain registration ID `78`. |
+| Basics | Passed | `kind`, `slug`, and `name` are present. Routing ID `64173` is active and distinct from historical on-chain registration ID `78`. |
 | Connection | Passed | Public HTTPS `base_url` is present and passed the portal endpoint validation. |
 | Endpoints | Passed | One forecast endpoint declares `WEATHER_FORECAST` and explicit required/optional query parameters. |
 | Semantics | Passed | Exactly `WEATHER_FORECAST` is declared; label, confidence, and reason mappings are explicit. |
 | Registration inputs | Separate | URI, raw-byte SHA-256, fee address, price, and wallet action are transaction inputs. The optional YAML `on_chain` block concerns ERC-8183 request/response mapping and is not required by the documented minimal Miner example. |
 | Live portal validation | Passed | `/api/validate` returned HTTP 200, `valid: true`, and `api_key_stored: true` for the exact 4,960-byte YAML. The response did not expose a durable per-endpoint case list. |
 | Pinning | Passed | Portal upload returned `ipfs://QmRTd9ojKSdMvokKj4tUa4MndQhQWHomy1NTLU6Jz4Un7F`; Pinata reproduced the exact frozen bytes/hash. |
-| Registration | Passed | Transaction `0x937d45d8…97b5d2` confirmed, emitted on-chain registration ID `78`, and `getMiner(78)` matches the exact approved payload. |
+| Registration | Passed (historical) | Transaction `0x937d45d8…97b5d2` confirmed, emitted historical on-chain registration ID `78`, and `getMiner(78)` matched the original approved payload. |
 | Dispatcher activation | Passed | Routing ID `64173`, slug `oathcast-weather`, endpoint `GET /predict`, and `WEATHER_FORECAST` are active. |
 
 Immediately before validation, the 41-record live dispatcher response contained
@@ -44,15 +46,15 @@ validation history remains intact.
 
 ## Registration result
 
-The confirmed transaction emitted sequential on-chain registration ID `78`.
+The 2026-08-13 transaction emitted sequential on-chain registration ID `78`.
 The YAML's numeric routing ID remains `64173`; the two IDs serve different
 purposes and must not be interchanged. The transaction used an EIP-7702 smart-
 wallet wrapper, while the nested call targeted the current Telegraph Diamond
 with zero native value. The `MinerRegistered` event and `getMiner(78)` both
 attribute the record to `0x6D4192Bca39641F9aA22DB17EfF991D6adD005dE`.
 
-The portal registration API and dispatcher now report the record active. The
-full sanitized confirmation is
+At that historical point the portal registration API and dispatcher reported the
+record active. The full sanitized confirmation is
 `../artifacts/registration-drafts/oathcast-weather-registration-confirmation-2026-08-13T1940Z.json`.
 
 The current registration guide identifies Base Sepolia (`84532`), Diamond
@@ -67,9 +69,31 @@ Diamond and encodes `registerWasm(bytes32,string,string)`, selector
 `0xfe1e40f7`, with the exact hash, existing gateway URL, and
 `WEATHER_FORECAST`.
 
+## Current registration (2026-08-27)
+
+The prior portal registration ID `78` is deregistered. The authorized
+2026-08-27 transaction
+`0x43748dcaac584be466d32d96a45f4293816295579ffa17ee1c20ec4aa288184c`
+confirmed with receipt status `1` and emitted current registration ID `245`.
+The active portal record is routing ID `64173`, slug `oathcast-weather`, and
+`WEATHER_FORECAST` at
+`https://gateway.pinata.cloud/ipfs/QmRSBA6ig48TVq15UWEwdiYq8HYr6woWRPam961j1q1oMu`.
+The retrieved 3,018-byte pinned representation has SHA-256
+`0f66aa0679328afb0f53a0d83b846d2e8407ea062189814e455136121ac90d18`.
+
+The local source snapshot is
+[`miners/candidates/oathcast-weather-cutoff-v2.yaml`](../miners/candidates/oathcast-weather-cutoff-v2.yaml),
+with raw SHA-256
+`a639611848c484fa035f33f9ef336e0abb943b8ce3a908ae66aa4fa80f160679`.
+It is not byte-identical to the portal-canonicalized pin. The complete
+sanitized comparison is
+`../artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
+
 ## Remaining non-actions
 
-- Do not treat routing ID `64173` as on-chain registration ID `78`.
+- Do not treat routing ID `64173` as an on-chain registration ID; `78` is the
+  historical record and current registration ID `245` is separate from the
+  routing ID.
 - Use the current scoring-module contract: `alloc`, `dealloc`, and
   `rank_answer(6 x i32) -> f32`. `breakdown_answer` is deprecated and removed.
   The retained metadata and hashes for the historical 16,318-byte scalar-export
