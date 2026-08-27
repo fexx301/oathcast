@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 from oathcast.adapters import OpenMeteoWindowAdapter
 from oathcast.adapters.base import AdapterError
 from oathcast.forecast import (
+    MAX_FORECAST_WINDOW_HOURS,
     WINDOW_PROBABILITY_SEMANTICS,
     CanonicalWindowForecast,
     ForecastWindowRequest,
@@ -51,7 +52,9 @@ def _payload(request, *, model="fixture-open-meteo-window"):
         "hourly": {
             "time": [value.strftime("%Y-%m-%dT%H:%M") for value in times],
             "temperature_2m": [20.0 + index / 2 for index in range(len(times))],
-            "precipitation_probability": [index for index in range(len(times))],
+            "precipitation_probability": [
+                index % 101 for index in range(len(times))
+            ],
         },
     }
 
@@ -63,7 +66,7 @@ def _hour(index, *, temperature=None, probability=None):
         interval_end=interval_start + timedelta(hours=1),
         temperature_2m_c=(20.0 + index if temperature is None else temperature),
         precipitation_probability=(
-            index / 100 if probability is None else probability
+            (index % 101) / 100 if probability is None else probability
         ),
     )
 
@@ -89,8 +92,8 @@ def _forecast(request, *, hours=None):
 
 
 class ForecastWindowModelTests(unittest.TestCase):
-    def test_request_accepts_inclusive_one_to_twenty_four_hour_bounds(self):
-        for hours in (1, 24):
+    def test_request_accepts_inclusive_one_to_one_hundred_sixty_eight_hour_bounds(self):
+        for hours in (1, 24, MAX_FORECAST_WINDOW_HOURS):
             with self.subTest(hours=hours):
                 request = _request(hours=hours, event_id=f"window-{hours}")
                 self.assertEqual(request.duration_hours, hours)
@@ -102,8 +105,9 @@ class ForecastWindowModelTests(unittest.TestCase):
     def test_request_rejects_duration_and_alignment_outside_contract(self):
         invalid = {
             "zero hours": {"horizon_end": START},
-            "more than 24 hours": {
-                "horizon_end": START + timedelta(hours=25)
+            "more than 168 hours": {
+                "horizon_end": START
+                + timedelta(hours=MAX_FORECAST_WINDOW_HOURS + 1)
             },
             "unaligned start": {
                 "horizon_start": START + timedelta(minutes=30),
@@ -123,15 +127,43 @@ class ForecastWindowModelTests(unittest.TestCase):
     def test_request_allows_a_cutoff_at_the_window_opening(self):
         """A window forecast may be committed right up to the window opening.
 
-        The one-hour point contract still demands strict lead time. A window
-        already reaches up to 24 hours forward, so requiring an extra hour of
-        lead rejected Telegraph's "next 24 hours" request without protecting
-        anything, and the service default now uses the opening itself.
+        The one-hour point contract still demands strict lead time. A cutoff at
+        the opening remains valid when a caller supplies it explicitly; omitted
+        multi-hour requests use the separately tested first-hour cutoff.
         """
 
         request = _request(hours=24, forecast_cutoff=START)
         self.assertEqual(request.forecast_cutoff, START)
         self.assertEqual(request.horizon_start, START)
+
+    def test_request_keeps_implicit_grace_outside_serialized_cutoff(self):
+        request = _request(
+            hours=24,
+            forecast_cutoff=START,
+            implicit_cutoff_grace=True,
+        )
+        self.assertEqual(request.forecast_cutoff, START)
+        self.assertEqual(request.effective_cutoff, START + timedelta(hours=1))
+        self.assertEqual(request.to_dict()["cutoff_policy"], "implicit_grace")
+        restored = ForecastWindowRequest.from_dict(request.to_dict())
+        self.assertTrue(restored.implicit_cutoff_grace)
+        self.assertEqual(restored.effective_cutoff, START + timedelta(hours=1))
+
+    def test_request_round_trips_explicit_cutoff_policy(self):
+        request = _request(
+            hours=24,
+            forecast_cutoff=START,
+            explicit_cutoff_policy=True,
+        )
+        self.assertEqual(request.to_dict()["cutoff_policy"], "explicit")
+        restored = ForecastWindowRequest.from_dict(request.to_dict())
+        self.assertTrue(restored.explicit_cutoff_policy)
+        self.assertFalse(restored.implicit_cutoff_grace)
+        self.assertEqual(restored.effective_cutoff, START)
+
+    def test_request_rejects_cutoff_after_window_opening(self):
+        with self.assertRaisesRegex(ValueError, "forecast_cutoff must not be after"):
+            _request(hours=24, forecast_cutoff=START + timedelta(minutes=1))
 
     def test_request_rejects_non_finite_coordinates_and_unsupported_semantics(self):
         invalid = {
@@ -232,14 +264,23 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         self.assertEqual(
             query,
             {
-                "forecast_days": ["7"],
+                "end_hour": ["2026-08-18T15:00"],
                 "hourly": ["temperature_2m,precipitation_probability"],
                 "latitude": ["6.524400"],
                 "longitude": ["3.379200"],
+                "start_hour": ["2026-08-17T15:00"],
                 "temperature_unit": ["celsius"],
                 "timezone": ["UTC"],
             },
         )
+
+    def test_url_requests_the_exact_seven_day_window_and_final_endpoint(self):
+        request = _request(hours=MAX_FORECAST_WINDOW_HOURS, event_id="window-168")
+        query = parse_qs(urlparse(self.adapter.build_url(request)).query)
+
+        self.assertEqual(query["start_hour"], ["2026-08-17T15:00"])
+        self.assertEqual(query["end_hour"], ["2026-08-24T15:00"])
+        self.assertNotIn("forecast_days", query)
 
     def test_provider_metadata_must_confirm_utc_and_celsius_when_present(self):
         request = _request(hours=2)
@@ -307,6 +348,28 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         )
         self.assertEqual(forecast.provider_model, "fixture-open-meteo-window")
         self.assertEqual(forecast.retrieved_at, RETRIEVED_AT)
+
+    def test_complete_one_hundred_sixty_eight_hour_response_preserves_every_interval(self):
+        request = _request(hours=MAX_FORECAST_WINDOW_HOURS, event_id="window-168")
+        forecast = self.adapter.parse(
+            _payload(request),
+            request,
+            issued_at=ISSUED_AT,
+            retrieved_at=RETRIEVED_AT,
+        )
+
+        self.assertEqual(len(forecast.hours), MAX_FORECAST_WINDOW_HOURS)
+        self.assertEqual(forecast.hours[0].interval_start, request.horizon_start)
+        self.assertEqual(forecast.hours[-1].interval_end, request.horizon_end)
+
+    def test_seven_day_response_requires_the_final_precipitation_endpoint(self):
+        request = _request(hours=MAX_FORECAST_WINDOW_HOURS, event_id="window-168")
+        payload = _payload(request)
+        for field in ("time", "temperature_2m", "precipitation_probability"):
+            payload["hourly"][field].pop()
+
+        with self.assertRaisesRegex(AdapterError, "precipitation coverage"):
+            self.adapter.parse(payload, request, issued_at=ISSUED_AT)
 
     def test_missing_required_temperature_or_precipitation_timestamp_is_rejected(self):
         request = _request(hours=3)
@@ -461,6 +524,26 @@ class ForecastWindowRendererTests(unittest.TestCase):
         self.assertEqual(json.loads(encoded), public_window_response(self.request, self.forecast))
         self.assertNotIn("\n", encoded)
         self.assertNotIn(": ", encoded)
+
+    def test_seven_day_public_json_keeps_the_registered_compact_response_shape(self):
+        request = _request(hours=MAX_FORECAST_WINDOW_HOURS, event_id="render-window-168")
+        forecast = _forecast(request)
+        encoded = public_window_response_json(request, forecast)
+        response = json.loads(encoded)
+
+        self.assertEqual(
+            set(response),
+            {
+                "content",
+                "max_hourly_precipitation_interval",
+                "max_hourly_precipitation_probability",
+                "maximum_hourly_temperature_c",
+                "minimum_hourly_temperature_c",
+                "probability",
+                "probability_semantics",
+            },
+        )
+        self.assertLess(len(encoded.encode("utf-8")), 4 * 1024)
 
     def test_renderer_rejects_mismatched_event_ids(self):
         other_request = _request(hours=3, event_id="different")

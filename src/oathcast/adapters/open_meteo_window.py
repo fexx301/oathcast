@@ -1,4 +1,4 @@
-"""Open-Meteo adapter for complete 1-to-24-hour UTC forecast windows."""
+"""Open-Meteo adapter for complete 1-to-168-hour UTC forecast windows."""
 
 from __future__ import annotations
 
@@ -46,7 +46,14 @@ class OpenMeteoWindowAdapter:
             "hourly": "temperature_2m,precipitation_probability",
             "temperature_unit": "celsius",
             "timezone": "UTC",
-            "forecast_days": "7",
+            # Ask for the exact UTC bounds plus the final endpoint used by the
+            # preceding-hour precipitation semantics.  ``forecast_days=7``
+            # starts at the provider's current day and fails for a request
+            # whose horizon begins later in the available forecast.  Open-Meteo
+            # returns both endpoints for start/end_hour, so an N-hour request
+            # is validated against N+1 rows by parse().
+            "start_hour": request.horizon_start.strftime("%Y-%m-%dT%H:%M"),
+            "end_hour": request.horizon_end.strftime("%Y-%m-%dT%H:%M"),
         }
         return f"{self.endpoint}?{urlencode(params)}"
 

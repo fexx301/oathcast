@@ -8,10 +8,14 @@ import tempfile
 import threading
 import unittest
 import unittest.mock
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from oathcast.adapters import OpenMeteoWindowAdapter
-from oathcast.forecast import ForecastWindowRequest, TemperatureWindowRequest
+from oathcast.forecast import (
+    MAX_FORECAST_WINDOW_HOURS,
+    ForecastWindowRequest,
+    TemperatureWindowRequest,
+)
 from oathcast.receipts import ReceiptConflict, SqliteReceiptStore
 from oathcast.service import (
     ForecastCutoffPassed,
@@ -104,7 +108,7 @@ def _window_payload(*, hours=24, start=START):
         for index in range(hours + 1)
     ]
     temperatures = [25.0 + (index % 7) * 0.5 for index in range(hours + 1)]
-    probabilities = list(range(hours + 1))
+    probabilities = [index % 101 for index in range(hours + 1)]
     probabilities[min(6, hours)] = 88
     return {
         "model": "service-window-fixture",
@@ -220,8 +224,95 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertIn("maximum_hourly_temperature_c", payload)
         self.assertEqual(len(calls), 1)
 
-    def test_predict_still_refuses_a_span_longer_than_twenty_four_hours(self):
-        """The 1-to-24-hour bound is the limit, and it fails before fetching."""
+    def test_predict_accepts_a_one_hundred_sixty_eight_hour_window(self):
+        calls = []
+        service = _service(
+            fetcher=lambda url: calls.append(url)
+            or _window_payload(hours=MAX_FORECAST_WINDOW_HOURS),
+        )
+        status, payload, _, encoded = _handler_request(
+            service,
+            "/predict?"
+            + urlencode(
+                _query_params(hours=MAX_FORECAST_WINDOW_HOURS),
+                doseq=True,
+            ),
+        )
+
+        self.assertEqual(status, 200, payload)
+        self.assertNotIn("hourly", payload)
+        self.assertIn("minimum_hourly_temperature_c", payload)
+        self.assertIn("maximum_hourly_temperature_c", payload)
+        self.assertIn("max_hourly_precipitation_probability", payload)
+        self.assertLess(len(encoded), 4 * 1024)
+        query = parse_qs(urlparse(calls[0]).query)
+        self.assertEqual(query["start_hour"], ["2026-08-17T15:00"])
+        self.assertEqual(query["end_hour"], ["2026-08-24T15:00"])
+
+    def test_predict_returns_502_when_provider_lacks_the_final_endpoint(self):
+        def incomplete_payload(url):
+            del url
+            payload = _window_payload(hours=MAX_FORECAST_WINDOW_HOURS)
+            for field in ("time", "temperature_2m", "precipitation_probability"):
+                payload["hourly"][field].pop()
+            return payload
+
+        service = _service(fetcher=incomplete_payload)
+        status, payload, headers, _ = _handler_request(
+            service,
+            "/predict?"
+            + urlencode(
+                _query_params(hours=MAX_FORECAST_WINDOW_HOURS),
+                doseq=True,
+            ),
+        )
+
+        self.assertEqual(status, 502)
+        self.assertEqual(payload, {"error": "provider_unavailable", "request_id": "window-http-test"})
+        self.assertEqual(headers["X-OathCast-Request-ID"], "window-http-test")
+
+    def test_predict_returns_502_when_provider_lacks_a_first_or_interior_timestamp(self):
+        for label, missing_index in (
+            ("first", 0),
+            ("interior", MAX_FORECAST_WINDOW_HOURS // 2),
+        ):
+            with self.subTest(label=label):
+                def incomplete_payload(url, *, index=missing_index):
+                    del url
+                    payload = _window_payload(hours=MAX_FORECAST_WINDOW_HOURS)
+                    for field in (
+                        "time",
+                        "temperature_2m",
+                        "precipitation_probability",
+                    ):
+                        del payload["hourly"][field][index]
+                    return payload
+
+                service = _service(fetcher=incomplete_payload)
+                status, payload, headers, _ = _handler_request(
+                    service,
+                    "/predict?"
+                    + urlencode(
+                        _query_params(hours=MAX_FORECAST_WINDOW_HOURS),
+                        doseq=True,
+                    ),
+                )
+
+                self.assertEqual(status, 502)
+                self.assertEqual(
+                    payload,
+                    {
+                        "error": "provider_unavailable",
+                        "request_id": "window-http-test",
+                    },
+                )
+                self.assertEqual(
+                    headers["X-OathCast-Request-ID"],
+                    "window-http-test",
+                )
+
+    def test_predict_refuses_a_span_longer_than_one_hundred_sixty_eight_hours(self):
+        """The 168-hour bound is the limit, and it fails before fetching."""
 
         calls = []
         service = _service(
@@ -229,12 +320,42 @@ class ForecastWindowHttpTests(unittest.TestCase):
         )
         status, payload, _, _ = _handler_request(
             service,
-            "/predict?" + urlencode(_query_params(hours=25), doseq=True),
+            "/predict?"
+            + urlencode(
+                _query_params(hours=MAX_FORECAST_WINDOW_HOURS + 1),
+                doseq=True,
+            ),
         )
 
         self.assertEqual(status, 400)
-        self.assertIn("between 1 and 24 hours", payload["error"])
+        self.assertIn("between 1 and 168 hours", payload["error"])
         self.assertEqual(calls, [])
+
+    def test_registered_paths_normalize_unaligned_windows_to_provider_hours(self):
+        """Telegraph's arbitrary ISO bounds are rounded before provider access."""
+
+        params = _query_params()
+        params["start"] = ["2026-08-19T11:45:43Z"]
+        params["end"] = ["2026-08-20T11:45:43Z"]
+        del params["cutoff"]
+
+        expected_start = datetime(2026, 8, 19, 12, tzinfo=UTC)
+        for path in ("/predict", "/v1/forecast/point"):
+            calls = []
+            service = _service(
+                fetcher=lambda url: calls.append(url)
+                or _window_payload(start=expected_start),
+            )
+            with self.subTest(path=path):
+                status, payload, _, _ = _handler_request(
+                    service,
+                    path + "?" + urlencode(params, doseq=True),
+                )
+
+                self.assertEqual(status, 200, payload)
+                self.assertIn("12:00 UTC on 19 August 2026", payload["content"])
+                self.assertIn("12:00 UTC on 20 August 2026", payload["content"])
+                self.assertEqual(len(calls), 1)
 
     def test_legacy_window_path_is_not_publicly_reachable_for_one_hour(self):
         calls = []
@@ -278,13 +399,11 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertIn("minimum_hourly_temperature_c", payload)
         self.assertEqual(len(calls), 1)
 
-    def test_multi_hour_window_defaults_its_cutoff_to_the_window_opening(self):
-        """Telegraph sends no cutoff, so the default must not reject the request.
+    def test_multi_hour_window_defaults_its_cutoff_to_the_first_hour_end(self):
+        """Telegraph sends no cutoff, so the default must cover the first hour.
 
-        An implied hour of lead time made every "next 24 hours" request fail with
-        410 before it reached a provider. A window forecast is still committed
-        ahead of the window it describes when it is issued as the window opens,
-        so the default is now the opening itself.
+        Nearest-hour normalization can move a request into the current hour. The
+        canonical one-hour grace keeps all dispatcher timestamp positions usable.
         """
 
         calls = []
@@ -299,12 +418,58 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertIn("minimum_hourly_temperature_c", payload)
         self.assertEqual(len(calls), 1)
 
-    def test_multi_hour_window_is_refused_once_it_has_already_opened(self):
-        """The commitment boundary is retained: a started window is 410, not 200.
+    def test_multi_hour_window_accepts_every_position_in_the_current_hour(self):
+        cases = (
+            ("2026-08-19T11:00:00Z", datetime(2026, 8, 19, 11, 0, 0, tzinfo=UTC)),
+            ("2026-08-19T11:15:00Z", datetime(2026, 8, 19, 11, 15, 0, tzinfo=UTC)),
+            ("2026-08-19T11:29:59Z", datetime(2026, 8, 19, 11, 29, 59, tzinfo=UTC)),
+            ("2026-08-19T11:30:00Z", datetime(2026, 8, 19, 11, 30, 0, tzinfo=UTC)),
+            ("2026-08-19T11:59:59Z", datetime(2026, 8, 19, 11, 59, 59, tzinfo=UTC)),
+        )
+        for raw_start, now in cases:
+            with self.subTest(raw_start=raw_start):
+                calls = []
+                params = _query_params()
+                requested_start = datetime.fromisoformat(raw_start.replace("Z", "+00:00"))
+                params["start"] = [raw_start]
+                params["end"] = [
+                    (requested_start + timedelta(hours=24))
+                    .isoformat()
+                    .replace("+00:00", "Z")
+                ]
+                del params["cutoff"]
+                expected_start = (
+                    datetime(2026, 8, 19, 12, tzinfo=UTC)
+                    if requested_start.minute >= 30
+                    else datetime(2026, 8, 19, 11, tzinfo=UTC)
+                )
+                service = _service(
+                    fetcher=lambda url: calls.append(url)
+                    or _window_payload(start=expected_start),
+                    clock=lambda now=now: now,
+                )
 
-        This is the deliberate limit of the relaxed default. A window whose first
-        hour is already elapsing cannot be forecast ahead of itself, so a request
-        naming the current hour is refused rather than answered.
+                request = window_request_from_query(params)
+                self.assertEqual(request.horizon_start, expected_start)
+                self.assertEqual(request.forecast_cutoff, expected_start)
+                self.assertEqual(
+                    request.effective_cutoff,
+                    expected_start + timedelta(hours=1),
+                )
+
+                status, payload, _, _ = _handler_request(
+                    service, "/predict?" + urlencode(params, doseq=True)
+                )
+
+                self.assertEqual(status, 200, payload)
+                self.assertIn("minimum_hourly_temperature_c", payload)
+                self.assertEqual(len(calls), 1)
+
+    def test_multi_hour_window_is_refused_once_the_first_normalized_hour_elapsed(self):
+        """The compatibility grace ends after the first normalized hour.
+
+        A request naming an older window remains 410 rather than being treated as
+        a fresh forecast merely because the dispatcher omitted the cutoff.
         """
 
         calls = []
@@ -511,7 +676,7 @@ class ForecastWindowHttpTests(unittest.TestCase):
             with self.subTest(provider=provider):
                 with self.assertRaisesRegex(
                     ValueError,
-                    "does not support complete 1-to-24-hour",
+                    "does not support complete 1-to-168-hour",
                 ):
                     service.forecast_window(
                         request,
@@ -528,6 +693,373 @@ class ForecastWindowQueryTests(unittest.TestCase):
         self.assertNotIsInstance(point, ForecastWindowRequest)
         self.assertIsInstance(window, ForecastWindowRequest)
         self.assertEqual(window.duration_hours, 24)
+
+    def test_unaligned_one_hour_query_keeps_the_existing_point_contract(self):
+        params = _query_params(hours=1)
+        params["start"] = ["2026-08-17T15:45:43Z"]
+        params["end"] = ["2026-08-17T16:45:43Z"]
+
+        question = forecast_request_from_query(params)
+
+        self.assertNotIsInstance(question, ForecastWindowRequest)
+        self.assertEqual(
+            question.horizon_start,
+            datetime(2026, 8, 17, 15, 45, 43, tzinfo=UTC),
+        )
+        self.assertEqual(
+            question.horizon_end,
+            datetime(2026, 8, 17, 16, 45, 43, tzinfo=UTC),
+        )
+
+    def test_one_hour_query_retains_legacy_naive_timestamp_acceptance(self):
+        params = _query_params(hours=1)
+        params["start"] = ["2026-08-17T15:45:43"]
+        params["end"] = ["2026-08-17T16:45:43"]
+
+        question = forecast_request_from_query(params)
+
+        self.assertNotIsInstance(question, ForecastWindowRequest)
+        self.assertEqual(
+            question.horizon_start,
+            datetime(2026, 8, 17, 15, 45, 43, tzinfo=UTC),
+        )
+
+    def test_query_timestamps_require_timezone_aware_iso_date_times(self):
+        cases = {
+            "naive start": {"start": ["2026-08-19T11:15:00"]},
+            "date-only start": {"start": ["2026-08-19"]},
+            "naive end": {"end": ["2026-08-20T11:15:00"]},
+            "date-only end": {"end": ["2026-08-20"]},
+            "naive cutoff": {"cutoff": ["2026-08-19T11:00:00"]},
+        }
+        for label, replacement in cases.items():
+            with self.subTest(label=label):
+                params = _query_params()
+                params.update(replacement)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "timezone-aware ISO-8601 timestamp",
+                ):
+                    window_request_from_query(params)
+
+    def test_unaligned_window_bounds_round_to_nearest_utc_hour_with_half_up_ties(self):
+        cases = {
+            "just before half-hour": (
+                "2026-08-19T13:29:59.999+02:00",
+                "2026-08-20T13:29:59.999+02:00",
+                datetime(2026, 8, 19, 11, tzinfo=UTC),
+            ),
+            "half-hour tie rounds up": (
+                "2026-08-19T13:30:00+02:00",
+                "2026-08-20T13:30:00+02:00",
+                datetime(2026, 8, 19, 12, tzinfo=UTC),
+            ),
+            "after half-hour": (
+                "2026-08-19T11:45:43Z",
+                "2026-08-20T11:45:43Z",
+                datetime(2026, 8, 19, 12, tzinfo=UTC),
+            ),
+            "rounds across UTC day boundary": (
+                "2026-08-19T23:45:43Z",
+                "2026-08-20T23:45:43Z",
+                datetime(2026, 8, 20, 0, tzinfo=UTC),
+            ),
+        }
+        for label, (raw_start, raw_end, expected_start) in cases.items():
+            with self.subTest(label=label):
+                params = _query_params()
+                params["start"] = [raw_start]
+                params["end"] = [raw_end]
+                del params["cutoff"]
+
+                request = window_request_from_query(params)
+
+                self.assertEqual(request.horizon_start, expected_start)
+                self.assertEqual(
+                    request.horizon_end,
+                    expected_start + timedelta(hours=24),
+                )
+                self.assertEqual(request.duration_hours, 24)
+                self.assertEqual(
+                    request.forecast_cutoff,
+                    expected_start,
+                )
+                self.assertEqual(
+                    request.effective_cutoff,
+                    expected_start + timedelta(hours=1),
+                )
+
+    def test_explicit_cutoff_is_not_rounded_when_window_bounds_are_normalized(self):
+        params = _query_params()
+        params["start"] = ["2026-08-19T13:45:43+02:00"]
+        params["end"] = ["2026-08-20T13:45:43+02:00"]
+        params["cutoff"] = ["2026-08-19T07:17:13.456-03:00"]
+
+        request = window_request_from_query(params)
+
+        self.assertEqual(request.horizon_start, datetime(2026, 8, 19, 12, tzinfo=UTC))
+        self.assertEqual(request.horizon_end, datetime(2026, 8, 20, 12, tzinfo=UTC))
+        self.assertEqual(
+            request.forecast_cutoff,
+            datetime(2026, 8, 19, 10, 17, 13, 456000, tzinfo=UTC),
+        )
+
+    def test_explicit_cutoff_after_normalized_start_is_not_silently_rounded(self):
+        params = _query_params()
+        params["start"] = ["2026-08-19T11:15:00Z"]
+        params["end"] = ["2026-08-20T11:15:00Z"]
+        params["cutoff"] = ["2026-08-19T11:30:00Z"]
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "forecast_cutoff must not be after horizon_start",
+        ):
+            window_request_from_query(params)
+
+    def test_implicit_grace_and_earlier_explicit_cutoff_have_distinct_identities(self):
+        omitted = _query_params()
+        omitted["start"] = ["2026-08-19T11:15:00Z"]
+        omitted["end"] = ["2026-08-20T11:15:00Z"]
+        del omitted["cutoff"]
+        explicit = {**omitted, "cutoff": ["2026-08-19T10:00:00Z"]}
+
+        implicit_request = window_request_from_query(omitted)
+        explicit_request = window_request_from_query(explicit)
+
+        self.assertEqual(
+            implicit_request.horizon_start,
+            explicit_request.horizon_start,
+        )
+        self.assertEqual(
+            implicit_request.forecast_cutoff,
+            datetime(2026, 8, 19, 11, tzinfo=UTC),
+        )
+        self.assertEqual(
+            implicit_request.effective_cutoff,
+            datetime(2026, 8, 19, 12, tzinfo=UTC),
+        )
+        self.assertEqual(
+            explicit_request.forecast_cutoff,
+            datetime(2026, 8, 19, 10, tzinfo=UTC),
+        )
+        self.assertNotEqual(implicit_request.to_dict(), explicit_request.to_dict())
+        self.assertNotEqual(implicit_request.event_id, explicit_request.event_id)
+
+        service = _service(
+            fetcher=lambda url: _window_payload(
+                start=datetime(2026, 8, 19, 11, tzinfo=UTC)
+            ),
+            clock=lambda: datetime(2026, 8, 19, 11, 15, tzinfo=UTC),
+        )
+        service.forecast_window(implicit_request, request_id="implicit-grace")
+        with self.assertRaises(ForecastCutoffPassed):
+            service.forecast_window(explicit_request, request_id="explicit-cutoff")
+
+    def test_implicit_grace_identity_matches_legacy_start_cutoff_for_rollback(self):
+        omitted = _query_params()
+        omitted["start"] = ["2026-08-19T11:15:00Z"]
+        omitted["end"] = ["2026-08-20T11:15:00Z"]
+        del omitted["cutoff"]
+        explicit_start = {**omitted, "cutoff": ["2026-08-19T11:00:00Z"]}
+
+        implicit_request = window_request_from_query(omitted)
+        legacy_request = window_request_from_query(explicit_start)
+        self.assertEqual(implicit_request.event_id, legacy_request.event_id)
+        implicit_identity = implicit_request.to_dict()
+        self.assertEqual(implicit_identity["forecast_cutoff"], "2026-08-19T11:00:00Z")
+        expected_legacy_identity = {
+            key: value
+            for key, value in implicit_identity.items()
+            if key != "cutoff_policy"
+        }
+        expected_legacy_identity["cutoff_policy"] = "explicit"
+        self.assertEqual(legacy_request.to_dict(), expected_legacy_identity)
+        self.assertIn("cutoff_policy", implicit_identity)
+
+    def test_explicit_cutoff_at_normalized_start_has_no_omitted_grace(self):
+        omitted = _query_params()
+        omitted["start"] = ["2026-08-19T11:15:00Z"]
+        omitted["end"] = ["2026-08-20T11:15:00Z"]
+        del omitted["cutoff"]
+        explicit = {**omitted, "cutoff": ["2026-08-19T11:00:00Z"]}
+
+        implicit_request = window_request_from_query(omitted)
+        explicit_request = window_request_from_query(explicit)
+
+        self.assertEqual(implicit_request.horizon_start, explicit_request.horizon_start)
+        self.assertEqual(implicit_request.forecast_cutoff, explicit_request.forecast_cutoff)
+        self.assertEqual(implicit_request.event_id, explicit_request.event_id)
+        self.assertEqual(
+            implicit_request.effective_cutoff,
+            datetime(2026, 8, 19, 12, tzinfo=UTC),
+        )
+        self.assertEqual(
+            explicit_request.effective_cutoff,
+            datetime(2026, 8, 19, 11, tzinfo=UTC),
+        )
+
+        calls = []
+        service = _service(
+            fetcher=lambda url: calls.append(url)
+            or _window_payload(start=implicit_request.horizon_start),
+            clock=lambda: datetime(2026, 8, 19, 11, 15, tzinfo=UTC),
+        )
+        with self.assertRaises(ForecastCutoffPassed):
+            service.forecast_window(explicit_request, request_id="explicit-start")
+        service.forecast_window(implicit_request, request_id="implicit-grace")
+        self.assertEqual(len(calls), 1)
+
+    def test_late_explicit_cutoff_cannot_replay_implicit_receipt(self):
+        """A shared legacy event ID must not bypass an explicit deadline."""
+
+        omitted = _query_params(event_id="shared-cutoff-replay")
+        omitted["start"] = ["2026-08-19T11:15:00Z"]
+        omitted["end"] = ["2026-08-20T11:15:00Z"]
+        del omitted["cutoff"]
+        explicit = {**omitted, "cutoff": ["2026-08-19T11:00:00Z"]}
+
+        implicit_request = window_request_from_query(omitted)
+        explicit_request = window_request_from_query(explicit)
+        self.assertEqual(implicit_request.event_id, explicit_request.event_id)
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            calls = []
+            try:
+                service = _service(
+                    fetcher=lambda url: calls.append(url)
+                    or _window_payload(
+                        start=implicit_request.horizon_start,
+                        hours=implicit_request.duration_hours,
+                    ),
+                    receipt_store=store,
+                    clock=lambda: datetime(2026, 8, 19, 10, 30, tzinfo=UTC),
+                )
+                service.forecast_window(
+                    implicit_request,
+                    request_id="implicit-before-explicit",
+                )
+                self.assertEqual(len(calls), 1)
+
+                late_service = _service(
+                    fetcher=lambda url: self.fail(
+                        "late explicit request must not fetch or replay"
+                    ),
+                    receipt_store=store,
+                    clock=lambda: datetime(2026, 8, 19, 11, 15, tzinfo=UTC),
+                )
+                with self.assertRaises(ReceiptConflict):
+                    late_service.forecast_window(
+                        explicit_request,
+                        request_id="late-explicit",
+                    )
+                self.assertEqual(len(calls), 1)
+            finally:
+                store.close()
+
+    def test_legacy_and_implicit_window_receipts_replay_in_both_directions(self):
+        params = _query_params()
+        params["start"] = ["2026-08-19T11:15:00Z"]
+        params["end"] = ["2026-08-20T11:15:00Z"]
+        del params["cutoff"]
+        implicit_request = window_request_from_query(params)
+        legacy_question = {
+            key: value
+            for key, value in implicit_request.to_dict().items()
+            if key != "cutoff_policy"
+        }
+        legacy_request = ForecastWindowRequest.from_dict(legacy_question)
+        self.assertEqual(legacy_request.event_id, implicit_request.event_id)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipts.sqlite3"
+            first_store = SqliteReceiptStore(path)
+            first_service = _service(
+                fetcher=lambda url: _window_payload(
+                    start=implicit_request.horizon_start,
+                    hours=implicit_request.duration_hours,
+                ),
+                receipt_store=first_store,
+                clock=lambda: datetime(2026, 8, 19, 10, 30, tzinfo=UTC),
+            )
+            first = first_service.forecast_window(
+                legacy_request,
+                request_id="legacy-window",
+            )
+            first_store.close()
+
+            new_store = SqliteReceiptStore(path)
+            new_service = _service(
+                fetcher=lambda url: self.fail("legacy receipt must replay"),
+                receipt_store=new_store,
+                clock=lambda: datetime(2026, 8, 19, 13, tzinfo=UTC),
+            )
+            replay = new_service.forecast_window(
+                implicit_request,
+                request_id="new-window-retry",
+            )
+            self.assertEqual(replay.receipt_sha256, first.receipt_sha256)
+            self.assertEqual(replay.to_public_response(), first.to_public_response())
+            new_store.close()
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipts.sqlite3"
+            new_store = SqliteReceiptStore(path)
+            new_service = _service(
+                fetcher=lambda url: _window_payload(
+                    start=implicit_request.horizon_start,
+                    hours=implicit_request.duration_hours,
+                ),
+                receipt_store=new_store,
+                clock=lambda: datetime(2026, 8, 19, 10, 30, tzinfo=UTC),
+            )
+            new_result = new_service.forecast_window(
+                implicit_request,
+                request_id="new-window",
+            )
+            new_store.close()
+
+            rollback_store = SqliteReceiptStore(path)
+            rollback_service = _service(
+                fetcher=lambda url: self.fail("new receipt must replay on rollback"),
+                receipt_store=rollback_store,
+                clock=lambda: datetime(2026, 8, 19, 13, tzinfo=UTC),
+            )
+            rollback = rollback_service.forecast_window(
+                legacy_request,
+                request_id="legacy-window-retry",
+            )
+            self.assertEqual(rollback.receipt_sha256, new_result.receipt_sha256)
+            self.assertEqual(rollback.to_public_response(), new_result.to_public_response())
+            rollback_store.close()
+
+    def test_non_integral_window_span_is_rejected_before_rounding(self):
+        params = _query_params()
+        params["start"] = ["2026-08-19T11:45:43Z"]
+        params["end"] = ["2026-08-19T13:15:43Z"]
+        del params["cutoff"]
+
+        with self.assertRaisesRegex(ValueError, "whole number of hours"):
+            window_request_from_query(params)
+
+    def test_unaligned_and_aligned_window_queries_share_canonical_generated_identity(self):
+        unaligned = _query_params()
+        unaligned["start"] = ["2026-08-17T15:45:43Z"]
+        unaligned["end"] = ["2026-08-18T15:45:43Z"]
+        del unaligned["cutoff"]
+
+        aligned = _query_params()
+        aligned["start"] = ["2026-08-17T16:00:00Z"]
+        aligned["end"] = ["2026-08-18T16:00:00Z"]
+        del aligned["cutoff"]
+
+        unaligned_request = forecast_request_from_query(unaligned)
+        aligned_request = forecast_request_from_query(aligned)
+
+        self.assertIsInstance(unaligned_request, ForecastWindowRequest)
+        self.assertIsInstance(aligned_request, ForecastWindowRequest)
+        self.assertEqual(unaligned_request.to_dict(), aligned_request.to_dict())
+        self.assertEqual(unaligned_request.event_id, aligned_request.event_id)
 
     def test_telegraph_2t_query_anchors_the_next_complete_utc_hour(self):
         request = forecast_request_from_query(
@@ -730,6 +1262,139 @@ class ForecastWindowServiceTests(unittest.TestCase):
             self.assertEqual(replay.request_id, "first-window")
             self.assertEqual(replay.receipt_sha256, first.receipt_sha256)
             first_store.close()
+            replay_store.close()
+
+    def test_schema_v2_168_hour_receipt_persists_and_replays_without_fetching(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipts.sqlite3"
+            first_calls = []
+            first_store = SqliteReceiptStore(path)
+            first_service = _service(
+                fetcher=lambda url: first_calls.append(url)
+                or _window_payload(hours=MAX_FORECAST_WINDOW_HOURS),
+                receipt_store=first_store,
+            )
+            request = window_request_from_query(
+                _query_params(
+                    hours=MAX_FORECAST_WINDOW_HOURS,
+                    event_id="window-receipt-168",
+                )
+            )
+            first = first_service.forecast_window(request, request_id="first-window-168")
+            stored = first_store.get(request.event_id)
+
+            self.assertEqual(len(first_calls), 1)
+            self.assertIsNotNone(stored)
+            self.assertEqual(len(first.forecast.hours), MAX_FORECAST_WINDOW_HOURS)
+            self.assertEqual(len(stored["forecast"]["hours"]), MAX_FORECAST_WINDOW_HOURS)
+            self.assertEqual(stored["public_response"], first.to_public_response())
+            first_store.close()
+
+            replay_store = SqliteReceiptStore(path)
+            replay_service = _service(
+                fetcher=lambda url: self.fail("168-hour receipt replay must not fetch"),
+                receipt_store=replay_store,
+                clock=lambda: datetime(2026, 8, 17, 13, tzinfo=UTC),
+            )
+            replay = replay_service.forecast_window(
+                request,
+                request_id="retry-window-168",
+            )
+
+            self.assertEqual(replay.request_id, "first-window-168")
+            self.assertEqual(replay.receipt_sha256, first.receipt_sha256)
+            self.assertEqual(replay.to_public_response(), first.to_public_response())
+            self.assertEqual(replay_store.row_count(), 1)
+            replay_store.close()
+
+    def test_schema_v2_implicit_response_completing_at_cutoff_is_not_persisted(self):
+        params = _query_params(event_id="window-implicit-cutoff-completion")
+        params["start"] = ["2026-08-19T11:15:00Z"]
+        params["end"] = ["2026-08-20T11:15:00Z"]
+        del params["cutoff"]
+        request = window_request_from_query(params)
+        clock_value = [datetime(2026, 8, 19, 11, 59, 59, tzinfo=UTC)]
+        calls = []
+
+        def fetch(url):
+            calls.append(url)
+            clock_value[0] = request.effective_cutoff
+            return _window_payload(
+                start=request.horizon_start,
+                hours=request.duration_hours,
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            try:
+                service = _service(
+                    fetcher=fetch,
+                    receipt_store=store,
+                    clock=lambda: clock_value[0],
+                )
+
+                with self.assertRaises(ForecastCutoffPassed):
+                    service.forecast_window(
+                        request,
+                        request_id="implicit-cutoff-completion",
+                    )
+
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(store.row_count(), 0)
+                self.assertIsNone(store.get(request.event_id))
+            finally:
+                store.close()
+
+    def test_normalized_window_identity_replays_from_an_aligned_retry(self):
+        unaligned = _query_params()
+        unaligned["start"] = ["2026-08-17T15:45:43Z"]
+        unaligned["end"] = ["2026-08-18T15:45:43Z"]
+        del unaligned["cutoff"]
+        aligned = _query_params()
+        aligned["start"] = ["2026-08-17T16:00:00Z"]
+        aligned["end"] = ["2026-08-18T16:00:00Z"]
+        del aligned["cutoff"]
+
+        first_request = window_request_from_query(unaligned)
+        retry_request = window_request_from_query(aligned)
+        self.assertEqual(first_request, retry_request)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipts.sqlite3"
+            calls = []
+            first_store = SqliteReceiptStore(path)
+            first_service = _service(
+                fetcher=lambda url: calls.append(url)
+                or _window_payload(
+                    start=first_request.horizon_start,
+                    hours=first_request.duration_hours,
+                ),
+                receipt_store=first_store,
+            )
+            first = first_service.forecast_window(
+                first_request,
+                request_id="unaligned-window",
+            )
+            frozen_response = first.to_public_response()
+            first_store.close()
+
+            replay_store = SqliteReceiptStore(path)
+            replay_service = _service(
+                fetcher=lambda url: self.fail(
+                    "canonicalized receipt replay must not fetch"
+                ),
+                receipt_store=replay_store,
+            )
+            replay = replay_service.forecast_window(
+                retry_request,
+                request_id="aligned-window-retry",
+            )
+
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(replay.request, first.request)
+            self.assertEqual(replay.to_public_response(), frozen_response)
+            self.assertEqual(replay.request_id, "unaligned-window")
+            self.assertEqual(replay.receipt_sha256, first.receipt_sha256)
             replay_store.close()
 
     def test_schema_v3_receipt_persists_replays_and_freezes_public_response(self):
@@ -1061,7 +1726,7 @@ class ForecastWindowServiceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ProviderUnavailable,
-            "no configured provider supports complete 1-to-24-hour",
+            "no configured provider supports complete 1-to-168-hour",
         ):
             service.forecast_window(request, request_id="no-window-provider")
 

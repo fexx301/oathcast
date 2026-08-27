@@ -7,7 +7,7 @@ visible, testable, and never silently hidden.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 import math
 from typing import Any
@@ -16,6 +16,11 @@ from typing import Any
 UTC = timezone.utc
 SUPPORTED_EVENT_OPERATOR = ">"
 SUPPORTED_EVENT_THRESHOLD_MM = 0.1
+# The registered ``start``/``end`` window path is additive to the original
+# one-hour contract.  Telegraph's live dispatcher now emits seven-day hourly
+# requests, so this bound belongs to that window model only.  Keep the
+# separate ``forecast_hours=...&hourly=2t`` compatibility contract at 24 hours.
+MAX_FORECAST_WINDOW_HOURS = 168
 WINDOW_PROBABILITY_SEMANTICS = (
     "maximum_one_hour_precipitation_probability_within_requested_window"
 )
@@ -226,6 +231,8 @@ class ForecastWindowRequest:
     operator: str = SUPPORTED_EVENT_OPERATOR
     timezone: str = "UTC"
     spatial_semantics: str = "point"
+    implicit_cutoff_grace: bool = field(default=False, compare=False, repr=False)
+    explicit_cutoff_policy: bool = field(default=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.event_id.strip():
@@ -257,20 +264,29 @@ class ForecastWindowRequest:
         cutoff = ensure_utc(self.forecast_cutoff, "forecast_cutoff")
         for field_name, value in (("horizon_start", start), ("horizon_end", end)):
             if value.minute or value.second or value.microsecond:
-                raise ValueError(f"{field_name} must be aligned to a whole UTC hour")
+                raise ValueError(
+                    f"{field_name} must be an RFC3339 UTC timestamp aligned to a "
+                    "whole UTC hour (minute, second, and fractional second must be zero; "
+                    "for example 2026-08-19T12:00:00Z)"
+                )
         duration = end - start
-        if duration < timedelta(hours=1) or duration > timedelta(hours=24):
-            raise ValueError("forecast window duration must be between 1 and 24 hours")
+        if duration < timedelta(hours=1) or duration > timedelta(hours=MAX_FORECAST_WINDOW_HOURS):
+            raise ValueError(
+                "forecast window duration must be between 1 and "
+                f"{MAX_FORECAST_WINDOW_HOURS} hours"
+            )
         if duration.total_seconds() % 3600 != 0:
             raise ValueError("forecast window duration must be a whole number of hours")
-        # A window forecast may be issued right up to the moment the window
-        # opens, so an equal cutoff is allowed here where the one-hour point
-        # contract requires strict lead time. Requiring an hour of lead on a
-        # span that already reaches 24 hours forward rejected the natural
-        # "next 24 hours" request without protecting anything: the forecast is
-        # still committed before the window it describes begins.
         if cutoff > start:
             raise ValueError("forecast_cutoff must not be after horizon_start")
+        if self.implicit_cutoff_grace and self.explicit_cutoff_policy:
+            raise ValueError("cutoff policy cannot be both implicit and explicit")
+        if self.implicit_cutoff_grace and (
+            duration <= timedelta(hours=1) or cutoff != start
+        ):
+            raise ValueError(
+                "implicit cutoff grace requires a multi-hour window at its opening"
+            )
 
         object.__setattr__(self, "horizon_start", start)
         object.__setattr__(self, "horizon_end", end)
@@ -280,8 +296,19 @@ class ForecastWindowRequest:
     def duration_hours(self) -> int:
         return int((self.horizon_end - self.horizon_start).total_seconds() // 3600)
 
+    @property
+    def effective_cutoff(self) -> datetime:
+        """Return the deadline used for a new upstream fetch."""
+
+        if self.implicit_cutoff_grace:
+            return self.horizon_start + timedelta(hours=1)
+        return self.forecast_cutoff
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ForecastWindowRequest":
+        cutoff_policy = data.get("cutoff_policy")
+        if cutoff_policy not in {None, "implicit_grace", "explicit"}:
+            raise ValueError("cutoff_policy must be implicit_grace or explicit")
         return cls(
             event_id=str(data["event_id"]),
             location_name=str(data["location_name"]),
@@ -294,10 +321,20 @@ class ForecastWindowRequest:
             operator=str(data.get("operator", SUPPORTED_EVENT_OPERATOR)),
             timezone=str(data.get("timezone", "UTC")),
             spatial_semantics=str(data.get("spatial_semantics", "point")),
+            implicit_cutoff_grace=(cutoff_policy == "implicit_grace"),
+            explicit_cutoff_policy=(cutoff_policy == "explicit"),
         )
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
+        implicit_cutoff_grace = data.pop("implicit_cutoff_grace", False)
+        explicit_cutoff_policy = data.pop("explicit_cutoff_policy", False)
+        if implicit_cutoff_grace:
+            # Unknown fields are ignored by the v11/v12 deserializer, keeping
+            # receipts replayable if the service is rolled back.
+            data["cutoff_policy"] = "implicit_grace"
+        elif explicit_cutoff_policy:
+            data["cutoff_policy"] = "explicit"
         for field_name in ("horizon_start", "horizon_end", "forecast_cutoff"):
             data[field_name] = format_timestamp(data[field_name])
         return data
@@ -350,7 +387,7 @@ class HourlyWindowForecast:
 
 @dataclass(frozen=True)
 class CanonicalWindowForecast:
-    """Complete normalized hourly coverage for one 1-to-24-hour request."""
+    """Complete normalized hourly coverage for one 1-to-168-hour request."""
 
     event_id: str
     provider: str
@@ -384,8 +421,11 @@ class CanonicalWindowForecast:
                     f"canonical forecast window {field_name} must align to a whole UTC hour"
                 )
         duration = end - start
-        if duration < timedelta(hours=1) or duration > timedelta(hours=24):
-            raise ValueError("canonical forecast window must be between 1 and 24 hours")
+        if duration < timedelta(hours=1) or duration > timedelta(hours=MAX_FORECAST_WINDOW_HOURS):
+            raise ValueError(
+                "canonical forecast window must be between 1 and "
+                f"{MAX_FORECAST_WINDOW_HOURS} hours"
+            )
         if duration.total_seconds() % 3600 != 0:
             raise ValueError("canonical forecast window duration must be a whole number of hours")
         expected_count = int(duration.total_seconds() // 3600)

@@ -36,6 +36,7 @@ from oathcast.adapters import (
 )
 from oathcast.protocol import outbound_headers
 from oathcast.forecast import (
+    MAX_FORECAST_WINDOW_HOURS,
     SUPPORTED_EVENT_OPERATOR,
     CanonicalForecast,
     CanonicalTemperatureWindowForecast,
@@ -773,7 +774,8 @@ class ForecastService:
         adapter = self.window_adapters.get(provider)
         if adapter is None:
             raise ValueError(
-                f"{provider} does not support complete 1-to-24-hour forecast windows"
+                f"{provider} does not support complete 1-to-"
+                f"{MAX_FORECAST_WINDOW_HOURS}-hour forecast windows"
             )
         retrieved_at = self.clock().astimezone(UTC)
         url = adapter.build_url(request, self._api_key_for(provider))
@@ -906,7 +908,8 @@ class ForecastService:
     ) -> ServiceWindowForecast:
         if requested_provider is not None and requested_provider not in self.window_adapters:
             raise ValueError(
-                f"{requested_provider} does not support complete 1-to-24-hour forecast windows"
+                f"{requested_provider} does not support complete 1-to-"
+                f"{MAX_FORECAST_WINDOW_HOURS}-hour forecast windows"
             )
         if self.receipt_store is not None:
             try:
@@ -923,11 +926,24 @@ class ForecastService:
                 except (ValueError, KeyError, TypeError, RuntimeError) as exc:
                     raise ReceiptStoreUnavailable("stored receipt evidence is malformed") from exc
 
+        # Replay remains idempotent after issuance. New implicit/explicit policy
+        # mismatches are rejected by the receipt binding helper; receipts from
+        # the older image have no policy marker and remain replayable for
+        # rollback compatibility. When no receipt exists, an explicit
+        # caller-authored deadline must be enforced before fetching.
+        if not request.implicit_cutoff_grace:
+            now = self.clock().astimezone(UTC)
+            if now >= request.forecast_cutoff:
+                raise ForecastCutoffPassed(
+                    "forecast_cutoff_passed: new forecasts must be issued before "
+                    f"{format_timestamp(request.forecast_cutoff)}"
+                )
+
         now = self.clock().astimezone(UTC)
-        if now >= request.forecast_cutoff:
+        if now >= request.effective_cutoff:
             raise ForecastCutoffPassed(
                 "forecast_cutoff_passed: new forecasts must be issued before "
-                f"{format_timestamp(request.forecast_cutoff)}"
+                f"{format_timestamp(request.effective_cutoff)}"
             )
 
         order = (
@@ -937,17 +953,18 @@ class ForecastService:
         )
         if not order:
             raise ProviderUnavailable(
-                "no configured provider supports complete 1-to-24-hour forecast windows"
+                "no configured provider supports complete 1-to-"
+                f"{MAX_FORECAST_WINDOW_HOURS}-hour forecast windows"
             )
         failures: list[str] = []
         for provider in order:
             try:
                 result = self._fetch_window_one(request, provider, request_id)
                 completed_at = self.clock().astimezone(UTC)
-                if completed_at >= request.forecast_cutoff:
+                if completed_at >= request.effective_cutoff:
                     raise ForecastCutoffPassed(
                         "forecast_cutoff_passed: upstream response completed at or after "
-                        f"{format_timestamp(request.forecast_cutoff)}"
+                        f"{format_timestamp(request.effective_cutoff)}"
                     )
             except ForecastCutoffPassed:
                 raise
@@ -1105,7 +1122,15 @@ class ForecastService:
                 f"event_id {requested_window.event_id!r} is already bound to a different forecast contract"
             )
         stored_request = ForecastWindowRequest.from_dict(receipt["question"])
-        if stored_request.to_dict() != requested_window.to_dict():
+        if stored_request.implicit_cutoff_grace and requested_window.explicit_cutoff_policy:
+            raise ReceiptConflict(
+                f"event_id {requested_window.event_id!r} is already bound to an implicit-grace forecast window"
+            )
+        stored_identity = stored_request.to_dict()
+        requested_identity = requested_window.to_dict()
+        stored_identity.pop("cutoff_policy", None)
+        requested_identity.pop("cutoff_policy", None)
+        if stored_identity != requested_identity:
             raise ReceiptConflict(
                 f"event_id {requested_window.event_id!r} is already bound to a different question"
             )
@@ -1294,9 +1319,61 @@ def _first_query_value(
 
 def _parse_query_timestamp(name: str, value: str) -> datetime:
     try:
+        normalized = value.strip()
+        iso_value = (
+            normalized[:-1] + "+00:00"
+            if normalized.endswith("Z")
+            else normalized
+        )
+        parsed = datetime.fromisoformat(iso_value)
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timestamp must include a timezone")
+        return parsed.astimezone(UTC)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(
+            f"{name} must be a timezone-aware ISO-8601 timestamp"
+        ) from exc
+
+
+def _parse_point_query_timestamp(name: str, value: str) -> datetime:
+    """Preserve the registered one-hour point parser's legacy permissiveness."""
+
+    try:
         return parse_timestamp(value)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be a valid ISO-8601 timestamp") from exc
+
+
+def _nearest_utc_hour(value: datetime) -> datetime:
+    """Round a UTC timestamp to the nearest hour, with half-hour ties forward."""
+
+    timestamp = ensure_utc(value, "timestamp")
+    hour = timestamp.replace(minute=0, second=0, microsecond=0)
+    if timestamp - hour >= timedelta(minutes=30):
+        hour += timedelta(hours=1)
+    return hour
+
+
+def _normalized_window_bounds(
+    start: datetime,
+    end: datetime,
+) -> tuple[datetime, datetime]:
+    """Align a multi-hour request without changing its requested duration."""
+
+    duration = end - start
+    if duration < timedelta(hours=1) or duration > timedelta(hours=MAX_FORECAST_WINDOW_HOURS):
+        raise ValueError(
+            "forecast window duration must be between 1 and "
+            f"{MAX_FORECAST_WINDOW_HOURS} hours"
+        )
+    if duration % timedelta(hours=1):
+        raise ValueError("forecast window duration must be a whole number of hours")
+    try:
+        aligned_start = _nearest_utc_hour(start)
+        aligned_end = aligned_start + duration
+    except OverflowError as exc:
+        raise ValueError("forecast window timestamps are out of range") from exc
+    return aligned_start, aligned_end
 
 
 def _parse_finite_number(name: str, value: str) -> float:
@@ -1347,6 +1424,10 @@ def default_window_event_id(request: ForecastWindowRequest) -> str:
 
     canonical = request.to_dict()
     canonical.pop("event_id", None)
+    # The grace policy is an issuance detail, not a receipt lookup identity.
+    # Keeping it out of generated IDs lets the older rollback image find and
+    # replay receipts written by the compatibility release.
+    canonical.pop("cutoff_policy", None)
     canonical["request_contract"] = "forecast_window_v2"
     encoded = json.dumps(
         canonical,
@@ -1465,11 +1546,11 @@ def telegraph_2t_window_request_from_query(
 def question_from_query(params: dict[str, list[str]]) -> ForecastQuestion:
     _validate_query_params(params)
 
-    start = _parse_query_timestamp(
+    start = _parse_point_query_timestamp(
         "horizon_start",
         _first_query_value(params, ("horizon_start", "start")),
     )
-    end = _parse_query_timestamp(
+    end = _parse_point_query_timestamp(
         "horizon_end",
         _first_query_value(params, ("horizon_end", "end")),
     )
@@ -1479,7 +1560,7 @@ def question_from_query(params: dict[str, list[str]]) -> ForecastQuestion:
         default=None,
     )
     cutoff = (
-        _parse_query_timestamp("forecast_cutoff", cutoff_value)
+        _parse_point_query_timestamp("forecast_cutoff", cutoff_value)
         if cutoff_value is not None
         # Keep the registered YAML's documented default of one hour before start.
         # This value is hashed into the derived event_id, so changing it changes
@@ -1533,27 +1614,40 @@ def window_request_from_query(
 ) -> ForecastWindowRequest:
     _validate_query_params(params)
 
-    start = _parse_query_timestamp(
+    requested_start = _parse_query_timestamp(
         "horizon_start",
         _first_query_value(params, ("horizon_start", "start")),
     )
-    end = _parse_query_timestamp(
+    requested_end = _parse_query_timestamp(
         "horizon_end",
         _first_query_value(params, ("horizon_end", "end")),
     )
+    # The registered one-hour point contract has its own identity and provider
+    # semantics. Keep that branch strict and unchanged; only provisional
+    # multi-hour windows are canonicalized for the provider's hourly grid.
+    if requested_end - requested_start == timedelta(hours=1):
+        start, end = requested_start, requested_end
+    else:
+        start, end = _normalized_window_bounds(requested_start, requested_end)
     cutoff_value = _first_query_value(
         params,
         ("forecast_cutoff", "cutoff"),
         default=None,
     )
-    cutoff = (
-        _parse_query_timestamp("forecast_cutoff", cutoff_value)
-        if cutoff_value is not None
-        # Default a window to the moment it opens, not an hour earlier. Telegraph
-        # sends no cutoff, so an hour of implied lead time rejected every
-        # "next 24 hours" request with 410 before this call was even routed.
-        else start
-    )
+    if cutoff_value is None:
+        # Nearest-hour normalization may move a dispatcher request backward into
+        # the current provider hour. Bind the implicit grace to the serialized
+        # question and receipt identity so it remains auditable and cannot be
+        # confused with an explicit cutoff at the normalized start.
+        cutoff = start
+        implicit_cutoff_grace = requested_end - requested_start > timedelta(hours=1)
+        explicit_cutoff_policy = False
+    else:
+        cutoff = _parse_query_timestamp("forecast_cutoff", cutoff_value)
+        if cutoff > start:
+            raise ValueError("forecast_cutoff must not be after horizon_start")
+        implicit_cutoff_grace = False
+        explicit_cutoff_policy = True
     event_id_value = _first_query_value(params, ("event_id",), default=None)
     event_id = (
         None
@@ -1586,6 +1680,8 @@ def window_request_from_query(
         horizon_start=start,
         horizon_end=end,
         forecast_cutoff=cutoff,
+        implicit_cutoff_grace=implicit_cutoff_grace,
+        explicit_cutoff_policy=explicit_cutoff_policy,
         threshold_mm=_parse_finite_number(
             "threshold_mm",
             _first_query_value(params, ("threshold_mm",), default="0.1"),
@@ -1618,11 +1714,11 @@ def forecast_request_from_query(
             reference_time=reference_time,
         )
     _validate_query_params(params)
-    start = _parse_query_timestamp(
+    start = _parse_point_query_timestamp(
         "horizon_start",
         _first_query_value(params, ("horizon_start", "start")),
     )
-    end = _parse_query_timestamp(
+    end = _parse_point_query_timestamp(
         "horizon_end",
         _first_query_value(params, ("horizon_end", "end")),
     )
