@@ -348,6 +348,8 @@ class HourlyWindowForecast:
     interval_end: datetime
     temperature_2m_c: float
     precipitation_probability: float
+    precipitation_mm: float | None = None
+    wind_speed_10m_kmh: float | None = None
 
     def __post_init__(self) -> None:
         start = ensure_utc(self.interval_start, "interval_start")
@@ -363,6 +365,14 @@ class HourlyWindowForecast:
             or not 0 <= self.precipitation_probability <= 1
         ):
             raise ValueError("precipitation_probability must be finite and in [0, 1]")
+        if self.precipitation_mm is not None and (
+            not math.isfinite(self.precipitation_mm) or self.precipitation_mm < 0
+        ):
+            raise ValueError("precipitation_mm must be finite and non-negative")
+        if self.wind_speed_10m_kmh is not None and (
+            not math.isfinite(self.wind_speed_10m_kmh) or self.wind_speed_10m_kmh < 0
+        ):
+            raise ValueError("wind_speed_10m_kmh must be finite and non-negative")
 
         object.__setattr__(self, "interval_start", start)
         object.__setattr__(self, "interval_end", end)
@@ -374,6 +384,16 @@ class HourlyWindowForecast:
             interval_end=parse_timestamp(data["interval_end"]),
             temperature_2m_c=float(data["temperature_2m_c"]),
             precipitation_probability=float(data["precipitation_probability"]),
+            precipitation_mm=(
+                None
+                if data.get("precipitation_mm") is None
+                else float(data["precipitation_mm"])
+            ),
+            wind_speed_10m_kmh=(
+                None
+                if data.get("wind_speed_10m_kmh") is None
+                else float(data["wind_speed_10m_kmh"])
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -382,6 +402,8 @@ class HourlyWindowForecast:
             "interval_end": format_timestamp(self.interval_end),
             "temperature_2m_c": self.temperature_2m_c,
             "precipitation_probability": self.precipitation_probability,
+            "precipitation_mm": self.precipitation_mm,
+            "wind_speed_10m_kmh": self.wind_speed_10m_kmh,
         }
 
 
@@ -471,6 +493,16 @@ class CanonicalWindowForecast:
     @property
     def probability_semantics(self) -> str:
         return WINDOW_PROBABILITY_SEMANTICS
+
+    @property
+    def has_complete_hourly_weather(self) -> bool:
+        """Whether every hour carries the fields introduced after schema v2."""
+
+        return all(
+            hour.precipitation_mm is not None
+            and hour.wind_speed_10m_kmh is not None
+            for hour in self.hours
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CanonicalWindowForecast":

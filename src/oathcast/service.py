@@ -1117,7 +1117,8 @@ class ForecastService:
         expected_digest = receipt.get("receipt_sha256")
         if expected_digest is not None and expected_digest != receipt_digest(receipt):
             raise ReceiptTampering("stored forecast receipt failed its integrity check")
-        if receipt.get("schema_version") != 2:
+        schema_version = receipt.get("schema_version")
+        if schema_version not in {2, 4}:
             raise ReceiptConflict(
                 f"event_id {requested_window.event_id!r} is already bound to a different forecast contract"
             )
@@ -1135,6 +1136,8 @@ class ForecastService:
                 f"event_id {requested_window.event_id!r} is already bound to a different question"
             )
         forecast = CanonicalWindowForecast.from_dict(receipt["forecast"])
+        if schema_version == 4 and not forecast.has_complete_hourly_weather:
+            raise RuntimeError("stored schema-v4 forecast receipt has incomplete hourly weather")
         stored_public_response = receipt.get("public_response")
         if not isinstance(stored_public_response, dict):
             raise RuntimeError("stored forecast receipt has no public response object")
@@ -1210,7 +1213,7 @@ class ForecastService:
         if self.receipt_store is None:
             return result
         receipt = {
-            "schema_version": 2,
+            "schema_version": 4,
             "created_at": format_timestamp(self.clock()),
             "request_id": result.request_id,
             "question": result.request.to_dict(),

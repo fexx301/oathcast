@@ -31,7 +31,7 @@ class OpenMeteoWindowAdapter:
     """Map exact Open-Meteo hourly points into complete interval records."""
 
     provider = "open_meteo"
-    adapter_version = "open_meteo_window_v1"
+    adapter_version = "open_meteo_window_v2"
     endpoint = "https://api.open-meteo.com/v1/forecast"
 
     def build_url(
@@ -43,8 +43,13 @@ class OpenMeteoWindowAdapter:
         params = {
             "latitude": f"{request.latitude:.6f}",
             "longitude": f"{request.longitude:.6f}",
-            "hourly": "temperature_2m,precipitation_probability",
+            "hourly": (
+                "temperature_2m,precipitation,"
+                "precipitation_probability,wind_speed_10m"
+            ),
             "temperature_unit": "celsius",
+            "precipitation_unit": "mm",
+            "wind_speed_unit": "kmh",
             "timezone": "UTC",
             # Ask for the exact UTC bounds plus the final endpoint used by the
             # preceding-hour precipitation semantics.  ``forecast_days=7``
@@ -101,29 +106,74 @@ class OpenMeteoWindowAdapter:
                 raise AdapterError(
                     "Open-Meteo window precipitation probability must use percent units"
                 )
+            precipitation_unit = hourly_units.get("precipitation")
+            if precipitation_unit is not None and str(precipitation_unit).lower() != "mm":
+                raise AdapterError(
+                    "Open-Meteo window precipitation amount must use millimetres"
+                )
+            wind_unit = hourly_units.get("wind_speed_10m")
+            if wind_unit is not None and str(wind_unit).lower() not in {
+                "km/h",
+                "kmh",
+            }:
+                raise AdapterError(
+                    "Open-Meteo window wind speed must use kilometres per hour"
+                )
         hourly = payload.get("hourly")
         if not isinstance(hourly, dict):
             raise AdapterError("Open-Meteo response has no hourly object")
         times = hourly.get("time")
         temperatures = hourly.get("temperature_2m")
+        precipitation_amounts = hourly.get("precipitation")
         probabilities = hourly.get("precipitation_probability")
-        if not all(isinstance(values, list) for values in (times, temperatures, probabilities)):
-            raise AdapterError(
-                "Open-Meteo response is missing hourly time, temperature, or probability arrays"
+        wind_speeds = hourly.get("wind_speed_10m")
+        if not all(
+            isinstance(values, list)
+            for values in (
+                times,
+                temperatures,
+                precipitation_amounts,
+                probabilities,
+                wind_speeds,
             )
-        if len(times) != len(temperatures) or len(times) != len(probabilities):
+        ):
+            raise AdapterError(
+                "Open-Meteo response is missing a required hourly weather array"
+            )
+        if any(
+            len(values) != len(times)
+            for values in (
+                temperatures,
+                precipitation_amounts,
+                probabilities,
+                wind_speeds,
+            )
+        ):
             raise AdapterError("Open-Meteo hourly arrays have different lengths")
 
-        rows: dict[datetime, tuple[Any, Any]] = {}
-        for time_value, temperature_value, probability_value in zip(
+        rows: dict[datetime, tuple[Any, Any, Any, Any]] = {}
+        for (
+            time_value,
+            temperature_value,
+            precipitation_value,
+            probability_value,
+            wind_value,
+        ) in zip(
             times,
             temperatures,
+            precipitation_amounts,
             probabilities,
+            wind_speeds,
         ):
             timestamp = parse_provider_time(time_value)
             if timestamp in rows:
                 raise AdapterError("Open-Meteo returned duplicate hourly timestamps")
-            rows[timestamp] = (temperature_value, probability_value)
+            rows[timestamp] = (
+                temperature_value,
+                precipitation_value,
+                probability_value,
+                wind_value,
+            )
 
         hours: list[HourlyWindowForecast] = []
         for index in range(request.duration_hours):
@@ -141,10 +191,22 @@ class OpenMeteoWindowAdapter:
                 rows[interval_start][0],
                 "temperature_2m",
             )
-            probability_percent = _finite_number(
+            wind_speed = _finite_number(
+                rows[interval_start][3],
+                "wind_speed_10m",
+            )
+            precipitation = _finite_number(
                 rows[interval_end][1],
+                "precipitation",
+            )
+            probability_percent = _finite_number(
+                rows[interval_end][2],
                 "precipitation_probability",
             )
+            if precipitation < 0:
+                raise AdapterError("Open-Meteo returned a negative precipitation amount")
+            if wind_speed < 0:
+                raise AdapterError("Open-Meteo returned a negative wind speed")
             if not 0 <= probability_percent <= 100:
                 raise AdapterError(
                     "Open-Meteo returned a precipitation probability outside [0, 100]"
@@ -155,6 +217,8 @@ class OpenMeteoWindowAdapter:
                     interval_end=interval_end,
                     temperature_2m_c=temperature,
                     precipitation_probability=probability_percent / 100,
+                    precipitation_mm=precipitation,
+                    wind_speed_10m_kmh=wind_speed,
                 )
             )
 
@@ -169,7 +233,8 @@ class OpenMeteoWindowAdapter:
                 "Hourly 2 metre air temperature sampled at the beginning of each UTC hour."
             ),
             precipitation_native_definition=(
-                "Probability of precipitation greater than 0.1 mm in the preceding hour."
+                "Precipitation sum and probability of precipitation greater than 0.1 mm "
+                "for the preceding hour."
             ),
             event_equivalence="documented_hourly_window",
             adapter_version=self.adapter_version,

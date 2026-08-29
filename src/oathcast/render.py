@@ -41,6 +41,10 @@ from oathcast.forecast import (
 
 RENDERER_VERSION = "semantic_text_v2"
 PREVIOUS_RENDERER_VERSION = "semantic_text_v1"
+WINDOW_RESPONSE_VERSION = "weather_window_v2"
+# OathCast's own bounded-response contract. This is not presented as a
+# Telegraph protocol limit; the fixed 168-hour maximum is tested against it.
+MAX_PUBLIC_WINDOW_RESPONSE_BYTES = 64 * 1024
 
 _MONTHS = (
     "January",
@@ -91,6 +95,10 @@ def _natural_time(moment) -> str:
 
 def _natural_date(moment) -> str:
     return f"{moment.day} {_MONTHS[moment.month - 1]} {moment.year}"
+
+
+def _compact_hour(moment) -> str:
+    return moment.strftime("%Y-%m-%dT%H:%MZ")
 
 
 def calibrated_phrase(probability: float) -> str:
@@ -228,8 +236,10 @@ def render_window_forecast_content(
         else maximum_temperature_c,
         2,
     )
+    if not forecast.has_complete_hourly_weather:
+        raise ValueError("complete hourly precipitation and wind fields are required")
     peak = forecast.peak_precipitation_hour
-    return (
+    summary = (
         f"For {request.location_name} from {_natural_time(request.horizon_start)} UTC on "
         f"{_natural_date(request.horizon_start)} to {_natural_time(request.horizon_end)} UTC on "
         f"{_natural_date(request.horizon_end)}, the minimum hourly temperature is "
@@ -238,6 +248,24 @@ def render_window_forecast_content(
         f"is {_percentage(visible_probability)}% for the hour from "
         f"{_natural_time(peak.interval_start)} to {_natural_time(peak.interval_end)} UTC on "
         f"{_natural_date(peak.interval_start)}."
+    )
+    rows = "\n".join(
+        " | ".join(
+            (
+                _compact_hour(hour.interval_start),
+                _measurement(round(hour.temperature_2m_c, 2)),
+                _measurement(round(hour.precipitation_mm, 2)),
+                _percentage(_public_probability(hour.precipitation_probability)),
+                _measurement(round(hour.wind_speed_10m_kmh, 2)),
+            )
+        )
+        for hour in forecast.hours
+    )
+    return (
+        f"{summary}\n"
+        "Hourly forecast (UTC time | 2t temperature C | precip mm | "
+        "precipitation probability % | wind_speed_10m km/h):\n"
+        f"{rows}"
     )
 
 
@@ -250,8 +278,11 @@ def public_window_response(
     visible_probability = _public_probability(forecast.probability)
     visible_minimum = round(forecast.minimum_hourly_temperature_c, 2)
     visible_maximum = round(forecast.maximum_hourly_temperature_c, 2)
+    if not forecast.has_complete_hourly_weather:
+        raise ValueError("complete hourly precipitation and wind fields are required")
     peak = forecast.peak_precipitation_hour
-    return {
+    response = {
+        "response_version": WINDOW_RESPONSE_VERSION,
         "content": render_window_forecast_content(
             request,
             forecast,
@@ -268,7 +299,32 @@ def public_window_response(
             "start": format_timestamp(peak.interval_start),
             "end": format_timestamp(peak.interval_end),
         },
+        "hourly": {
+            "time": [_compact_hour(hour.interval_start) for hour in forecast.hours],
+            "2t": [round(hour.temperature_2m_c, 2) for hour in forecast.hours],
+            "precip": [round(hour.precipitation_mm, 2) for hour in forecast.hours],
+            "precipitation_probability": [
+                _public_probability(hour.precipitation_probability)
+                for hour in forecast.hours
+            ],
+            "wind_speed_10m": [
+                round(hour.wind_speed_10m_kmh, 2) for hour in forecast.hours
+            ],
+        },
+        "hourly_units": {
+            "time": "iso8601_utc",
+            "2t": "C",
+            "precip": "mm",
+            "precipitation_probability": "fraction",
+            "wind_speed_10m": "km/h",
+        },
     }
+    encoded_size = len(
+        json.dumps(response, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    )
+    if encoded_size > MAX_PUBLIC_WINDOW_RESPONSE_BYTES:
+        raise ValueError("public window response exceeds the OathCast byte limit")
+    return response
 
 
 def public_window_response_json(

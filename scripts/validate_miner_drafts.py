@@ -35,10 +35,14 @@ VERSIONED_REGISTRATION_CANDIDATE_PATHS = frozenset(
     {
         ROOT / "miners" / "candidates" / "oathcast-weather-cutoff-v2.yaml",
         ROOT / "miners" / "candidates" / "oathcast-weather-window-v3.yaml",
+        ROOT / "miners" / "candidates" / "oathcast-weather-hourly-v4.yaml",
     }
 )
 WINDOW_REGISTRATION_CANDIDATE_PATH = (
     ROOT / "miners" / "candidates" / "oathcast-weather-window-v3.yaml"
+)
+HOURLY_REGISTRATION_CANDIDATE_PATH = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-hourly-v4.yaml"
 )
 
 EXPECTED_INPUT_PROPERTIES = {
@@ -73,6 +77,80 @@ EXPECTED_SIGNAL_MAPPING = {
     "label_field": "content",
     "confidence_field": "probability",
     "reason_field": "content",
+}
+HOURLY_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "response_version": {"type": "string", "enum": ["weather_window_v2"]},
+        "content": {"type": "string"},
+        "probability": {"type": "number", "minimum": 0, "maximum": 1},
+        "probability_semantics": {"type": "string"},
+        "minimum_hourly_temperature_c": {"type": "number"},
+        "maximum_hourly_temperature_c": {"type": "number"},
+        "max_hourly_precipitation_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+        },
+        "max_hourly_precipitation_interval": {
+            "type": "object",
+            "properties": {
+                "start": {"type": "string", "format": "date-time"},
+                "end": {"type": "string", "format": "date-time"},
+            },
+            "required": ["start", "end"],
+        },
+        "hourly": {
+            "type": "object",
+            "properties": {
+                "time": {
+                    "type": "array",
+                    "items": {"type": "string", "format": "date-time"},
+                },
+                "2t": {"type": "array", "items": {"type": "number"}},
+                "precip": {"type": "array", "items": {"type": "number"}},
+                "precipitation_probability": {
+                    "type": "array",
+                    "items": {"type": "number", "minimum": 0, "maximum": 1},
+                },
+                "wind_speed_10m": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                },
+            },
+            "required": [
+                "time",
+                "2t",
+                "precip",
+                "precipitation_probability",
+                "wind_speed_10m",
+            ],
+        },
+        "hourly_units": {
+            "type": "object",
+            "properties": {
+                "time": {"type": "string", "enum": ["iso8601_utc"]},
+                "2t": {"type": "string", "enum": ["C"]},
+                "precip": {"type": "string", "enum": ["mm"]},
+                "precipitation_probability": {
+                    "type": "string",
+                    "enum": ["fraction"],
+                },
+                "wind_speed_10m": {"type": "string", "enum": ["km/h"]},
+            },
+            "required": [
+                "time",
+                "2t",
+                "precip",
+                "precipitation_probability",
+                "wind_speed_10m",
+            ],
+        },
+    },
+    # The one-hour route intentionally retains its frozen point response.
+    # Multi-hour responses include every property above; both shapes require
+    # the two fields used by Telegraph's signal mapping.
+    "required": ["content", "probability"],
 }
 WINDOW_CANDIDATE_INPUT_SCHEMA = {
     "type": "object",
@@ -432,7 +510,11 @@ def _endpoint_param_errors(
     return errors
 
 
-def _canonical_contract_errors(document: dict[Any, Any]) -> list[str]:
+def _canonical_contract_errors(
+    document: dict[Any, Any],
+    *,
+    expected_output_schema: dict[str, Any] | None = None,
+) -> list[str]:
     errors: list[str] = []
     input_schema = _schema_contract(document, "input_schema")
     output_schema = _schema_contract(document, "output_schema")
@@ -477,6 +559,11 @@ def _canonical_contract_errors(document: dict[Any, Any]) -> list[str]:
 
     if output_schema is None:
         errors.append("canonical output_schema is required")
+    elif expected_output_schema is not None:
+        if output_schema != expected_output_schema:
+            errors.append(
+                "hourly registration candidate output_schema must match the versioned public hourly response"
+            )
     else:
         if output_schema.get("type") != "object":
             errors.append("canonical output_schema.type must be object")
@@ -811,8 +898,20 @@ def validate_draft(
             errors.append(
                 'versioned registration candidate auth.value_prefix must be omitted or "Bearer "'
             )
-        errors.extend(_canonical_contract_errors(document))
-        if path == WINDOW_REGISTRATION_CANDIDATE_PATH.resolve():
+        errors.extend(
+            _canonical_contract_errors(
+                document,
+                expected_output_schema=(
+                    HOURLY_OUTPUT_SCHEMA
+                    if path == HOURLY_REGISTRATION_CANDIDATE_PATH.resolve()
+                    else None
+                ),
+            )
+        )
+        if path in {
+            WINDOW_REGISTRATION_CANDIDATE_PATH.resolve(),
+            HOURLY_REGISTRATION_CANDIDATE_PATH.resolve(),
+        }:
             errors.extend(_window_registration_description_errors(document))
     elif is_window_candidate:
         if not lines or lines[0] != "# UNREGISTERED COMPATIBILITY CANDIDATE ONLY.":

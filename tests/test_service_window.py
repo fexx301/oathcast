@@ -16,7 +16,8 @@ from oathcast.forecast import (
     ForecastWindowRequest,
     TemperatureWindowRequest,
 )
-from oathcast.receipts import ReceiptConflict, SqliteReceiptStore
+from oathcast.receipts import ReceiptConflict, SqliteReceiptStore, receipt_digest
+from oathcast.render import MAX_PUBLIC_WINDOW_RESPONSE_BYTES, WINDOW_RESPONSE_VERSION
 from oathcast.service import (
     ForecastCutoffPassed,
     ForecastRequestHandler,
@@ -39,6 +40,9 @@ FIXTURES = ROOT / "fixtures"
 REGISTERED_MANIFEST = ROOT / "miners" / "oathcast-weather.yaml"
 WINDOW_CANDIDATE_MANIFEST = (
     ROOT / "miners" / "candidates" / "oathcast-weather-window-unregistered.yaml"
+)
+HOURLY_REREGISTRATION_MANIFEST = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-hourly-v4.yaml"
 )
 UTC = timezone.utc
 START = datetime(2026, 8, 17, 15, tzinfo=UTC)
@@ -110,12 +114,16 @@ def _window_payload(*, hours=24, start=START):
     temperatures = [25.0 + (index % 7) * 0.5 for index in range(hours + 1)]
     probabilities = [index % 101 for index in range(hours + 1)]
     probabilities[min(6, hours)] = 88
+    precipitation = [round((index % 9) / 10, 2) for index in range(hours + 1)]
+    wind_speeds = [8.0 + (index % 13) * 0.5 for index in range(hours + 1)]
     return {
         "model": "service-window-fixture",
         "hourly": {
             "time": [value.strftime("%Y-%m-%dT%H:%M") for value in timestamps],
             "temperature_2m": temperatures,
+            "precipitation": precipitation,
             "precipitation_probability": probabilities,
+            "wind_speed_10m": wind_speeds,
         },
     }
 
@@ -240,20 +248,52 @@ class ForecastWindowHttpTests(unittest.TestCase):
         )
 
         self.assertEqual(status, 200, payload)
-        self.assertNotIn("hourly", payload)
+        self.assertEqual(payload["response_version"], WINDOW_RESPONSE_VERSION)
+        self.assertEqual(len(payload["hourly"]["time"]), MAX_FORECAST_WINDOW_HOURS)
+        for field in ("2t", "precip", "precipitation_probability", "wind_speed_10m"):
+            self.assertEqual(len(payload["hourly"][field]), MAX_FORECAST_WINDOW_HOURS)
         self.assertIn("minimum_hourly_temperature_c", payload)
         self.assertIn("maximum_hourly_temperature_c", payload)
         self.assertIn("max_hourly_precipitation_probability", payload)
-        self.assertLess(len(encoded), 4 * 1024)
+        self.assertLessEqual(len(encoded), MAX_PUBLIC_WINDOW_RESPONSE_BYTES)
         query = parse_qs(urlparse(calls[0]).query)
         self.assertEqual(query["start_hour"], ["2026-08-17T15:00"])
         self.assertEqual(query["end_hour"], ["2026-08-24T15:00"])
+
+    def test_multi_hour_response_matches_the_v4_registration_schema(self):
+        service = _service(fetcher=lambda url: _window_payload())
+        status, payload, _, _ = _handler_request(
+            service,
+            "/predict?" + urlencode(_query_params(), doseq=True),
+        )
+
+        self.assertEqual(status, 200, payload)
+        schema = load_schema_contract(HOURLY_REREGISTRATION_MANIFEST)
+        self.assertEqual(schema_instance_errors(schema, payload), [])
+
+    def test_frozen_one_hour_response_matches_the_v4_registration_schema(self):
+        service = _service(fetcher=lambda url: _load_json("open_meteo.json"))
+        status, payload, _, encoded = _handler_request(
+            service,
+            "/predict?" + urlencode(_query_params(hours=1), doseq=True),
+        )
+
+        self.assertEqual(status, 200, payload)
+        self.assertEqual(encoded, LEGACY_PUBLIC_RESPONSE_BYTES)
+        schema = load_schema_contract(HOURLY_REREGISTRATION_MANIFEST)
+        self.assertEqual(schema_instance_errors(schema, payload), [])
 
     def test_predict_returns_502_when_provider_lacks_the_final_endpoint(self):
         def incomplete_payload(url):
             del url
             payload = _window_payload(hours=MAX_FORECAST_WINDOW_HOURS)
-            for field in ("time", "temperature_2m", "precipitation_probability"):
+            for field in (
+                "time",
+                "temperature_2m",
+                "precipitation",
+                "precipitation_probability",
+                "wind_speed_10m",
+            ):
                 payload["hourly"][field].pop()
             return payload
 
@@ -283,7 +323,9 @@ class ForecastWindowHttpTests(unittest.TestCase):
                     for field in (
                         "time",
                         "temperature_2m",
+                        "precipitation",
                         "precipitation_probability",
+                        "wind_speed_10m",
                     ):
                         del payload["hourly"][field][index]
                     return payload
@@ -1247,7 +1289,7 @@ class ForecastWindowServiceTests(unittest.TestCase):
         result = allowed.forecast_window(request, request_id="allowed-equivalence")
         self.assertEqual(result.forecast.event_equivalence, "unverified")
 
-    def test_schema_v2_receipt_persists_replays_and_freezes_public_response(self):
+    def test_schema_v4_receipt_persists_replays_and_freezes_public_response(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "receipts.sqlite3"
             first_calls = []
@@ -1257,7 +1299,7 @@ class ForecastWindowServiceTests(unittest.TestCase):
                 receipt_store=first_store,
             )
             request = window_request_from_query(
-                _query_params(event_id="window-receipt-v2")
+                _query_params(event_id="window-receipt-v4")
             )
             first = first_service.forecast_window(request, request_id="first-window")
             frozen_response = first.to_public_response()
@@ -1265,7 +1307,7 @@ class ForecastWindowServiceTests(unittest.TestCase):
 
             self.assertEqual(len(first_calls), 1)
             self.assertIsNotNone(stored)
-            self.assertEqual(stored["schema_version"], 2)
+            self.assertEqual(stored["schema_version"], 4)
             self.assertEqual(stored["public_response"], frozen_response)
             self.assertEqual(stored["question"], request.to_dict())
             self.assertEqual(first.receipt_sha256, stored["receipt_sha256"])
@@ -1295,7 +1337,60 @@ class ForecastWindowServiceTests(unittest.TestCase):
             first_store.close()
             replay_store.close()
 
-    def test_schema_v2_168_hour_receipt_persists_and_replays_without_fetching(self):
+    def test_schema_v2_receipt_replays_legacy_response_without_inventing_fields(self):
+        request = window_request_from_query(
+            _query_params(event_id="legacy-window-receipt-v2")
+        )
+        source = _service(fetcher=lambda url: _window_payload()).forecast_window(
+            request,
+            request_id="legacy-window-request",
+        )
+        legacy_forecast = source.forecast.to_dict()
+        for hour in legacy_forecast["hours"]:
+            hour.pop("precipitation_mm")
+            hour.pop("wind_speed_10m_kmh")
+        legacy_response = {
+            "content": "Legacy summary bytes stay frozen.",
+            "probability": 0.88,
+        }
+        legacy_bytes = json.dumps(
+            legacy_response,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        receipt = {
+            "schema_version": 2,
+            "created_at": "2026-08-17T11:00:00Z",
+            "request_id": "legacy-window-request",
+            "question": request.to_dict(),
+            "forecast": legacy_forecast,
+            "raw_payload": {},
+            "public_response": legacy_response,
+        }
+        receipt["receipt_sha256"] = receipt_digest(receipt)
+
+        store = SqliteReceiptStore(":memory:")
+        try:
+            store.save(receipt)
+            replay = _service(
+                fetcher=lambda url: self.fail("legacy receipt replay must not fetch"),
+                receipt_store=store,
+            ).forecast_window(request, request_id="ignored-retry-id")
+
+            self.assertFalse(replay.forecast.has_complete_hourly_weather)
+            self.assertEqual(replay.to_public_response(), legacy_response)
+            self.assertEqual(
+                json.dumps(
+                    replay.to_public_response(),
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ).encode("utf-8"),
+                legacy_bytes,
+            )
+        finally:
+            store.close()
+
+    def test_schema_v4_168_hour_receipt_persists_and_replays_without_fetching(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "receipts.sqlite3"
             first_calls = []
@@ -1338,7 +1433,7 @@ class ForecastWindowServiceTests(unittest.TestCase):
             self.assertEqual(replay_store.row_count(), 1)
             replay_store.close()
 
-    def test_schema_v2_implicit_response_completing_at_cutoff_is_not_persisted(self):
+    def test_schema_v4_implicit_response_completing_at_cutoff_is_not_persisted(self):
         params = _query_params(event_id="window-implicit-cutoff-completion")
         params["start"] = ["2026-08-19T11:15:00Z"]
         params["end"] = ["2026-08-20T11:15:00Z"]

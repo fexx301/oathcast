@@ -1,0 +1,266 @@
+# VERSIONED HOURLY RE-REGISTRATION CANDIDATE - NOT ACTIVE.
+# This candidate documents the complete 1-to-168-hour response introduced by
+# weather_window_v2. It must be portal-validated, pinned, and explicitly
+# authorized before upload, signing, or registration update.
+version: "1"
+kind: miner
+id: 64173
+slug: oathcast-weather
+protocol: generic
+name: OathCast Weather Forecast Miner v4
+description: A frozen one-hour point summary and complete hourly point forecasts for absolute UTC windows from 2 through 168 whole hours, including 2 metre temperature, precipitation, precipitation probability, and 10 metre wind speed.
+base_url: https://oathcastcourt.duckdns.org
+
+auth:
+  type: bearer
+  header_name: Authorization
+  env_var: OATHCAST_MINER_API_KEY
+
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+endpoints:
+  - path: /predict
+    external_path: /v1/forecast/point
+    method: GET
+    description: Return the frozen point summary for one hour or every UTC hour in an absolute 2-to-168-hour point forecast window.
+    intents: [WEATHER_FORECAST]
+    params:
+      query:
+        required:
+          - name: lat
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point latitude in decimal degrees (-90 to 90).
+            example: 6.5244
+          - name: lon
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Point longitude in decimal degrees (-180 to 180).
+            example: 3.3792
+          - name: start
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: >
+              Required inclusive start as an absolute RFC 3339 timestamp with
+              an explicit timezone; prefer canonical UTC with a Z suffix. A
+              relative phrase such as "tomorrow" or "next Monday" is invalid
+              as an API value. Resolve it using the user's intended timezone
+              and a known reference time; ask rather than guess if either is
+              unavailable.
+            example: "2026-08-27T09:00:00Z"
+          - name: end
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: >
+              Required exclusive end as an absolute RFC 3339 timestamp with an
+              explicit timezone. The duration end-start MUST be a whole number
+              of hours from 1 through 168, inclusive. Define N days as exactly
+              24*N hours: for seven days, end MUST equal start plus 168 hours.
+              Do not use an inclusive end-of-day value or extend through an
+              additional final day.
+            example: "2026-09-03T09:00:00Z"
+        optional:
+          - name: cutoff
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: >
+              Optional absolute RFC 3339 issuance deadline with an explicit
+              timezone; prefer canonical UTC with a Z suffix. It maps to
+              forecast_cutoff and MUST be at or before start. Best to OMIT it
+              unless an earlier deadline is specifically required; when absent,
+              the service applies the default for the selected window contract.
+              Never derive a cutoff later than start.
+          - name: threshold_mm
+            type: number
+            intents: [WEATHER_FORECAST]
+            description: Fixed measurable precipitation threshold.
+            default: 0.1
+          - name: operator
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Fixed precipitation comparison operator.
+            default: ">"
+          - name: event_id
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Stable event identifier.
+          - name: location_name
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Human-readable point name.
+          - name: provider
+            type: string
+            intents: [WEATHER_FORECAST]
+            description: Optional provider selector.
+    param_map:
+      lat: latitude
+      lon: longitude
+      start: horizon_start
+      end: horizon_end
+      cutoff: forecast_cutoff
+
+input_schema:
+  type: object
+  properties:
+    event_id:
+      type: string
+      description: Stable event identifier; defaults to a request-derived identifier when omitted.
+    location_name:
+      type: string
+      description: Human-readable point name; defaults to requested location when omitted.
+    lat:
+      type: number
+      description: Point latitude in decimal degrees.
+      minimum: -90
+      maximum: 90
+    lon:
+      type: number
+      description: Point longitude in decimal degrees.
+      minimum: -180
+      maximum: 180
+    start:
+      type: string
+      description: >
+        Required inclusive start as an absolute RFC 3339 timestamp with an
+        explicit timezone; prefer canonical UTC with a Z suffix. Relative
+        phrases such as "tomorrow" and "next Monday" are invalid API values.
+        Resolve them using the user's intended timezone and a known reference
+        time, and ask rather than guess if either is unavailable.
+      format: date-time
+    end:
+      type: string
+      description: >
+        Required exclusive absolute RFC 3339 timestamp with an explicit
+        timezone. The duration end-start MUST be a whole number of hours from 1
+        through 168, inclusive. N days means exactly 24*N hours, so a seven-day
+        request MUST set end to start plus 168 hours, without an inclusive
+        end-of-day value or an additional final day.
+      format: date-time
+    cutoff:
+      type: string
+      description: >
+        Optional absolute RFC 3339 issuance deadline with an explicit timezone;
+        prefer canonical UTC with a Z suffix. It maps to forecast_cutoff and
+        MUST be at or before start. Best to omit unless an earlier deadline is
+        specifically required; when absent, the service applies the default for
+        the selected window contract. Never derive a cutoff later than start.
+      format: date-time
+    threshold_mm:
+      type: number
+      description: Measurable precipitation threshold supported by this service.
+      enum:
+        - 0.1
+    operator:
+      type: string
+      description: Provider-native precipitation comparison supported by this service.
+      enum:
+        - ">"
+    provider:
+      type: string
+      description: Optional provider selector; the service still applies its configured provider allowlist.
+  required:
+    - lat
+    - lon
+    - start
+    - end
+
+output_schema:
+  type: object
+  properties:
+    response_version:
+      type: string
+      description: Version of the complete hourly response contract.
+      enum: [weather_window_v2]
+    content:
+      type: string
+      description: Compact summary followed by one chronological UTC row per requested hour.
+    probability:
+      type: number
+      description: Maximum one-hour precipitation probability in the requested window.
+      minimum: 0
+      maximum: 1
+    probability_semantics:
+      type: string
+      description: Meaning of the top-level probability field.
+    minimum_hourly_temperature_c:
+      type: number
+      description: Minimum hourly 2 metre temperature in degrees Celsius.
+    maximum_hourly_temperature_c:
+      type: number
+      description: Maximum hourly 2 metre temperature in degrees Celsius.
+    max_hourly_precipitation_probability:
+      type: number
+      description: Maximum hourly precipitation probability as a fraction.
+      minimum: 0
+      maximum: 1
+    max_hourly_precipitation_interval:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+      required: [start, end]
+    hourly:
+      type: object
+      description: Equal-length chronological arrays with one value for each requested UTC hour.
+      properties:
+        time:
+          type: array
+          items:
+            type: string
+            format: date-time
+        2t:
+          type: array
+          items:
+            type: number
+        precip:
+          type: array
+          items:
+            type: number
+        precipitation_probability:
+          type: array
+          items:
+            type: number
+            minimum: 0
+            maximum: 1
+        wind_speed_10m:
+          type: array
+          items:
+            type: number
+      required: [time, 2t, precip, precipitation_probability, wind_speed_10m]
+    hourly_units:
+      type: object
+      properties:
+        time:
+          type: string
+          enum: [iso8601_utc]
+        2t:
+          type: string
+          enum: [C]
+        precip:
+          type: string
+          enum: [mm]
+        precipitation_probability:
+          type: string
+          enum: [fraction]
+        wind_speed_10m:
+          type: string
+          enum: [km/h]
+      required: [time, 2t, precip, precipitation_probability, wind_speed_10m]
+  required:
+    - content
+    - probability
+
+semantics:
+  signal_mapping:
+    label_field: content
+    confidence_field: probability
+    reason_field: content
+  supported_intents:
+    - WEATHER_FORECAST

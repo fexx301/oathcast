@@ -14,6 +14,8 @@ from oathcast.forecast import (
     HourlyWindowForecast,
 )
 from oathcast.render import (
+    MAX_PUBLIC_WINDOW_RESPONSE_BYTES,
+    WINDOW_RESPONSE_VERSION,
     public_window_response,
     public_window_response_json,
     render_window_forecast_content,
@@ -52,14 +54,23 @@ def _payload(request, *, model="fixture-open-meteo-window"):
         "hourly": {
             "time": [value.strftime("%Y-%m-%dT%H:%M") for value in times],
             "temperature_2m": [20.0 + index / 2 for index in range(len(times))],
+            "precipitation": [index / 10 for index in range(len(times))],
             "precipitation_probability": [
                 index % 101 for index in range(len(times))
             ],
+            "wind_speed_10m": [8.0 + index / 4 for index in range(len(times))],
         },
     }
 
 
-def _hour(index, *, temperature=None, probability=None):
+def _hour(
+    index,
+    *,
+    temperature=None,
+    precipitation=None,
+    probability=None,
+    wind_speed=None,
+):
     interval_start = START + timedelta(hours=index)
     return HourlyWindowForecast(
         interval_start=interval_start,
@@ -68,6 +79,8 @@ def _hour(index, *, temperature=None, probability=None):
         precipitation_probability=(
             (index % 101) / 100 if probability is None else probability
         ),
+        precipitation_mm=(index / 10 if precipitation is None else precipitation),
+        wind_speed_10m_kmh=(8.0 + index / 4 if wind_speed is None else wind_speed),
     )
 
 
@@ -85,7 +98,7 @@ def _forecast(request, *, hours=None):
         temperature_native_definition="fixture temperature definition",
         precipitation_native_definition="fixture precipitation definition",
         event_equivalence="documented_hourly_window",
-        adapter_version="open_meteo_window_v1",
+        adapter_version="open_meteo_window_v2",
         provider_model="fixture-open-meteo-window",
         retrieved_at=RETRIEVED_AT,
     )
@@ -182,7 +195,7 @@ class ForecastWindowModelTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(ValueError):
                 _request(**changes)
 
-    def test_hourly_forecast_validates_interval_temperature_and_probability(self):
+    def test_hourly_forecast_validates_all_weather_fields(self):
         invalid = {
             "short interval": {"interval_end": START + timedelta(minutes=30)},
             "unaligned interval": {
@@ -194,12 +207,18 @@ class ForecastWindowModelTests(unittest.TestCase):
             "negative probability": {"precipitation_probability": -0.001},
             "probability above one": {"precipitation_probability": 1.001},
             "nan probability": {"precipitation_probability": math.nan},
+            "negative precipitation": {"precipitation_mm": -0.01},
+            "nan precipitation": {"precipitation_mm": math.nan},
+            "negative wind": {"wind_speed_10m_kmh": -0.01},
+            "infinite wind": {"wind_speed_10m_kmh": math.inf},
         }
         base = {
             "interval_start": START,
             "interval_end": START + timedelta(hours=1),
             "temperature_2m_c": 27.5,
             "precipitation_probability": 0.4,
+            "precipitation_mm": 0.5,
+            "wind_speed_10m_kmh": 12.0,
         }
         for label, changes in invalid.items():
             with self.subTest(label=label), self.assertRaises(ValueError):
@@ -265,12 +284,17 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
             query,
             {
                 "end_hour": ["2026-08-18T15:00"],
-                "hourly": ["temperature_2m,precipitation_probability"],
+                "hourly": [
+                    "temperature_2m,precipitation,"
+                    "precipitation_probability,wind_speed_10m"
+                ],
                 "latitude": ["6.524400"],
                 "longitude": ["3.379200"],
+                "precipitation_unit": ["mm"],
                 "start_hour": ["2026-08-17T15:00"],
                 "temperature_unit": ["celsius"],
                 "timezone": ["UTC"],
+                "wind_speed_unit": ["kmh"],
             },
         )
 
@@ -290,7 +314,9 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         accepted["hourly_units"] = {
             "time": "iso8601",
             "temperature_2m": "\N{DEGREE SIGN}C",
+            "precipitation": "mm",
             "precipitation_probability": "%",
+            "wind_speed_10m": "km/h",
         }
         self.assertEqual(
             len(self.adapter.parse(accepted, request, issued_at=ISSUED_AT).hours),
@@ -310,6 +336,16 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
                 {"hourly_units": {"precipitation_probability": "fraction"}},
                 "must use percent units",
             ),
+            (
+                "non-mm precipitation",
+                {"hourly_units": {"precipitation": "inch"}},
+                "must use millimetres",
+            ),
+            (
+                "non-kmh wind",
+                {"hourly_units": {"wind_speed_10m": "m/s"}},
+                "kilometres per hour",
+            ),
         )
         for label, changes, message in invalid:
             payload = _payload(request)
@@ -326,6 +362,8 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         payload["hourly"]["temperature_2m"][0] = 17.25
         payload["hourly"]["temperature_2m"][23] = 34.75
         payload["hourly"]["precipitation_probability"][8] = 91
+        payload["hourly"]["precipitation"][8] = 7.25
+        payload["hourly"]["wind_speed_10m"][7] = 32.5
 
         forecast = self.adapter.parse(
             payload,
@@ -342,6 +380,8 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         self.assertEqual(forecast.minimum_hourly_temperature_c, 17.25)
         self.assertEqual(forecast.maximum_hourly_temperature_c, 34.75)
         self.assertAlmostEqual(forecast.probability, 0.91)
+        self.assertEqual(forecast.hours[7].precipitation_mm, 7.25)
+        self.assertEqual(forecast.hours[7].wind_speed_10m_kmh, 32.5)
         self.assertEqual(
             forecast.peak_precipitation_hour.interval_start,
             request.horizon_start + timedelta(hours=7),
@@ -365,7 +405,13 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
     def test_seven_day_response_requires_the_final_precipitation_endpoint(self):
         request = _request(hours=MAX_FORECAST_WINDOW_HOURS, event_id="window-168")
         payload = _payload(request)
-        for field in ("time", "temperature_2m", "precipitation_probability"):
+        for field in (
+            "time",
+            "temperature_2m",
+            "precipitation",
+            "precipitation_probability",
+            "wind_speed_10m",
+        ):
             payload["hourly"][field].pop()
 
         with self.assertRaisesRegex(AdapterError, "precipitation coverage"):
@@ -389,7 +435,13 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
     def test_duplicate_required_timestamp_is_rejected(self):
         request = _request(hours=2)
         payload = _payload(request)
-        for field_name in ("time", "temperature_2m", "precipitation_probability"):
+        for field_name in (
+            "time",
+            "temperature_2m",
+            "precipitation",
+            "precipitation_probability",
+            "wind_speed_10m",
+        ):
             payload["hourly"][field_name].insert(2, payload["hourly"][field_name][1])
 
         with self.assertRaisesRegex(AdapterError, "duplicate hourly timestamps"):
@@ -407,6 +459,12 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         payload["hourly"]["precipitation_probability"] = [math.nan] + payload[
             "hourly"
         ]["precipitation_probability"] + [math.inf]
+        payload["hourly"]["precipitation"] = [math.nan] + payload["hourly"][
+            "precipitation"
+        ] + [math.inf]
+        payload["hourly"]["wind_speed_10m"] = [math.nan] + payload["hourly"][
+            "wind_speed_10m"
+        ] + [math.inf]
 
         forecast = self.adapter.parse(payload, request, issued_at=ISSUED_AT)
 
@@ -422,7 +480,9 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         for field_name, value in (
             ("time", "2026-08-17T14:00"),
             ("temperature_2m", None),
+            ("precipitation", math.nan),
             ("precipitation_probability", math.nan),
+            ("wind_speed_10m", math.nan),
         ):
             payload["hourly"][field_name][0:0] = [value, value]
 
@@ -433,11 +493,13 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         request = _request(hours=2)
         cases = {
             "required temperature": ("temperature_2m", 0, math.nan),
-            "required precipitation": (
+            "required precipitation amount": ("precipitation", 2, math.inf),
+            "required precipitation probability": (
                 "precipitation_probability",
                 2,
                 math.inf,
             ),
+            "required wind": ("wind_speed_10m", 0, math.nan),
         }
         for label, (field_name, index, value) in cases.items():
             payload = _payload(request)
@@ -451,12 +513,19 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
         request = _request(hours=2)
         cases = {
             "required temperature": ("temperature_2m", 0, None, "temperature_2m"),
-            "required precipitation": (
+            "required precipitation amount": (
+                "precipitation",
+                1,
+                True,
+                "precipitation",
+            ),
+            "required precipitation probability": (
                 "precipitation_probability",
                 1,
                 True,
                 "precipitation_probability",
             ),
+            "required wind": ("wind_speed_10m", 0, None, "wind_speed_10m"),
         }
         for label, (field_name, index, value, message) in cases.items():
             payload = _payload(request)
@@ -474,6 +543,20 @@ class OpenMeteoWindowAdapterTests(unittest.TestCase):
             payload["hourly"]["precipitation_probability"][1] = value
             with self.subTest(value=value), self.assertRaisesRegex(
                 AdapterError, r"outside \[0, 100\]"
+            ):
+                self.adapter.parse(payload, request, issued_at=ISSUED_AT)
+
+    def test_required_precipitation_and_wind_must_be_non_negative(self):
+        request = _request(hours=2)
+        for field_name, index, message in (
+            ("precipitation", 1, "negative precipitation"),
+            ("wind_speed_10m", 0, "negative wind"),
+        ):
+            payload = _payload(request)
+            payload["hourly"][field_name][index] = -0.01
+            with self.subTest(field=field_name), self.assertRaisesRegex(
+                AdapterError,
+                message,
             ):
                 self.adapter.parse(payload, request, issued_at=ISSUED_AT)
 
@@ -509,7 +592,37 @@ class ForecastWindowRendererTests(unittest.TestCase):
         self.assertIn("maximum hourly temperature is 32 C", response["content"])
         self.assertIn("87.65%", response["content"])
         self.assertIn("from 16:00 to 17:00 UTC", response["content"])
+        self.assertIn(
+            "UTC time | 2t temperature C | precip mm | precipitation probability %",
+            response["content"],
+        )
+        self.assertIn("2026-08-17T16:00Z | 23.44 | 0.1 | 87.65 | 8.25", response["content"])
         self.assertNotIn("whole-window probability", response["content"].lower())
+        self.assertEqual(response["response_version"], WINDOW_RESPONSE_VERSION)
+        self.assertEqual(
+            response["hourly"],
+            {
+                "time": [
+                    "2026-08-17T15:00Z",
+                    "2026-08-17T16:00Z",
+                    "2026-08-17T17:00Z",
+                ],
+                "2t": [28.12, 23.44, 32.0],
+                "precip": [0.0, 0.1, 0.2],
+                "precipitation_probability": [0.12, 0.8765, 0.33],
+                "wind_speed_10m": [8.0, 8.25, 8.5],
+            },
+        )
+        self.assertEqual(
+            response["hourly_units"],
+            {
+                "time": "iso8601_utc",
+                "2t": "C",
+                "precip": "mm",
+                "precipitation_probability": "fraction",
+                "wind_speed_10m": "km/h",
+            },
+        )
 
     def test_twenty_four_hour_content_states_both_window_dates(self):
         request = _request()
@@ -525,7 +638,7 @@ class ForecastWindowRendererTests(unittest.TestCase):
         self.assertNotIn("\n", encoded)
         self.assertNotIn(": ", encoded)
 
-    def test_seven_day_public_json_keeps_the_registered_compact_response_shape(self):
+    def test_seven_day_public_json_includes_every_hour_within_the_byte_contract(self):
         request = _request(hours=MAX_FORECAST_WINDOW_HOURS, event_id="render-window-168")
         forecast = _forecast(request)
         encoded = public_window_response_json(request, forecast)
@@ -535,15 +648,38 @@ class ForecastWindowRendererTests(unittest.TestCase):
             set(response),
             {
                 "content",
+                "hourly",
+                "hourly_units",
                 "max_hourly_precipitation_interval",
                 "max_hourly_precipitation_probability",
                 "maximum_hourly_temperature_c",
                 "minimum_hourly_temperature_c",
                 "probability",
                 "probability_semantics",
+                "response_version",
             },
         )
-        self.assertLess(len(encoded.encode("utf-8")), 4 * 1024)
+        self.assertEqual(len(response["hourly"]["time"]), MAX_FORECAST_WINDOW_HOURS)
+        for field in ("2t", "precip", "precipitation_probability", "wind_speed_10m"):
+            self.assertEqual(len(response["hourly"][field]), MAX_FORECAST_WINDOW_HOURS)
+        self.assertLessEqual(
+            len(encoded.encode("utf-8")),
+            MAX_PUBLIC_WINDOW_RESPONSE_BYTES,
+        )
+
+    def test_new_renderer_refuses_legacy_hours_instead_of_inventing_zeroes(self):
+        request = _request(hours=1, event_id="legacy-render")
+        legacy_hour = HourlyWindowForecast(
+            interval_start=request.horizon_start,
+            interval_end=request.horizon_end,
+            temperature_2m_c=27.5,
+            precipitation_probability=0.4,
+        )
+        forecast = _forecast(request, hours=(legacy_hour,))
+
+        self.assertFalse(forecast.has_complete_hourly_weather)
+        with self.assertRaisesRegex(ValueError, "complete hourly"):
+            public_window_response(request, forecast)
 
     def test_renderer_rejects_mismatched_event_ids(self):
         other_request = _request(hours=3, event_id="different")

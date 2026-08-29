@@ -35,6 +35,9 @@ REREGISTRATION_CANDIDATE = (
 WINDOW_REREGISTRATION_CANDIDATE = (
     ROOT / "miners" / "candidates" / "oathcast-weather-window-v3.yaml"
 )
+HOURLY_REREGISTRATION_CANDIDATE = (
+    ROOT / "miners" / "candidates" / "oathcast-weather-hourly-v4.yaml"
+)
 
 
 def _without_dispatch_guidance(value):
@@ -351,6 +354,56 @@ on_chain:
         )
         self.assertEqual(artifact["registration"]["miner_slug"], "oathcast-weather")
         self.assertEqual(artifact["registration"]["miner_id"], "64173")
+        self.assertFalse(artifact["registration_call"]["ready_to_encode"])
+        self.assertFalse(artifact["official_registration"]["submitted"])
+
+    def test_hourly_reregistration_candidate_matches_the_public_response(self):
+        result = validate_draft(HOURLY_REREGISTRATION_CANDIDATE)
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertTrue(result["registration_candidate"])
+
+        source = yaml.safe_load(
+            HOURLY_REREGISTRATION_CANDIDATE.read_text(encoding="utf-8")
+        )
+        self.assertEqual(source["output_schema"]["properties"]["hourly"]["required"], [
+            "time",
+            "2t",
+            "precip",
+            "precipitation_probability",
+            "wind_speed_10m",
+        ])
+        self.assertEqual(
+            source["output_schema"]["properties"]["response_version"]["enum"],
+            ["weather_window_v2"],
+        )
+        self.assertEqual(
+            source["output_schema"]["required"],
+            ["content", "probability"],
+        )
+        self.assertIn(
+            "frozen one-hour point summary",
+            source["description"],
+        )
+
+        aggregate = validate_paths(
+            [
+                CANONICAL_MINER,
+                REREGISTRATION_CANDIDATE,
+                WINDOW_REREGISTRATION_CANDIDATE,
+                HOURLY_REREGISTRATION_CANDIDATE,
+            ],
+            CANONICAL_MINER,
+        )
+        self.assertTrue(aggregate["valid"], aggregate["errors"])
+
+    def test_registration_draft_accepts_the_hourly_candidate(self):
+        artifact = build_registration_draft(HOURLY_REREGISTRATION_CANDIDATE)
+
+        self.assertEqual(
+            artifact["source"]["path"],
+            "miners/candidates/oathcast-weather-hourly-v4.yaml",
+        )
+        self.assertEqual(artifact["registration"]["miner_slug"], "oathcast-weather")
         self.assertFalse(artifact["registration_call"]["ready_to_encode"])
         self.assertFalse(artifact["official_registration"]["submitted"])
 
