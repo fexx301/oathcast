@@ -68,14 +68,14 @@
     "draft_path": "artifacts/registration-drafts/oathcast-weather-window-v3-update-preflight-2026-08-29.json",
     "operation": "update",
     "old_registration_id": 245,
-    "yaml_uri": "ipfs://QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav",
+    "yaml_uri": "https://gateway.pinata.cloud/ipfs/QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav",
     "yaml_hash_bytes32": "0xf7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164",
     "fee_address": "0x6d4192bca39641f9aa22db17eff991d6add005de",
     "min_price_micro_usdc": 10000,
     "supported_intents": [
       "WEATHER_FORECAST"
     ],
-    "eth_call_block": 46123882,
+    "eth_call_block": 46124379,
     "simulation_returned_registration_id": 307,
     "simulation_return_value_reserved": false,
     "encoded_calldata": null,

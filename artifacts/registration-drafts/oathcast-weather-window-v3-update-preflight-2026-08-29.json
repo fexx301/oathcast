@@ -6,7 +6,7 @@
     "paid_telegraph_traffic": false,
     "telegraph_registered": false
   },
-  "generated_at": "2026-08-29T15:09:46.274791Z",
+  "generated_at": "2026-08-29T15:24:39.866903Z",
   "official_registration": {
     "endpoint_sandbox_status": "not_run",
     "pending": [
@@ -39,7 +39,7 @@
       "WEATHER_FORECAST"
     ],
     "yaml_sha256": "f7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164",
-    "yaml_uri": "ipfs://QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav"
+    "yaml_uri": "https://gateway.pinata.cloud/ipfs/QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav"
   },
   "registration_call": {
     "arguments": {
@@ -50,7 +50,7 @@
         "WEATHER_FORECAST"
       ],
       "yaml_hash_bytes32": "0xf7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164",
-      "yaml_uri": "ipfs://QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav"
+      "yaml_uri": "https://gateway.pinata.cloud/ipfs/QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav"
     },
     "chain_id": 84532,
     "contract": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
@@ -59,7 +59,7 @@
     "ready_to_encode": true,
     "signature": "updateMiner(uint256,string,bytes32,address,uint256,string[])",
     "simulation": {
-      "block": 46123882,
+      "block": 46124379,
       "note": "The simulated return value is not reserved and may change before submission.",
       "returned_registration_id": 307
     }
