@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE_SEPOLIA_CHAIN_ID = 84532
 MINER_REGISTRY_DIAMOND = "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8"
 REGISTER_MINER_SIGNATURE = "registerMiner(string,bytes32,address,uint256,string[])"
+UPDATE_MINER_SIGNATURE = "updateMiner(uint256,string,bytes32,address,uint256,string[])"
 CANONICAL_INTENTS = ("WEATHER_FORECAST",)
 EVM_ADDRESS_PATTERN = re.compile(r"^0x[0-9a-fA-F]{40}$")
 ZERO_EVM_ADDRESS = "0x" + ("0" * 40)
@@ -102,6 +103,9 @@ def build_registration_draft(
     min_price_micro_usdc: int = MINIMUM_PRICE_MICRO_USDC,
     yaml_uri: str | None = None,
     fee_address: str | None = None,
+    update_registration_id: int | None = None,
+    simulation_block: int | None = None,
+    simulation_returned_id: int | None = None,
 ) -> dict[str, object]:
     yaml_path = yaml_path.resolve()
     if not yaml_path.exists():
@@ -135,6 +139,19 @@ def build_registration_draft(
         raise ValueError("min_price_micro_usdc must be an integer at least 10000")
     yaml_uri = _optional_yaml_uri(yaml_uri)
     fee_address = _optional_fee_address(fee_address)
+    for field_name, value in (
+        ("update_registration_id", update_registration_id),
+        ("simulation_block", simulation_block),
+        ("simulation_returned_id", simulation_returned_id),
+    ):
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+        ):
+            raise ValueError(f"{field_name} must be a positive integer")
+    if update_registration_id is None and (
+        simulation_block is not None or simulation_returned_id is not None
+    ):
+        raise ValueError("simulation evidence requires update_registration_id")
 
     declaration = MinerRegistrationDeclaration.from_yaml(
         yaml_path,
@@ -148,19 +165,45 @@ def build_registration_draft(
         confirmation_status="draft",
         schema_profile="telegraph_live_2026-08-13",
     )
+    operation = "update" if update_registration_id is not None else "register"
     pending = [
         "consult the separate registration-readiness manifest for external portal/IPFS observations; this offline generator does not perform them",
-        "live portal/node recheck that the candidate slug remains available; the numeric routing id is not the on-chain registrationId",
     ]
+    if update_registration_id is None:
+        pending.append(
+            "live portal/node recheck that the candidate slug remains available; the numeric routing id is not the on-chain registrationId"
+        )
+    else:
+        pending.append(
+            "recheck that the existing registration is active and still owned by the signing wallet immediately before any future signature"
+        )
     if yaml_uri is None:
         pending.append("pin the exact final YAML bytes to stable IPFS or HTTPS")
     if fee_address is None:
         pending.append("provide and verify a nonzero EVM fee address")
-    pending.append("fund the registering wallet with a small amount of Base Sepolia ETH for gas")
+    pending.append("fund the signing wallet with a small amount of Base Sepolia ETH for gas")
     pending.append("obtain action-time confirmation before wallet signature or submission")
+    call_arguments: dict[str, object] = {
+        "yaml_uri": yaml_uri,
+        "yaml_hash_bytes32": f"0x{declaration.yaml_sha256}",
+        "fee_address": fee_address,
+        "min_price_micro_usdc": min_price_micro_usdc,
+        "supported_intents": list(intents),
+    }
+    if update_registration_id is not None:
+        call_arguments = {
+            "old_registration_id": update_registration_id,
+            **call_arguments,
+        }
+    ready_to_encode = (
+        operation == "update"
+        and update_registration_id is not None
+        and yaml_uri is not None
+        and fee_address is not None
+    )
     return {
         "artifact_type": "oathcast_miner_registration_dry_run",
-        "artifact_version": 2,
+        "artifact_version": 3 if operation == "update" else 2,
         "generated_at": datetime.now(tz=timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": {
             "path": str(yaml_path.relative_to(ROOT)),
@@ -175,18 +218,26 @@ def build_registration_draft(
         },
         "registration": declaration.to_dict(),
         "registration_call": {
+            "operation": operation,
             "chain_id": BASE_SEPOLIA_CHAIN_ID,
             "contract": MINER_REGISTRY_DIAMOND,
-            "signature": REGISTER_MINER_SIGNATURE,
-            "arguments": {
-                "yaml_uri": yaml_uri,
-                "yaml_hash_bytes32": f"0x{declaration.yaml_sha256}",
-                "fee_address": fee_address,
-                "min_price_micro_usdc": min_price_micro_usdc,
-                "supported_intents": list(intents),
-            },
-            "ready_to_encode": False,
+            "signature": (
+                UPDATE_MINER_SIGNATURE
+                if operation == "update"
+                else REGISTER_MINER_SIGNATURE
+            ),
+            "arguments": call_arguments,
+            "ready_to_encode": ready_to_encode,
             "encoded_calldata": None,
+            "simulation": {
+                "block": simulation_block,
+                "returned_registration_id": simulation_returned_id,
+                "note": (
+                    "The simulated return value is not reserved and may change before submission."
+                    if simulation_returned_id is not None
+                    else None
+                ),
+            },
         },
         "registration_input_sources": {
             "candidate_id": "validated Miner YAML id",
@@ -203,6 +254,11 @@ def build_registration_draft(
                 else "operator/portal input; absent from this generated draft"
             ),
             "min_price_micro_usdc": "explicit generator input; protocol floor defaults to 10000",
+            "old_registration_id": (
+                "explicit --update-registration-id operator input"
+                if update_registration_id is not None
+                else None
+            ),
         },
         "official_registration": {
             "status_scope": "local_generator_only",
@@ -256,12 +312,30 @@ def main() -> None:
         "--fee-address",
         help="optional nonzero EVM fee address; omit for an unsigned incomplete draft",
     )
+    parser.add_argument(
+        "--update-registration-id",
+        type=int,
+        help="prepare updateMiner for this active on-chain registration instead of registerMiner",
+    )
+    parser.add_argument(
+        "--simulation-block",
+        type=int,
+        help="optional block used for the read-only updateMiner eth_call",
+    )
+    parser.add_argument(
+        "--simulation-returned-id",
+        type=int,
+        help="optional registration ID returned by the read-only updateMiner eth_call",
+    )
     args = parser.parse_args()
     artifact = build_registration_draft(
         args.yaml,
         min_price_micro_usdc=args.min_price_micro_usdc,
         yaml_uri=args.yaml_uri,
         fee_address=args.fee_address,
+        update_registration_id=args.update_registration_id,
+        simulation_block=args.simulation_block,
+        simulation_returned_id=args.simulation_returned_id,
     )
     atomic_write_text(
         args.output,

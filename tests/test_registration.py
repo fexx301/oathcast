@@ -15,6 +15,7 @@ from scripts.create_registration_draft import (
     BASE_SEPOLIA_CHAIN_ID,
     MINER_REGISTRY_DIAMOND,
     REGISTER_MINER_SIGNATURE,
+    UPDATE_MINER_SIGNATURE,
     build_registration_draft,
 )
 from scripts.read_leaderboard import DECLARED_INTENTS
@@ -274,6 +275,27 @@ on_chain:
             "separate registration-readiness manifest",
             artifact["official_registration"]["status_scope_note"],
         )
+
+    def test_update_draft_uses_update_miner_and_remains_unsigned(self):
+        artifact = build_registration_draft(
+            WINDOW_REREGISTRATION_CANDIDATE,
+            yaml_uri="ipfs://QmCandidate",
+            fee_address="0x6d4192bca39641f9aa22db17eff991d6add005de",
+            update_registration_id=245,
+            simulation_block=46_123_882,
+            simulation_returned_id=307,
+        )
+        call = artifact["registration_call"]
+        self.assertEqual(artifact["artifact_version"], 3)
+        self.assertEqual(call["operation"], "update")
+        self.assertEqual(call["signature"], UPDATE_MINER_SIGNATURE)
+        self.assertEqual(call["arguments"]["old_registration_id"], 245)
+        self.assertTrue(call["ready_to_encode"])
+        self.assertIsNone(call["encoded_calldata"])
+        self.assertEqual(call["simulation"]["block"], 46_123_882)
+        self.assertEqual(call["simulation"]["returned_registration_id"], 307)
+        self.assertFalse(artifact["official_registration"]["submitted"])
+        self.assertIsNone(artifact["official_registration"]["transaction_hash"])
 
     def test_local_validator_pending_text_distinguishes_slug_from_routing_id(self):
         result = validate_draft(CANONICAL_MINER, canonical=True)

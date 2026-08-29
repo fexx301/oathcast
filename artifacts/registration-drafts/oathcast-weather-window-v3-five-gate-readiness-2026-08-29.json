@@ -1,0 +1,86 @@
+{
+  "artifact_type": "oathcast_miner_update_five_gate_readiness",
+  "artifact_version": 1,
+  "generated_at": "2026-08-29T15:12:43Z",
+  "decision": "ready_for_separately_authorized_wallet_signature",
+  "submitted": false,
+  "signed": false,
+  "transaction_hash": null,
+  "gate_1_active_registration_and_update_path": {
+    "status": "passed",
+    "network": "Base Sepolia",
+    "chain_id": 84532,
+    "contract": "0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8",
+    "routing_id": 64173,
+    "registration_id": 245,
+    "slug": "oathcast-weather",
+    "owner": "0x6d4192bca39641f9aa22db17eff991d6add005de",
+    "activation_status": "active",
+    "current_yaml_uri": "https://gateway.pinata.cloud/ipfs/QmRSBA6ig48TVq15UWEwdiYq8HYr6woWRPam961j1q1oMu",
+    "current_yaml_sha256": "0f66aa0679328afb0f53a0d83b846d2e8407ea062189814e455136121ac90d18",
+    "supported_intents": [
+      "WEATHER_FORECAST"
+    ],
+    "fee_address": "0x6d4192bca39641f9aa22db17eff991d6add005de",
+    "min_price_micro_usdc": 10000,
+    "contract_method": "updateMiner(uint256,string,bytes32,address,uint256,string[])",
+    "deregistration_required": false
+  },
+  "gate_2_exact_candidate_pin": {
+    "status": "passed",
+    "source_path": "miners/candidates/oathcast-weather-window-v3.yaml",
+    "utf8": true,
+    "json_round_trip_exact": true,
+    "byte_count": 7099,
+    "sha256": "f7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164",
+    "cid": "QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav",
+    "yaml_uri": "ipfs://QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav",
+    "upload_route": "https://integrate.telegraphprotocol.com/api/upload"
+  },
+  "gate_3_independent_cid_retrieval": {
+    "status": "passed",
+    "gateway": "https://eu.orbitor.dev/ipfs/QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav",
+    "http_status": 200,
+    "content_encoding": "identity",
+    "byte_count": 7099,
+    "sha256": "f7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164",
+    "byte_for_byte_equal_to_source": true
+  },
+  "gate_4_authenticated_production_forecast": {
+    "status": "passed",
+    "service_url": "https://oathcastcourt.duckdns.org",
+    "request_path": "/predict",
+    "http_status": 200,
+    "start": "2026-08-29T17:00:00Z",
+    "end": "2026-09-05T17:00:00Z",
+    "duration_hours": 168,
+    "cutoff_omitted": true,
+    "content_nonempty": true,
+    "content_sha256": "cccc5ec5626433de442396d2fe5a7b272ae5fcd1522fb28132774e3fe15b3ef0",
+    "probability": 1.0,
+    "probability_valid": true,
+    "receipt_header_present": true,
+    "request_id_header_present": true,
+    "secret_recorded": false
+  },
+  "gate_5_unsigned_update_draft": {
+    "status": "passed",
+    "draft_path": "artifacts/registration-drafts/oathcast-weather-window-v3-update-preflight-2026-08-29.json",
+    "operation": "update",
+    "old_registration_id": 245,
+    "yaml_uri": "ipfs://QmbAbBdnb4DM8Gg7b42kEgCcaCEskKAafCa9STumLTxtav",
+    "yaml_hash_bytes32": "0xf7831c43855b074bbae612698ddfe1e0040df2351e7d83d2c7966f03f5562164",
+    "fee_address": "0x6d4192bca39641f9aa22db17eff991d6add005de",
+    "min_price_micro_usdc": 10000,
+    "supported_intents": [
+      "WEATHER_FORECAST"
+    ],
+    "eth_call_block": 46123882,
+    "simulation_returned_registration_id": 307,
+    "simulation_return_value_reserved": false,
+    "encoded_calldata": null,
+    "signature": null,
+    "transaction_hash": null
+  },
+  "next_action": "Recheck owner and active registration state, repeat eth_call, then request separate authorization before any wallet signature or submission."
+}
