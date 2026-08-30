@@ -372,6 +372,17 @@ WASM scorer, wallet, and Caddy configuration were unchanged.
   public/post-restart smokes, canonical and exact-wire replay records, hourly
   matrices, schema replay, rollback rehearsal, credential fingerprints,
   receipt-backup metadata, and runtime evidence.
+- On 2026-08-30, host-side bearer overlap added a new 256-bit key to the
+  secondary allow-list while preserving both existing credentials. The v18
+  container was recreated with the pre-rotation redacted configuration hash;
+  health/readiness remained `200`, unauthenticated `/predict` remained `401`,
+  and all three credentials reached authenticated validation through both
+  localhost and public HTTPS. Fingerprint-only evidence is retained at
+  `artifacts/release-evidence/2026-08-30-hourly-v18-credential-overlap.json`.
+  The previous credentials remain accepted temporarily because Telegraph's
+  external credential cutover is not yet verified. The local GitHub CLI session
+  is invalid, so the Actions secret was not changed and no retirement is
+  claimed.
 
 The checked-in scheduled canary is now pinned to the v18 runtime-evidence file.
 This local commit does not push the accumulated branch; GitHub's remote schedule
