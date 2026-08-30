@@ -1,0 +1,55 @@
+{
+  "release_id": "2026-08-30-hourly-v18",
+  "captured_at_utc": "2026-08-30T12:22:01Z",
+  "operation": "bearer_credential_final_cutover",
+  "fingerprints_only": true,
+  "telegraph": {
+    "miner_slug": "oathcast-weather",
+    "api_key_install_confirmed": true,
+    "effect": "next_call"
+  },
+  "github_actions": {
+    "secret_name": "OATHCAST_MINER_API_KEY",
+    "secret_updated": true,
+    "workflow_head_sha": "90def2a65318627d8c541041e3b8f80decc89182",
+    "post_retirement_canary_run_id": 33311276317,
+    "post_retirement_canary_conclusion": "success"
+  },
+  "runtime_flag_repair": {
+    "initial_temperature_window_enabled": false,
+    "final_temperature_window_enabled": true,
+    "post_fix_canary_run_id": 33310663289,
+    "post_fix_canary_conclusion": "success"
+  },
+  "production": {
+    "container": "oathcast",
+    "image": "oathcast:2026-08-30-hourly-v18",
+    "image_digest": "sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859",
+    "health": "healthy",
+    "temperature_window_enabled": true,
+    "new_credential_status": 200,
+    "retired_primary_status": 401,
+    "retired_overlap_status": 401,
+    "accepted_credential_count": 1,
+    "temporary_overlap_containers_removed": true,
+    "rollback_target": "oathcast-v17-rollback-20260830"
+  },
+  "credentials": [
+    {
+      "slot": "new",
+      "length": 64,
+      "sha256": "6c36972ecf01b06ef03c4af473a871fb4d286630f9f7a9b67cafc3666fde586f"
+    },
+    {
+      "slot": "retired_primary",
+      "length": 43,
+      "sha256": "85c92c7f89a080c42aae73a75fd4e3817cc3b07ae1f51b8943368476fa8a150d"
+    },
+    {
+      "slot": "retired_overlap",
+      "length": 64,
+      "sha256": "03597e26dce36bc3044302cefa542fb57ee9fdd9923ce4275b426398171bb3d7"
+    }
+  ],
+  "raw_credentials_written": false
+}

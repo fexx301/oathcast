@@ -371,7 +371,8 @@ WASM scorer, wallet, and Caddy configuration were unchanged.
   `artifacts/release-evidence/2026-08-30-hourly-v18-*`, including the manifest,
   public/post-restart smokes, canonical and exact-wire replay records, hourly
   matrices, schema replay, rollback rehearsal, credential fingerprints,
-  receipt-backup metadata, and runtime evidence.
+  receipt-backup metadata, runtime evidence, and the final credential-cutover
+  record.
 - On 2026-08-30, host-side bearer overlap added a new 256-bit key to the
   secondary allow-list while preserving both existing credentials. The v18
   container was recreated with the pre-rotation redacted configuration hash;
@@ -379,15 +380,18 @@ WASM scorer, wallet, and Caddy configuration were unchanged.
   and all three credentials reached authenticated validation through both
   localhost and public HTTPS. Fingerprint-only evidence is retained at
   `artifacts/release-evidence/2026-08-30-hourly-v18-credential-overlap.json`.
-  The previous credentials remain accepted temporarily because Telegraph's
-  external credential cutover is not yet verified. The local GitHub CLI session
-  is invalid, so the Actions secret was not changed and no retirement is
-  claimed.
+  Telegraph then installed the new key for `oathcast-weather`, the GitHub
+  Actions secret was updated, and the production runtime was corrected to set
+  `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. The final cutover recreated v18,
+  verified the new key with HTTP `200`, verified both retired credentials with
+  HTTP `401`, removed the temporary overlap containers, and passed the
+  post-retirement public canary. Final fingerprint-only evidence is retained at
+  `artifacts/release-evidence/2026-08-30-hourly-v18-final-cutover.json`.
 
 The checked-in scheduled canary is now pinned to the v18 runtime-evidence file.
-This local commit does not push the accumulated branch; GitHub's remote schedule
-must not be described as v18-pinned until a separately authorized push is made
-and the workflow is observed running successfully.
+The accumulated branch was pushed to `main` at commit
+`90def2a65318627d8c541041e3b8f80decc89182`, and the post-push canary run
+`33311276317` completed successfully.
 
 ## Release 2026-08-23 - seven-day timestamp-normalizing window release (HISTORICAL; SUPERSEDED BY V18)
 
