@@ -1,0 +1,93 @@
+{
+  "checks": [
+    {
+      "body_bytes": 172,
+      "keys": [
+        "content",
+        "probability"
+      ],
+      "name": "legacy_one_hour",
+      "ok": true,
+      "receipt_sha256": "6a588ef27afdec86311388a81276c720a96bedd278223cfc3c2de6d9f9c02d71",
+      "status": 200
+    },
+    {
+      "body_bytes": 1132,
+      "body_sha256": "f94452d5af5805667ab2937b97b154d75b3fa3bec877987a710ec35194c1f45c",
+      "contiguous": true,
+      "event_id_sha256": "1f04e9cb62735ce682fdbe5a9f924c33d0855d66800a7c238c6e7a2bcd9a8637",
+      "hourly_keys": [
+        "2t",
+        "precip",
+        "precipitation_probability",
+        "time",
+        "wind_speed_10m"
+      ],
+      "hours": 2,
+      "name": "window_2_hour",
+      "ok": true,
+      "receipt_sha256": "4d68f910779a0bd52774036d20db3a7686ac0872766a2a05ce00da524d69ed2a",
+      "response_version": "weather_window_v2",
+      "status": 200
+    },
+    {
+      "body_bytes": 2852,
+      "body_sha256": "b31491c49b7438732af64909a6f99b97b9fd8c7d5ce159cdb5d21e488a6e69c2",
+      "contiguous": true,
+      "event_id_sha256": "a2fd3a7147223effae94afa70bcaab169e4a50b915257b85a2d77ad392e94146",
+      "hourly_keys": [
+        "2t",
+        "precip",
+        "precipitation_probability",
+        "time",
+        "wind_speed_10m"
+      ],
+      "hours": 24,
+      "name": "window_24_hour",
+      "ok": true,
+      "receipt_sha256": "b142f19dff1987bfc3bfea5bda7c34f2aa6d0922f66ed0b7b8ac73fd73bf1146",
+      "response_version": "weather_window_v2",
+      "status": 200
+    },
+    {
+      "body_bytes": 14417,
+      "body_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493",
+      "contiguous": true,
+      "event_id_sha256": "c9d29bfb9941265a9948ff853ced64e05786f2698f012c1c15f650ea146607a6",
+      "hourly_keys": [
+        "2t",
+        "precip",
+        "precipitation_probability",
+        "time",
+        "wind_speed_10m"
+      ],
+      "hours": 168,
+      "name": "window_168_hour",
+      "ok": true,
+      "receipt_sha256": "c0dbdd8e831581ad3f377bef945f67b12826133fc8d5120cdb8469f680f4e5a8",
+      "response_version": "weather_window_v2",
+      "status": 200
+    },
+    {
+      "error": "forecast window duration must be between 1 and 168 hours",
+      "name": "window_169_hour_rejected",
+      "ok": true,
+      "status": 400
+    },
+    {
+      "body_bytes": 1674,
+      "hours": 24,
+      "keys": [
+        "content",
+        "hourly",
+        "hourly_units",
+        "reference_time"
+      ],
+      "name": "legacy_temperature_24_hour",
+      "ok": true,
+      "receipt_sha256": "aa455e2c616088971775b355ecfbce35758ae563d50596c301fa2e38fe28d2ac",
+      "status": 200
+    }
+  ],
+  "ok": true
+}

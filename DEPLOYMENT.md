@@ -1,7 +1,7 @@
 # Deployment and payment boundary
 
 The repository packages one public HTTPS OathCast Miner. The
-`2026-08-23-window-v17` release is running in Docker on AWS EC2
+`2026-08-30-hourly-v18` release is running in Docker on AWS EC2
 behind private host port 8080, with Caddy terminating HTTPS at
 `https://oathcastcourt.duckdns.org`.
 Set the environment variables from `.env.example`. Registration is complete and
@@ -14,9 +14,9 @@ details are archived under
 
 ## Current deployment status
 
-The deployed Miner is v17; stopped `oathcast-v16-rollback-20260823` is the
-immediate Miner rollback target. Caddy configuration did not change for v17 and
-remains pinned by its retained hash. The v16 and earlier sections below are
+The deployed Miner is v18; stopped `oathcast-v17-rollback-20260830` is the
+immediate Miner rollback target. Caddy configuration did not change for v18 and
+remains pinned by its retained hash. The v17 and earlier sections below are
 historical release records. The public decision UI is deployed separately. Its
 safe public surface is a read-only release/status page plus a client-only
 development fixture. It
@@ -24,12 +24,12 @@ has no Telegraph-backed runner, accepts no live Planning Desk intake, and
 returns 503 for decision requests. Live decisions must not be enabled until the
 authenticated, budgeted payment path has been reviewed and deployed.
 
-V17 has persisted a 168-hour receipt that v16 could not originally parse. If a
-rollback becomes necessary, preserve the current production database unchanged
-and do **not** restore the pre-v17 backup over it. Starting v16 may restore
-short-window availability while leaving that new event temporarily unreplayable;
-retain v17 and the current database until the 168-hour receipt can be served
-again.
+V18 has persisted schema-4 receipts containing complete hourly weather fields
+that v17 cannot replay. If a rollback becomes necessary, preserve the current
+production database unchanged and do **not** restore the pre-v18 backup over it.
+Starting v17 may restore old-contract availability while leaving v18 schema-4
+events temporarily unreplayable; retain v18 and the current database until those
+events can be served again.
 
 UI-only replacements must override the Dockerfile health check, which targets
 the Miner on port 8080. Run the UI on Docker bridge networking, publish only
@@ -129,15 +129,15 @@ Create a source manifest before each deployment:
 
     PYTHONPATH=src python3 scripts/validate_miner_drafts.py
     PYTHONPATH=src python3 scripts/create_release_manifest.py \
-      --release-id 2026-08-23-window-v17 \
+      --release-id 2026-08-30-hourly-v18 \
       --output /tmp/oathcast-release-manifest.json
 
 Build the image with the manifest's `source_sha256` and a unique release ID:
 
     docker build \
-      --build-arg OATHCAST_RELEASE_ID=2026-08-23-window-v17 \
+      --build-arg OATHCAST_RELEASE_ID=2026-08-30-hourly-v18 \
       --build-arg OATHCAST_SOURCE_SHA256=<manifest-source-sha256> \
-      -t oathcast:2026-08-23-window-v17 .
+      -t oathcast:2026-08-30-hourly-v18 .
 
 Run the production container with
 `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`. The Dockerfile and `.env.example`
@@ -154,9 +154,9 @@ After deployment, verify the exact release without printing secrets:
 
     PYTHONPATH=src python3 scripts/smoke_miner.py \
       --base-url https://oathcastcourt.duckdns.org \
-      --expected-release-id 2026-08-23-window-v17 \
-      --expected-source-sha256 9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f \
-      --expected-image-digest sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c \
+      --expected-release-id 2026-08-30-hourly-v18 \
+      --expected-source-sha256 5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b \
+      --expected-image-digest sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859 \
       --require-receipt-write-probe \
       --require-temperature-window
 
@@ -166,8 +166,8 @@ create paid demand. Record its JSON output with the release manifest.
 
 For a cutover, freeze one old-release question and its safe fingerprints before
 replacing the container, then replay that exact question after the new release
-starts. The current v16-to-v17 comparison is retained at
-`artifacts/release-evidence/oathcast-2026-08-23-window-v17-replay.json`.
+starts. The current v17-to-v18 comparison is retained at
+`artifacts/release-evidence/2026-08-30-hourly-v18-replay.json`.
 The earlier v6-to-v7 comparison remains historical evidence at
 `artifacts/release-evidence/oathcast-2026-08-16-route-v7-replay.json`.
 
@@ -227,6 +227,55 @@ it with an older backup merely to start the previous container. Restore Caddy
 only if its retained hash or routing changed. Update canary identity/evidence
 pins only after the real image digest and sanitized release bundle exist.
 
+### v18 candidate gates and credential handling
+
+The v18 release adds complete hourly weather fields to the multi-hour response.
+Its candidate checks are stricter than `scripts/smoke_miner.py`, which only
+asserts the legacy point contract and the additive temperature compatibility
+route. Capture the v17 replay question and fingerprints **before** taking the
+online database backup so that the exact receipt is present in the candidate
+copy. Then run the following gates against a disposable database copy:
+
+1. Confirm the release directory and container/image names do not already exist;
+   reproduce the exact manifest file set and source digest, and record the
+   resolved base-image ID, image ID, labels, disk bytes, and free inodes.
+2. Load only the runtime allow-list from the owner-only host env file:
+   `OATHCAST_MINER_API_KEY`, `OATHCAST_MINER_API_KEYS`, `OATHCAST_REQUIRE_AUTH`,
+   `OATHCAST_ENABLE_TEMPERATURE_WINDOW`, `OATHCAST_TRUSTED_PROXIES`, and the
+   receipt-cap settings. Reject wallet, signer, private-key, and unrelated
+   credential variables. Explicitly override `OATHCAST_RELEASE_ID`,
+   `OATHCAST_SOURCE_SHA256`, and `OATHCAST_IMAGE_DIGEST` for the image under
+   test. Verify configured credentials only by non-secret fingerprints and
+   status codes; never print the values or raw `docker inspect` environment.
+3. Exercise unauthenticated `401`, the legacy one-hour response, exact replay
+   of schema-1, schema-2, and schema-3 receipts, and the unchanged
+   `forecast_hours=24&hourly=2t` response. For the new window contract, require
+   valid structured hourly output at 2, 24, and 168 hours, reject 169 hours,
+   check contiguous timestamps and units, and verify the public response stays
+   below the 64-KiB cap. Persist a schema-4 receipt, restart the candidate,
+   and replay it with no provider call; verify the row count delta and SQLite
+   integrity before and after restart.
+4. After v18 has written a schema-4 receipt, start the pinned v17 image against
+   a separate copy of that candidate database. Require v17 startup and
+   schema-1/2/3 replay to work, and record that a schema-4 event is refused
+   closed rather than silently reinterpreted. Do not use that rehearsal copy
+   for production and never restore an older backup over the live database.
+5. Preserve the stopped v17 container as the immediate rollback target, keep
+   Caddy untouched after checking its exact image and Caddyfile hash, and run
+   the same strict identity, replay, and restart checks after cutover. A
+   rollback restores process availability with the newest database; it does
+   not promise v17 can serve a v18 schema-4 event.
+
+The previously printed secondary bearer is treated as compromised. Because it
+is likely Telegraph's persistent registration credential, do not revoke it or
+replace it unilaterally during this deployment. After v18 stabilizes, coordinate
+an overlap rotation with Telegraph, verify both credentials, retire the exposed
+one, and prove that the retired credential receives `401`. If the private
+transcript or any captured output is accessible to an untrusted party, stop the
+deployment and rotate first. AWS root CLI access is also an operational risk;
+do not make additional AWS mutations with it unless unavoidable, and schedule
+root-key retirement separately.
+
 Live execution remains gated on a dedicated faucet-funded Solana-devnet wallet.
 The unpaid Miner-18 preflight passed on 2026-08-09 and is archived under
 `artifacts/payment-canary/`; it did not read a wallet or create demand.
@@ -257,8 +306,8 @@ The staging host is an Amazon Linux 2023 `t3.micro` in `eu-north-1`
 key pair `oathcast-ec2`. Region matters operationally: the security group,
 the instance, and the key pair are all regional objects, so the console must
 be switched to `eu-north-1` before any of them is visible. The
-`oathcast:2026-08-23-window-v17` image runs as container `oathcast` with restart
-policy `unless-stopped`; stopped container `oathcast-v16-rollback-20260823`
+`oathcast:2026-08-30-hourly-v18` image runs as container `oathcast` with restart
+policy `unless-stopped`; stopped container `oathcast-v17-rollback-20260830`
 preserves the immediate previous release. `/healthz`, `/readyz`, authenticated
 `/predict`, canonical-path parity, the additive 24-hour temperature contract and
 parity, transactional write, and restart/replay smoke tests have passed. The
@@ -272,7 +321,64 @@ DuckDNS currently maps
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-08-23 - seven-day timestamp-normalizing window release (CURRENT)
+## Release 2026-08-30 - complete hourly weather window release (CURRENT)
+
+Release v18 supersedes v17 as the live runtime. It retains v17's registered
+one-hour precipitation behavior, historical receipt replay, and additive
+`forecast_hours=1..24&hourly=2t` temperature contract while replacing the
+multi-hour summary-only response with a complete hourly weather envelope. Each
+2-to-168-hour response now carries temperature, precipitation amount,
+precipitation probability, and 10-metre wind speed for every contiguous UTC
+hour. New multi-hour receipts use schema 4; legacy schema 1, 2, and 3 receipts
+remain replayable byte-for-byte. The registered YAML, Telegraph registration,
+WASM scorer, wallet, and Caddy configuration were unchanged.
+
+- Release ID: `2026-08-30-hourly-v18`
+- Source SHA-256:
+  `5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`
+- Runtime image ID:
+  `sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`
+- Resolved base reference:
+  `docker.io/library/python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217`
+- The exact deploy manifest is 11,860 bytes with file SHA-256
+  `c8a4e0b3920c9df60569e4d19539ebcf4d0356aaf01172680dd7cd4111859464`.
+  The retained local 800,768-byte source archive has SHA-256
+  `fb6bb7314e2b9953a6274548b1ab6a7f596971fbfb446892cbf4378e2d9ef082`;
+  the archive itself is not checked into the repository.
+- Caddy configuration was unchanged; retained Caddy SHA-256:
+  `29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1`.
+- Candidate standard smoke passed 12/12. Both configured credentials returned
+  HTTP 200 in status-only checks, schema 1/2/3 receipts replayed exactly, and
+  the candidate matrix passed the legacy one-hour route, 2/24/168-hour
+  structured responses, 169-hour rejection, and the legacy temperature route.
+- A schema-4 168-hour receipt survived candidate restart with 304 rows and
+  SQLite integrity `ok`; response, receipt, and wire fingerprints were exact
+  before and after restart. The pinned v17 image replayed schema 1/2/3 against
+  a separate copy and refused the schema-4 event with HTTP 409, fail-closed.
+- Production public and post-restart smokes passed 12/12. A v17-to-v18 replay
+  preserved the event, receipt, and public response; an exact public wire
+  replay remained 172 bytes and identical across the v18 restart. Production
+  2/24/168-hour canary requests passed, 169 hours returned HTTP 400, and the
+  legacy 24-hour temperature envelope passed.
+- The online pre-cutover backup has 299 source and 299 backup rows, SQLite
+  integrity `ok`, and SHA-256
+  `22c95bbbf9602bd586294a3ddde18c2ce8c83436d162172dfcf87b89fa33d279`.
+  The live store had 305 rows with integrity `ok` after canary traffic.
+- Stopped `oathcast-v17-rollback-20260830` is the immediate rollback target.
+  The disposable v18 candidate and v17 rehearsal containers were stopped after
+  evidence capture and retained in the release directory.
+- Release evidence is retained under
+  `artifacts/release-evidence/2026-08-30-hourly-v18-*`, including the manifest,
+  public/post-restart smokes, canonical and exact-wire replay records, hourly
+  matrices, schema replay, rollback rehearsal, credential fingerprints,
+  receipt-backup metadata, and runtime evidence.
+
+The checked-in scheduled canary is now pinned to the v18 runtime-evidence file.
+This local commit does not push the accumulated branch; GitHub's remote schedule
+must not be described as v18-pinned until a separately authorized push is made
+and the workflow is observed running successfully.
+
+## Release 2026-08-23 - seven-day timestamp-normalizing window release (HISTORICAL; SUPERSEDED BY V18)
 
 Release v17 supersedes v16 as the live runtime. It keeps v16's dispatcher
 timestamp normalization and extends the `start`/`end` window implementation to

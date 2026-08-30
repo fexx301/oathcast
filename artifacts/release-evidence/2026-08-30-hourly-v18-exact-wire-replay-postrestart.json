@@ -1,0 +1,12 @@
+{
+  "body_bytes": 172,
+  "database_integrity": "ok",
+  "event_id_sha256": "6aac1e5510a5492d1ab254d898905de3a185c4992f145a34dfec9584a1ce4714",
+  "expected_body_bytes": 172,
+  "expected_wire_body_sha256": "e81d67096dfeafae33b4e0152cb2355fed067d41f2bbb19df4b7ba29c528a35d",
+  "ok": true,
+  "returned_receipt_sha256": "63f5d942738464280765d0e167e2655cf2b8d6028924d98e34c47d05417ac4bd",
+  "status": 200,
+  "stored_receipt_sha256": "63f5d942738464280765d0e167e2655cf2b8d6028924d98e34c47d05417ac4bd",
+  "wire_body_sha256": "e81d67096dfeafae33b4e0152cb2355fed067d41f2bbb19df4b7ba29c528a35d"
+}

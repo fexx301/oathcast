@@ -1,0 +1,123 @@
+{
+  "authenticated_checks_skipped": false,
+  "base_url": "https://oathcastcourt.duckdns.org",
+  "checks": [
+    {
+      "name": "healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "actual": "2026-08-30-hourly-v18",
+      "expected": "2026-08-30-hourly-v18",
+      "name": "release_id",
+      "ok": true
+    },
+    {
+      "actual": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b",
+      "expected": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b",
+      "name": "source_sha256",
+      "ok": true
+    },
+    {
+      "actual": "sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859",
+      "expected": "sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859",
+      "name": "image_digest",
+      "ok": true
+    },
+    {
+      "name": "readyz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "accepting_new_receipts": true,
+      "bytes_headroom_percent": 99.488,
+      "name": "receipt_capacity",
+      "ok": true,
+      "reported": true,
+      "required": false,
+      "rows_headroom_percent": 99.85
+    },
+    {
+      "cached": true,
+      "name": "receipt_store_write",
+      "ok": true,
+      "probe": "sqlite_transactional_write",
+      "reported": true,
+      "required": true,
+      "rolled_back": true
+    },
+    {
+      "name": "unauthorized_rejected",
+      "ok": true,
+      "path": "/predict",
+      "status": 401
+    },
+    {
+      "event_id": "v18-replay-lagos-20260831T1200z",
+      "name": "authenticated_forecast",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "e81d67096dfeafae33b4e0152cb2355fed067d41f2bbb19df4b7ba29c528a35d",
+      "receipt_sha256": "63f5d942738464280765d0e167e2655cf2b8d6028924d98e34c47d05417ac4bd",
+      "request_id": "smoke-release",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "canonical_path_parity",
+      "ok": true,
+      "public_response_sha256": "e81d67096dfeafae33b4e0152cb2355fed067d41f2bbb19df4b7ba29c528a35d",
+      "receipt_sha256": "63f5d942738464280765d0e167e2655cf2b8d6028924d98e34c47d05417ac4bd",
+      "registered_path": "/predict",
+      "status": 200
+    },
+    {
+      "event_id": "smoke-temperature-20260830T10z",
+      "expected_reference_time": "2026-08-30T10:00:00Z",
+      "forecast_hours": 24,
+      "hourly": "2t",
+      "name": "authenticated_temperature_window",
+      "ok": true,
+      "path": "/predict",
+      "public_response_sha256": "4025050e72c7fbbc7f68c965e5c38c357d2a94739cca60071f27858a629eca28",
+      "receipt_sha256": "c96cc92e0cde3c51e9b9b1a39ec1d2d1bc81f9854aaead45bb8b71d144c34cc9",
+      "request_id": "smoke-release-temperature",
+      "status": 200
+    },
+    {
+      "canonical_path": "/v1/forecast/point",
+      "name": "temperature_path_parity",
+      "ok": true,
+      "public_response_sha256": "4025050e72c7fbbc7f68c965e5c38c357d2a94739cca60071f27858a629eca28",
+      "receipt_sha256": "c96cc92e0cde3c51e9b9b1a39ec1d2d1bc81f9854aaead45bb8b71d144c34cc9",
+      "registered_path": "/predict",
+      "status": 200
+    }
+  ],
+  "ok": true,
+  "partial": false,
+  "question": {
+    "event_id": "v18-replay-lagos-20260831T1200z",
+    "forecast_cutoff": "2026-08-31T11:00:00Z",
+    "horizon_end": "2026-08-31T13:00:00Z",
+    "horizon_start": "2026-08-31T12:00:00Z",
+    "latitude": 6.5244,
+    "location_name": "Lagos",
+    "longitude": 3.3792,
+    "metric": "precipitation",
+    "operator": ">",
+    "precipitation_type": "measurable",
+    "spatial_semantics": "point",
+    "threshold_mm": 0.1,
+    "timezone": "UTC"
+  },
+  "release": {
+    "contract_version": "forecast_contract_v1",
+    "image_digest": "sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859",
+    "release_id": "2026-08-30-hourly-v18",
+    "source_sha256": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b"
+  },
+  "release_id": "2026-08-30-hourly-v18"
+}

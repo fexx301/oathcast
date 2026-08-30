@@ -3,7 +3,7 @@
 The project contains a no-state canary at
 `.github/workflows/oathcast-canary.yml`. It requests a run every 15 minutes
 (GitHub scheduling is best-effort), checks the public staging Miner, verifies the
-expected v17 release identity, rejects unauthenticated `/predict` calls, verifies
+expected v18 release identity, rejects unauthenticated `/predict` calls, verifies
 registered-path/canonical-path response and receipt parity for both the
 registered one-hour forecast and additive 24-hour temperature response, and uses
 the API key only through the repository secret `OATHCAST_MINER_API_KEY`.
@@ -12,22 +12,22 @@ The workflow is intentionally fail-closed. The repository and secret are
 already configured; if the secret disappears, scheduled and manual runs fail
 visibly rather than reporting a skipped success.
 
-The current local workflow pins are release `2026-08-23-window-v17`, source SHA-256
-`9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f`, and
+The current local workflow pins are release `2026-08-30-hourly-v18`, source SHA-256
+`5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`, and
 image digest
-`sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c`.
-The workflow loads those values from the checked-in v17 runtime-evidence file
+`sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`.
+The workflow loads those values from the checked-in v18 runtime-evidence file
 and verifies its linked manifest and public smoke before sending requests.
 The workflow also passes `--require-temperature-window`; changing only the
 identity pin would leave the compatibility contract unmonitored.
 
-These v17 workflow and evidence updates are checked in locally. GitHub's remote
+These v18 workflow and evidence updates are checked in locally. GitHub's remote
 scheduled canary remains on its last pushed v11 configuration until this branch
 is pushed and the workflow is observed running successfully. Do not describe
-the remote schedule as v17-pinned before that happens.
+the remote schedule as v18-pinned before that happens.
 
 Local verification passes: focused canary tests `44/44`, full Python discovery
-`526/526`, and the v17 evidence identity loader accepts the retained bundle.
+`539/539`, and the v18 evidence identity loader accepts the retained bundle.
 
 ## Local repository
 
@@ -74,7 +74,7 @@ Actions tab. Confirm that the job reports:
 - `/healthz` = `200`;
 - `/readyz` = `200`;
 - `receipt_store_write` reports a successful transactional write and rollback
-  after the v17 cutover;
+  after the v18 cutover;
 - unauthenticated `/predict` = `401`;
 - authenticated `/predict` = `200` with a non-empty answer, receipt, and request
   ID; and

@@ -1,18 +1,18 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-27
+Last reviewed: 2026-08-30
 
-Current baseline: the public Miner runs `2026-08-23-window-v17`, source SHA-256
-`9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f`, image
-`sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c`.
+Current baseline: the public Miner runs `2026-08-30-hourly-v18`, source SHA-256
+`5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`, image
+`sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`.
 The separate decision UI provides a read-only status shell and development
-fixture while its live API remains fail-closed without a runner. V17 retains
+fixture while its live API remains fail-closed without a runner. V18 retains
 the exact registered `/predict` route, the legacy one-hour precipitation
 contract, multi-hour `start`/`end` spans of 1 to 168 hours, and the additive
 `hourly=2t` compatibility path with
 `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`.
 
-For multi-hour requests, v17 accepts timezone-aware ISO/RFC3339 bounds,
+For multi-hour requests, v18 accepts timezone-aware ISO/RFC3339 bounds,
 normalizes `start` internally to the nearest whole UTC hour using half-up
 rounding, and derives `end` from the original integral-hour duration. An
 omitted cutoff serializes as normalized `start` with `cutoff_policy:
@@ -21,19 +21,21 @@ explicit cutoff is preserved exactly, must not be after normalized `start`, and
 receives no grace. The one-hour point and
 `forecast_hours=1..24&hourly=2t` contracts are unchanged.
 
-Candidate, public, and post-restart smokes passed 12/12, and v16-to-v17 replay
-preserved event, receipt, and public-response identity. A dispatcher-shaped
-request then created a real normalized 168-hour receipt; the production store
-reported 190 rows and SQLite integrity `ok`. A later 169-hour dispatcher-shaped
-request correctly returned 400. Stopped `oathcast-v16-rollback-20260823` is the
-immediate rollback target, and the disposable v17 candidate was stopped after
-evidence capture. OathCast remains registered on Base Sepolia as current
-on-chain registration ID `245` and active in the Telegraph dispatcher as
+Candidate, public, and post-restart smokes passed 12/12, schema 1/2/3 replay
+preserved event, receipt, and public-response identity, and schema 4 replay
+survived a candidate restart. The hourly matrix accepted 2, 24, and 168 hours,
+rejected 169 hours with HTTP 400, and preserved the legacy temperature route.
+The v17 rollback rehearsal passed for legacy receipts and failed closed for a
+v18 schema-4 receipt already bound to a different forecast contract. Stopped
+`oathcast-v17-rollback-20260830` is the immediate rollback target, and the
+disposable v18 candidate was stopped after evidence capture. OathCast remains
+registered on Base Sepolia as current on-chain registration ID `245` and active
+in the Telegraph dispatcher as
 routing ID `64173`, slug `oathcast-weather`. The prior registration ID `78` is
 deregistered. Current registration evidence is retained in
 `artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
-Full Python discovery passes `526/526`, focused canary tests pass `44/44`, and
-the v17 evidence identity loader accepts the retained bundle.
+Full Python discovery passes `539/539`, focused canary tests pass `44/44`, and
+the v18 evidence identity loader accepts the retained bundle.
 
 On 2026-08-27, production logs correlated Telegraph epochs 286 and 287 with
 authenticated dispatcher requests from `13.237.89.59`. The requests reached
@@ -53,7 +55,7 @@ for a bare key and 200 for `Authorization: Bearer <key>`, while authenticated
 dispatcher traffic already succeeds under the active bearer registration.
 The candidate therefore preserves that known-working auth block; the sandbox
 failure is unresolved and the YAML has not been pinned, signed, deployed, or
-registered. Registration ID `245` and the v17 runtime remain unchanged.
+registered. Registration ID `245` and the v18 runtime remain unchanged.
 
 This register separates work we can complete now that Miner registration is
 live from work that still depends on external participants, independent
@@ -75,7 +77,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   values. The path is live but unregistered; the protected registered YAML and
   its one-hour precipitation contract are unchanged. The legacy
   `/v1/forecast/window` path is not publicly exposed and returns 404. The strict
-  v17 smoke requires this response and registered/canonical path parity.
+  v18 smoke requires this response and registered/canonical path parity.
 - Release provenance through a non-secret release ID, source-tree digest, and
   image digest fields exposed by `/healthz` and response headers.
 - `/readyz` readiness endpoint and a reproducible public Miner smoke script
@@ -101,7 +103,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
 - An external-canary entry point plus a no-cost scheduled GitHub Actions
   workflow. The repository secret is configured, missing-secret runs fail
   visibly, and the workflow requires the temperature-window check. Its checked-in
-  local release-evidence pin now resolves the live v17 identity through sanitized
+  local release-evidence pin now resolves the live v18 identity through sanitized
   manifest, final public-smoke, replay, and runtime-evidence artifacts. The
   workflow integrity test invokes the production evidence loader. The remote
   GitHub schedule remains on stale v11 evidence until an authorized commit and
@@ -390,13 +392,13 @@ breakdown-layout blocker before a registration candidate can be frozen.
   paraphrase rather than weather and every such misroute applies a probability
   ceiling to a correct answer.
 
-- Keep deployed v17 stable and retain stopped `oathcast-v16-rollback-20260823`
+- Keep deployed v18 stable and retain stopped `oathcast-v17-rollback-20260830`
   as the immediate rollback target. The local recurring workflow now points to the
-  checked-in v17 runtime-evidence file and validates its linked manifest and
+  checked-in v18 runtime-evidence file and validates its linked manifest and
   public smoke with the same loader used by the scheduled canary. Keep that
   integrity gate green before treating a scheduled run as current-release
-  evidence. Preserve the current production database on rollback; v16 may not
-  replay the 168-hour receipt already committed by v17. The remote GitHub
+  evidence. Preserve the current production database on rollback; v17 may not
+  replay the schema-4 receipt already committed by v18. The remote GitHub
   schedule remains on stale v11 evidence until a separately authorized commit
   and push.
 - Remove the temporary inbound SSH security-group rule manually after remote
@@ -431,7 +433,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
 
 ## Blocked on authorization, external evidence, or remaining documentation
 
-- Release `2026-08-23-window-v17` retains the multi-hour `start`/`end` branch
+- Release `2026-08-30-hourly-v18` retains the multi-hour `start`/`end` branch
   introduced by v10 on the registered `/predict` route, so Telegraph's valid
   1-to-168-hour `WEATHER_FORECAST` requests are answered instead of refused. The
   response is structurally
@@ -450,7 +452,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   against the deployed service: `start`/`end` were described as "the one-hour
   forecast window", and `cutoff` as "defaults to one hour before start", which
   remains true for the one-hour point contract but not for a window request. The
-  cutoff-description re-registration completed on 2026-08-27. V17 still
+  cutoff-description re-registration completed on 2026-08-27. V18 still
   serializes an omitted window cutoff as the normalized opening, but marks it
   `cutoff_policy: "implicit_grace"` and uses the end of the first normalized
   hour as the effective issuance deadline. The active portal pin and its
@@ -478,7 +480,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   replay gates passed, and Telegraph subsequently persisted a normalized
   24-hour receipt. The registered YAML was not edited, uploaded, or
   re-registered.
-- The deployed `2026-08-23-window-v17` service answers the additive
+- The deployed `2026-08-30-hourly-v18` service answers the additive
   `forecast_hours`/`hourly=2t` shape on the registered `/predict` route with
   `OATHCAST_ENABLE_TEMPERATURE_WINDOW=true`, but the registered YAML does not
   declare that response. `output_schema.required` is `[content, probability]`
@@ -500,7 +502,7 @@ breakdown-layout blocker before a registration candidate can be frozen.
   an undeclared `200` into a certain `400 temperature compatibility window is
   disabled` for the same request. The flag therefore stays enabled until the
   YAML catches up. Miner scoring is unaffected because `content` is present, and
-  schema-v3 receipts persist and replay normally.
+  schema-v3 and schema-v4 receipts persist and replay normally.
 - Telegraph reported that the breakdown-related rejection, Intent binding, and
   registry mismatch are fixed. The August 14 portal/API response remains
   historical surfaced output saying `missing required export

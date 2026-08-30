@@ -1,0 +1,15 @@
+{
+  "event_id": "v18-replay-lagos-20260831T1200z",
+  "forecast_cutoff": "2026-08-31T11:00:00Z",
+  "horizon_end": "2026-08-31T13:00:00Z",
+  "horizon_start": "2026-08-31T12:00:00Z",
+  "latitude": 6.5244,
+  "location_name": "Lagos",
+  "longitude": 3.3792,
+  "metric": "precipitation",
+  "operator": ">",
+  "precipitation_type": "measurable",
+  "spatial_semantics": "point",
+  "threshold_mm": 0.1,
+  "timezone": "UTC"
+}

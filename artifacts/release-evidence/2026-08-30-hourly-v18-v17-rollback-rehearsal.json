@@ -1,0 +1,57 @@
+{
+  "database_integrity": "ok",
+  "database_rows": 304,
+  "ok": true,
+  "results": [
+    {
+      "cutoff_policy_replayed": "explicit",
+      "error": null,
+      "event_id_sha256": "6733ad18c8c76769e23d2f64910981166c84cba38998a3bcc90e295d16ad0b21",
+      "ok": true,
+      "returned_receipt_sha256": "2bbb88c2421275b40a607700fa778cd0ffa80e235bdd1cb71cc75f4b235ec85d",
+      "schema_version": 1,
+      "status": 200,
+      "stored_receipt_sha256": "2bbb88c2421275b40a607700fa778cd0ffa80e235bdd1cb71cc75f4b235ec85d",
+      "stored_response_sha256": "90a8201ba24cb01eb1a453c2f5c81d3396246fb128c00ce12704205f85fa18ad"
+    },
+    {
+      "cutoff_policy_replayed": "implicit_grace",
+      "error": null,
+      "event_id_sha256": "2f9b6c811624cc034ccc4848e6fa949d956f570ef5b8cc646f338be04b380242",
+      "ok": true,
+      "returned_receipt_sha256": "e235af31e046ed8e77fe0baeb295a38e877a30f65bc76a65e7f6aba8e7041e93",
+      "schema_version": 2,
+      "status": 200,
+      "stored_receipt_sha256": "e235af31e046ed8e77fe0baeb295a38e877a30f65bc76a65e7f6aba8e7041e93",
+      "stored_response_sha256": "8ab00d822f065f0f0d6212df85487c761eb92345fd28f6471961ef44993f020b"
+    },
+    {
+      "cutoff_policy_replayed": "explicit",
+      "error": null,
+      "event_id_sha256": "3208abae635ba26139a254242fcbf424653611e1c5484f6098644573db965f79",
+      "ok": true,
+      "returned_receipt_sha256": "aa455e2c616088971775b355ecfbce35758ae563d50596c301fa2e38fe28d2ac",
+      "schema_version": 3,
+      "status": 200,
+      "stored_receipt_sha256": "aa455e2c616088971775b355ecfbce35758ae563d50596c301fa2e38fe28d2ac",
+      "stored_response_sha256": "4056041fca6889b8f009184eeeadb23db9d750657e91e14815a833e6141f7f70"
+    },
+    {
+      "cutoff_policy_replayed": "explicit",
+      "error": "event_id 'candidate-window-168h-20260831T1200z' is already bound to a different forecast contract",
+      "event_id_sha256": "c9d29bfb9941265a9948ff853ced64e05786f2698f012c1c15f650ea146607a6",
+      "ok": true,
+      "returned_receipt_sha256": null,
+      "schema_version": 4,
+      "status": 409,
+      "stored_receipt_sha256": "c0dbdd8e831581ad3f377bef945f67b12826133fc8d5120cdb8469f680f4e5a8",
+      "stored_response_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493"
+    }
+  ],
+  "schema_counts": {
+    "1": 35,
+    "2": 49,
+    "3": 217,
+    "4": 3
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "database_integrity": "ok",
+  "database_rows": 304,
+  "event_id_sha256": "c9d29bfb9941265a9948ff853ced64e05786f2698f012c1c15f650ea146607a6",
+  "hours": 168,
+  "ok": true,
+  "returned_receipt_sha256": "c0dbdd8e831581ad3f377bef945f67b12826133fc8d5120cdb8469f680f4e5a8",
+  "returned_response_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493",
+  "schema_version": 4,
+  "status": 200,
+  "stored_receipt_sha256": "c0dbdd8e831581ad3f377bef945f67b12826133fc8d5120cdb8469f680f4e5a8",
+  "stored_response_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493",
+  "wire_body_bytes": 14417,
+  "wire_body_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493"
+}

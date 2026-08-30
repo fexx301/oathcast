@@ -1,0 +1,11 @@
+{
+  "after_release_id": "2026-08-30-hourly-v18",
+  "before_release_id": "2026-08-23-window-v17",
+  "errors": [],
+  "fingerprints": {
+    "event_id": "v18-replay-lagos-20260831T1200z",
+    "public_response_sha256": "e81d67096dfeafae33b4e0152cb2355fed067d41f2bbb19df4b7ba29c528a35d",
+    "receipt_sha256": "63f5d942738464280765d0e167e2655cf2b8d6028924d98e34c47d05417ac4bd"
+  },
+  "ok": true
+}

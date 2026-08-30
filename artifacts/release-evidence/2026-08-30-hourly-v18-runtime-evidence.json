@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-30T10:38:00Z",
+  "release_id": "2026-08-30-hourly-v18",
+  "source_sha256": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b",
+  "source_verification": {
+    "build_root": "/home/ec2-user/oathcast/releases/2026-08-30-hourly-v18/source-clean",
+    "clean_source_bundle_bytes": 800768,
+    "clean_source_bundle_sha256": "fb6bb7314e2b9953a6274548b1ab6a7f596971fbfb446892cbf4378e2d9ef082",
+    "expected_source_sha256": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b",
+    "file_count": 71,
+    "host_recomputed_source_sha256": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b",
+    "manifest_bytes": 11860,
+    "manifest_file_sha256": "c8a4e0b3920c9df60569e4d19539ebcf4d0356aaf01172680dd7cd4111859464",
+    "manifest_path": "artifacts/release-evidence/2026-08-30-hourly-v18-manifest.json",
+    "verified": true
+  },
+  "source_archive": {
+    "local_capture_path": "/private/tmp/oathcast-2026-08-30-hourly-v18-source.tar",
+    "bytes": 800768,
+    "sha256": "fb6bb7314e2b9953a6274548b1ab6a7f596971fbfb446892cbf4378e2d9ef082",
+    "retained_in_repository": false
+  },
+  "image": {
+    "name": "oathcast:2026-08-30-hourly-v18",
+    "image_id": "sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859",
+    "image_digest": "sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859",
+    "base_image_reference": "docker.io/library/python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217",
+    "labels": {
+      "org.opencontainers.image.title": "OathCast Miner",
+      "org.opencontainers.image.version": "2026-08-30-hourly-v18",
+      "org.opencontainers.image.revision": "5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b"
+    }
+  },
+  "runtime": {
+    "public_base_url": "https://oathcastcourt.duckdns.org",
+    "container": "oathcast",
+    "status": "running",
+    "port_binding": "127.0.0.1:8080:8080",
+    "receipt_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "restart_policy": "unless-stopped",
+    "user": "1000:1000",
+    "rollback_container": "oathcast-v17-rollback-20260830",
+    "candidate_container": "oathcast-v18-candidate-20260830",
+    "candidate_status_at_capture": "stopped after candidate and restart evidence capture",
+    "rollback_rehearsal_container": "oathcast-v17-rehearsal-20260830",
+    "rollback_rehearsal_status_at_capture": "stopped after compatibility evidence capture"
+  },
+  "edge": {
+    "caddy_image_id": "sha256:af555904a0961945f16bb323a501457b13a4f7e9bde969b145b97da80b38ecbe",
+    "caddyfile_sha256": "29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1",
+    "config_changed": false,
+    "request_body_cap": "64KB on both handles",
+    "security_headers": [
+      "Strict-Transport-Security",
+      "X-Content-Type-Options",
+      "Referrer-Policy"
+    ]
+  },
+  "verification": {
+    "candidate_release_smoke": "12/12",
+    "candidate_credentials": {
+      "count": 2,
+      "all_status_200": true,
+      "fingerprints_only": true
+    },
+    "candidate_schema_receipts_replayed": [1, 2, 3],
+    "candidate_hourly_matrix": {
+      "passed": true,
+      "accepted_hours": [2, 24, 168],
+      "rejected_hours": [169],
+      "response_bytes": {
+        "2": 1132,
+        "24": 2852,
+        "168": 14417
+      }
+    },
+    "candidate_schema4_restart": {
+      "passed": true,
+      "hours": 168,
+      "database_rows": 304,
+      "database_integrity": "ok",
+      "pre_post_wire_identical": true,
+      "receipt_sha256": "c0dbdd8e831581ad3f377bef945f67b12826133fc8d5120cdb8469f680f4e5a8",
+      "public_response_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493"
+    },
+    "v17_rollback_rehearsal": {
+      "passed": true,
+      "database_rows": 304,
+      "database_integrity": "ok",
+      "schema_1_2_3_status": 200,
+      "schema4_status": 409,
+      "schema4_fail_closed": true
+    },
+    "production_public_smoke": "12/12",
+    "production_postrestart_smoke": "12/12",
+    "production_exact_wire_replay": {
+      "passed": true,
+      "pre_post_restart_identical": true,
+      "body_bytes": 172,
+      "wire_body_sha256": "e81d67096dfeafae33b4e0152cb2355fed067d41f2bbb19df4b7ba29c528a35d"
+    },
+    "production_hourly_canary": {
+      "passed": true,
+      "accepted_hours": [2, 24, 168],
+      "rejected_hours": [169],
+      "legacy_temperature_24_hour": true
+    },
+    "production_credentials": {
+      "count": 2,
+      "all_status_200": true,
+      "fingerprints_only": true
+    },
+    "receipt_integrity": "ok"
+  },
+  "database": {
+    "backup_evidence": "artifacts/release-evidence/2026-08-30-hourly-v18-receipt-backup.json",
+    "backup_rows": 299,
+    "backup_sha256": "22c95bbbf9602bd586294a3ddde18c2ce8c83436d162172dfcf87b89fa33d279",
+    "backup_integrity": "ok",
+    "backup_source_open_mode": "ro",
+    "production_rows_after_canary": 305,
+    "production_integrity_after_canary": "ok"
+  },
+  "registered_contract": {
+    "manifest_changed": false,
+    "path": "miners/oathcast-weather.yaml",
+    "bytes": 4960,
+    "sha256": "9ad11f06fda61960d621b7160e2f27a84daafa21683a24f6a3278427bb56ee0e"
+  },
+  "boundaries": {
+    "registered_yaml_changed": false,
+    "miner_reregistered": false,
+    "wasm_uploaded": false,
+    "wallet_or_signing_action": false,
+    "scorer_included_in_release_manifest": false,
+    "remote_push": false,
+    "local_evidence_commit": true
+  },
+  "evidence": {
+    "manifest": "artifacts/release-evidence/2026-08-30-hourly-v18-manifest.json",
+    "public_smoke": "artifacts/release-evidence/2026-08-30-hourly-v18-public-smoke.json",
+    "postrestart_smoke": "artifacts/release-evidence/2026-08-30-hourly-v18-postrestart-smoke.json",
+    "replay": "artifacts/release-evidence/2026-08-30-hourly-v18-replay.json",
+    "exact_wire_replay": "artifacts/release-evidence/2026-08-30-hourly-v18-exact-wire-replay.json",
+    "restart_replay": "artifacts/release-evidence/2026-08-30-hourly-v18-exact-wire-replay-postrestart.json",
+    "candidate_smoke": "artifacts/release-evidence/2026-08-30-hourly-v18-candidate-standard-smoke.json",
+    "candidate_hourly_matrix": "artifacts/release-evidence/2026-08-30-hourly-v18-candidate-hourly-matrix.json",
+    "candidate_schema_replay": "artifacts/release-evidence/2026-08-30-hourly-v18-candidate-schema-replay.json",
+    "candidate_v4_pre_restart": "artifacts/release-evidence/2026-08-30-hourly-v18-candidate-v4-pre-restart.json",
+    "candidate_v4_post_restart": "artifacts/release-evidence/2026-08-30-hourly-v18-candidate-v4-post-restart.json",
+    "v17_before_smoke": "artifacts/release-evidence/2026-08-30-hourly-v18-v17-before-smoke.json",
+    "v17_rollback_rehearsal": "artifacts/release-evidence/2026-08-30-hourly-v18-v17-rollback-rehearsal.json",
+    "production_hourly_canary": "artifacts/release-evidence/2026-08-30-hourly-v18-production-hourly-canary.json",
+    "production_credentials": "artifacts/release-evidence/2026-08-30-hourly-v18-production-credentials.json",
+    "receipt_backup": "artifacts/release-evidence/2026-08-30-hourly-v18-receipt-backup.json",
+    "replay_question": "artifacts/release-evidence/2026-08-30-hourly-v18-v17-replay-question.json",
+    "caddyfile": "artifacts/release-evidence/2026-08-30-hourly-v18-caddyfile.sha256"
+  },
+  "evidence_capture_sha256": {
+    "manifest": "c8a4e0b3920c9df60569e4d19539ebcf4d0356aaf01172680dd7cd4111859464",
+    "public_smoke": "76ee21193d13d5a1d703c9dfc6997838fa23dce1f47e4551fd91148676c0657c",
+    "postrestart_smoke": "5feb7acf857c064e71ea968e15bf9a18918ede8da2b08c662c0ebf4347e1e40f",
+    "replay": "3d7656952eca0ddbd66539122a9f13b80395aadf8d8db80994ebbb7558955f47",
+    "exact_wire_replay": "629059ee73ca2e9bfa56f6ff1d66d905c0d0b7f8d9f2e94725f39acfac505922",
+    "restart_replay": "629059ee73ca2e9bfa56f6ff1d66d905c0d0b7f8d9f2e94725f39acfac505922",
+    "candidate_smoke": "ddb2c4f9111d5604331008853de220e95119a26a84b11c92b6a83b6a1519e010",
+    "candidate_hourly_matrix": "6c21f1c1b355b44fb2400a2ae45c4501ae18791f2fafba04a3a6ec2e96c725fa",
+    "candidate_schema_replay": "88e6f1bc66148d3163fa95e1e542712361f95bf64fbb40ef6ea822eef7382c5d",
+    "candidate_v4_pre_restart": "d517dd0427fb1eaa7e5f7ecb62214dbc54e7f59929cc9d7e71485b595b7a01cc",
+    "candidate_v4_post_restart": "d517dd0427fb1eaa7e5f7ecb62214dbc54e7f59929cc9d7e71485b595b7a01cc",
+    "v17_before_smoke": "09ef84052d92d9f665aaa1b18e1b20920e1100da09433cf564a92646a7ad3e73",
+    "v17_rollback_rehearsal": "85d9b80f8ea700b3269c83f2fe726e56a2cabdcdbdecc37811ed644d8885785d",
+    "production_hourly_canary": "beefc2f8c01c56414f184405d221ed63636468b51766a5a5979407d975d31a30",
+    "production_credentials": "46f9089775964c9c5dcdd684c8869c09f61dd76ddf2439c731ffbdab257e6136",
+    "receipt_backup": "b707421ec7d6a23f35b55b7a11ab1be3c302679610241c4e00cb11f0597e5e8a",
+    "replay_question": "932aab3a795d445f35d6f8cdefe9126c3b12ce86951c46dc90de210f8b89af42",
+    "caddyfile": "5f1ef56ed2718bd366bf039a69940dddd686736731771fa5e6d1e60f26f13cac"
+  },
+  "scope": "Runtime-only v18 complete hourly weather responses and compatibility validation. The registered YAML, Telegraph registration, WASM scorer, wallet, Caddy configuration, and remote canary publication were unchanged."
+}

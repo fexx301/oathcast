@@ -1,0 +1,50 @@
+{
+  "checks": [
+    {
+      "body_bytes": 1132,
+      "body_sha256": "f94452d5af5805667ab2937b97b154d75b3fa3bec877987a710ec35194c1f45c",
+      "contiguous": true,
+      "hours": 2,
+      "name": "window_2_hour",
+      "ok": true,
+      "receipt_sha256": "c24bb50131617489dbac31d6a899c412765bea3c06894b3d45b7397d6e82d8e2",
+      "status": 200
+    },
+    {
+      "body_bytes": 2852,
+      "body_sha256": "b31491c49b7438732af64909a6f99b97b9fd8c7d5ce159cdb5d21e488a6e69c2",
+      "contiguous": true,
+      "hours": 24,
+      "name": "window_24_hour",
+      "ok": true,
+      "receipt_sha256": "5b5ec4a4e920e387b6f8e88dea9d633fb94026f0404ec0e78da939df547529ef",
+      "status": 200
+    },
+    {
+      "body_bytes": 14417,
+      "body_sha256": "34aee74e61f819fd39e015e82ba9487ee865a04bb7dbb059fc646e626ec91493",
+      "contiguous": true,
+      "hours": 168,
+      "name": "window_168_hour",
+      "ok": true,
+      "receipt_sha256": "8d4743b844289ade0b29d736221675b3706b1a591d070179488f3fb69bca512b",
+      "status": 200
+    },
+    {
+      "error": "forecast window duration must be between 1 and 168 hours",
+      "name": "window_169_hour_rejected",
+      "ok": true,
+      "status": 400
+    },
+    {
+      "body_bytes": 1674,
+      "body_sha256": "4025050e72c7fbbc7f68c965e5c38c357d2a94739cca60071f27858a629eca28",
+      "hours": 24,
+      "name": "legacy_temperature_24_hour",
+      "ok": true,
+      "receipt_sha256": "444e2fed1142355e20d465fe15f2715f4819ec64cdffbd06c416bb144e5c68af",
+      "status": 200
+    }
+  ],
+  "ok": true
+}

@@ -4,13 +4,14 @@
 
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
-publicly on release `2026-08-23-window-v17`. The registered `GET /predict`
+publicly on release `2026-08-30-hourly-v18`. The registered `GET /predict`
 route and canonical `GET /v1/forecast/point` route share the same authenticated
-forecast and receipt path. V17 supports 1-to-168-hour window requests. For
-multi-hour aware ISO/RFC3339 bounds it normalizes the start to the nearest whole
-UTC hour using half-up rounding; the registered one-hour point behavior remains
-unchanged. It also retains the additive, unregistered temperature compatibility
-route without changing the v17 runtime. The YAML description re-registration on
+forecast and receipt path. V18 supports the registered one-hour point contract
+plus complete 2-to-168-hour weather windows. For multi-hour aware ISO/RFC3339
+bounds it normalizes the start to the nearest whole UTC hour using half-up
+rounding; the registered one-hour point behavior remains unchanged. It also
+retains the additive, unregistered temperature compatibility route. The YAML
+description re-registration on
 2026-08-27 is documented separately and changed no runtime behavior. The
 separate public UI exposes a truthful read-only status surface and client-only
 development fixture. Its live decision endpoint remains degraded and returns
@@ -69,14 +70,14 @@ Provider model names, retrieval timestamps, raw hashes, and native event
 definitions remain internal. All three adapters require an exact native hourly
 point; they refuse to choose a nearest point or invent a max/mean aggregation.
 The registered precipitation contract remains a one-hour UTC window. The
-deployed v17 service also exposes an additive, unregistered temperature-only
+deployed v18 service also exposes an additive, unregistered temperature-only
 contract for `/predict?lat=...&lon=...&forecast_hours=24&hourly=2t`:
 `forecast_hours`
 accepts `1..24`, the window starts at the next complete UTC hour, and the
 response contains RFC3339 `time` values plus Kelvin `2t` values. The same
 shape is available at `/v1/forecast/point`. The legacy
 `/v1/forecast/window` path is not publicly exposed and returns 404. This work is
-served additively since v8 and remains enabled in v17; it has not been
+served additively since v8 and remains enabled in v18; it has not been
 substituted into, uploaded as, or re-registered through the protected YAML.
 
 Open-Meteo is the only adapter currently marked as a documented event match.
@@ -153,7 +154,7 @@ It exposes `/healthz`, `/readyz`, the registered `/predict` route, and the
 canonical `/v1/forecast/point` route. The two forecast paths are exact aliases;
 near-miss paths return 404 and both aliases share authentication, rate limits,
 responses, and receipt identity. With
-`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true` (enabled by the deployed v17 service),
+`OATHCAST_ENABLE_TEMPERATURE_WINDOW=true` (enabled by the deployed v18 service),
 they also accept the additive, unregistered 1-to-24-hour
 `forecast_hours`/`hourly=2t` temperature contract. The legacy
 `/v1/forecast/window` route is not publicly exposed and returns 404. The service
@@ -177,7 +178,7 @@ of an already-issued receipt always succeeds, even at capacity. Defaults are
 200,000 rows and 512 MiB, overridable with `OATHCAST_RECEIPT_MAX_ROWS` and
 `OATHCAST_RECEIPT_MAX_BYTES` (`none` disables a cap).
 
-The deployed v17 release retains v6's deliberately fail-closed replay contract.
+The deployed v18 release retains v6's deliberately fail-closed replay contract.
 New receipts freeze the exact digest-covered `public_response`; replay serves
 those stored bytes rather than invoking a newer renderer. If a legacy receipt
 lacks `public_response`, the current service returns HTTP 503
@@ -196,16 +197,17 @@ release/request headers. `compare_release_replay.py` compares two smoke reports
 and proves a stored event's receipt and public response survived a release
 cutover unchanged.
 
-The current public identity is release `2026-08-23-window-v17`, source
-SHA-256 `9d939f53931b4895d8abf3eb6c0ae2a1f12c6e282980f8c862ae86c7806b628f`,
+The current public identity is release `2026-08-30-hourly-v18`, source
+SHA-256 `5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`,
 and image digest
-`sha256:3cc91107208ffa806b025d79297e64b695329255f6329714e32464a7a7eaae8c`.
-The v17 manifest, public smoke, v16-to-v17 replay, post-restart smoke, 168-hour
-public smoke, receipt-backup metadata, and linked runtime evidence are retained
-under `artifacts/release-evidence/oathcast-2026-08-23-window-v17-*`; stopped
-`oathcast-v16-rollback-20260823` is the immediate Miner rollback target.
-Full Python discovery passes `526/526`, focused canary tests pass `44/44`, and
-the v17 evidence identity loader accepts the retained bundle.
+`sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`.
+The v18 manifest, candidate/public/post-restart smokes, schema replay, exact
+wire replay, hourly boundary canary, receipt-backup metadata, v17 rollback
+rehearsal, and linked runtime evidence are retained under
+`artifacts/release-evidence/2026-08-30-hourly-v18-*`; stopped
+`oathcast-v17-rollback-20260830` is the immediate Miner rollback target.
+Full Python discovery passes `539/539`, focused canary tests pass `44/44`, and
+the v18 evidence identity loader accepts the retained bundle.
 
 `create_registration_draft.py` first requires that local check to pass, then
 records an unsigned registration snapshot. It hashes the exact YAML bytes and
@@ -216,8 +218,8 @@ or submits `registerMiner`.
 `public_canary.py` is the same no-state check intended to run from an
 independent scheduler such as GitHub Actions; `.github/workflows/oathcast-canary.yml`
 contains the no-cost scheduled path and expects the API key in a repository
-secret. The local v17 canary configuration requires the 24-hour temperature
-response and alias parity, and resolves release identity from the checked-in v17
+secret. The local v18 canary configuration requires the 24-hour temperature
+response and alias parity, and resolves release identity from the checked-in v18
 evidence bundle. The remote GitHub schedule remains on its last pushed v11
 configuration until a separately authorized commit and push.
 See `docs/repository-and-canary.md` for the safe repository/secret
