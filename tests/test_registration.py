@@ -345,6 +345,36 @@ on_chain:
         )
         self.assertTrue(result["valid"], result["errors"])
 
+    def test_window_reregistration_candidate_explains_fresh_cutoff_contract(self):
+        source = yaml.safe_load(
+            WINDOW_REREGISTRATION_CANDIDATE.read_text(encoding="utf-8")
+        )
+        endpoint = source["endpoints"][0]
+        endpoint_cutoff = next(
+            item
+            for item in endpoint["params"]["query"]["optional"]
+            if item["name"] == "cutoff"
+        )
+        descriptions = {
+            "endpoint": str(endpoint["description"]).lower(),
+            "endpoint cutoff": str(endpoint_cutoff["description"]).lower(),
+            "input schema cutoff": str(
+                source["input_schema"]["properties"]["cutoff"]["description"]
+            ).lower(),
+        }
+
+        self.assertIn("new absolute utc window", descriptions["endpoint"])
+        self.assertIn("expired window", descriptions["endpoint"])
+        self.assertIn("replaying an already-issued receipt", descriptions["endpoint"])
+        for label in ("endpoint cutoff", "input schema cutoff"):
+            with self.subTest(description=label):
+                description = descriptions[label]
+                self.assertIn("future when the miner receives", description)
+                self.assertIn("at or before start", description)
+                self.assertIn("stale or historical epoch", description)
+                self.assertIn("omit", description)
+                self.assertIn("replaying an already-issued receipt", description)
+
     def test_registration_draft_accepts_the_recognized_window_candidate(self):
         artifact = build_registration_draft(WINDOW_REREGISTRATION_CANDIDATE)
 

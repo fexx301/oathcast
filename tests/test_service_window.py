@@ -404,6 +404,53 @@ class ForecastWindowHttpTests(unittest.TestCase):
         self.assertIn("error", payload)
         self.assertEqual(calls, [])
 
+    def test_predict_reports_observed_invalid_one_hour_timestamps_clearly(self):
+        for field, value, expected_error in (
+            (
+                "start",
+                "tomorrow",
+                "horizon_start must be a valid ISO-8601 timestamp",
+            ),
+            (
+                "end",
+                "2026-08-17",
+                "horizon_end must be a timezone-aware ISO-8601 timestamp",
+            ),
+        ):
+            with self.subTest(field=field):
+                calls = []
+                params = _query_params(hours=1)
+                params[field] = [value]
+                service = _service(
+                    fetcher=lambda url: calls.append(url) or _window_payload(hours=1),
+                )
+
+                status, payload, _, _ = _handler_request(
+                    service,
+                    "/v1/forecast/point?" + urlencode(params, doseq=True),
+                )
+
+                self.assertEqual(status, 400)
+                self.assertEqual(payload["error"], expected_error)
+                self.assertEqual(calls, [])
+
+    def test_predict_refuses_an_expired_explicit_cutoff_before_provider_fetch(self):
+        calls = []
+        service = _service(
+            fetcher=lambda url: calls.append(url) or _window_payload(),
+        )
+        params = _query_params()
+        params["cutoff"] = ["2026-08-17T10:59:59Z"]
+
+        status, payload, _, _ = _handler_request(
+            service,
+            "/predict?" + urlencode(params, doseq=True),
+        )
+
+        self.assertEqual(status, 410)
+        self.assertIn("forecast_cutoff_passed", payload["error"])
+        self.assertEqual(calls, [])
+
     def test_registered_paths_normalize_unaligned_windows_to_provider_hours(self):
         """Telegraph's arbitrary ISO bounds are rounded before provider access."""
 

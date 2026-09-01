@@ -624,6 +624,33 @@ class ForecastWindowRendererTests(unittest.TestCase):
             },
         )
 
+    def test_public_window_response_keeps_start_inclusive_and_end_exclusive_at_boundaries(self):
+        for hours in (1, 24, MAX_FORECAST_WINDOW_HOURS):
+            with self.subTest(hours=hours):
+                request = _request(hours=hours, event_id=f"render-boundary-{hours}")
+                response = public_window_response(request, _forecast(request))
+                expected_times = [
+                    (request.horizon_start + timedelta(hours=index)).strftime(
+                        "%Y-%m-%dT%H:%MZ"
+                    )
+                    for index in range(hours)
+                ]
+
+                self.assertEqual(response["hourly"]["time"], expected_times)
+                self.assertEqual(
+                    response["hourly"]["time"][-1],
+                    (request.horizon_end - timedelta(hours=1)).strftime(
+                        "%Y-%m-%dT%H:%MZ"
+                    ),
+                )
+                for field in (
+                    "2t",
+                    "precip",
+                    "precipitation_probability",
+                    "wind_speed_10m",
+                ):
+                    self.assertEqual(len(response["hourly"][field]), hours)
+
     def test_twenty_four_hour_content_states_both_window_dates(self):
         request = _request()
         forecast = _forecast(request)

@@ -26,7 +26,11 @@ endpoints:
   - path: /predict
     external_path: /v1/forecast/point
     method: GET
-    description: Summarize a point forecast over an absolute window from 1 through 168 whole hours.
+    description: >
+      Summarize a point forecast over a new absolute UTC window from 1 through
+      168 whole hours. For a new forecast, the window and any issuance deadline
+      must still be valid when the request is received; an expired window may
+      only be served by replaying an already-issued receipt.
     intents: [WEATHER_FORECAST]
     params:
       query:
@@ -70,10 +74,14 @@ endpoints:
             description: >
               Optional absolute RFC 3339 issuance deadline with an explicit
               timezone; prefer canonical UTC with a Z suffix. It maps to
-              forecast_cutoff and MUST be at or before start. Best to OMIT it
-              unless an earlier deadline is specifically required; when absent,
-              the service applies the default for the selected window contract.
-              Never derive a cutoff later than start.
+              forecast_cutoff. For creation of a new forecast, it MUST still be
+              in the future when the miner receives the request and MUST be at
+              or before start. Allow enough clock and network margin. Best to
+              OMIT it unless an earlier deadline is specifically required; when
+              absent, the service applies the default for the selected window
+              contract. Never derive a cutoff from a stale or historical epoch,
+              and never derive a cutoff later than start. An expired window may
+              only be served by replaying an already-issued receipt.
           - name: threshold_mm
             type: number
             intents: [WEATHER_FORECAST]
@@ -144,10 +152,14 @@ input_schema:
       type: string
       description: >
         Optional absolute RFC 3339 issuance deadline with an explicit timezone;
-        prefer canonical UTC with a Z suffix. It maps to forecast_cutoff and
-        MUST be at or before start. Best to omit unless an earlier deadline is
+        prefer canonical UTC with a Z suffix. It maps to forecast_cutoff. For
+        creation of a new forecast, it MUST still be in the future when the
+        miner receives the request and MUST be at or before start. Allow enough
+        clock and network margin. Best to omit unless an earlier deadline is
         specifically required; when absent, the service applies the default for
-        the selected window contract. Never derive a cutoff later than start.
+        the selected window contract. Never derive a cutoff from a stale or
+        historical epoch, and never derive a cutoff later than start. An expired
+        window may only be served by replaying an already-issued receipt.
       format: date-time
     threshold_mm:
       type: number
