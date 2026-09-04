@@ -217,7 +217,9 @@ relevant to that track.
 - [x] Durable question, reply, decision, observation, and resolution evidence.
 - [x] Local Planning Desk intake pilot.
 - [x] One isolated, manually authorized x402 devnet settlement rehearsal independently verified; not Application demand.
-- [ ] Reviewed Application payment boundary integrated and verified end to end.
+- [~] Reviewed Application payment boundary implemented and locally tested;
+  fresh discovery, operator authorization, and a real end-to-end payment remain
+  pending.
 - [ ] Real Application calls routed through Telegraph.
 - [ ] Independent Explorer/payment evidence retained per request. *(Telegraph
   confirmed 2026-08-11 that requests served through Telegraph are tracked and

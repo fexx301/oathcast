@@ -128,8 +128,13 @@ class DemandEvent:
         if is_fixture and source != "development-fixture":
             raise ValueError("fixture events must identify their development source")
 
+        demand_id = (
+            f"demand-{hashlib.sha256(str(payment_attempt_id).encode('utf-8')).hexdigest()}"
+            if payment_attempt_id
+            else f"demand-{uuid.uuid4().hex}"
+        )
         event = cls(
-            demand_id=f"demand-{uuid.uuid4().hex}",
+            demand_id=demand_id,
             question_event_id=question_event_id,
             application_request_id=application_request_id,
             miner_id=str(miner_id),
@@ -295,7 +300,24 @@ class DemandLedger:
                     "SELECT event_json FROM demand_events WHERE demand_id = ?",
                     (event.demand_id,),
                 ).fetchone()
-                if existing is not None and existing[0] != event_json:
+                if existing is not None:
+                    if existing[0] == event_json:
+                        connection.commit()
+                        return event
+                    try:
+                        existing_payload = json.loads(existing[0])
+                    except (TypeError, json.JSONDecodeError) as error:
+                        raise ValueError("stored demand evidence is malformed") from error
+                    stable_keys = set(payload) - {"demand_id", "occurred_at"}
+                    if (
+                        event.payment_attempt_id
+                        and existing_payload.get("payment_attempt_id") == event.payment_attempt_id
+                        and all(existing_payload.get(key) == payload.get(key) for key in stable_keys)
+                    ):
+                        # A replay may have a new observation timestamp, but a
+                        # payment attempt can only project one immutable demand.
+                        connection.commit()
+                        return event
                     raise ValueError("demand_id is already bound to different evidence")
                 connection.execute(
                     """

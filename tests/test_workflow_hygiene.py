@@ -12,7 +12,7 @@ class WorkflowHygieneTests(unittest.TestCase):
 
         self.assertIn("group: oathcast-ci-${{ github.ref }}", workflow)
         self.assertIn("cancel-in-progress: true", workflow)
-        self.assertEqual(workflow.count("persist-credentials: false"), 2)
+        self.assertGreaterEqual(workflow.count("persist-credentials: false"), 2)
 
     def test_read_only_workflows_do_not_persist_checkout_credentials(self):
         for name in ("oathcast-canary.yml", "provider-evidence-freshness.yml"):

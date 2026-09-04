@@ -436,6 +436,9 @@ describe("payment canary", () => {
     expect(result.evidence.settlement?.transaction_signature).toBe(transactionSignature);
     expect(result.evidence.verification?.confirmed_transaction).toBe(true);
     expect(result.evidence.verification?.token_movement.status).toBe("verified");
+    expect(result.paid_response_body_text).toBe('{"content":"paid"}');
+    expect(result.paid_response_body).toEqual({ content: "paid" });
+    expect(result.paid_response_body_sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
     expect(calls[1].init?.signal).toBeInstanceOf(AbortSignal);
@@ -540,6 +543,68 @@ describe("payment canary", () => {
     expect(signals[0]).toBeInstanceOf(AbortSignal);
     expect(signals[1]).toBeInstanceOf(AbortSignal);
     expect(signals[1]).not.toBe(signals[0]);
+  });
+
+  it("binds execution to the exact preflight challenge before signer access", async () => {
+    const target = buildTarget(options(true));
+    const challenge = challengeFor(target.requestUrl);
+    const fetch = preflightFetch(challenge);
+    const createSigner = vi.fn();
+    const beforePaidRequest = vi.fn();
+
+    const result = await runCanary(
+      { ...options(true), expectedChallengeSha256: "0".repeat(64) },
+      { fetch, createSigner, beforePaidRequest },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.evidence.error?.code).toBe("CHALLENGE_BINDING_MISMATCH");
+    expect(result.evidence.preflight.payment_attempted).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(createSigner).not.toHaveBeenCalled();
+    expect(beforePaidRequest).not.toHaveBeenCalled();
+  });
+
+  it("marks the paid boundary before the second fetch", async () => {
+    const target = buildTarget(options(true));
+    const challenge = challengeFor(target.requestUrl);
+    const settlement = {
+      success: true,
+      transaction: transactionSignature,
+      network: SOLANA_DEVNET_NETWORK,
+    };
+    let requestCount = 0;
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      requestCount += 1;
+      return requestCount === 1
+        ? new Response("", {
+            status: 402,
+            headers: { "PAYMENT-REQUIRED": encodeHeader(challenge) },
+          })
+        : new Response("paid", {
+            status: 200,
+            headers: { "PAYMENT-RESPONSE": encodeHeader(settlement) },
+          });
+    });
+    const order: string[] = [];
+    const result = await runCanary(options(true), {
+      fetch: async (...args) => {
+        order.push("fetch");
+        return fetch(...args);
+      },
+      env: { SOLANA_PRIVATE_KEY: privateKey },
+      createSigner: async () => ({ address: payerAddress } as never),
+      createPaymentClient: () => ({
+        createPaymentPayload: async () => ({}),
+        encodePaymentSignatureHeader: () => ({ "PAYMENT-SIGNATURE": "proof" }),
+      }),
+      createRpc: () => verifiedRpcFixture().rpc,
+      beforePaidRequest: () => {
+        order.push("journal");
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(order).toEqual(["fetch", "journal", "fetch"]);
   });
 
   it("bounds total RPC verification and preserves settlement evidence on timeout", async () => {

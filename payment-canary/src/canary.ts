@@ -26,6 +26,7 @@ export const EXPECTED_FEE_PAYER =
 export const DEFAULT_MAX_AMOUNT = 10_000n;
 export const FETCH_TIMEOUT_MS = 30_000;
 export const RPC_TIMEOUT_MS = 30_000;
+export const MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_RPC_URL = "https://api.devnet.solana.com";
 export const DEFAULT_MINER_ID = "18";
 export const DEFAULT_ENDPOINT_PATH = "predict";
@@ -84,6 +85,8 @@ export interface CanaryOptions {
   maxAmount?: string | number | bigint;
   rpcUrl?: string;
   params?: Record<string, string>;
+  /** Hash returned by the unpaid preflight that an execute phase must use. */
+  expectedChallengeSha256?: string;
 }
 
 export interface CanaryDependencies {
@@ -96,6 +99,8 @@ export interface CanaryDependencies {
     selectedRequirement: PaymentRequirements,
   ) => PaymentHttpClientLike;
   createRpc?: (rpcUrl: string) => SolanaRpcLike;
+  /** Called after payload construction, immediately before the paid fetch. */
+  beforePaidRequest?: () => void | Promise<void>;
 }
 
 export interface SelectedPaymentEvidence {
@@ -146,6 +151,8 @@ export interface CanaryEvidence {
     selected?: SelectedPaymentEvidence;
     payment_attempted: boolean;
   };
+  paid_response_status?: number;
+  paid_response_body_sha256?: string;
   settlement?: {
     header_sha256: string;
     transaction_signature: string;
@@ -163,6 +170,11 @@ export interface CanaryEvidence {
 export interface CanaryResult {
   ok: boolean;
   evidence: CanaryEvidence;
+  /** Bounded paid body, retained only for the private application boundary. */
+  paid_response_status?: number;
+  paid_response_body?: unknown;
+  paid_response_body_text?: string;
+  paid_response_body_sha256?: string;
 }
 
 export type CanaryErrorCode =
@@ -184,6 +196,7 @@ export type CanaryErrorCode =
   | "CHALLENGE_PAY_TO_MISMATCH"
   | "CHALLENGE_FEE_PAYER_MISMATCH"
   | "CHALLENGE_OPTION_AMBIGUOUS"
+  | "CHALLENGE_BINDING_MISMATCH"
   | "SIGNER_KEY_MISSING"
   | "SIGNER_KEY_INVALID"
   | "SIGNER_INITIALIZATION_FAILED"
@@ -227,6 +240,7 @@ const ERROR_MESSAGES: Record<CanaryErrorCode, string> = {
   CHALLENGE_PAY_TO_MISMATCH: "the challenge recipient is not the approved recipient",
   CHALLENGE_FEE_PAYER_MISMATCH: "the challenge fee payer is not the approved fee payer",
   CHALLENGE_OPTION_AMBIGUOUS: "the challenge contains multiple indistinguishable approved options",
+  CHALLENGE_BINDING_MISMATCH: "the execute phase received a different challenge than its preflight",
   SIGNER_KEY_MISSING: "--execute requires SOLANA_PRIVATE_KEY in the environment",
   SIGNER_KEY_INVALID: "SOLANA_PRIVATE_KEY is not a 64-byte base58 Solana secret key",
   SIGNER_INITIALIZATION_FAILED: "the Solana signer could not be initialized from SOLANA_PRIVATE_KEY",
@@ -490,9 +504,52 @@ function firstHeader(headers: Headers, names: readonly string[]): string | null 
   return null;
 }
 
+async function readBoundedResponseText(
+  response: Response,
+  maxBytes = MAX_RESPONSE_BODY_BYTES,
+): Promise<string> {
+  const declared = response.headers.get("Content-Length");
+  if (declared !== null && /^\d+$/.test(declared) && Number(declared) > maxBytes) {
+    throw new Error("response body exceeds cap");
+  }
+
+  if (!response.body) {
+    const body = await response.text();
+    if (new TextEncoder().encode(body).byteLength > maxBytes) {
+      throw new Error("response body exceeds cap");
+    }
+    return body;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        throw new Error("response body exceeds cap");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 async function responseBodyDigest(response: Response): Promise<string> {
-  const body = await response.text();
-  return sha256Text(body);
+  return sha256Text(await readBoundedResponseText(response));
 }
 
 function decodeBodyIfJson(text: string): unknown {
@@ -573,7 +630,7 @@ function defaultCreateSigner(secretKeyBytes: Uint8Array): Promise<SolanaSigner> 
   return createKeyPairSignerFromBytes(secretKeyBytes);
 }
 
-function defaultCreateRpc(rpcUrl: string): SolanaRpcLike {
+export function createDevnetRpc(rpcUrl: string): SolanaRpcLike {
   return createSolanaRpc(devnet(rpcUrl)) as unknown as SolanaRpcLike;
 }
 
@@ -682,7 +739,7 @@ function aggregateTokenBalances(
   return { available: true, sawExpectedMint, byOwner };
 }
 
-async function verifyOnChain(
+export async function verifyPaymentOnChain(
   rpc: SolanaRpcLike,
   transactionSignature: string,
   signerAddress: string,
@@ -854,6 +911,27 @@ export async function runCanary(
   let selected: PaymentRequirements | undefined;
   let paymentClient: PaymentHttpClientLike | undefined;
   let paidRequestWasSent = false;
+  let paidResponseStatus: number | undefined;
+  let paidResponseBodyText: string | undefined;
+  let paidResponseBody: unknown;
+  let paidResponseBodySha256: string | undefined;
+
+  const resultWithPaidBody = (ok: boolean): CanaryResult => {
+    const result: CanaryResult = { ok, evidence };
+    if (paidResponseStatus !== undefined) {
+      result.paid_response_status = paidResponseStatus;
+      evidence.paid_response_status = paidResponseStatus;
+    }
+    if (paidResponseBodySha256 !== undefined) {
+      result.paid_response_body_sha256 = paidResponseBodySha256;
+      evidence.paid_response_body_sha256 = paidResponseBodySha256;
+    }
+    if (paidResponseBodyText !== undefined) {
+      result.paid_response_body_text = paidResponseBodyText;
+      result.paid_response_body = paidResponseBody;
+    }
+    return result;
+  };
 
   try {
     if (!safeOperationId(options.operationId)) {
@@ -888,7 +966,12 @@ export async function runCanary(
       throw new CanaryError("PREFLIGHT_FETCH_FAILED");
     }
     evidence.preflight.status = preflightResponse.status;
-    const preflightBody = await preflightResponse.text();
+    let preflightBody: string;
+    try {
+      preflightBody = await readBoundedResponseText(preflightResponse);
+    } catch {
+      throw new CanaryError("INVALID_CHALLENGE");
+    }
     evidence.preflight.response_body_sha256 = sha256Text(preflightBody);
 
     const encodedChallenge = getHeader(preflightResponse.headers, "PAYMENT-REQUIRED");
@@ -915,6 +998,14 @@ export async function runCanary(
     evidence.preflight.challenge_validated = true;
     evidence.preflight.selected = selectedEvidence(selected);
 
+    if (
+      options.execute &&
+      options.expectedChallengeSha256 !== undefined &&
+      options.expectedChallengeSha256 !== evidence.preflight.challenge_sha256
+    ) {
+      throw new CanaryError("CHALLENGE_BINDING_MISMATCH");
+    }
+
     if (!options.execute) {
       evidence.ok = true;
       return { ok: true, evidence };
@@ -933,7 +1024,7 @@ export async function runCanary(
     }
 
     const rpcUrl = options.rpcUrl ?? environment.SOLANA_RPC_URL ?? DEFAULT_RPC_URL;
-    const rpc = (dependencies.createRpc ?? defaultCreateRpc)(rpcUrl);
+    const rpc = (dependencies.createRpc ?? createDevnetRpc)(rpcUrl);
     evidence.verification = {
       rpc_url_sha256: sha256Text(rpcUrl),
       confirmed_transaction: false,
@@ -975,6 +1066,7 @@ export async function runCanary(
 
     let paidResponse: Response;
     try {
+      await dependencies.beforePaidRequest?.();
       paidRequestWasSent = true;
       evidence.preflight.payment_attempted = true;
       paidResponse = await fetchFn(target.requestUrl, {
@@ -991,8 +1083,15 @@ export async function runCanary(
       throw new CanaryError("PAID_REQUEST_OUTCOME_UNKNOWN");
     }
 
+    paidResponseStatus = paidResponse.status;
+    try {
+      paidResponseBodyText = await readBoundedResponseText(paidResponse);
+      paidResponseBodySha256 = sha256Text(paidResponseBodyText);
+      paidResponseBody = decodeBodyIfJson(paidResponseBodyText) ?? paidResponseBodyText;
+    } catch {
+      throw new CanaryError("PAID_RESPONSE_INVALID");
+    }
     if (paidResponse.status < 200 || paidResponse.status >= 300) {
-      await responseBodyDigest(paidResponse);
       throw new CanaryError("PAID_RESPONSE_INVALID");
     }
     const settlementHeader = extractSettlementHeader(paidResponse);
@@ -1033,7 +1132,7 @@ export async function runCanary(
     try {
       verification = await withAbortTimeout(
         RPC_TIMEOUT_MS,
-        (abortSignal) => verifyOnChain(
+        (abortSignal) => verifyPaymentOnChain(
           rpc,
           transactionSignature,
           signerAddress,
@@ -1052,10 +1151,10 @@ export async function runCanary(
       }
       throw new CanaryError("TRANSACTION_NOT_CONFIRMED");
     }
-    if (verification.transaction_signature_matches === false) {
+    if (verification.transaction_signature_matches !== true) {
       throw new CanaryError("TRANSACTION_SIGNATURE_MISMATCH");
     }
-    if (verification.fee_payer_verified === false) {
+    if (verification.fee_payer_verified !== true) {
       throw new CanaryError("FEE_PAYER_ONCHAIN_MISMATCH");
     }
     if (verification.token_movement.status === "unavailable") {
@@ -1065,9 +1164,17 @@ export async function runCanary(
       throw new CanaryError("TOKEN_BALANCE_MOVEMENT_MISMATCH");
     }
     evidence.ok = true;
-    return { ok: true, evidence };
+    return resultWithPaidBody(true);
   } catch (error) {
-    if (error instanceof CanaryError) return fail(evidence, error.code);
-    return fail(evidence, paidRequestWasSent ? "PAID_REQUEST_OUTCOME_UNKNOWN" : "CANARY_FAILED");
+    if (error instanceof CanaryError) {
+      const result = resultWithPaidBody(false);
+      result.evidence.error = publicError(error.code);
+      return result;
+    }
+    const result = resultWithPaidBody(false);
+    result.evidence.error = publicError(
+      paidRequestWasSent ? "PAID_REQUEST_OUTCOME_UNKNOWN" : "CANARY_FAILED",
+    );
+    return result;
   }
 }

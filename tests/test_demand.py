@@ -145,6 +145,26 @@ class DemandLedgerTests(unittest.TestCase):
         self.assertFalse(event.local_candidate)
         self.assertEqual(event.settlement_artifact_sha256, "a" * 64)
 
+    def test_paid_attempt_projects_once_and_preserves_first_timestamp(self):
+        ledger = DemandLedger(":memory:")
+        first = ledger.append(
+            self.event(
+                payment_attempt_id="attempt-1",
+                occurred_at=datetime(2026, 8, 18, 12, tzinfo=timezone.utc),
+            )
+        )
+        ledger.append(
+            self.event(
+                payment_attempt_id="attempt-1",
+                occurred_at=datetime(2026, 8, 18, 13, tzinfo=timezone.utc),
+            )
+        )
+
+        events = ledger.list_events()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["demand_id"], first.demand_id)
+        self.assertEqual(events[0]["occurred_at"], "2026-08-18T12:00:00Z")
+
     def test_demand_events_are_immutable(self):
         ledger = DemandLedger(":memory:")
         event = ledger.append(self.event())

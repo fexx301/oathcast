@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -14,6 +15,7 @@ from oathcast.ground_truth import (
     PrecipitationObservation,
     resolve_precipitation,
 )
+from oathcast.protocol import ProtocolReceipt, ProtocolResultEnvelope
 
 
 UTC = timezone.utc
@@ -184,6 +186,65 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(revised["ground_truth"]["outcome"], 1)
             self.assertEqual(len(revised["observations"]), 2)
             self.assertEqual(len(revised["resolutions"]), 2)
+
+    def test_reply_projection_is_idempotent_and_retains_protocol_provenance(self):
+        store = SqliteCaseStore(":memory:")
+        store.create(self.question)
+        protocol_result = ProtocolResultEnvelope(
+            body={"probability": 0.7},
+            receipt=ProtocolReceipt(
+                request_url="https://dispatcher.example/v1/212/forecast",
+                route_mode="telegraph",
+                response_status=200,
+                received_at="2026-08-17T11:58:00Z",
+                payment_attempt_id="payment-attempt-1",
+                settlement_verification="verified",
+                response_sha256="a" * 64,
+                response_body_sha256="b" * 64,
+            ),
+        )
+        reply = MinerReply(
+            miner_id="212",
+            slug="weatherapi",
+            owned=False,
+            raw_response={"probability": 0.7},
+            probability=0.7,
+            content="70%",
+            latency_ms=5,
+            transport="telegraph",
+            received_at=datetime(2026, 8, 17, 11, 58, tzinfo=UTC),
+            request_id="app-1",
+            protocol_result=protocol_result,
+        )
+
+        store.record_reply(self.question.event_id, reply.to_dict())
+        replay = reply.to_dict()
+        replay["received_at"] = "2026-08-17T12:00:00Z"
+        store.record_reply(self.question.event_id, replay)
+
+        case = store.get(self.question.event_id)
+        self.assertIsNotNone(case)
+        self.assertEqual(len(case["miner_replies"]), 1)
+        projected = case["miner_replies"][0]
+        self.assertEqual(projected["response_body_sha256"], "b" * 64)
+        self.assertEqual(
+            projected["protocol_receipt"]["payment_attempt_id"],
+            "payment-attempt-1",
+        )
+
+    def test_sealed_policy_records_the_actual_decision_threshold(self):
+        store = SqliteCaseStore(":memory:")
+        store.create(self.question)
+        store.seal_decision(
+            self.question.event_id,
+            replace(self.decision, decision_threshold=0.7),
+        )
+
+        case = store.get(self.question.event_id)
+        self.assertEqual(
+            case["decisions"][0]["policy"]["decision_threshold_x10000"],
+            7000,
+        )
 
     def test_file_case_store_enforces_foreign_keys_on_fresh_connections(self):
         with tempfile.TemporaryDirectory() as directory:

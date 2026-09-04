@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import unittest
 
 from oathcast.application import CrossMinerRouter
@@ -66,6 +66,36 @@ class MinerAdapterTests(unittest.TestCase):
         self.assertAlmostEqual(result.probability, 0.66)
         self.assertTrue(result.probability_comparable)
         self.assertTrue(result.has_comparable_probability)
+
+    def test_weatherapi_rejects_horizons_outside_provider_window(self):
+        too_long = self.question.__class__(
+            event_id="adapter-too-long",
+            location_name=self.question.location_name,
+            latitude=self.question.latitude,
+            longitude=self.question.longitude,
+            horizon_start=self.question.horizon_start,
+            horizon_end=self.question.horizon_end,
+            forecast_cutoff=self.question.forecast_cutoff - timedelta(days=14),
+        )
+        with self.assertRaisesRegex(ValueError, "at most 14"):
+            WeatherApiMinerAdapter().validate_question(too_long)
+
+        future_start = (datetime.now(tz=UTC) + timedelta(days=15)).replace(
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        too_far = self.question.__class__(
+            event_id="adapter-too-far",
+            location_name=self.question.location_name,
+            latitude=self.question.latitude,
+            longitude=self.question.longitude,
+            horizon_start=future_start,
+            horizon_end=future_start + timedelta(hours=1),
+            forecast_cutoff=future_start - timedelta(hours=1),
+        )
+        with self.assertRaisesRegex(ValueError, "14-day"):
+            WeatherApiMinerAdapter().validate_question(too_far)
 
     def test_zeus_temperature_context_is_excluded_from_probability_consensus(self):
         capabilities = [

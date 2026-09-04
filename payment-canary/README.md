@@ -137,3 +137,20 @@ addresses, status fields, and the settlement transaction signature. It never
 contains `SOLANA_PRIVATE_KEY`, `PAYMENT-SIGNATURE`, a payment payload, or a
 raw settlement proof. A failed paid retry is treated as an unknown outcome and
 is never retried by the CLI.
+
+## Private Application sidecar
+
+Track 3 uses `src/application-sidecar.ts` as a separate, Unix-socket-only
+process. It owns the signer and the SQLite payment journal; the Python
+Application gateway never constructs a payment header. The sidecar is disabled
+unless `OATHCAST_APPLICATION_ENABLE_PAID=true`, requires a 32-byte-or-longer
+shared token and `SOLANA_PRIVATE_KEY`, and defaults to one allowlisted external
+Miner (`212` / `forecast`) and one paid request.
+
+The sidecar performs the same unpaid preflight before reserving a payment,
+stores a bounded paid response and settlement/RPC evidence, and converts
+unfinished work to a non-retryable `unknown` state on restart. Duplicate
+settled requests replay the stored body. Unknown outcomes require an explicit
+operator reconciliation message; there is no automatic retry. The normal
+`npm run canary` command remains a one-shot diagnostic and does not start the
+sidecar.

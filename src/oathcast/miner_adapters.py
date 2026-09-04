@@ -12,7 +12,7 @@ precipitation field can become a consensus input.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 from typing import Any, Protocol
 from urllib.parse import urlencode
@@ -129,16 +129,31 @@ class WeatherApiMinerAdapter:
     endpoint_name = "forecast"
     parser_version = "weatherapi_miner_response_v1"
 
+    def validate_question(self, question: ForecastQuestion) -> None:
+        """Reject windows WeatherAPI's finite forecast horizon cannot serve."""
+
+        horizon_start = ensure_utc(question.horizon_start, "horizon_start")
+        horizon_end = ensure_utc(question.horizon_end, "horizon_end")
+        forecast_cutoff = ensure_utc(question.forecast_cutoff, "forecast_cutoff")
+        if horizon_end <= horizon_start:
+            raise ValueError("horizon_end must be after horizon_start")
+        if forecast_cutoff > horizon_start:
+            raise ValueError("forecast_cutoff must be at or before horizon_start")
+        requested_days = (horizon_end.date() - forecast_cutoff.date()).days + 1
+        if requested_days > 14:
+            raise ValueError("WeatherAPI supports at most 14 forecast days")
+        latest_supported_date = datetime.now(tz=UTC).date() + timedelta(days=13)
+        if horizon_start.date() > latest_supported_date:
+            raise ValueError("WeatherAPI cannot serve a horizon beyond its 14-day forecast")
+
     def build_params(self, question: ForecastQuestion) -> dict[str, Any]:
+        self.validate_question(question)
         requested_days = (
             question.horizon_end.date() - question.forecast_cutoff.date()
         ).days + 1
         return {
             "q": f"{question.latitude:.6f},{question.longitude:.6f}",
-            # WeatherAPI accepts 1-14 forecast days. A capped request remains
-            # safe: parse_response still refuses a payload without the exact
-            # requested hour instead of substituting a nearby forecast.
-            "days": str(min(14, max(1, requested_days))),
+            "days": str(max(1, requested_days)),
         }
 
     def build_url(

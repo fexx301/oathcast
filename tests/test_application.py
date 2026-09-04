@@ -46,6 +46,22 @@ class ApplicationTests(unittest.TestCase):
             {decision.application_request_id},
         )
 
+    def test_decision_threshold_is_applied_and_persisted_in_the_decision(self):
+        router = CrossMinerRouter(
+            self.capabilities[:2],
+            clients={
+                "oathcast-weather": lambda question: {"probability": 0.7},
+                "external-alpha": lambda question: {"probability": 0.7},
+            },
+            own_slugs={"oathcast-weather"},
+        )
+
+        decision = router.decide(self.question, decision_threshold=0.7)
+
+        self.assertTrue(decision.event_likely)
+        self.assertEqual(decision.recommended_action, "plan_for_event")
+        self.assertEqual(decision.to_dict()["decision_threshold"], 0.7)
+
     def test_application_survives_with_owned_miner_disabled(self):
         router = CrossMinerRouter(
             self.capabilities,

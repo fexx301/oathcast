@@ -34,14 +34,26 @@ class ApplicationWorkflow:
         self.observation_source = observation_source
         self.clock = clock or (lambda: datetime.now(tz=UTC))
 
-    def decide(self, question: ForecastQuestion, *, disable_owned: bool = False) -> ApplicationDecision:
+    def decide(
+        self,
+        question: ForecastQuestion,
+        *,
+        disable_owned: bool = False,
+        application_request_id: str | None = None,
+        decision_threshold: float = 0.5,
+    ) -> ApplicationDecision:
         """Create and freeze one case using only current Miner responses."""
 
         self.case_store.create(question, created_at=self.clock())
         existing = self.case_store.get(question.event_id)
         if existing is not None and existing.get("decision") is not None:
             raise CaseStateError("case decision is already sealed; use its stored evidence")
-        decision = self.router.decide(question, disable_owned=disable_owned)
+        decision = self.router.decide(
+            question,
+            disable_owned=disable_owned,
+            application_request_id=application_request_id,
+            decision_threshold=decision_threshold,
+        )
         self.case_store.seal_decision(
             question.event_id,
             decision,

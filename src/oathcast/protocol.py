@@ -84,6 +84,9 @@ class ProtocolReceipt:
     registry_snapshot_sha256: str | None = None
     challenge_deadline: str | None = None
     response_sha256: str | None = None
+    response_body_sha256: str | None = None
+    request_url_sha256: str | None = None
+    settlement_transaction_signature: str | None = None
 
     def __post_init__(self) -> None:
         if self.route_mode not in ROUTE_MODES:
@@ -114,6 +117,9 @@ class ProtocolReceipt:
             "registry_snapshot_sha256": self.registry_snapshot_sha256,
             "challenge_deadline": self.challenge_deadline,
             "response_sha256": self.response_sha256,
+            "response_body_sha256": self.response_body_sha256,
+            "request_url_sha256": self.request_url_sha256,
+            "settlement_transaction_signature": self.settlement_transaction_signature,
         }
 
     @property
@@ -175,6 +181,9 @@ class ProtocolResultEnvelope:
             registry_snapshot_sha256=registry_snapshot_sha256,
             challenge_deadline=getattr(response, "challenge_deadline", None),
             response_sha256=response_hash,
+            response_body_sha256=getattr(response, "response_body_sha256", None),
+            request_url_sha256=getattr(response, "target_sha256", None),
+            settlement_transaction_signature=getattr(response, "transaction_signature", None),
         )
         return cls(body=body, receipt=receipt)
 

@@ -32,7 +32,8 @@ python scripts/run_decision_ui.py --host 127.0.0.1 --port 8787
 
 Open <http://127.0.0.1:8787/>. The page and health endpoints are available, but
 `POST /api/decision` intentionally returns `503` until a real Telegraph-backed
-decision runner is injected.
+decision runner is injected. The reviewed Track 3 gateway is a separate
+loopback-only service; it is not wired into this public endpoint.
 
 Port `8787` is reserved for this public edge service. The separate local
 Planning Desk pilot defaults to `8788` and must not be placed behind Caddy's

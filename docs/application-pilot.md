@@ -1,9 +1,9 @@
 # OathCast Planning Desk pilot
 
 The Planning Desk is the first user-facing Application surface. OathCast Miner
-registration is complete and active, but this local intake remains deliberately
-disconnected from Telegraph routing and payment until the Application track and
-reviewed paid-request boundary are enabled.
+registration is complete and active. This local intake remains disconnected
+from Telegraph routing and payment; the reviewed private Application boundary
+is implemented separately and remains disabled by default.
 
 ## Run locally
 
@@ -70,3 +70,22 @@ Before routing any queued request through Telegraph, the operator must verify:
 Only then should a reviewed queue item become a paid Telegraph request. The
 local queue is preparation and demand discovery, not a substitute for the
 protocol's Explorer accounting.
+
+## Private Application gateway
+
+The reviewed live path is a separate loopback service plus a TypeScript
+payment sidecar. It is not mounted behind the public UI or Caddy. The sidecar
+owns the Solana signer and journal; the Python gateway receives only a bounded,
+sanitized result. See [`application-payment-boundary.md`](application-payment-boundary.md)
+for the threat model and activation gates.
+
+The repository check is non-live:
+
+```sh
+PYTHONPATH=src python3 -m unittest tests.test_application_payment
+cd payment-canary && npm run check
+```
+
+These tests use injected responses. They do not perform a paid request. A
+real activation still requires fresh discovery and explicit authorization for
+one devnet attempt.

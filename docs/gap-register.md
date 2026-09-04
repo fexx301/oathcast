@@ -1,6 +1,6 @@
 # OathCast gap register
 
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-04
 
 Current baseline: the public Miner runs `2026-08-30-hourly-v18`, source SHA-256
 `5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`, image
@@ -427,9 +427,12 @@ breakdown-layout blocker before a registration candidate can be frozen.
   registration or replacement is authorized. Any future attempt requires a
   fresh decoded wrapper/nested-call preflight for the new hash and fresh
   explicit user authorization.
-- Write the payment-boundary ADR and threat model, then implement one private,
-  authenticated, allowlisted, transactionally budgeted Solana request with a
-  durable payment journal. Do not enable the public decision endpoint first.
+- The private authenticated Application payment boundary, threat model, and
+  append-only Solana journal are now implemented and locally tested. It remains
+  disabled and is pinned to one reviewed external Miner/endpoint until fresh
+  discovery, payee/route verification, explicit one-request authorization, and
+  a real independent end-to-end payment are complete. Do not enable the public
+  decision endpoint first.
 
 ## Blocked on authorization, external evidence, or remaining documentation
 
@@ -572,9 +575,11 @@ breakdown-layout blocker before a registration candidate can be frozen.
   rechecked near submission, and the separate 100-real-request condition remains
   unmet.
 - The Solana x402 canary has completed one independently RPC-verified devnet
-  payment, but it is an isolated CLI. A production Application boundary still
-  needs authenticated principals, transactional budgets, idempotency binding,
-  durable ambiguous-outcome reconciliation, and capture of the paid Miner body.
+  payment, but it is an isolated CLI. The reviewed production Application
+  boundary now supplies authenticated principals, transactional budgets,
+  idempotency binding, durable ambiguous-outcome reconciliation, and bounded
+  paid-Miner-body capture. It remains disabled pending fresh discovery,
+  operator authorization, and a real end-to-end Application payment.
 
 ## Non-goals
 

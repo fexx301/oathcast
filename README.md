@@ -15,13 +15,16 @@ description re-registration on
 2026-08-27 is documented separately and changed no runtime behavior. The
 separate public UI exposes a truthful read-only status surface and client-only
 development fixture. Its live decision endpoint remains degraded and returns
-503 because no reviewed paid Application runner is configured.
+503 because the private paid Application runner is not attached to the public
+UI.
 
 The repository also contains provider adapters, a cross-Miner Application
-scaffold, durable case and receipt stores, a development Script Author proxy,
+router, durable case and receipt stores, a development Script Author proxy,
 an isolated TypeScript Solana x402 canary, and leakage-safe evaluation tools.
-These components are tested, but they are not yet composed into a live paid
-Application.
+The paid Application path now has a private loopback gateway and a TypeScript
+sidecar with an append-only journal. It is implemented and tested but remains
+disabled by default; no live paid Application traffic or user adoption is
+claimed.
 
 The project deliberately separates two scoring paths:
 

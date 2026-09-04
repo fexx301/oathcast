@@ -8,7 +8,7 @@ import hashlib
 import os
 import sqlite3
 import threading
-from typing import Any
+from typing import Any, Mapping
 
 from oathcast.application import ApplicationDecision
 from oathcast.forecast import ForecastQuestion, format_timestamp
@@ -32,6 +32,40 @@ def _canonical_json(value: Any) -> str:
 
 def _sha256_json(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _reply_id(event_id: str, reply: dict[str, Any]) -> str:
+    """Derive one stable evidence id for one Application request/reply pair."""
+
+    return _sha256_json(
+        {
+            "event_id": event_id,
+            "miner_id": reply.get("miner_id"),
+            "request_id": reply.get("request_id"),
+            "raw_response": reply.get("raw_response"),
+            "parser_version": reply.get("parser_version", "probability_extractor_v1"),
+        }
+    )
+
+
+def _protocol_projection_fields(reply: Mapping[str, Any]) -> tuple[str | None, str | None, str | None]:
+    """Return the receipt JSON, exact paid-body hash, and request id to persist."""
+
+    request_id = reply.get("request_id")
+    request_id = request_id if isinstance(request_id, str) and request_id else None
+    protocol = reply.get("protocol_result")
+    if not isinstance(protocol, Mapping):
+        return request_id, None, None
+    receipt = protocol.get("receipt")
+    if not isinstance(receipt, Mapping):
+        return request_id, None, None
+    response_body_sha256 = receipt.get("response_body_sha256")
+    response_body_sha256 = (
+        response_body_sha256
+        if isinstance(response_body_sha256, str) and response_body_sha256
+        else None
+    )
+    return request_id, _canonical_json(receipt), response_body_sha256
 
 
 def _timestamp(value: datetime | None = None) -> str:
@@ -69,6 +103,15 @@ class SqliteCaseStore:
                     resolved_at TEXT
                 );
 
+                CREATE TABLE IF NOT EXISTS application_request_bindings (
+                    principal_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    request_sha256 TEXT NOT NULL,
+                    event_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (principal_id, idempotency_key)
+                );
+
                 CREATE TABLE IF NOT EXISTS miner_replies (
                     reply_id TEXT PRIMARY KEY,
                     event_id TEXT NOT NULL,
@@ -82,6 +125,9 @@ class SqliteCaseStore:
                     probability_x10000 INTEGER,
                     parser_version TEXT NOT NULL,
                     validity_reason TEXT,
+                    request_id TEXT,
+                    protocol_receipt_json TEXT,
+                    response_body_sha256 TEXT,
                     FOREIGN KEY (event_id) REFERENCES application_cases(event_id)
                 );
 
@@ -121,6 +167,23 @@ class SqliteCaseStore:
                 );
                 """
             )
+            existing_columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(miner_replies)").fetchall()
+            }
+            migrations = {
+                "request_id": "ALTER TABLE miner_replies ADD COLUMN request_id TEXT",
+                "protocol_receipt_json": (
+                    "ALTER TABLE miner_replies ADD COLUMN protocol_receipt_json TEXT"
+                ),
+                "response_body_sha256": (
+                    "ALTER TABLE miner_replies ADD COLUMN response_body_sha256 TEXT"
+                ),
+            }
+            for column, statement in migrations.items():
+                if column not in existing_columns:
+                    connection.execute(statement)
+            connection.commit()
         finally:
             if self._memory_connection is None:
                 connection.close()
@@ -188,6 +251,9 @@ class SqliteCaseStore:
             ).fetchall()]
             for reply in replies:
                 reply["raw_response"] = json.loads(reply.pop("raw_response_json"))
+                protocol_receipt_json = reply.pop("protocol_receipt_json", None)
+                if protocol_receipt_json is not None:
+                    reply["protocol_receipt"] = json.loads(protocol_receipt_json)
             decisions = [dict(item) for item in connection.execute(
                 "SELECT * FROM decisions WHERE event_id = ? ORDER BY decided_at, decision_id",
                 (event_id,),
@@ -266,6 +332,118 @@ class SqliteCaseStore:
                 if self._memory_connection is None:
                     connection.close()
 
+    def bind_application_request(
+        self,
+        *,
+        principal_id: str,
+        idempotency_key: str,
+        request_sha256: str,
+        event_id: str,
+        created_at: datetime | None = None,
+    ) -> None:
+        """Bind an authenticated Application idempotency key to one request."""
+
+        values = (principal_id, idempotency_key, request_sha256, event_id)
+        with self._lock:
+            connection = self._connection()
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO application_request_bindings (
+                        principal_id, idempotency_key, request_sha256, event_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (*values, _timestamp(created_at)),
+                )
+                existing = connection.execute(
+                    """
+                    SELECT request_sha256, event_id
+                    FROM application_request_bindings
+                    WHERE principal_id = ? AND idempotency_key = ?
+                    """,
+                    (principal_id, idempotency_key),
+                ).fetchone()
+                if existing is None:
+                    raise CaseStateError("Application idempotency binding could not be stored")
+                if existing[0] != request_sha256 or existing[1] != event_id:
+                    raise CaseConflict(
+                        "Application idempotency key is bound to a different request"
+                    )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            finally:
+                if self._memory_connection is None:
+                    connection.close()
+
+    def record_reply(self, event_id: str, reply: dict[str, Any]) -> None:
+        """Project one received reply before a decision is sealed.
+
+        The projector is deliberately idempotent: a process can persist a
+        response, crash before sealing the decision, and safely replay the
+        same Application request later without duplicating or rewriting the
+        evidence row.
+        """
+
+        if not isinstance(reply, dict):
+            raise CaseConflict("projected Miner reply must be an object")
+        raw_response = reply.get("raw_response")
+        raw_response_json = _canonical_json(raw_response)
+        received_at = reply.get("received_at")
+        reply_id = _reply_id(event_id, reply)
+        request_id, protocol_receipt_json, response_body_sha256 = _protocol_projection_fields(reply)
+        probability = reply.get("probability")
+        probability_x10000 = (
+            None if probability is None else int(round(float(probability) * 10000))
+        )
+        with self._lock:
+            connection = self._connection()
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                case = connection.execute(
+                    "SELECT 1 FROM application_cases WHERE event_id = ?",
+                    (event_id,),
+                ).fetchone()
+                if case is None:
+                    raise CaseStateError("case must be created before projecting a reply")
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO miner_replies (
+                        reply_id, event_id, miner_id, slug, owned,
+                        raw_response_json, raw_response_sha256, received_at,
+                        latency_ms, probability_x10000, parser_version,
+                        validity_reason, request_id, protocol_receipt_json,
+                        response_body_sha256
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        reply_id,
+                        event_id,
+                        str(reply.get("miner_id", "")),
+                        str(reply.get("slug", "")),
+                        int(bool(reply.get("owned"))),
+                        raw_response_json,
+                        _sha256_json(raw_response),
+                        received_at,
+                        reply.get("latency_ms"),
+                        probability_x10000,
+                        str(reply.get("parser_version", "probability_extractor_v1")),
+                        reply.get("validity_reason") or reply.get("error"),
+                        request_id,
+                        protocol_receipt_json,
+                        response_body_sha256,
+                    ),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            finally:
+                if self._memory_connection is None:
+                    connection.close()
+
     def seal_decision(
         self,
         event_id: str,
@@ -301,13 +479,9 @@ class SqliteCaseStore:
                             raise CaseConflict("decision contains a malformed Miner reply")
                         raw_response_json = _canonical_json(reply.get("raw_response"))
                         received_at = reply.get("received_at") or payload.get("decided_at")
-                        reply_id = _sha256_json(
-                            {
-                                "event_id": event_id,
-                                "miner_id": reply.get("miner_id"),
-                                "raw_response_json": raw_response_json,
-                                "received_at": received_at,
-                            }
+                        reply_id = _reply_id(event_id, reply)
+                        request_id, protocol_receipt_json, response_body_sha256 = (
+                            _protocol_projection_fields(reply)
                         )
                         reply_ids.append(reply_id)
                         probability = reply.get("probability")
@@ -322,8 +496,9 @@ class SqliteCaseStore:
                                 reply_id, event_id, miner_id, slug, owned,
                                 raw_response_json, raw_response_sha256, received_at,
                                 latency_ms, probability_x10000, parser_version,
-                                validity_reason
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                validity_reason, request_id, protocol_receipt_json,
+                                response_body_sha256
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """,
                             (
                                 reply_id,
@@ -338,12 +513,18 @@ class SqliteCaseStore:
                                 probability_x10000,
                                 str(reply.get("parser_version", "probability_extractor_v1")),
                                 reply.get("validity_reason") or reply.get("error"),
+                                request_id,
+                                protocol_receipt_json,
+                                response_body_sha256,
                             ),
                         )
                     decided_at = str(payload["decided_at"])
+                    decision_threshold = float(payload.get("decision_threshold", 0.5))
+                    if not 0 <= decision_threshold <= 1:
+                        raise CaseConflict("decision threshold must be between 0 and 1")
                     policy = {
-                        "policy_version": "cross_miner_weighted_v1",
-                        "decision_threshold_x10000": 5000,
+                        "policy_version": "cross_miner_weighted_v2",
+                        "decision_threshold_x10000": int(round(decision_threshold * 10000)),
                         "aggregate_probability_x10000": int(
                             round(float(payload["aggregate_probability"]) * 10000)
                         ),
