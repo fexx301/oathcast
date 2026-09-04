@@ -24,6 +24,22 @@ has no Telegraph-backed runner, accepts no live Planning Desk intake, and
 returns 503 for decision requests. Live decisions must not be enabled until the
 authenticated, budgeted payment path has been reviewed and deployed.
 
+On 2026-09-04, the separate `oathcast-decision-ui` container was refreshed to
+the already verified `oathcast:2026-08-30-hourly-v18` image
+(`sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`).
+This UI-only cutover replaced the stale `oathcast-ui:2026-08-13-ui-v1` shell
+that returned 404 for the packaged mark. The old container remains stopped as
+`oathcast-decision-ui-rollback-20260904` (ID
+`1c6afb3524a698a7cf9fceabe2d4669a017a4520926970e5d291518684878228`); the new
+container is `2ff364622c02d8e161d31894ef394a8fea8d27e494d30bb07bbecc53b171d368`.
+The replacement remains bridge-networked, publishes only `127.0.0.1:8787`,
+runs as UID/GID `1000:1000`, and had zero restarts in the initial stability
+check. Public verification returned the logo reference in `/`, and
+`/assets/oathcast-mark.webp?v=16fae356` returned HTTP 200 as `image/webp`,
+18,454 bytes, with SHA-256
+`16fae356c71fe6ed83d7594feb780477455c2868ac5409763099c8d66305a80a`.
+Miner and Caddy container IDs and start times were unchanged.
+
 V18 has persisted schema-4 receipts containing complete hourly weather fields
 that v17 cannot replay. If a rollback becomes necessary, preserve the current
 production database unchanged and do **not** restore the pre-v18 backup over it.
