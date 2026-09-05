@@ -727,16 +727,19 @@ def render_decision_result(result: DecisionResult) -> str:
         '<tr><td colspan="5">No public Miner evidence was returned.</td></tr>'
     )
     return (
-        '<section class="result" aria-labelledby="result-heading">'
-        '<p class="eyebrow">Decision returned</p>'
-        f'<h2 id="result-heading">{escape(safe.action.upper())}</h2>'
+        '<section class="result live-result" aria-labelledby="result-heading">'
+        '<p class="eyebrow"><span class="status-dot" aria-hidden="true"></span>Decision returned</p>'
+        f'<div class="result-title-row"><h2 id="result-heading">{escape(safe.action.upper())}</h2>'
+        '<span class="result-badge">Live evidence</span></div>'
         f'<p class="summary">{escape(safe.summary)}</p>'
         f'<p>{escape(safe.rationale)}</p>'
+        '<p class="supporting">Use this as planning evidence. It is not a safety guarantee.</p>'
         '<dl class="result-facts">'
         f'<div><dt>Risk estimate</dt><dd>{escape(_format_percent(safe.risk_percent))}</dd></div>'
         f'<div><dt>Request ID</dt><dd>{escape(safe.request_id or "Not available")}</dd></div>'
         '</dl>'
-        '<h3>Miner evidence</h3>'
+        '<h3>Evidence behind this result</h3>'
+        '<p class="supporting">Each row is one forecast provider. The route and payment columns explain how the evidence reached OathCast.</p>'
         '<div class="table-wrap"><table><thead><tr>'
         '<th scope="col">Miner</th><th scope="col">Status</th>'
         '<th scope="col">Risk</th><th scope="col">Telegraph route</th>'
@@ -857,81 +860,255 @@ def _render_page(*, result: DecisionResult | None = None, error: str | None = No
       .button-row button {{ width: 100%; }}
     }}
     @media (prefers-reduced-motion: reduce) {{ html {{ scroll-behavior: auto; }} * {{ transition: none !important; }} }}
+
+    /* OathCast public preview system: calm, legible, and status-first. */
+    :root {{
+      --paper: #080a0d;
+      --panel: #101419;
+      --panel-strong: #151b22;
+      --ink: #f4f7fa;
+      --muted: #aab5c1;
+      --muted-strong: #d1d9e1;
+      --line: #29333d;
+      --line-strong: #43515e;
+      --accent: #f0525f;
+      --accent-bright: #ff707c;
+      --accent-soft: #2b0e13;
+      --positive: #85e7b5;
+      --caution: #f6cb69;
+      --focus: #9ad8ff;
+      --danger: #ff9aa2;
+      --danger-soft: #321219;
+      --shadow: rgba(0, 0, 0, .28);
+    }}
+    html {{ scroll-padding-top: 1.5rem; }}
+    body {{ background: var(--paper); color: var(--ink); font-size: 16px; line-height: 1.6; }}
+    .shell {{ width: min(100% - 2rem, 1180px); padding: 1rem 0 4rem; }}
+    .site-header {{ min-height: 4.5rem; gap: 1.5rem; }}
+    .brand {{ gap: .7rem; color: var(--ink); text-decoration: none; }}
+    .brand-mark {{ width: 2.75rem; height: 2.75rem; filter: drop-shadow(0 0 .6rem rgba(240, 82, 95, .16)); }}
+    .brand-copy {{ display: grid; gap: .05rem; }}
+    .brand-name {{ line-height: 1; }}
+    .brand-subtitle {{ color: var(--muted); font-size: .7rem; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }}
+    .site-nav {{ display: flex; align-items: center; gap: .35rem; }}
+    .site-nav a {{ display: inline-flex; min-height: 2.75rem; align-items: center; border-radius: .35rem; padding: .55rem .75rem; color: var(--muted-strong); font-size: .88rem; font-weight: 720; text-decoration: none; }}
+    .site-nav a:hover {{ background: var(--panel); color: var(--ink); }}
+    .site-nav .status-link {{ border: 1px solid var(--line-strong); color: var(--ink); }}
+    .skip-link {{ background: var(--panel); }}
+    main {{ gap: clamp(2.5rem, 6vw, 5rem); padding-top: clamp(2.75rem, 7vw, 6rem); }}
+    section {{ scroll-margin-top: 1.5rem; }}
+    h1, h2, h3 {{ letter-spacing: -.025em; }}
+    h1 {{ max-width: 16ch; margin: 1rem 0 1.35rem; font-family: Georgia, "Times New Roman", serif; font-size: clamp(3.15rem, 8vw, 6.2rem); line-height: .98; text-wrap: balance; }}
+    h2 {{ font-size: clamp(1.8rem, 4vw, 3rem); }}
+    p {{ max-width: 70ch; }}
+    .lede {{ font-size: clamp(1.05rem, 1.7vw, 1.24rem); }}
+    .eyebrow {{ display: flex; align-items: center; gap: .55rem; color: var(--muted-strong); font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }}
+    .status-dot {{ display: inline-block; width: .56rem; height: .56rem; flex: 0 0 auto; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 .28rem rgba(240, 82, 95, .12); }}
+    .status-dot.positive {{ background: var(--positive); box-shadow: 0 0 0 .28rem rgba(133, 231, 181, .12); }}
+    .semantic-status {{ display: inline-flex; align-items: center; gap: .5rem; min-height: 2.1rem; border: 1px solid var(--line-strong); border-radius: 999px; background: #0c1014; color: var(--muted-strong); padding: .35rem .72rem; }}
+    .semantic-status.warning {{ border-color: #826322; background: #2b210d; color: var(--caution); }}
+    .hero {{ position: relative; grid-template-columns: minmax(0, 1.2fr) minmax(18rem, .8fr); gap: clamp(2rem, 6vw, 5rem); align-items: center; padding-bottom: clamp(2.5rem, 6vw, 5rem); }}
+    .hero::after {{ display: none; }}
+    .hero-copy {{ min-width: 0; }}
+    .hero-actions {{ display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-top: 1.65rem; }}
+    .button {{ display: inline-flex; min-height: 3rem; width: auto; align-items: center; justify-content: center; border: 1px solid var(--accent); border-radius: .35rem; background: var(--accent); color: #17070a; cursor: pointer; padding: .72rem 1rem; font-weight: 800; text-decoration: none; transition: background-color .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }}
+    .button:hover {{ border-color: var(--accent-bright); background: var(--accent-bright); color: #17070a; }}
+    .button:active {{ transform: translateY(1px); }}
+    .text-link {{ display: inline-flex; min-height: 3rem; align-items: center; padding: .72rem .35rem; color: var(--muted-strong); font-weight: 760; }}
+    .quiet-note {{ display: flex; align-items: center; gap: .65rem; margin: 1.35rem 0 0; color: var(--muted); font-size: .88rem; }}
+    .hero-status {{ border-left: 0; }}
+    .mode-card {{ border: 1px solid var(--line-strong); border-top: .25rem solid var(--accent); border-radius: .5rem; background: var(--panel); padding: clamp(1.25rem, 3vw, 2rem); box-shadow: 0 1.75rem 4rem var(--shadow); }}
+    .mode-card h2 {{ margin-top: .85rem; font-size: clamp(1.65rem, 3vw, 2.25rem); }}
+    .mode-card p {{ color: var(--muted-strong); }}
+    .mode-card .card-eyebrow {{ margin: 0; color: var(--accent-bright); font-size: .78rem; font-weight: 820; letter-spacing: .14em; text-transform: uppercase; }}
+    .mode-list {{ display: grid; gap: .7rem; margin-top: 1.45rem; }}
+    .mode-item {{ display: grid; gap: .1rem; border-top: 1px solid var(--line); padding-top: .7rem; }}
+    .mode-item strong {{ font-size: .86rem; }}
+    .mode-item span {{ color: var(--muted); font-size: .88rem; }}
+    .section-heading {{ display: grid; gap: .2rem; max-width: 760px; }}
+    .section-heading > p:last-child {{ margin-top: .3rem; color: var(--muted); }}
+    .step-list {{ display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 1.5rem 0 0; padding: 0; list-style: none; }}
+    .step-card {{ min-height: 12rem; border: 1px solid var(--line); border-radius: .45rem; background: #0c1014; padding: 1.25rem; }}
+    .step-number {{ display: inline-grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent-bright); font-weight: 850; font-variant-numeric: tabular-nums; }}
+    .step-card h3 {{ margin-top: 1.15rem; }}
+    .step-card p {{ margin-bottom: 0; color: var(--muted); font-size: .94rem; }}
+    .status-section {{ display: grid; gap: 1.35rem; }}
+    .status-grid {{ display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 0; }}
+    .status-item {{ min-height: 10.5rem; border: 1px solid var(--line); border-radius: .45rem; background: var(--panel); padding: 1.25rem; }}
+    .status-item:nth-child(odd), .status-item:nth-child(even) {{ border-right: 1px solid var(--line); padding-left: 1.25rem; }}
+    .status-item strong {{ display: flex; align-items: center; gap: .55rem; margin-bottom: .45rem; }}
+    .status-item p {{ margin: 0; color: var(--muted); }}
+    .available {{ color: var(--positive); }}
+    .unavailable {{ color: var(--caution); }}
+    .status-item .status-dot {{ width: .45rem; height: .45rem; box-shadow: none; }}
+    .panel {{ border: 1px solid var(--line); border-radius: .5rem; background: var(--panel); padding: clamp(1.25rem, 4vw, 2.5rem); box-shadow: 0 1.5rem 4rem var(--shadow); }}
+    .fixture-head {{ gap: 1.5rem; }}
+    .fixture-head .supporting {{ margin-bottom: 0; }}
+    .fixture-note {{ border-left: .22rem solid var(--accent); border-radius: .2rem; background: var(--accent-soft); color: var(--muted-strong); padding: .9rem 1rem; font-size: .93rem; }}
+    .fixture-layout {{ gap: 1.5rem; grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr); margin-top: 1.5rem; }}
+    .fixture-controls {{ align-content: start; gap: 1rem; }}
+    .group-title {{ margin: 0; color: var(--muted-strong); font-size: .88rem; font-weight: 800; }}
+    .field {{ display: grid; gap: .4rem; }}
+    label {{ font-weight: 760; }}
+    input, select {{ min-height: 3rem; border-color: var(--line-strong); border-radius: .35rem; background: #080b0e; color: var(--ink); padding: .72rem .8rem; }}
+    input[aria-invalid="true"] {{ border-color: var(--danger); }}
+    .help {{ margin: 0; font-size: .88rem; }}
+    .field-error {{ min-height: 0; margin: 0; color: var(--danger); font-size: .88rem; }}
+    .field-error[hidden] {{ display: none; }}
+    input:focus, select:focus, button:focus-visible, a:focus-visible {{ outline: 3px solid var(--focus); outline-offset: 3px; border-color: var(--focus); }}
+    button {{ min-height: 3rem; border-radius: .35rem; }}
+    button[disabled] {{ cursor: not-allowed; border-color: var(--line-strong); background: #0c1014; color: #81909e; transform: none; }}
+    .result {{ border-color: var(--line-strong); border-radius: .45rem; background: var(--panel-strong); }}
+    .result-title-row {{ display: flex; align-items: center; flex-wrap: wrap; gap: .8rem; }}
+    .result h2 {{ margin: .6rem 0 .8rem; font-size: clamp(1.9rem, 4vw, 2.8rem); }}
+    .result-badge {{ border: 1px solid var(--positive); border-radius: 999px; color: var(--positive); padding: .3rem .6rem; font-size: .76rem; font-weight: 800; text-transform: uppercase; }}
+    .result h3 {{ margin-top: 1.3rem; font-size: 1.45rem; }}
+    .result-facts {{ gap: .8rem; margin: 1.25rem 0; }}
+    .result-facts div {{ border-top-color: var(--line-strong); padding: .78rem 0; }}
+    .limits li {{ display: flex; gap: .6rem; align-items: flex-start; border-left: 0; color: var(--muted-strong); padding-left: 0; }}
+    .limits li::before {{ content: ""; width: .55rem; height: .55rem; flex: 0 0 auto; margin-top: .55rem; border-radius: 50%; background: var(--accent); }}
+    .definitions {{ display: grid; gap: 1rem; }}
+    .definition-grid {{ display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+    .definition {{ border-top: 2px solid var(--line-strong); padding-top: .9rem; }}
+    .definition p {{ margin-bottom: 0; color: var(--muted); font-size: .94rem; }}
+    .live-disabled {{ border-color: #70404a; background: #180e12; }}
+    .live-disabled::after {{ display: none; }}
+    .live-disabled .supporting {{ color: #e2adb4; }}
+    .live-disabled .button-row {{ margin-top: 1.25rem; }}
+    .table-wrap {{ margin-top: .9rem; }}
+    table {{ min-width: 650px; }}
+    footer {{ margin-top: 0; padding-top: 1.35rem; border-top: 1px solid var(--line); font-size: .88rem; }}
+    @media (max-width: 980px) {{
+      .hero {{ grid-template-columns: minmax(0, 1fr) minmax(17rem, .75fr); }}
+      .fixture-layout {{ grid-template-columns: 1fr; }}
+    }}
+    @media (max-width: 760px) {{
+      .shell {{ width: min(100% - 1.25rem, 1180px); }}
+      .site-header {{ align-items: flex-start; flex-wrap: wrap; padding: .85rem 0; }}
+      .site-nav {{ width: 100%; overflow-x: auto; }}
+      .site-nav a {{ flex: 0 0 auto; }}
+      .hero, .status-grid, .step-list, .definition-grid, .result-facts {{ grid-template-columns: 1fr; }}
+      h1 {{ max-width: 14ch; font-size: clamp(3rem, 13vw, 4.6rem); }}
+      .lede {{ font-size: 1.05rem; }}
+      .fixture-head {{ display: block; }}
+      .fixture-head .semantic-status {{ margin-top: 1rem; }}
+      .button-row button, .hero-actions .button {{ width: 100%; }}
+      .hero-actions {{ align-items: stretch; }}
+      .text-link {{ justify-content: center; }}
+      .status-item, .status-item:nth-child(even) {{ border-right: 1px solid var(--line); padding: 1.1rem 1rem; }}
+    }}
   </style>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
   <div class="shell">
     <header class="site-header">
-      <p class="brand"><img class="brand-mark" src="{LOGO_PATH}?v={LOGO_VERSION}" width="192" height="192" alt="" aria-hidden="true">OathCast</p>
-      <a class="status-link" href="{STATUS_PATH}">Machine-readable status</a>
+      <a class="brand" href="#overview" aria-label="OathCast public preview home"><img class="brand-mark" src="{LOGO_PATH}?v={LOGO_VERSION}" width="192" height="192" alt="" aria-hidden="true"><span class="brand-copy"><span class="brand-name">OathCast</span><span class="brand-subtitle">Weather decisions</span></span></a>
+      <nav class="site-nav" aria-label="Page sections">
+        <a href="#how-it-works">How it works</a>
+        <a href="#availability">Status</a>
+        <a href="#example">Example</a>
+        <a class="status-link" href="{STATUS_PATH}">System status</a>
+      </nav>
     </header>
     <main id="main-content">
-      <section class="hero" aria-labelledby="page-heading">
-        <div>
-          <span class="semantic-status">Live decisions unavailable</span>
-          <h1 id="page-heading">OathCast is online. Live decisions are not.</h1>
-          <p class="lede">The Miner is registered and active. This interface stays read-only while paid Application flows remain disabled.</p>
+      <section class="hero" id="overview" aria-labelledby="page-heading">
+        <div class="hero-copy">
+          <span class="semantic-status warning"><span class="status-dot" aria-hidden="true"></span>Public preview / read-only</span>
+          <h1 id="page-heading">See how weather evidence becomes a planning decision.</h1>
+          <p class="lede">This page is a simple tour of OathCast. You can check what is live, try a safe local example, and learn what happens before a real decision request is enabled.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#example">Try the example</a>
+            <a class="text-link" href="#how-it-works">Read the three steps</a>
+          </div>
+          <p class="quiet-note"><span class="status-dot" aria-hidden="true"></span>Current mode: live decisions are unavailable.</p>
         </div>
-        <div class="hero-status" role="status">
-          <strong>Current public mode</strong>
-          <span>Miner live. Fixture local. Decision API closed.</span>
-        </div>
+        <aside class="mode-card" aria-labelledby="mode-heading">
+          <p class="card-eyebrow">Current mode</p>
+          <h2 id="mode-heading">Live decisions are not available yet</h2>
+          <p>The Miner is registered and active. The paid Application path remains closed until its routing, payment, and evidence checks are reviewed.</p>
+          <div class="mode-list">
+            <div class="mode-item"><strong>What you can do</strong><span>Read the status and change the local example.</span></div>
+            <div class="mode-item"><strong>What you cannot do</strong><span>Submit personal planning details or spend funds here.</span></div>
+          </div>
+        </aside>
       </section>
 
-      <section aria-labelledby="availability-heading">
-        <h2 id="availability-heading">What is available now</h2>
+      <section id="how-it-works" aria-labelledby="how-heading">
+        <div class="section-heading">
+          <p class="eyebrow">Start here</p>
+          <h2 id="how-heading">Three things to know before you click</h2>
+          <p>OathCast uses weather forecasts to help with a specific plan, such as moving an event indoors. The labels below explain exactly which parts are real and which parts are only a demonstration.</p>
+        </div>
+        <ol class="step-list">
+          <li class="step-card"><span class="step-number" aria-hidden="true">1</span><h3>Check the status</h3><p>The words next to each status tell you whether a service is available, local only, or not available yet.</p></li>
+          <li class="step-card"><span class="step-number" aria-hidden="true">2</span><h3>Try the example</h3><p>Change the sample risk and threshold. The result changes in this browser only; no provider is contacted.</p></li>
+          <li class="step-card"><span class="step-number" aria-hidden="true">3</span><h3>Read the boundary</h3><p>A real forecast decision needs reviewed routing, payment authorization, and public evidence. Those checks are still closed.</p></li>
+        </ol>
+      </section>
+
+      <section class="status-section" id="availability" aria-labelledby="availability-heading">
+        <div class="section-heading">
+          <p class="eyebrow">At a glance</p>
+          <h2 id="availability-heading">What is available now</h2>
+          <p>Every card includes the practical meaning, so you do not have to decode internal project terms.</p>
+        </div>
         <div class="status-grid">
           <div class="status-item">
-            <strong class="available">Public Miner</strong>
-            <p>The authenticated forecast service is deployed separately and reports its release identity.</p>
+            <strong class="available"><span class="status-dot positive" aria-hidden="true"></span>Public Miner</strong>
+            <p>A Miner is a registered forecast provider. The authenticated forecast service is deployed separately and reports its release identity.</p>
           </div>
           <div class="status-item">
-            <strong class="available">Development fixture</strong>
-            <p>A static example demonstrates the intended decision language without a network request.</p>
+            <strong class="available"><span class="status-dot positive" aria-hidden="true"></span>Development fixture</strong>
+            <p>This safe example demonstrates the decision language without a network request, payment, or saved planning brief.</p>
           </div>
           <div class="status-item">
-            <strong class="available">Telegraph registration</strong>
-            <p>Active as on-chain registration ID 245 and dispatcher routing ID 64173 under WEATHER_FORECAST.</p>
+            <strong class="available"><span class="status-dot positive" aria-hidden="true"></span>Telegraph registration</strong>
+            <p>Telegraph is the routing and payment protocol around the forecast service. The active registration ID 245 is on-chain with routing ID 64173 under WEATHER_FORECAST.</p>
           </div>
           <div class="status-item">
-            <strong class="unavailable">Paid Application requests</strong>
-            <p>No wallet signing, payment composition, live Application intake, or qualifying demand is enabled here.</p>
+            <strong class="unavailable"><span class="status-dot" aria-hidden="true"></span>Paid Application requests</strong>
+            <p>Not available here. No wallet signing, payment composition, live intake, or qualifying demand is enabled on this page.</p>
           </div>
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="fixture-heading">
+      <section class="panel" id="example" aria-labelledby="fixture-heading">
         <div class="fixture-head">
-          <span class="semantic-status">Development fixture</span>
           <div>
-            <h2 id="fixture-heading">Try the decision presentation</h2>
-            <p class="supporting">Adjust the sample risk and threshold. The result is calculated only in this browser from those two values.</p>
+            <p class="eyebrow">Safe demo</p>
+            <h2 id="fixture-heading">Try a sample decision</h2>
+            <p class="supporting">Change two sample numbers to see how a risk threshold changes the suggested action.</p>
           </div>
+          <span class="semantic-status"><span class="status-dot positive" aria-hidden="true"></span>Browser only</span>
         </div>
-        <p class="fixture-note"><strong>This example is not Telegraph-routed.</strong> It makes no payment, creates no qualifying demand, and is not a safety guarantee.</p>
+        <p class="fixture-note"><strong>Nothing is sent.</strong> This example is not Telegraph-routed. It makes no payment, creates no qualifying demand, and is not a safety guarantee.</p>
         <div class="fixture-layout">
-          <div class="fixture-controls" id="fixture-controls">
-            <div>
+          <div class="fixture-controls" id="fixture-controls" role="group" aria-labelledby="fixture-controls-heading">
+            <p class="group-title" id="fixture-controls-heading">Change the two sample numbers</p>
+            <div class="field">
               <label for="fixture-risk">Example rain risk (%)</label>
               <input id="fixture-risk" type="number" min="0" max="100" step="1" value="42" inputmode="numeric" required aria-describedby="fixture-risk-help">
-              <p class="help" id="fixture-risk-help">Development input only. No provider is called.</p>
+              <p class="help" id="fixture-risk-help">A higher number means rain is more likely in this example.</p>
+              <p class="field-error" id="fixture-risk-error" role="alert" hidden></p>
             </div>
-            <div>
+            <div class="field">
               <label for="fixture-threshold">Example decision threshold (%)</label>
               <input id="fixture-threshold" type="number" min="0" max="100" step="1" value="30" inputmode="numeric" required aria-describedby="fixture-threshold-help">
-              <p class="help" id="fixture-threshold-help">At or above the threshold, the example recommends a contingency.</p>
+              <p class="help" id="fixture-threshold-help">At or above this number, the example recommends a contingency plan.</p>
+              <p class="field-error" id="fixture-threshold-error" role="alert" hidden></p>
             </div>
             <div class="button-row">
               <button id="fixture-update" type="button">Update example</button>
             </div>
             <p class="feedback" id="fixture-feedback" role="status" aria-live="polite">Example ready.</p>
           </div>
-          <section class="result" id="fixture-result" aria-labelledby="fixture-result-heading">
-            <span class="semantic-status">Static example</span>
+          <section class="result" id="fixture-result" aria-labelledby="fixture-result-heading" aria-live="polite">
+            <span class="semantic-status"><span class="status-dot" aria-hidden="true"></span>Static example</span>
             <h3 id="fixture-result-heading">Example outcome: CONTINGENCY</h3>
             <p class="summary" id="fixture-summary">Prepare a covered alternative for the sample outdoor activity.</p>
             <p id="fixture-rationale">The development risk of 42% is at or above the example threshold of 30%.</p>
+            <p class="supporting">The rule is simple: when risk is at or above the threshold, choose the contingency option.</p>
             <dl class="result-facts">
               <div><dt>Example risk</dt><dd id="fixture-risk-output">42%</dd></div>
               <div><dt>Example threshold</dt><dd id="fixture-threshold-output">30%</dd></div>
@@ -947,19 +1124,32 @@ def _render_page(*, result: DecisionResult | None = None, error: str | None = No
         </div>
       </section>
 
-      <section class="panel live-disabled" aria-labelledby="live-heading">
+      <section class="panel live-disabled" id="live" aria-labelledby="live-heading">
+        <p class="eyebrow">Not available yet</p>
         <h2 id="live-heading">Live Planning Desk intake is disabled</h2>
-        <p>No personal planning details are accepted from this public page. The live action stays unavailable until reviewed Telegraph routing, payment authorization, and evidence handling are deliberately enabled.</p>
+        <p>No personal planning details are accepted from this public page. A live action will only appear after Telegraph routing, payment authorization, and evidence handling are deliberately enabled and reviewed.</p>
         <div class="button-row">
           <button type="button" disabled aria-describedby="live-disabled-reason">Run live decision</button>
-          <span id="live-disabled-reason" class="supporting">Unavailable in this release</span>
+          <span id="live-disabled-reason" class="supporting">Unavailable in this release. Nothing is waiting for your input.</span>
+        </div>
+      </section>
+
+      <section class="definitions" id="terms" aria-labelledby="terms-heading">
+        <div class="section-heading">
+          <p class="eyebrow">Plain-language guide</p>
+          <h2 id="terms-heading">Words you may see on this site</h2>
+        </div>
+        <div class="definition-grid">
+          <div class="definition"><h3>Miner</h3><p>A registered service that supplies a forecast answer. OathCast compares public evidence from Miners before making a decision.</p></div>
+          <div class="definition"><h3>Telegraph</h3><p>The protocol that routes requests and handles authorized payment between an application and a Miner.</p></div>
+          <div class="definition"><h3>Local fixture</h3><p>A safe demonstration that runs in your browser. It is useful for learning the interface, but it is not a real forecast.</p></div>
         </div>
       </section>
 
       <div id="result" aria-live="polite">{result_markup}</div>
       {feedback}
-      <noscript><p class="feedback error">JavaScript is only needed to update the local development fixture. No live request is available.</p></noscript>
-      <footer>OathCast does not expose wallet material here. Fixture activity is local to the browser and is never counted as Telegraph traffic.</footer>
+      <noscript><p class="feedback error">JavaScript is only needed to update the local example. No live request is available.</p></noscript>
+      <footer>OathCast does not expose wallet material here. Example activity stays in the browser and is never counted as Telegraph traffic. If you need a live decision later, submit only the details needed for that one plan.</footer>
     </main>
   </div>
   <script>
@@ -973,18 +1163,26 @@ def _render_page(*, result: DecisionResult | None = None, error: str | None = No
       const riskOutput = document.getElementById("fixture-risk-output");
       const thresholdOutput = document.getElementById("fixture-threshold-output");
       const feedback = document.getElementById("fixture-feedback");
+      const riskError = document.getElementById("fixture-risk-error");
+      const thresholdError = document.getElementById("fixture-threshold-error");
+      const setFieldError = (input, error, message) => {{
+        input.setAttribute("aria-invalid", message ? "true" : "false");
+        error.textContent = message;
+        error.hidden = !message;
+      }};
       updateButton.addEventListener("click", () => {{
         const risk = Number(riskInput.value);
         const threshold = Number(thresholdInput.value);
-        if (riskInput.value.trim() === "" || thresholdInput.value.trim() === "" || !Number.isFinite(risk) || !Number.isFinite(threshold) || risk < 0 || risk > 100 || threshold < 0 || threshold > 100) {{
-          riskInput.setAttribute("aria-invalid", String(riskInput.value.trim() === "" || !Number.isFinite(risk) || risk < 0 || risk > 100));
-          thresholdInput.setAttribute("aria-invalid", String(thresholdInput.value.trim() === "" || !Number.isFinite(threshold) || threshold < 0 || threshold > 100));
-          feedback.textContent = "Use values from 0 to 100.";
+        const riskInvalid = riskInput.value.trim() === "" || !Number.isFinite(risk) || risk < 0 || risk > 100;
+        const thresholdInvalid = thresholdInput.value.trim() === "" || !Number.isFinite(threshold) || threshold < 0 || threshold > 100;
+        setFieldError(riskInput, riskError, riskInvalid ? "Enter a number from 0 to 100." : "");
+        setFieldError(thresholdInput, thresholdError, thresholdInvalid ? "Enter a number from 0 to 100." : "");
+        if (riskInvalid || thresholdInvalid) {{
+          feedback.textContent = "Please fix the highlighted example value, then try again.";
           feedback.className = "feedback error";
+          (riskInvalid ? riskInput : thresholdInput).focus();
           return;
         }}
-        riskInput.setAttribute("aria-invalid", "false");
-        thresholdInput.setAttribute("aria-invalid", "false");
         const contingency = risk >= threshold;
         heading.textContent = "Example outcome: " + (contingency ? "CONTINGENCY" : "GO");
         summary.textContent = contingency
