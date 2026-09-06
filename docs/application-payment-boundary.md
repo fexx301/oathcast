@@ -5,7 +5,10 @@ Application request. The current Telegraph transport is the Engine API:
 `POST https://devnode.telegraphprotocol.com/engine/v1/ask/212`, carrying the
 logical upstream `GET /forecast` request in its JSON envelope. The retired
 `/miner-dispatcher/v1/{id}/...` route is not used for new Application traffic.
-This document does not claim that a new Application payment has been made.
+The path remains disabled by default in the code. On 2026-09-06, one
+operator-authorized Solana Devnet request traversed the boundary and settled
+successfully through Telegraph; the retained sanitized evidence is explicitly
+incomplete and does not claim official demand, adoption, or a resolved score.
 
 ## Decision
 
@@ -54,8 +57,9 @@ transaction signature; there is no automatic retry, and reconciliation is
 never automatic.
 
 The paid body is capped at 2 MiB and stored with its SHA-256, HTTP status,
-settlement-header hash, transaction signature, and RPC verification JSON before
-the sidecar acknowledges success to Python. Payment authorization headers,
+settlement-header hash, transaction signature, RPC verification JSON, and its
+verification-artifact SHA-256 before the sidecar acknowledges success to Python.
+Payment authorization headers,
 private keys, and raw settlement headers never cross the boundary or appear in
 public evidence.
 
@@ -101,6 +105,16 @@ An operator may prepare the environment without spending:
 
 The repository tests use injected canary responses and never sign, contact a
 live Miner, or spend funds.
+
+## Evidence packaging
+
+`scripts/build_application_evidence.py` opens the payment, case, demand, and
+discovery sources read-only. Strict mode refuses malformed or incomplete
+cross-links. `--allow-incomplete` writes a sanitized JSON/Markdown bundle that
+lists unresolved gaps without copying the raw paid response, payment headers,
+private key, principal, or idempotency key. The retained 2026-09-06 bundle is
+`artifacts/application-evidence/track3-2026-09-06-payment.json` with the
+operator-readable companion Markdown beside it.
 
 ## Process wiring
 

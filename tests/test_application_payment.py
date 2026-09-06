@@ -33,6 +33,9 @@ from oathcast.discovery import MinerCapability
 
 
 UTC = timezone.utc
+TEST_LOCAL_DATETIME = (
+    datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0) + timedelta(days=1)
+).isoformat().replace("+00:00", "Z")
 
 
 def _future_forecast_time() -> str:

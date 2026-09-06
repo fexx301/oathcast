@@ -45,12 +45,14 @@ describe("private payment journal", () => {
         response_body_sha256: "e".repeat(64),
         response_body_is_json: true,
         settlement_artifact_sha256: "f".repeat(64),
+        verification_artifact_sha256: "1".repeat(64),
         transaction_signature: "transaction-signature",
         verification_json: '{"confirmed_transaction":true}',
       });
       const replay = journal.reserve(input());
       expect(replay.kind).toBe("replay");
       expect(replay.record.status).toBe("settled_verified");
+      expect(replay.record.verification_artifact_sha256).toBe("1".repeat(64));
       expect(journal.list()).toHaveLength(1);
       expect(journal.integrityCheck()).toBe("ok");
     });

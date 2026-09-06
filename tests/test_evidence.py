@@ -232,6 +232,16 @@ class EvidenceTests(unittest.TestCase):
             "payment-attempt-1",
         )
 
+    def test_protocol_receipt_rejects_malformed_hashes(self):
+        with self.assertRaises(ValueError):
+            ProtocolReceipt(
+                request_url="https://dispatcher.example/v1/212/forecast",
+                route_mode="telegraph",
+                response_status=200,
+                received_at="2026-08-17T11:58:00Z",
+                registry_snapshot_sha256="snapshot-hash-too-short",
+            )
+
     def test_sealed_policy_records_the_actual_decision_threshold(self):
         store = SqliteCaseStore(":memory:")
         store.create(self.question)

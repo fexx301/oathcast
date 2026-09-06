@@ -217,11 +217,14 @@ relevant to that track.
 - [x] Durable question, reply, decision, observation, and resolution evidence.
 - [x] Local Planning Desk intake pilot.
 - [x] One isolated, manually authorized x402 devnet settlement rehearsal independently verified; not Application demand.
-- [~] Reviewed Application payment boundary implemented and locally tested;
-  fresh discovery, operator authorization, and a real end-to-end payment remain
-  pending.
-- [ ] Real Application calls routed through Telegraph.
-- [ ] Independent Explorer/payment evidence retained per request. *(Telegraph
+- [x] Reviewed Application payment boundary implemented and locally tested;
+  fresh discovery, operator authorization, and one real end-to-end devnet
+  payment are complete. The boundary remains disabled by default.
+- [x] One operator-authorized Application call routed through Telegraph and
+  settled through x402; this is a local candidate, not official demand volume.
+- [~] Independent payment evidence retained per request in the sanitized
+  `artifacts/application-evidence/` bundle; Explorer corroboration and a
+  complete receipt chain remain pending. *(Telegraph
   confirmed 2026-08-11 that requests served through Telegraph are tracked and
   counted server-side even if they do not surface on the Explorer, so Explorer
   visibility is corroboration rather than a gate. Payment evidence via Solana RPC

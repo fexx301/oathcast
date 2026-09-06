@@ -150,6 +150,9 @@ describe("application payment sidecar", () => {
       const replay = await sidecar.handle(fullRequest);
       expect(replay).toMatchObject({ ok: true, status: 200 });
       expect(executeCalls).toBe(1);
+      expect(sidecar.journal.list()[0]?.verification_artifact_sha256).toBe(
+        hashText(canonicalJson({ confirmed_transaction: true })),
+      );
       await sidecar.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });

@@ -494,6 +494,14 @@ use an HTTPS dev node and offer Base Sepolia or Solana Devnet; for any separatel
 authorized request, validate the exact received `accepts[]` entry. The legacy
 Python Base-Sepolia module remains regression coverage, not a live signer.
 
+For the Track 3 boundary, `scripts/build_application_evidence.py` verifies the
+read-only payment journal, Application case, demand ledger, and fresh discovery
+snapshot, then emits an allow-listed JSON/Markdown package. Strict mode fails on
+missing or mismatched links; `--allow-incomplete` preserves unresolved gaps in
+the artifact without copying raw paid responses, payment headers, credentials,
+principals, or idempotency keys. The current one-request package is retained at
+`artifacts/application-evidence/track3-2026-09-06-payment.json`.
+
 When deployed behind a host such as Railway, the service honors the host's
 `PORT` value. Set `OATHCAST_MINER_API_KEY` to enable the Bearer protection that
 matches the canonical YAML's `auth` block; keep that secret in the host secret

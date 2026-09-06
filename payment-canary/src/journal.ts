@@ -432,6 +432,7 @@ export class PaymentJournal {
       response_body_sha256: string;
       response_body_is_json: boolean;
       settlement_artifact_sha256: string;
+      verification_artifact_sha256: string;
       transaction_signature: string;
       verification_json: string;
     },
@@ -444,6 +445,7 @@ export class PaymentJournal {
         response_status: input.response_status,
         response_body_sha256: input.response_body_sha256,
         settlement_artifact_sha256: input.settlement_artifact_sha256,
+        verification_artifact_sha256: input.verification_artifact_sha256,
         transaction_signature: input.transaction_signature,
       },
       input,

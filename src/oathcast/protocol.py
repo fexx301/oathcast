@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import re
 from typing import Any
 
 
@@ -52,6 +53,7 @@ ROUTE_MODES = frozenset({"telegraph", "direct", "auto", "fixture", "unknown"})
 SETTLEMENT_VERIFICATION_STATES = frozenset(
     {"not_attempted", "unverified", "verified", "invalid", "unknown"}
 )
+SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _canonical_json(value: Any) -> str:
@@ -60,6 +62,11 @@ def _canonical_json(value: Any) -> str:
 
 def _sha256_json(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _validate_optional_sha256(value: str | None, *, field: str) -> None:
+    if value is not None and not SHA256_HEX_RE.fullmatch(value):
+        raise ValueError(f"{field} must be a lowercase SHA-256 hex digest")
 
 
 @dataclass(frozen=True)
@@ -98,6 +105,16 @@ class ProtocolReceipt:
             )
         if self.response_status is not None and not 100 <= int(self.response_status) <= 599:
             raise ValueError("response_status must be an HTTP status code")
+        for field in (
+            "challenge_sha256",
+            "settlement_artifact_sha256",
+            "signal_receipt_sha256",
+            "registry_snapshot_sha256",
+            "response_sha256",
+            "response_body_sha256",
+            "request_url_sha256",
+        ):
+            _validate_optional_sha256(getattr(self, field), field=field)
 
     @property
     def settlement_verified(self) -> bool:

@@ -1022,6 +1022,8 @@ export class ApplicationPaymentSidecar {
       return publicError("INCOMPLETE_SETTLEMENT_EVIDENCE", "the paid response did not produce complete settlement evidence", operationId, execute.evidence);
     }
     let settled: PaymentJournalRecord;
+    const verificationJson = canonicalJson(verification);
+    const verificationArtifactSha256 = sha256Text(verificationJson);
     try {
       settled = this.journal.markSettled(operationId, {
         response_status: execute.paid_response_status,
@@ -1029,8 +1031,9 @@ export class ApplicationPaymentSidecar {
         response_body_sha256: execute.paid_response_body_sha256 ?? sha256Text(paidBodyText),
         response_body_is_json: bodyIsJson(paidBodyText),
         settlement_artifact_sha256: settlement.header_sha256,
+        verification_artifact_sha256: verificationArtifactSha256,
         transaction_signature: settlement.transaction_signature,
-        verification_json: canonicalJson(verification),
+        verification_json: verificationJson,
       });
     } catch {
       try {

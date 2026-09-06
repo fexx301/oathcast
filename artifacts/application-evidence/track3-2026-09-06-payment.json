@@ -1,0 +1,162 @@
+{
+  "application": {
+    "application_request_id": "app-90c60f8ba329abdd99bee0df356555a0b75ca6a350524e2ac88cae6a3f33",
+    "decision": {
+      "aggregate_probability": 0.53,
+      "decided_at": "2026-09-05T23:39:50.835203Z",
+      "decision_threshold": 0.3,
+      "event_likely": true,
+      "external_influence": true,
+      "recommended_action": "plan_for_event",
+      "used_external_miner": true
+    },
+    "event_id": "application-9b59a35d1c56475cd53b1e0e0f2592206b3336a9afc729fd",
+    "miner_reply": {
+      "miner_id": "212",
+      "parser_version": "weatherapi_miner_response_v1",
+      "probability_x10000": 5300,
+      "protocol": {
+        "challenge_sha256": "0e73bad03a8676d497803e07b0138ebd6d282e0d6313ab6115258cdf7a4957d7",
+        "payment_attempt_id": "app-bb5fd53366e28d6ff1ed5c644cb471a795303200910ba15c565ba423395a",
+        "received_at": "2026-09-05T23:39:50.827Z",
+        "registry_snapshot_sha256": "259f0cb352db59365676567d6ae39b1d90c89cb2568f31a0aabe62a42dd7133",
+        "request_url_sha256": "7bced9a93e13596486f0ce00d3252c78be55ee2f55352322443b911f49cb9547",
+        "response_body_sha256": "f662b3ef2ee8f9bb3c4f3d8a5ab805adbb6da5c146acd86a02c52009265bf5b6",
+        "response_sha256": "f662b3ef2ee8f9bb3c4f3d8a5ab805adbb6da5c146acd86a02c52009265bf5b6",
+        "response_status": 200,
+        "route_mode": "telegraph",
+        "settlement_artifact_sha256": "46b0cf62e85ed0d4e4b541b9dbfcdc0fbdcf8938df6856055bc42c2f4163d912",
+        "settlement_transaction_signature": "4SSxNZf2z8URpccdPK66EqkF5FW9fUpdiMTkGcQuC3D9U7fVboHRtjpxC4vaux3FXUA4xsAL6KcfG4y57MzVM9VK",
+        "settlement_verification": "verified",
+        "signal_receipt_sha256": null
+      },
+      "protocol_receipt_sha256": "dc24929645379f6d9acdd8911e5b68950d7bce7d5a050ed741a20ab6f5d724aa",
+      "request_id": "app-90c60f8ba329abdd99bee0df356555a0b75ca6a350524e2ac88cae6a3f33",
+      "response_body_sha256": "f662b3ef2ee8f9bb3c4f3d8a5ab805adbb6da5c146acd86a02c52009265bf5b6",
+      "slug": "weatherapi"
+    },
+    "question": {
+      "forecast_cutoff": "2026-09-06T01:00:00Z",
+      "horizon_end": "2026-09-06T03:00:00Z",
+      "horizon_start": "2026-09-06T02:00:00Z",
+      "latitude": 6.5244,
+      "location_name": "Lagos outdoor track",
+      "longitude": 3.3792
+    },
+    "resolution": {
+      "observation_count": 0,
+      "resolution_count": 0,
+      "status": "pending"
+    }
+  },
+  "demand": {
+    "demand_id": "demand-2d26e39e36c03d0d7450809e143d62452d065fba6190cfb61f8fb7982c7f5ac4",
+    "http_status": 200,
+    "local_candidate": true,
+    "occurred_at": "2026-09-05T23:39:50.831740Z",
+    "official_telegraph_count": null,
+    "protocol_receipt_sha256": "dc24929645379f6d9acdd8911e5b68950d7bce7d5a050ed741a20ab6f5d724aa"
+  },
+  "discovery": {
+    "miner": {
+      "endpoint": "forecast",
+      "id": "212",
+      "minimum_price_micro_usdc": 10000,
+      "name": "WeatherAPI",
+      "slug": "weatherapi"
+    },
+    "observed_at": "2026-09-05T23:25:22.457183Z",
+    "payload_sha256": "259f0cb352db59365676567d6ae39b1d90c89cb2568f31a0aabe62a42dd7133a",
+    "source": "telegraph_integrations_read_only"
+  },
+  "evidence_kind": "track3_application_payment",
+  "files": {
+    "application_db": {
+      "bytes": 184320,
+      "path": "state/track3-application-20260906-c.sqlite3",
+      "sha256": "7cf14e1311095f69a1294d7f116c255f9373ba136369f377d9978b9691c809da"
+    },
+    "demand_db": {
+      "bytes": 12288,
+      "path": "state/track3-demand-20260906-c.sqlite3",
+      "sha256": "4a9fd9567ce27103ad90540eb4ef97e13b55af60b92d3d7b899aed7acfc87922"
+    },
+    "discovery_snapshot": {
+      "bytes": 5182,
+      "path": "state/track3-discovery-20260906.json",
+      "sha256": "07f199df8ed3e2c11ecda10df05e28b7488555373dab78f9a2be13025bd90ddb"
+    },
+    "payment_journal": {
+      "bytes": 45056,
+      "path": "state/track3-payment-journal-20260906-c.sqlite3",
+      "sha256": "bae74ab96651b481d9b933b96262fcd8b46425e2c94625211d97e8c1b2a627dd"
+    }
+  },
+  "local_candidate_observed": true,
+  "official_demand_claimed": false,
+  "payment": {
+    "amount_micro_usdc": 10000,
+    "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "computed_verification_artifact_sha256": "32b5261318fd38f2432c5a91dfdea57b8e97a8cf9d45939e2c6208a6c5907efc",
+    "method": "x402",
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "payment_attempt_id": "app-bb5fd53366e28d6ff1ed5c644cb471a795303200910ba15c565ba423395a",
+    "settlement_artifact_sha256": "46b0cf62e85ed0d4e4b541b9dbfcdc0fbdcf8938df6856055bc42c2f4163d912",
+    "settlement_verification": "verified",
+    "transaction_signature": "4SSxNZf2z8URpccdPK66EqkF5FW9fUpdiMTkGcQuC3D9U7fVboHRtjpxC4vaux3FXUA4xsAL6KcfG4y57MzVM9VK",
+    "verification_artifact_persisted": false,
+    "verification_artifact_sha256": null
+  },
+  "qualification_note": "This bundle proves one locally verified Application-to-Telegraph payment and response. It does not establish Telegraph's official demand count or user adoption.",
+  "schema_version": 2,
+  "telegraph": {
+    "challenge_sha256": "0e73bad03a8676d497803e07b0138ebd6d282e0d6313ab6115258cdf7a4957d7",
+    "endpoint": "forecast",
+    "miner_id": "212",
+    "protocol_registry_snapshot_sha256": "259f0cb352db59365676567d6ae39b1d90c89cb2568f31a0aabe62a42dd7133",
+    "registry_snapshot_sha256": "259f0cb352db59365676567d6ae39b1d90c89cb2568f31a0aabe62a42dd7133a",
+    "response_body_sha256": "f662b3ef2ee8f9bb3c4f3d8a5ab805adbb6da5c146acd86a02c52009265bf5b6",
+    "response_status": 200,
+    "route_mode": "telegraph",
+    "signal_receipt_sha256": null,
+    "target_sha256": "7bced9a93e13596486f0ce00d3252c78be55ee2f55352322443b911f49cb9547"
+  },
+  "verification": {
+    "all_checks_passed": false,
+    "checks": {
+      "application_external_influence": true,
+      "application_receipt_bound_to_payment": true,
+      "application_resolved": false,
+      "demand_event_is_local_candidate": true,
+      "demand_ledger_integrity": true,
+      "fresh_discovery_contains_reviewed_miner": true,
+      "payment_events_hashed": true,
+      "payment_journal_integrity": true,
+      "registry_snapshot_linked_to_discovery": false,
+      "signal_receipt_present": false,
+      "solana_settlement_verified": true,
+      "verification_artifact_persisted": false
+    },
+    "issues": [
+      "payment journal does not persist verification_artifact_sha256 for this settled attempt",
+      "application protocol receipt registry_snapshot_sha256 is malformed",
+      "application protocol receipt has no signal receipt hash",
+      "application case has no independent observation and resolution",
+      "application protocol receipt registry snapshot does not match the fresh discovery snapshot"
+    ],
+    "payment_verification": {
+      "confirmed_transaction": true,
+      "fee_payer_verified": true,
+      "token_movement": {
+        "expected_amount": "10000",
+        "payer": "2BGoFrhXmt6sDR9N6CNfgKtepbvkjJB6TuV53Tpvv5yw",
+        "payer_delta": "-10000",
+        "recipient": "G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix",
+        "recipient_delta": "10000",
+        "status": "verified"
+      },
+      "transaction_error": false,
+      "transaction_signature_matches": true
+    }
+  }
+}
