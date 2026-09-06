@@ -110,6 +110,7 @@ function verifiedRpcFixture(options: { omitRecipientPreBalance?: boolean } = {})
 async function runSettlementCase(
   overrides: Record<string, unknown> = {},
   rpcOptions: { omitRecipientPreBalance?: boolean } = {},
+  responseOptions: { body?: string; headers?: Record<string, string> } = {},
 ) {
   const target = buildTarget(options(true));
   const challenge = challengeFor(target.requestUrl);
@@ -127,9 +128,12 @@ async function runSettlementCase(
           status: 402,
           headers: { "PAYMENT-REQUIRED": encodeHeader(challenge) },
         })
-      : new Response("paid", {
+      : new Response(responseOptions.body ?? "paid", {
           status: 200,
-          headers: { "PAYMENT-RESPONSE": encodeHeader(settlement) },
+          headers: {
+            "PAYMENT-RESPONSE": encodeHeader(settlement),
+            ...responseOptions.headers,
+          },
         });
   });
   const rpcFixture = verifiedRpcFixture(rpcOptions);
@@ -410,6 +414,29 @@ describe("payment canary", () => {
     expect(createPaymentClient).not.toHaveBeenCalled();
   });
 
+  it("fails closed before payment when the signer address is not pinned", async () => {
+    const target = buildTarget(options(true));
+    const fetch = preflightFetch(challengeFor(target.requestUrl));
+    const createPaymentClient = vi.fn();
+    const expectedSignerAddress = base58.encode(new Uint8Array(32).fill(4));
+
+    const result = await runCanary(
+      { ...options(true), expectedSignerAddress },
+      {
+        fetch,
+        env: { SOLANA_PRIVATE_KEY: privateKey },
+        createSigner: async () => ({ address: payerAddress } as never),
+        createPaymentClient,
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.evidence.error?.code).toBe("SIGNER_ADDRESS_MISMATCH");
+    expect(result.evidence.preflight.payment_attempted).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(createPaymentClient).not.toHaveBeenCalled();
+  });
+
   it("accepts omitted optional settlement fields and verifies confirmed USDC movement", async () => {
     const target = buildTarget(options(true));
     const challenge = challengeFor(target.requestUrl);
@@ -493,6 +520,20 @@ describe("payment canary", () => {
     expect(JSON.stringify(result.evidence)).not.toContain("test-only-payment-proof");
     expect(rpc.getSignatureStatuses).toHaveBeenCalledTimes(1);
     expect(rpc.getTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures a public Signal hash without retaining payment headers", async () => {
+    const signalHash = `0x${"a".repeat(64)}`;
+    const { result } = await runSettlementCase(
+      {},
+      {},
+      { body: JSON.stringify({ content: "paid", signal_hash: signalHash }) },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.evidence.signal_hash).toBe(signalHash);
+    expect(JSON.stringify(result.evidence)).not.toContain("PAYMENT-RESPONSE");
+    expect(JSON.stringify(result.evidence)).not.toContain("fixture-proof");
   });
 
   it.each([

@@ -21,6 +21,8 @@ Optional:
   --param key=value         Query parameter; may be repeated
   --max-amount <integer>    Lower the fixed 10000-unit ceiling (no override)
   --rpc-url <https-url>     Solana devnet RPC (default: api.devnet.solana.com)
+  --expected-signer-address <address>
+                            Require this public Solana signer before payment
   --allow-insecure-http-devnet
                             Permit only the pinned live devnet HTTP dispatcher
   --execute                 Sign exactly one validated challenge and retry once
@@ -56,6 +58,7 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
   let allowInsecureHttpDevnet = false;
   let maxAmount: string | undefined;
   let rpcUrl: string | undefined;
+  let expectedSignerAddress: string | undefined;
   const params: Record<string, string> = {};
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -99,6 +102,10 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
         break;
       case "--rpc-url":
         rpcUrl = requireValue(argv, index, flag);
+        index += 1;
+        break;
+      case "--expected-signer-address":
+        expectedSignerAddress = requireValue(argv, index, flag);
         index += 1;
         break;
       case "--param": {
@@ -147,6 +154,7 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
     allowInsecureHttpDevnet,
     maxAmount,
     rpcUrl,
+    expectedSignerAddress,
     params: Object.keys(params).length > 0 ? params : undefined,
   };
 }

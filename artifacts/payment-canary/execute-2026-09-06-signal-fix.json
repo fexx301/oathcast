@@ -1,0 +1,68 @@
+{
+  "evidence_version": "oathcast.payment-canary.v1",
+  "mode": "execute",
+  "ok": true,
+  "operation_id": "signal-fix-execute-20260906-01",
+  "target": {
+    "dispatcher_origin": "https://devnode.telegraphprotocol.com",
+    "path": "/miner-dispatcher/v1/212/forecast",
+    "miner_id": "212",
+    "endpoint_path": "forecast",
+    "request_parameters": {
+      "days": "1",
+      "q": "6.524400,3.379200"
+    },
+    "request_url_sha256": "7bced9a93e13596486f0ce00d3252c78be55ee2f55352322443b911f49cb9547"
+  },
+  "challenge": {
+    "status": 402,
+    "challenge_sha256": "0e73bad03a8676d497803e07b0138ebd6d282e0d6313ab6115258cdf7a4957d7",
+    "amount": "10000",
+    "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "pay_to": "G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix",
+    "fee_payer": "2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4"
+  },
+  "paid_response": {
+    "status": 200,
+    "body_sha256": "90ed0ab0ebbc9765dffc5cedfa997c3c88a54d1f07e74a1799e2e4fc70e86a4b",
+    "signal_hash": null,
+    "signal_receipt_sha256": null,
+    "signal_capture_note": "No recognized public Signal hash or opaque Signal receipt header was present in the paid response."
+  },
+  "settlement": {
+    "success": true,
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "header_sha256": "bf6dab7067a24a02d98450b1299d6a4c350b4af7dc7660d4ac463f9a46ac2c25",
+    "transaction_signature": "N2YWKfJ1bpxzWq6PdYJ4UzmpEAuArs8G6JxmPjVPbPzSNkWwHRM3DuwytLWyz3hTyTLtjiXUEDRjt9KzxCHAbSB",
+    "transaction_block_time_utc": "2026-09-06T15:47:18Z"
+  },
+  "signer_address": "2BGoFrhXmt6sDR9N6CNfgKtepbvkjJB6TuV53Tpvv5yw",
+  "verification": {
+    "confirmed_transaction": true,
+    "confirmation_status": "confirmed",
+    "transaction_error": false,
+    "transaction_signature_matches": true,
+    "fee_payer_verified": true,
+    "token_movement": {
+      "status": "verified",
+      "expected_amount": "10000",
+      "payer_delta": "-10000",
+      "recipient_delta": "10000",
+      "payer": "2BGoFrhXmt6sDR9N6CNfgKtepbvkjJB6TuV53Tpvv5yw",
+      "recipient": "G53EbeTZSNsAn7bj6iMFUQnq3zpDdEbHhKkPRywo8bix"
+    }
+  },
+  "explorer_reconciliation": {
+    "official_demand_claim": false,
+    "status": "no_one_to_one_match_in_checked_recent_pages",
+    "checked_at_utc": "2026-09-06T16:02:26Z",
+    "note": "The public recent-signal feed was checked for Miner 212 forecast records in the checked recent pages; no one-to-one match was found."
+  },
+  "limitations": [
+    "This is one manually authorized Solana Devnet testnet payment.",
+    "Settlement and token movement were independently verified on Solana Devnet.",
+    "The paid response did not expose a Signal hash or recognized Signal receipt header to this client.",
+    "No official Telegraph demand or Signal record is claimed by this artifact."
+  ]
+}

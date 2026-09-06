@@ -91,6 +91,8 @@ export interface CanaryOptions {
   params?: Record<string, string>;
   /** Hash returned by the unpaid preflight that an execute phase must use. */
   expectedChallengeSha256?: string;
+  /** Optional public signer pin; execution fails closed when it does not match. */
+  expectedSignerAddress?: string;
 }
 
 export interface CanaryDependencies {
@@ -159,6 +161,10 @@ export interface CanaryEvidence {
   };
   paid_response_status?: number;
   paid_response_body_sha256?: string;
+  /** Public Signal identity returned after a paid response, when available. */
+  signal_hash?: string;
+  /** Digest of an opaque Signal receipt header; the raw receipt is never retained. */
+  signal_receipt_sha256?: string;
   settlement?: {
     header_sha256: string;
     transaction_signature: string;
@@ -206,6 +212,7 @@ export type CanaryErrorCode =
   | "SIGNER_KEY_MISSING"
   | "SIGNER_KEY_INVALID"
   | "SIGNER_INITIALIZATION_FAILED"
+  | "SIGNER_ADDRESS_MISMATCH"
   | "SIGNER_RECIPIENT_SAME"
   | "PAYLOAD_CREATION_FAILED"
   | "PAYMENT_HEADER_INVALID"
@@ -225,6 +232,8 @@ export type CanaryErrorCode =
   | "FEE_PAYER_ONCHAIN_MISMATCH"
   | "TOKEN_BALANCE_METADATA_UNAVAILABLE"
   | "TOKEN_BALANCE_MOVEMENT_MISMATCH"
+  | "SIGNAL_HASH_INVALID"
+  | "SIGNAL_HASH_CONFLICT"
   | "CANARY_FAILED";
 
 const ERROR_MESSAGES: Record<CanaryErrorCode, string> = {
@@ -250,6 +259,7 @@ const ERROR_MESSAGES: Record<CanaryErrorCode, string> = {
   SIGNER_KEY_MISSING: "--execute requires SOLANA_PRIVATE_KEY in the environment",
   SIGNER_KEY_INVALID: "SOLANA_PRIVATE_KEY is not a 64-byte base58 Solana secret key",
   SIGNER_INITIALIZATION_FAILED: "the Solana signer could not be initialized from SOLANA_PRIVATE_KEY",
+  SIGNER_ADDRESS_MISMATCH: "the initialized signer does not match the authorized public address",
   SIGNER_RECIPIENT_SAME: "the signer address must not equal the approved payment recipient",
   PAYLOAD_CREATION_FAILED: "the x402 Solana payment payload could not be created",
   PAYMENT_HEADER_INVALID: "the x402 payment signature header could not be encoded",
@@ -269,6 +279,8 @@ const ERROR_MESSAGES: Record<CanaryErrorCode, string> = {
   FEE_PAYER_ONCHAIN_MISMATCH: "the confirmed transaction fee payer does not match the challenge",
   TOKEN_BALANCE_METADATA_UNAVAILABLE: "the RPC response did not expose enough token metadata to verify movement",
   TOKEN_BALANCE_MOVEMENT_MISMATCH: "the confirmed transaction does not show the expected USDC movement to the recipient",
+  SIGNAL_HASH_INVALID: "the paid response contained a malformed public Signal hash",
+  SIGNAL_HASH_CONFLICT: "the paid response contained conflicting Signal hash values",
   CANARY_FAILED: "the payment canary failed before producing a more specific sanitized result",
 };
 
@@ -924,6 +936,58 @@ function extractSettlementHeader(response: Response): string | null {
   ]);
 }
 
+const SIGNAL_HASH_HEADERS = [
+  "SIGNAL-HASH",
+  "X-SIGNAL-HASH",
+  "X-TELEGRAPH-SIGNAL-HASH",
+] as const;
+
+const SIGNAL_RECEIPT_HEADERS = [
+  "X-SIGNAL-RECEIPT",
+  "X-TELEGRAPH-SIGNAL-RECEIPT",
+] as const;
+
+function publicSignalValue(value: unknown): string | null {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 256 ||
+    !/^0x[0-9a-f]{64}$/i.test(value)
+  ) {
+    return null;
+  }
+  return value;
+}
+
+function extractSignalEvidence(
+  response: Response,
+  body: unknown,
+): Pick<CanaryEvidence, "signal_hash" | "signal_receipt_sha256"> {
+  const bodyHash = isRecord(body) && "signal_hash" in body
+    ? publicSignalValue(body.signal_hash)
+    : null;
+  if (isRecord(body) && "signal_hash" in body && body.signal_hash !== null && !bodyHash) {
+    throw new CanaryError("SIGNAL_HASH_INVALID");
+  }
+
+  const headerHashValue = firstHeader(response.headers, SIGNAL_HASH_HEADERS);
+  const headerHash = headerHashValue === null
+    ? null
+    : publicSignalValue(headerHashValue);
+  if (headerHashValue !== null && !headerHash) {
+    throw new CanaryError("SIGNAL_HASH_INVALID");
+  }
+  if (bodyHash !== null && headerHash !== null && bodyHash !== headerHash) {
+    throw new CanaryError("SIGNAL_HASH_CONFLICT");
+  }
+
+  const receipt = firstHeader(response.headers, SIGNAL_RECEIPT_HEADERS);
+  return {
+    ...(bodyHash ?? headerHash ? { signal_hash: bodyHash ?? headerHash! } : {}),
+    ...(receipt ? { signal_receipt_sha256: sha256Text(receipt) } : {}),
+  };
+}
+
 function decodeSettlement(header: string): JsonRecord {
   try {
     const decoded = decodePaymentResponseHeader(header);
@@ -1087,6 +1151,14 @@ export async function runCanary(
     const signerAddress = String(signer.address);
     assertSolanaAddress(signerAddress, "SIGNER_INITIALIZATION_FAILED");
     evidence.signer_address = signerAddress;
+    const expectedSignerAddress =
+      options.expectedSignerAddress ?? environment.OATHCAST_EXPECTED_SOLANA_SIGNER;
+    if (expectedSignerAddress !== undefined) {
+      assertSolanaAddress(expectedSignerAddress, "SIGNER_ADDRESS_MISMATCH");
+      if (signerAddress !== expectedSignerAddress) {
+        throw new CanaryError("SIGNER_ADDRESS_MISMATCH");
+      }
+    }
     if (signerAddress === EXPECTED_PAY_TO) {
       throw new CanaryError("SIGNER_RECIPIENT_SAME");
     }
@@ -1141,7 +1213,8 @@ export async function runCanary(
         ...requestInit(options, {
           ...operationHeaders,
           ...paymentHeaders,
-          "Access-Control-Expose-Headers": "PAYMENT-RESPONSE,X-PAYMENT-RESPONSE",
+          "Access-Control-Expose-Headers":
+            "PAYMENT-RESPONSE,X-PAYMENT-RESPONSE,SIGNAL-HASH,X-SIGNAL-HASH,X-TELEGRAPH-SIGNAL-HASH,X-SIGNAL-RECEIPT,X-TELEGRAPH-SIGNAL-RECEIPT",
         }),
         redirect: "error",
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -1161,6 +1234,7 @@ export async function runCanary(
     if (paidResponse.status < 200 || paidResponse.status >= 300) {
       throw new CanaryError("PAID_RESPONSE_INVALID");
     }
+    Object.assign(evidence, extractSignalEvidence(paidResponse, paidResponseBody));
     const settlementHeader = extractSettlementHeader(paidResponse);
     if (!settlementHeader) throw new CanaryError("SETTLEMENT_HEADER_MISSING");
     evidence.settlement = {
