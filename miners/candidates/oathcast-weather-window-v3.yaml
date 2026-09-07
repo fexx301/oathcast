@@ -202,3 +202,27 @@ semantics:
     reason_field: content
   supported_intents:
     - WEATHER_FORECAST
+
+on_chain:
+  description: >-
+    The forecast answer and the probability behind it.
+  transform: direct
+  min_price_usdc: 0.01
+  fields:
+    strings:
+      - index: 0
+        name: content
+        description: The forecast in plain language.
+        source_path: content
+    integers:
+      - index: 0
+        name: probability_x10000
+        description: Probability from 0 to 1, multiplied by 10000.
+        source_path: probability
+        multiplier: 10000
+  request:
+    - endpoint: predict
+      method: GET
+      query_params:
+        lat: { source: strings.0 }
+        lon: { source: strings.1 }
