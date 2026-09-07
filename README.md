@@ -13,18 +13,19 @@ rounding; the registered one-hour point behavior remains unchanged. It also
 retains the additive, unregistered temperature compatibility route. The YAML
 description re-registration on
 2026-08-27 is documented separately and changed no runtime behavior. The
-separate public UI exposes a judge-friendly Planning Desk. It can run in an
-explicit payment-free interactive demo mode, while the real live decision
-route remains opt-in and fail-closed until the private Application gateway and
-its payment boundary are healthy.
+separate public UI exposes a consumer-facing Planning Desk in live mode. Its
+browser request crosses a private loopback Application gateway and a
+budgeted payment sidecar before it accepts a Telegraph Miner result; it fails
+closed with 503 whenever that boundary is not ready. The deployed application
+release is `2026-09-07-live-application-v2` from source `e86406c`.
 
 The repository also contains provider adapters, a cross-Miner Application
 router, durable case and receipt stores, a development Script Author proxy,
 an isolated TypeScript Solana x402 canary, and leakage-safe evaluation tools.
-The paid Application path now has a private loopback gateway and a TypeScript
-sidecar with an append-only journal. It is implemented and tested but remains
-disabled by default; no live paid Application traffic or user adoption is
-claimed.
+The paid Application path has a private loopback gateway and a TypeScript
+sidecar with an append-only journal. A live canary request has been settled and
+verified through Telegraph; additional paid demand remains explicitly
+budgeted by the sidecar rather than being open-ended.
 
 The project deliberately separates two scoring paths:
 

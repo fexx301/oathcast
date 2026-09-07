@@ -17,12 +17,17 @@ details are archived under
 The deployed Miner is v18; stopped `oathcast-v17-rollback-20260830` is the
 immediate Miner rollback target. Caddy configuration did not change for v18 and
 remains pinned by its retained hash. The v17 and earlier sections below are
-historical release records. The public decision UI is deployed separately. Its
-safe public surface is a read-only release/status page plus a client-only
-development fixture. It
-has no Telegraph-backed runner, accepts no live Planning Desk intake, and
-returns 503 for decision requests. Live decisions must not be enabled until the
-authenticated, budgeted payment path has been reviewed and deployed.
+historical release records. The public decision UI is deployed separately in
+live mode as `2026-09-07-live-application-v2` from source `e86406c`. It serves
+the consumer-facing Planning Desk at
+`https://oathcastcourt.duckdns.org`, proxies browser requests to a loopback-only
+gateway, and reaches Miner 212 only through the authenticated payment sidecar.
+The browser never receives the gateway token or wallet material. If the gateway,
+sidecar, or budget guard is unavailable, `/api/decision` fails closed with 503.
+
+The live canary has two settled and independently verified 0.01 USDC Devnet
+requests in its append-only journal. The sidecar cap is deliberately finite;
+new paid demand requires an explicit budget change and sidecar restart.
 
 On 2026-09-04, the separate `oathcast-decision-ui` container was refreshed to
 the already verified `oathcast:2026-08-30-hourly-v18` image
@@ -38,7 +43,17 @@ check. Public verification returned the logo reference in `/`, and
 `/assets/oathcast-mark.webp?v=16fae356` returned HTTP 200 as `image/webp`,
 18,454 bytes, with SHA-256
 `16fae356c71fe6ed83d7594feb780477455c2868ac5409763099c8d66305a80a`.
-Miner and Caddy container IDs and start times were unchanged.
+Miner and Caddy container IDs and start times were unchanged. This paragraph is
+the historical UI-only refresh; it was superseded by the live application
+cutover below.
+
+On 2026-09-07, the live application cutover started
+`oathcast-application-gateway` and `oathcast-decision-ui` from the pinned
+`oathcast:2026-09-07-planning-desk-v2` image. The gateway uses host-loopback
+port 8790 and the UI uses host-loopback port 8787; Caddy's public route stayed
+unchanged. The previous gateway and UI remain stopped under
+`*-rollback-20260907-v1` names. The public `/status` response reports
+`public_mode: live`, `live_decision_available: true`, and source `e86406c`.
 
 V18 has persisted schema-4 receipts containing complete hourly weather fields
 that v17 cannot replay. If a rollback becomes necessary, preserve the current
@@ -51,9 +66,10 @@ UI-only replacements must override the Dockerfile health check, which targets
 the Miner on port 8080. Run the UI on Docker bridge networking, publish only
 `127.0.0.1:8787:8787`, bind the process to `0.0.0.0:8787` inside the container,
 and probe `http://127.0.0.1:8787/health` internally. Caddy sends exact
-`/predict`, `/healthz`, `/readyz`, and `/v1/*` requests to the Miner, so the
-public decision fail-closed probe is `/api/decision`, not `/v1/decision`. The
-disabled API returns 503 before reading a request body.
+`/predict`, `/healthz`, `/readyz`, and `/v1/*` requests to the Miner, while
+`/api/decision` is handled by the live consumer UI. The public decision
+fail-closed probe is `/api/decision`, not `/v1/decision`; an unhealthy private
+gateway or exhausted payment budget returns 503.
 
 ## Local run
 
@@ -91,7 +107,8 @@ so already-issued commitments are always honoured.
 
 ## x402 boundary
 
-`payment-canary/` is the retained one-shot Solana rehearsal boundary. It uses
+`payment-canary/` is the retained Solana x402 boundary and the source for the
+deployed sidecar. It uses
 the official x402 fetch/SVM client packages and permits one unpaid preflight
 followed by at most one explicitly enabled paid retry. Before loading a signer
 it validates x402 v2, the approved amount cap, recipient, fee payer, Miner ID,
@@ -105,12 +122,15 @@ authorized request, treat the exact received `accepts[]` entry as authoritative
 for network, asset, amount, recipient, fee payer when present, and resource;
 keep redirects and mismatched authorities/paths/queries fail-closed.
 
-After a Solana settlement, the canary queries Devnet RPC and requires a
+After a Solana settlement, the sidecar queries Devnet RPC and requires a
 confirmed, error-free transaction with the expected signature, fee payer, mint,
 and exact token movement. Preserve Telegraph `signal_hash`/node evidence and
 independent settlement proof separately; the August 9 result remains a rehearsal,
-not qualifying demand. `src/oathcast/payment.py` remains a legacy Base-Sepolia
-policy/journal regression harness and must not be used as the current signer.
+not qualifying demand. The current live canary is also finite and explicitly
+budgeted; see `docs/application-pilot.md` before increasing the budget or
+sharing the route with additional users. `src/oathcast/payment.py` remains a
+legacy Base-Sepolia policy/journal regression harness and must not be used as
+the current signer.
 
 Set `OATHCAST_MINER_API_KEY` on the host to enforce the Bearer token declared in
 the canonical YAML. Keep the payment wallet local; never put its private key
