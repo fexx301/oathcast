@@ -68,23 +68,11 @@ class MinerAdapterTests(unittest.TestCase):
         self.assertTrue(result.has_comparable_probability)
 
     def test_weatherapi_rejects_horizons_outside_provider_window(self):
-        too_long = self.question.__class__(
-            event_id="adapter-too-long",
-            location_name=self.question.location_name,
-            latitude=self.question.latitude,
-            longitude=self.question.longitude,
-            horizon_start=self.question.horizon_start,
-            horizon_end=self.question.horizon_end,
-            forecast_cutoff=self.question.forecast_cutoff - timedelta(days=14),
-        )
-        with self.assertRaisesRegex(ValueError, "at most 14"):
-            WeatherApiMinerAdapter().validate_question(too_long)
-
-        future_start = (datetime.now(tz=UTC) + timedelta(days=15)).replace(
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
+        future_start = datetime.combine(
+            datetime.now(tz=UTC).date() + timedelta(days=14),
+            datetime.min.time(),
+            tzinfo=UTC,
+        ).replace(hour=12)
         too_far = self.question.__class__(
             event_id="adapter-too-far",
             location_name=self.question.location_name,
@@ -94,8 +82,27 @@ class MinerAdapterTests(unittest.TestCase):
             horizon_end=future_start + timedelta(hours=1),
             forecast_cutoff=future_start - timedelta(hours=1),
         )
-        with self.assertRaisesRegex(ValueError, "14-day"):
+        with self.assertRaisesRegex(ValueError, "14 forecast days|14-day"):
             WeatherApiMinerAdapter().validate_question(too_far)
+
+    def test_weatherapi_days_covers_tomorrow_from_today(self):
+        today = datetime.now(tz=UTC).date()
+        tomorrow = datetime.combine(
+            today + timedelta(days=1),
+            datetime.min.time(),
+            tzinfo=UTC,
+        ).replace(hour=12)
+        question = self.question.__class__(
+            event_id="adapter-tomorrow",
+            location_name="Lagos",
+            latitude=self.question.latitude,
+            longitude=self.question.longitude,
+            horizon_start=tomorrow,
+            horizon_end=tomorrow + timedelta(hours=1),
+            forecast_cutoff=tomorrow - timedelta(hours=1),
+        )
+
+        self.assertEqual(WeatherApiMinerAdapter().build_params(question)["days"], "2")
 
     def test_zeus_temperature_context_is_excluded_from_probability_consensus(self):
         capabilities = [

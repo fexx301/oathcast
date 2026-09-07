@@ -139,7 +139,12 @@ class WeatherApiMinerAdapter:
             raise ValueError("horizon_end must be after horizon_start")
         if forecast_cutoff > horizon_start:
             raise ValueError("forecast_cutoff must be at or before horizon_start")
-        requested_days = (horizon_end.date() - forecast_cutoff.date()).days + 1
+        # WeatherAPI's ``days`` parameter is relative to today; it does not
+        # mean "number of calendar days between cutoff and horizon".  The
+        # dispatcher therefore needs every day from the current UTC date
+        # through the requested hour, otherwise a perfectly valid tomorrow
+        # request is answered with today's forecast only.
+        requested_days = (horizon_end.date() - datetime.now(tz=UTC).date()).days + 1
         if requested_days > 14:
             raise ValueError("WeatherAPI supports at most 14 forecast days")
         latest_supported_date = datetime.now(tz=UTC).date() + timedelta(days=13)
@@ -149,7 +154,7 @@ class WeatherApiMinerAdapter:
     def build_params(self, question: ForecastQuestion) -> dict[str, Any]:
         self.validate_question(question)
         requested_days = (
-            question.horizon_end.date() - question.forecast_cutoff.date()
+            question.horizon_end.date() - datetime.now(tz=UTC).date()
         ).days + 1
         return {
             "q": f"{question.latitude:.6f},{question.longitude:.6f}",
