@@ -356,7 +356,10 @@ def _validate_paid_evidence(
     if evidence.get("paid_response_body_sha256") != response_body_sha256:
         raise PaymentBoundaryUnavailable("the payment sidecar response body hash is mismatched")
     target = evidence.get("target")
-    if not isinstance(target, Mapping) or target.get("request_url_sha256") != target_sha256:
+    if not isinstance(target, Mapping) or not (
+        target.get("request_binding_sha256") == target_sha256
+        or target.get("request_url_sha256") == target_sha256
+    ):
         raise PaymentBoundaryUnavailable("the payment sidecar target evidence is mismatched")
     return evidence
 

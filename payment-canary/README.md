@@ -38,19 +38,27 @@ ceiling. Zero, negative, fractional, unsafe numeric, and above-ceiling values
 fail with `MAX_AMOUNT_INVALID` before any HTTP request is made.
 
 ```bash
-export TELEGRAPH_DISPATCHER_URL='https://your-telegraph-dispatcher.example/miner-dispatcher'
+export TELEGRAPH_DISPATCHER_URL='https://devnode.telegraphprotocol.com'
 npm run canary -- \
   --dispatcher-url "$TELEGRAPH_DISPATCHER_URL" \
-  --miner-id 18 \
-  --path predict \
-  --operation-id preflight-2026-08-08-001 \
-  --param lat=6.5244 \
-  --param lon=3.3792
+  --route engine \
+  --miner-id 212 \
+  --path forecast \
+  --operation-id preflight-2026-09-07-001 \
+  --param q=6.5245,3.3792 \
+  --param days=1
 ```
 
-Use `--target-url https://host/v1/18/predict` instead of
-`--dispatcher-url ...` for a direct registered route. The challenge resource
-URL must exactly equal the resulting URL, including sorted query parameters.
+The current Telegraph route is `POST /engine/v1/ask/{miner_id}`. The canary
+wraps the logical upstream request in the JSON body documented by Telegraph:
+`{"method":"GET","endpoint":"/forecast","payload":{"q":"...","days":1}}`.
+The x402 challenge resource must exactly equal the Engine URL. The retired
+`/miner-dispatcher/v1/{id}/...` route is retained only for historical
+compatibility tests and must not be used for new traffic.
+
+Use `--target-url ...` only for a separately reviewed direct target. It is not
+an alias for the Engine route; a challenge must exactly bind to its method,
+URL, and request body.
 
 The August 9 dispatcher was exposed over HTTP on Solana Devnet and advertised
 its canonical resource without the gateway's `/miner-dispatcher` prefix. That
@@ -60,6 +68,7 @@ historical, narrowly pinned compatibility mode must be enabled explicitly:
 npm run canary -- \
   --dispatcher-url http://13.237.89.59:7044/miner-dispatcher \
   --allow-insecure-http-devnet \
+  --route dispatcher \
   --miner-id 18 \
   --path predict \
   --operation-id preflight-live-001 \

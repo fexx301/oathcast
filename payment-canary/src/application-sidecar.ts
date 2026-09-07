@@ -35,10 +35,12 @@ import {
   buildTarget,
   createDevnetRpc,
   loadSignerFromEnvironment,
+  requestBindingSha256,
   runCanary,
   verifyPaymentOnChain,
   type CanaryEvidence,
   type CanaryResult,
+  type TelegraphRoute,
   type SolanaRpcLike,
 } from "./canary.js";
 import {
@@ -61,6 +63,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/;
 const SAFE_OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SAFE_MINER_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_ENDPOINT = /^[A-Za-z0-9_~-]{1,128}$/;
+const LIVE_DEVNET_ORIGIN = "http://13.237.89.59:7044";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -69,6 +72,7 @@ export interface SidecarConfig {
   journalPath: string;
   authToken: string;
   dispatcherUrl: string;
+  route: TelegraphRoute;
   rpcUrl: string;
   allowedMinerIds: readonly string[];
   allowedEndpoints: readonly string[];
@@ -238,6 +242,33 @@ function parseEnvInteger(value: string | undefined, fallback: number, name: stri
   return parsed;
 }
 
+function validateTelegraphBaseUrl(
+  value: string,
+  route: TelegraphRoute,
+  allowInsecureHttpDevnet: boolean,
+): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new SidecarConfigError("dispatcher URL is invalid");
+  }
+  const isPinnedDevnetHttp =
+    allowInsecureHttpDevnet && parsed.origin === LIVE_DEVNET_ORIGIN;
+  if (parsed.protocol !== "https:" && !isPinnedDevnetHttp) {
+    throw new SidecarConfigError("dispatcher URL must use HTTPS");
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new SidecarConfigError("dispatcher URL must be an origin or base path without credentials");
+  }
+  const basePath = parsed.pathname.replace(/\/+$/g, "");
+  if (route === "engine" && basePath !== "") {
+    throw new SidecarConfigError(
+      "Engine routing requires the Telegraph node origin, not a legacy dispatcher path",
+    );
+  }
+}
+
 function validateConfig(config: SidecarConfig): void {
   if (!isAbsolute(config.socketPath) || !isAbsolute(config.journalPath)) {
     throw new SidecarConfigError("socket and journal paths must be absolute");
@@ -251,6 +282,14 @@ function validateConfig(config: SidecarConfig): void {
     throw new SidecarConfigError("auth token must be 32-512 bytes");
   }
   boundedString(config.dispatcherUrl, "dispatcher URL", 2048);
+  if (config.route !== "dispatcher" && config.route !== "engine") {
+    throw new SidecarConfigError("Telegraph route is invalid");
+  }
+  validateTelegraphBaseUrl(
+    config.dispatcherUrl,
+    config.route,
+    config.allowInsecureHttpDevnet,
+  );
   boundedString(config.rpcUrl, "RPC URL", 2048);
   if (config.allowedMinerIds.length === 0 || config.allowedEndpoints.length === 0) {
     throw new SidecarConfigError("an allowlist is required");
@@ -299,9 +338,23 @@ export function configFromEnvironment(
   if (Buffer.byteLength(authToken, "utf8") < 32 || Buffer.byteLength(authToken, "utf8") > MAX_AUTH_TOKEN_BYTES) {
     throw new SidecarConfigError("OATHCAST_APPLICATION_SIDECAR_TOKEN must be 32-512 bytes");
   }
-  const dispatcherUrl = environment.OATHCAST_DISPATCHER_URL ??
-    environment.TELEGRAPH_DISPATCHER_URL ?? "";
+  const primaryDispatcherUrl = environment.OATHCAST_DISPATCHER_URL;
+  const legacyDispatcherUrl = environment.TELEGRAPH_DISPATCHER_URL;
+  if (
+    primaryDispatcherUrl &&
+    legacyDispatcherUrl &&
+    primaryDispatcherUrl !== legacyDispatcherUrl
+  ) {
+    throw new SidecarConfigError(
+      "OATHCAST_DISPATCHER_URL conflicts with TELEGRAPH_DISPATCHER_URL",
+    );
+  }
+  const dispatcherUrl = primaryDispatcherUrl ?? legacyDispatcherUrl ?? "";
   if (!dispatcherUrl) throw new SidecarConfigError("a dispatcher URL is required");
+  const route = environment.OATHCAST_TELEGRAPH_ROUTE ?? "engine";
+  if (route !== "dispatcher" && route !== "engine") {
+    throw new SidecarConfigError("OATHCAST_TELEGRAPH_ROUTE must be dispatcher or engine");
+  }
   const maxAmountMicroUsdc = positiveInteger(
     environment.OATHCAST_MAX_PAYMENT_MICRO_USDC ?? DEFAULT_MAX_AMOUNT.toString(),
     "OATHCAST_MAX_PAYMENT_MICRO_USDC",
@@ -336,6 +389,7 @@ export function configFromEnvironment(
     journalPath,
     authToken,
     dispatcherUrl,
+    route,
     rpcUrl: environment.SOLANA_RPC_URL ?? DEFAULT_RPC_URL,
     allowedMinerIds,
     allowedEndpoints,
@@ -472,6 +526,7 @@ function policySha256(config: SidecarConfig, targetSha256: string): string {
   return sha256Json({
     policy_version: "oathcast.application.payment.v1",
     target_sha256: targetSha256,
+    route: config.route,
     dispatcher_url_sha256: sha256Text(config.dispatcherUrl),
     network: SOLANA_DEVNET_NETWORK,
     asset: SOLANA_DEVNET_USDC,
@@ -525,7 +580,7 @@ function replayResponse(
     target: {
       miner_id: record.miner_id,
       endpoint_path: record.endpoint,
-      request_url_sha256: targetSha256,
+      request_binding_sha256: targetSha256,
     },
     preflight: {
       status: 402,
@@ -706,7 +761,7 @@ export class ApplicationPaymentSidecar {
         target: {
           miner_id: updated.miner_id,
           endpoint_path: updated.endpoint,
-          request_url_sha256: updated.target_sha256,
+          request_binding_sha256: updated.target_sha256,
         },
         preflight: {
           status: 402,
@@ -770,6 +825,7 @@ export class ApplicationPaymentSidecar {
     try {
       const preflightOptions = {
         dispatcherUrl: this.config.dispatcherUrl,
+        route: this.config.route,
         minerId: request.miner_id,
         endpointPath: request.endpoint,
         operationId: "preflight-" + request.idempotency_key,
@@ -780,7 +836,7 @@ export class ApplicationPaymentSidecar {
         params: request.params,
       } as const;
       const builtTarget = (this.dependencies.buildTarget ?? buildTarget)(preflightOptions);
-      targetSha256 = sha256Text(builtTarget.requestUrl);
+      targetSha256 = requestBindingSha256(builtTarget);
       operationId = operationIdFor(request, targetSha256);
     } catch {
       return publicError("TARGET_REJECTED", "the requested Miner route is invalid");
@@ -815,6 +871,7 @@ export class ApplicationPaymentSidecar {
     try {
       preflight = await run({
         dispatcherUrl: this.config.dispatcherUrl,
+        route: this.config.route,
         minerId: request.miner_id,
         endpointPath: request.endpoint,
         operationId,
@@ -870,6 +927,7 @@ export class ApplicationPaymentSidecar {
     try {
       execute = await run({
         dispatcherUrl: this.config.dispatcherUrl,
+        route: this.config.route,
         minerId: request.miner_id,
         endpointPath: request.endpoint,
         operationId,

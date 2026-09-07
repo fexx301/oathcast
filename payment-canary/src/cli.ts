@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { runCanary, type CanaryOptions } from "./canary.js";
+import { runCanary, type CanaryOptions, type TelegraphRoute } from "./canary.js";
 import { fileURLToPath } from "node:url";
 
 class CliError extends Error {}
@@ -10,11 +10,12 @@ function usage(): string {
   npm run canary -- --dispatcher-url <url> --operation-id <id> [options]
 
 Required:
-  --dispatcher-url <url>    HTTPS Telegraph dispatcher base URL
+  --dispatcher-url <url>    HTTPS Telegraph node origin/base URL
   --operation-id <id>       One-shot idempotency identifier
 
 Optional:
   --target-url <url>        Direct HTTPS route; mutually exclusive with dispatcher URL
+  --route <route>           Telegraph route: dispatcher or engine (default: env or dispatcher)
   --miner-id <id>           Miner id (default: 18)
   --path <path>             Miner endpoint path (default: predict)
   --param key=value         Query parameter; may be repeated
@@ -47,6 +48,7 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
   let dispatcherUrl: string | undefined;
   let dispatcherFlagProvided = false;
   let targetUrl: string | undefined;
+  let route: TelegraphRoute | undefined;
   let minerId = "18";
   let endpointPath = "predict";
   let operationId: string | undefined;
@@ -70,6 +72,15 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
         targetUrl = requireValue(argv, index, flag);
         index += 1;
         break;
+      case "--route": {
+        const value = requireValue(argv, index, flag);
+        if (value !== "dispatcher" && value !== "engine") {
+          throw new CliError("--route must be dispatcher or engine");
+        }
+        route = value;
+        index += 1;
+        break;
+      }
       case "--miner-id":
         minerId = requireValue(argv, index, flag);
         index += 1;
@@ -108,7 +119,15 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
   }
 
   if (!dispatcherFlagProvided && !targetUrl) {
-    dispatcherUrl = environment.TELEGRAPH_DISPATCHER_URL;
+    dispatcherUrl = environment.OATHCAST_DISPATCHER_URL ??
+      environment.TELEGRAPH_DISPATCHER_URL;
+  }
+  if (!route) {
+    const configuredRoute = environment.OATHCAST_TELEGRAPH_ROUTE;
+    if (configuredRoute !== undefined && configuredRoute !== "dispatcher" && configuredRoute !== "engine") {
+      throw new CliError("OATHCAST_TELEGRAPH_ROUTE must be dispatcher or engine");
+    }
+    route = configuredRoute ?? "dispatcher";
   }
   if (!operationId) throw new CliError("--operation-id is required");
   if (!dispatcherUrl && !targetUrl) {
@@ -120,6 +139,7 @@ export function parseCliArgs(argv: string[], environment: NodeJS.ProcessEnv = pr
   return {
     dispatcherUrl,
     targetUrl,
+    route,
     minerId,
     endpointPath,
     operationId,

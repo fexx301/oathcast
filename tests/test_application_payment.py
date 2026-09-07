@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.client import HTTPResponse
 from pathlib import Path
 import json
@@ -33,6 +33,20 @@ from oathcast.discovery import MinerCapability
 
 
 UTC = timezone.utc
+
+
+def _future_forecast_time() -> str:
+    """Keep live-gateway fixtures ahead of the clock used by the service."""
+
+    start = (datetime.now(tz=UTC) + timedelta(days=2)).replace(
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    return start.isoformat().replace("+00:00", "Z")
+
+
+TEST_FORECAST_TIME = _future_forecast_time()
 
 
 class FakeSidecarClient:
@@ -196,7 +210,7 @@ class ApplicationPaymentTests(unittest.TestCase):
                 "location": "Lagos",
                 "latitude": 6.5244,
                 "longitude": 3.3792,
-                "local_datetime": "2026-09-05T15:00:00Z",
+                "local_datetime": TEST_FORECAST_TIME,
                 "risk_threshold_percent": 50,
                 "consent": True,
             }
@@ -232,7 +246,7 @@ class ApplicationPaymentTests(unittest.TestCase):
                     "location": "Lagos",
                     "latitude": 6.5244,
                     "longitude": 3.3792,
-                    "local_datetime": "2026-09-05T15:00:00Z",
+                    "local_datetime": TEST_FORECAST_TIME,
                     "risk_threshold_percent": 50,
                     "consent": True,
                 }
@@ -244,7 +258,7 @@ class ApplicationPaymentTests(unittest.TestCase):
                     "location": "Tokyo",
                     "latitude": 35.6762,
                     "longitude": 139.6503,
-                    "local_datetime": "2026-09-05T15:00:00Z",
+                    "local_datetime": TEST_FORECAST_TIME,
                     "risk_threshold_percent": 50,
                     "consent": True,
                 }
@@ -272,7 +286,7 @@ class ApplicationPaymentTests(unittest.TestCase):
                         "location": "Lagos",
                         "latitude": 6.5244,
                         "longitude": 3.3792,
-                        "local_datetime": "2026-09-05T15:00:00Z",
+                        "local_datetime": TEST_FORECAST_TIME,
                         "risk_threshold_percent": 50,
                         "consent": True,
                     }

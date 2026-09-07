@@ -10,6 +10,7 @@ import {
   SOLANA_DEVNET_NETWORK,
   SOLANA_DEVNET_USDC,
   buildTarget,
+  requestBindingSha256,
   runCanary,
 } from "../src/canary.js";
 import { deriveWalletFromSeed } from "../src/wallet.js";
@@ -183,6 +184,49 @@ describe("payment canary", () => {
         targetUrl: "https://miner.test/v1/18/predict",
       }).path,
     ).toBe("/v1/18/predict");
+  });
+
+  it("builds the current Engine direct-inference POST envelope", async () => {
+    const engineOptions = {
+      dispatcherUrl: "https://devnode.telegraphprotocol.com",
+      route: "engine" as const,
+      minerId: "212",
+      endpointPath: "forecast",
+      operationId: "engine-preflight-001",
+      execute: false,
+      params: { q: "6.524500,3.379200", days: "1" },
+    };
+    const target = buildTarget(engineOptions);
+    expect(target.requestUrl).toBe(
+      "https://devnode.telegraphprotocol.com/engine/v1/ask/212",
+    );
+    expect(target.method).toBe("POST");
+    expect(target.body).toBe(
+      JSON.stringify({
+        method: "GET",
+        endpoint: "/forecast",
+        payload: { q: "6.524500,3.379200", days: 1 },
+      }),
+    );
+    expect(requestBindingSha256(target)).toMatch(/^[0-9a-f]{64}$/);
+
+    let request: { input: RequestInfo | URL; init?: RequestInit } | undefined;
+    const result = await runCanary(engineOptions, {
+      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        request = { input, init };
+        return new Response("", {
+          status: 402,
+          headers: { "PAYMENT-REQUIRED": encodeHeader(challengeFor(target.requestUrl)) },
+        });
+      }),
+    });
+    expect(result.ok).toBe(true);
+    expect(request?.input).toBe(target.requestUrl);
+    expect(request?.init?.method).toBe("POST");
+    expect((request?.init?.headers as Record<string, string>) ["Content-Type"]).toBe(
+      "application/json",
+    );
+    expect(request?.init?.body).toBe(target.body);
   });
 
   it("accepts only the pinned gateway's canonical prefix-free resource alias", async () => {

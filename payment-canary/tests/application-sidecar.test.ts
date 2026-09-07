@@ -18,6 +18,7 @@ function config(directory: string): SidecarConfig {
     journalPath: join(directory, "payments.sqlite3"),
     authToken: "sidecar-token-" + "x".repeat(24),
     dispatcherUrl: "https://dispatcher.test/miner-dispatcher",
+    route: "dispatcher",
     rpcUrl: "https://api.devnet.solana.com",
     allowedMinerIds: ["212"],
     allowedEndpoints: ["forecast"],
@@ -117,6 +118,8 @@ describe("application payment sidecar", () => {
           path: "/miner-dispatcher/v1/212/forecast",
           minerId: "212",
           endpointPath: "forecast",
+          route: "dispatcher",
+          method: "GET",
         })) as typeof buildTarget,
         runCanary: (async (options, dependencies) => {
           const operationId = options.operationId;
@@ -163,6 +166,8 @@ describe("application payment sidecar", () => {
         path: "/miner-dispatcher/v1/212/forecast",
         minerId: "212",
         endpointPath: "forecast",
+        route: "dispatcher",
+        method: "GET",
       })) as typeof buildTarget,
       runCanary: (async (options, dependencies) => {
         if (!options.execute) return evidence(true, options.operationId);
@@ -215,6 +220,8 @@ describe("application payment sidecar", () => {
           path: "/miner-dispatcher/v1/212/forecast",
           minerId: "212",
           endpointPath: "forecast",
+          route: "dispatcher",
+          method: "GET",
         })) as typeof buildTarget,
         runCanary: (async (options, dependencies) => {
           if (!options.execute) return evidence(true, options.operationId);
@@ -284,6 +291,8 @@ describe("application payment sidecar", () => {
           path: "/miner-dispatcher/v1/212/forecast",
           minerId: "212",
           endpointPath: "forecast",
+          route: "dispatcher",
+          method: "GET",
         })) as typeof buildTarget,
         runCanary: (async (options, dependencies) => {
           if (!options.execute) return evidence(true, options.operationId);

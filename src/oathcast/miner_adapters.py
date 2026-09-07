@@ -207,6 +207,16 @@ class WeatherApiMinerAdapter:
         question: ForecastQuestion,
     ) -> AdaptedMinerResponse:
         payload = _body(raw_response)
+        # Telegraph's Engine direct-inference route wraps the upstream reply
+        # in an envelope.  The legacy dispatcher returned the WeatherAPI body
+        # at the root, so accept both shapes while keeping the full envelope
+        # available to protocol provenance callers.
+        if isinstance(payload, dict):
+            engine_result = payload.get("result")
+            if isinstance(engine_result, dict) and (
+                "location" in engine_result or "forecast" in engine_result
+            ):
+                payload = engine_result
         if not isinstance(payload, dict):
             return AdaptedMinerResponse(
                 probability=None,

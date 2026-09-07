@@ -64,7 +64,10 @@ def main() -> None:
         name="WeatherAPI",
         base_url=dispatcher_url,
         intents=frozenset({"WEATHER_FORECAST"}),
-        endpoint_path="/v1/212/forecast",
+        # Telegraph Engine maps this logical upstream endpoint into the
+        # POST /engine/v1/ask/212 envelope. Keep the upstream path here so
+        # gateway metadata does not advertise the retired dispatcher route.
+        endpoint_path="/forecast",
         endpoint_name="forecast",
         registry_snapshot_sha256=os.environ.get("OATHCAST_APPLICATION_REGISTRY_SNAPSHOT_SHA256"),
     )

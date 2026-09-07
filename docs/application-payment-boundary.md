@@ -1,8 +1,11 @@
 # Track 3 Application payment boundary
 
 This document records the reviewed implementation boundary for a live
-Application request. It does not claim that the path has been enabled or that
-an Application payment has been made.
+Application request. The current Telegraph transport is the Engine API:
+`POST https://devnode.telegraphprotocol.com/engine/v1/ask/212`, carrying the
+logical upstream `GET /forecast` request in its JSON envelope. The retired
+`/miner-dispatcher/v1/{id}/...` route is not used for new Application traffic.
+This document does not claim that a new Application payment has been made.
 
 ## Decision
 
@@ -35,8 +38,9 @@ is not enabled by this build.
 ## State and idempotency
 
 Before signing, the sidecar performs an unpaid preflight and validates the
-exact route, x402 version, network, asset, amount, recipient, fee payer, and
-challenge resource. It then reserves a journal row. The row binds:
+exact Engine route, POST method, JSON envelope, x402 version, network, asset,
+amount, recipient, fee payer, and challenge resource. It then reserves a
+journal row. The row binds:
 
 `principal_id + idempotency_key + canonical request hash + policy hash + target hash + challenge hash`
 
@@ -82,7 +86,7 @@ verified in Telegraph/payment evidence.
 
 An operator may prepare the environment without spending:
 
-1. Confirm fresh registry discovery, ownership, endpoint, HTTPS route, payee,
+1. Confirm fresh registry discovery, ownership, endpoint, HTTPS Engine route, payee,
    fee payer, and current x402 `accepts[]` data for Miner 212.
 2. Review the exact YAML/schema and freeze the request parameter mapping.
 3. Provision separate sidecar and gateway tokens; never put the Solana key in

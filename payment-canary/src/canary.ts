@@ -33,6 +33,8 @@ export const DEFAULT_ENDPOINT_PATH = "predict";
 export const LIVE_DEVNET_DISPATCHER_ORIGIN = "http://13.237.89.59:7044";
 export const LIVE_DEVNET_DISPATCHER_PREFIX = "/miner-dispatcher";
 
+export type TelegraphRoute = "dispatcher" | "engine";
+
 const OPERATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MINER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const PATH_SEGMENT_PATTERN = /^[A-Za-z0-9_~-]{1,128}$/;
@@ -76,6 +78,8 @@ export interface CanaryOptions {
   dispatcherUrl?: string;
   /** Direct target URL, useful for a registered route outside a dispatcher. */
   targetUrl?: string;
+  /** Telegraph surface used to construct the request target. */
+  route?: TelegraphRoute;
   minerId: string;
   endpointPath: string;
   operationId: string;
@@ -140,7 +144,9 @@ export interface CanaryEvidence {
     path?: string;
     miner_id?: string;
     endpoint_path?: string;
+    route?: TelegraphRoute;
     request_url_sha256?: string;
+    request_binding_sha256?: string;
   };
   preflight: {
     status: number | null;
@@ -403,12 +409,16 @@ export interface BuiltTarget {
   path: string;
   minerId: string;
   endpointPath: string;
+  route: TelegraphRoute;
+  method: "GET" | "POST";
+  body?: string;
 }
 
-export function buildTarget(options: Pick<CanaryOptions, "dispatcherUrl" | "targetUrl" | "minerId" | "endpointPath" | "params" | "allowInsecureHttpDevnet">): BuiltTarget {
+export function buildTarget(options: Pick<CanaryOptions, "dispatcherUrl" | "targetUrl" | "route" | "minerId" | "endpointPath" | "params" | "allowInsecureHttpDevnet">): BuiltTarget {
   if ((options.dispatcherUrl && options.targetUrl) || (!options.dispatcherUrl && !options.targetUrl)) {
     throw new CanaryError("INVALID_TARGET");
   }
+  const route = options.route ?? "dispatcher";
   const parts = assertTargetPathParts(options.minerId, options.endpointPath);
   const normalizedEndpointPath = parts.join("/");
   let target: URL;
@@ -419,8 +429,10 @@ export function buildTarget(options: Pick<CanaryOptions, "dispatcherUrl" | "targ
       "TARGET_URL_INVALID",
       options.allowInsecureHttpDevnet,
     );
-    const expectedSuffix = `/v1/${options.minerId}/${normalizedEndpointPath}`;
-    if (target.pathname !== expectedSuffix) {
+    const expectedSuffix = route === "engine"
+      ? `/engine/v1/ask/${options.minerId}`
+      : `/v1/${options.minerId}/${normalizedEndpointPath}`;
+    if (target.pathname !== expectedSuffix || (route === "engine" && target.search)) {
       throw new CanaryError("TARGET_PATH_MISMATCH");
     }
   } else {
@@ -432,17 +444,72 @@ export function buildTarget(options: Pick<CanaryOptions, "dispatcherUrl" | "targ
     if (dispatcher.search) throw new CanaryError("TARGET_URL_INVALID");
     const basePath = dispatcher.pathname.replace(/\/+$/g, "");
     target = new URL(dispatcher.toString());
-    target.pathname = `${basePath}/v1/${options.minerId}/${normalizedEndpointPath}`;
+    target.pathname = route === "engine"
+      ? `${basePath}/engine/v1/ask/${options.minerId}`
+      : `${basePath}/v1/${options.minerId}/${normalizedEndpointPath}`;
   }
 
-  setSortedParams(target, options.params);
+  setSortedParams(target, route === "dispatcher" ? options.params : undefined);
+  const method = route === "engine" ? "POST" : "GET";
   return {
     requestUrl: target.toString(),
     origin: target.origin,
     path: target.pathname,
     minerId: options.minerId,
     endpointPath: normalizedEndpointPath,
+    route,
+    method,
+    ...(route === "engine"
+      ? { body: engineRequestBody(normalizedEndpointPath, options.params) }
+      : {}),
   };
+}
+
+export function requestBindingSha256(target: BuiltTarget): string {
+  return sha256Json({
+    version: "oathcast.request-binding.v2",
+    route: target.route,
+    method: target.method,
+    url: target.requestUrl,
+    content_type: target.method === "POST" ? "application/json" : null,
+    body_sha256: target.body === undefined ? null : sha256Text(target.body),
+  });
+}
+
+function enginePayload(params: Record<string, string> | undefined): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params ?? {})) {
+    payload[key] = key === "days" && /^[0-9]+$/.test(value) ? Number(value) : value;
+  }
+  return payload;
+}
+
+function engineRequestBody(
+  endpointPath: string,
+  params: Record<string, string> | undefined,
+): string {
+  return JSON.stringify({
+    method: "GET",
+    endpoint: `/${endpointPath.replace(/^\/+|\/+$/g, "")}`,
+    payload: enginePayload(params),
+  });
+}
+
+function requestInit(
+  options: Pick<CanaryOptions, "route" | "endpointPath" | "params">,
+  headers: Record<string, string>,
+): RequestInit {
+  if ((options.route ?? "dispatcher") === "engine") {
+    return {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: engineRequestBody(options.endpointPath, options.params),
+    };
+  }
+  return { method: "GET", headers };
 }
 
 function challengeResourceMatches(resource: unknown, target: BuiltTarget): boolean {
@@ -943,7 +1010,9 @@ export async function runCanary(
       path: target.path,
       miner_id: target.minerId,
       endpoint_path: target.endpointPath,
+      route: target.route,
       request_url_sha256: sha256Text(target.requestUrl),
+      request_binding_sha256: requestBindingSha256(target),
     };
     const maxAmount = parseCap(options.maxAmount);
 
@@ -957,8 +1026,7 @@ export async function runCanary(
     let preflightResponse: Response;
     try {
       preflightResponse = await fetchFn(target.requestUrl, {
-        method: "GET",
-        headers: operationHeaders,
+        ...requestInit(options, operationHeaders),
         redirect: "error",
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -1070,14 +1138,13 @@ export async function runCanary(
       paidRequestWasSent = true;
       evidence.preflight.payment_attempted = true;
       paidResponse = await fetchFn(target.requestUrl, {
-        method: "GET",
-        redirect: "error",
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: {
+        ...requestInit(options, {
           ...operationHeaders,
           ...paymentHeaders,
           "Access-Control-Expose-Headers": "PAYMENT-RESPONSE,X-PAYMENT-RESPONSE",
-        },
+        }),
+        redirect: "error",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
     } catch {
       throw new CanaryError("PAID_REQUEST_OUTCOME_UNKNOWN");

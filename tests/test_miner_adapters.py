@@ -67,6 +67,34 @@ class MinerAdapterTests(unittest.TestCase):
         self.assertTrue(result.probability_comparable)
         self.assertTrue(result.has_comparable_probability)
 
+    def test_weatherapi_unwraps_engine_result_envelope(self):
+        result = WeatherApiMinerAdapter().parse_response(
+            {
+                "miner_id": "212",
+                "miner_name": "WeatherAPI",
+                "result": {
+                    "location": {"tz_id": "UTC"},
+                    "forecast": {
+                        "forecastday": [
+                            {
+                                "date": "2026-08-17",
+                                "hour": [
+                                    {
+                                        "time": "2026-08-17 15:00",
+                                        "chance_of_rain": 42,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+                "cost_usd": 0.01,
+            },
+            self.question,
+        )
+        self.assertAlmostEqual(result.probability, 0.42)
+        self.assertTrue(result.probability_comparable)
+
     def test_weatherapi_rejects_horizons_outside_provider_window(self):
         future_start = datetime.combine(
             datetime.now(tz=UTC).date() + timedelta(days=14),

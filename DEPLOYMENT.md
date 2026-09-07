@@ -18,7 +18,8 @@ The deployed Miner is v18; stopped `oathcast-v17-rollback-20260830` is the
 immediate Miner rollback target. Caddy configuration did not change for v18 and
 remains pinned by its retained hash. The v17 and earlier sections below are
 historical release records. The public decision UI is deployed separately in
-live mode as `2026-09-07-live-application-v2` from source `e86406c`. It serves
+live mode as `2026-09-07-live-application-v3` from the Engine-route migration
+commit. It serves
 the consumer-facing Planning Desk at
 `https://oathcastcourt.duckdns.org`, proxies browser requests to a loopback-only
 gateway, and reaches Miner 212 only through the authenticated payment sidecar.
