@@ -13,10 +13,10 @@ rounding; the registered one-hour point behavior remains unchanged. It also
 retains the additive, unregistered temperature compatibility route. The YAML
 description re-registration on
 2026-08-27 is documented separately and changed no runtime behavior. The
-separate public UI exposes a truthful read-only status surface and client-only
-development fixture. Its live decision endpoint remains degraded and returns
-503 because the private paid Application runner is not attached to the public
-UI.
+separate public UI exposes a judge-friendly Planning Desk. It can run in an
+explicit payment-free interactive demo mode, while the real live decision
+route remains opt-in and fail-closed until the private Application gateway and
+its payment boundary are healthy.
 
 The repository also contains provider adapters, a cross-Miner Application
 router, durable case and receipt stores, a development Script Author proxy,

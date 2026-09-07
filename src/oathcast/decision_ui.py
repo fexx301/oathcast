@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -508,6 +508,60 @@ class TelegraphDecisionRunner:
         return self.decision_callable(request)
 
 
+class DemoDecisionRunner:
+    """Deterministic, payment-free runner used for a judge-friendly preview.
+
+    The demo is intentionally a separate capability from the Telegraph path.
+    It gives a reviewer a complete interaction to try without suggesting that
+    a local calculation is live weather data, protocol traffic, or demand.
+    """
+
+    public_mode = "demo"
+
+    @property
+    def configured(self) -> bool:
+        return True
+
+    @property
+    def telegraph_configured(self) -> bool:
+        return False
+
+    def __call__(self, request: DecisionInput) -> DecisionResult:
+        seed = "|".join(
+            (
+                request.activity,
+                request.location,
+                f"{request.latitude:.6f}",
+                f"{request.longitude:.6f}",
+                request.local_datetime.isoformat(),
+            )
+        ).encode("utf-8")
+        digest = hashlib.sha256(seed).digest()
+        # Keep the preview varied while preserving a stable result for the
+        # same brief. This is a scenario generator, not a weather model.
+        risk_percent = round(18 + (int.from_bytes(digest[:4], "big") % 6501) / 100, 2)
+        contingency = risk_percent >= request.risk_threshold_percent
+        action = "contingency" if contingency else "go"
+        return DecisionResult(
+            action=action,
+            summary=(
+                f"Demo estimate: {risk_percent:g}% precipitation risk for the selected hour."
+            ),
+            rationale=(
+                f"The local scenario is {'at or above' if contingency else 'below'} "
+                f"your {request.risk_threshold_percent:g}% threshold."
+            ),
+            risk_percent=risk_percent,
+            miner_evidence=(
+                MinerEvidence(
+                    miner_id="local-demo",
+                    status="unknown",
+                    probability_percent=risk_percent,
+                ),
+            ),
+        )
+
+
 class DecisionApplication:
     """HTTP-independent application service used by the request handler."""
 
@@ -529,30 +583,47 @@ class DecisionApplication:
         # A bare callable is not proof that real Telegraph routing and payment
         # are ready. Public execution requires an explicit capability-bearing
         # runner so an accidentally injected fixture cannot enable the API.
-        return bool(
-            getattr(self.decision_runner, "configured", False)
-            and getattr(self.decision_runner, "telegraph_configured", False)
-            and (
-                callable(self.decision_runner)
-                or callable(getattr(self.decision_runner, "run", None))
-            )
+        configured = bool(getattr(self.decision_runner, "configured", False))
+        callable_runner = callable(self.decision_runner) or callable(
+            getattr(self.decision_runner, "run", None)
         )
+        # The only non-Telegraph mode that can open the public API is the
+        # explicit, payment-free demo runner. Everything else stays closed.
+        demo = getattr(self.decision_runner, "public_mode", None) == "demo"
+        telegraph = bool(getattr(self.decision_runner, "telegraph_configured", False))
+        return bool(configured and callable_runner and (demo or telegraph))
 
     @property
     def telegraph_configured(self) -> bool:
         return bool(getattr(self.decision_runner, "telegraph_configured", False))
 
+    @property
+    def public_mode(self) -> str:
+        if not self.runner_configured:
+            return "read_only_fixture"
+        if getattr(self.decision_runner, "public_mode", None) == "demo":
+            return "demo"
+        return "live"
+
     def status_payload(self) -> dict[str, Any]:
         ready = self.runner_configured
+        mode = self.public_mode
         return {
             "service": SERVICE_NAME,
             "status": "ok" if ready else "degraded",
             "ready": ready,
             "runner_configured": ready,
-            "public_mode": "read_only_fixture",
-            "api_mode": "live_decisions" if ready else "fail_closed",
+            "public_mode": mode,
+            "api_mode": (
+                "demo"
+                if mode == "demo"
+                else "live_decisions"
+                if mode == "live"
+                else "fail_closed"
+            ),
             "fixture_available": True,
-            "live_decision_available": ready,
+            "interactive_demo_available": mode == "demo",
+            "live_decision_available": mode == "live",
             "decision_api_available": ready,
             "telegraph_routing_and_payment_configured": self.telegraph_configured,
             "release": current_release().to_dict(),
@@ -931,6 +1002,380 @@ def _render_page(*, result: DecisionResult | None = None, error: str | None = No
 </html>'''
 
 
+def _render_interactive_page(*, mode: str) -> str:
+    """Render the judge-facing Planning Desk for demo or live mode."""
+
+    live = mode == "live"
+    mode_label = "Live Telegraph route" if live else "Interactive demo"
+    mode_class = "live-mode" if live else "demo-mode"
+    mode_title = (
+        "Make the call before the weather changes."
+        if live
+        else "Make a plan before the weather changes."
+    )
+    mode_copy = (
+        "Describe one outdoor decision, choose the hour that matters, and receive a "
+        "transparent risk decision backed by the configured Telegraph Application path."
+        if live
+        else "Describe one outdoor decision, choose the hour that matters, and see how "
+        "OathCast turns a forecast signal into a clear next step."
+    )
+    notice = (
+        "This brief is routed through the private Application boundary. It is planning "
+        "support, not a safety guarantee."
+        if live
+        else "This is a payment-free local scenario. It never calls Telegraph, spends funds, "
+        "or counts as protocol demand."
+    )
+    consent_label = (
+        "I agree to send this planning brief through OathCast's live Application route."
+        if live
+        else "I understand this is a local demonstration and not live weather data."
+    )
+    submit_label = "Run live decision" if live else "Run interactive preview"
+    footer = (
+        "Live route enabled by the operator. Wallet material stays outside this browser. "
+        "Use the result as non-binding planning support."
+        if live
+        else "Demo mode is intentionally separate from Telegraph traffic. No wallet material "
+        "is exposed, and no request leaves this application."
+    )
+    planned = (datetime.now(timezone.utc) + timedelta(hours=2)).replace(
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    hour_options = "".join(
+        f'<option value="{hour:02d}"{' selected' if hour == planned.hour else ''}>{hour:02d}:00</option>'
+        for hour in range(24)
+    )
+    page = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OathCast Planning Desk</title>
+  <meta name="description" content="Use OathCast to turn a weather forecast into a clear outdoor planning decision.">
+  <style>
+    :root { color-scheme: dark; --ink:#f4f7f8; --muted:#a6b0b5; --faint:#6e7a80; --paper:#071014; --panel:#0c171c; --panel-2:#101e24; --line:#203139; --line-strong:#36505a; --sky:#61d5f5; --sky-deep:#153c4b; --amber:#f3bf6a; --green:#77e2a6; --danger:#ff9d9d; --danger-bg:#351c20; --shadow:rgba(0,0,0,.28); }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { min-height:100dvh; margin:0; background:var(--paper); color:var(--ink); font:16px/1.58 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.32; background-image:linear-gradient(rgba(97,213,245,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(97,213,245,.05) 1px,transparent 1px); background-size:48px 48px; mask-image:linear-gradient(to bottom,black,transparent 52rem); }
+    a { color:var(--ink); text-underline-offset:.22em; text-decoration-color:var(--sky); }
+    button,input,select { font:inherit; }
+    button,a { -webkit-tap-highlight-color:transparent; }
+    button { touch-action:manipulation; }
+    .shell { width:min(100% - 2rem,1180px); margin:0 auto; padding:1rem 0 4rem; }
+    .topbar { min-height:4.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; border-bottom:1px solid var(--line); }
+    .brand { display:inline-flex; align-items:center; gap:.65rem; margin:0; font-weight:850; letter-spacing:.02em; }
+    .brand-mark { width:2.5rem; height:2.5rem; object-fit:contain; filter:drop-shadow(0 0 .65rem rgba(97,213,245,.12)); }
+    .status-link { color:var(--muted); font-size:.86rem; font-weight:700; }
+    .skip-link { position:fixed; top:.75rem; left:.75rem; z-index:20; transform:translateY(-5rem); border:1px solid var(--sky); background:var(--paper); padding:.7rem .9rem; font-weight:800; }
+    .skip-link:focus { transform:translateY(0); }
+    main { display:grid; gap:clamp(1.5rem,4vw,3.5rem); padding-top:clamp(2.5rem,7vw,6rem); }
+    .eyebrow,.meta { color:var(--faint); font:700 .75rem/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; text-transform:uppercase; }
+    .hero { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(18rem,.65fr); gap:clamp(2rem,6vw,6rem); align-items:end; padding-bottom:clamp(2rem,5vw,4rem); border-bottom:1px solid var(--line); }
+    .hero-kicker { display:flex; align-items:center; gap:.65rem; color:var(--sky); }
+    .hero-kicker svg { width:1.1rem; height:1.1rem; flex:0 0 auto; }
+    .mode-badge { display:inline-flex; align-items:center; gap:.45rem; width:max-content; margin-top:1.5rem; border:1px solid var(--line-strong); border-radius:999px; padding:.38rem .7rem; color:var(--ink); font-size:.8rem; font-weight:800; }
+    .mode-badge::before { content:""; width:.5rem; height:.5rem; border-radius:50%; background:var(--amber); box-shadow:0 0 .6rem currentColor; }
+    .live-mode { border-color:rgba(119,226,166,.55); color:var(--green); }
+    .live-mode::before { background:var(--green); }
+    h1,h2,h3 { line-height:1.08; letter-spacing:-.035em; }
+    h1 { max-width:13ch; margin:1rem 0 1.25rem; font-size:clamp(3rem,6.2vw,5.8rem); text-wrap:balance; }
+    h2 { margin:0 0 .75rem; font-size:clamp(1.8rem,4vw,3.2rem); text-wrap:balance; }
+    h3 { margin:0; font-size:1.05rem; }
+    p { max-width:68ch; }
+    .lede { max-width:62ch; margin:0; color:var(--muted); font-size:clamp(1.05rem,1.8vw,1.28rem); }
+    .hero-aside { display:grid; gap:1rem; border-left:2px solid var(--sky); padding-left:1.15rem; }
+    .hero-aside strong { display:block; margin-bottom:.25rem; }
+    .hero-aside p { margin:0; color:var(--muted); }
+    .steps { display:grid; gap:.9rem; margin-top:1.2rem; }
+    .step { display:grid; grid-template-columns:2rem 1fr; gap:.75rem; align-items:start; }
+    .step-number { display:grid; place-items:center; width:2rem; height:2rem; border:1px solid var(--line-strong); border-radius:50%; color:var(--sky); font:700 .8rem ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .step p { margin:.18rem 0 0; color:var(--muted); font-size:.9rem; }
+    .section-heading { display:flex; justify-content:space-between; align-items:end; gap:1rem; margin-bottom:1.1rem; }
+    .section-heading p { margin:0; color:var(--muted); }
+    .workbench { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(18rem,.9fr); gap:1.25rem; }
+    .panel { border:1px solid var(--line); border-radius:.55rem; background:linear-gradient(145deg,rgba(16,30,36,.96),rgba(8,18,22,.96)); box-shadow:0 1.5rem 4rem var(--shadow); padding:clamp(1.15rem,3vw,2rem); }
+    form { display:grid; gap:1.25rem; }
+    fieldset { min-width:0; margin:0; border:0; padding:0; }
+    legend { margin-bottom:.9rem; color:var(--ink); font-size:1.1rem; font-weight:800; }
+    .legend-note { display:block; margin-top:.15rem; color:var(--muted); font-size:.88rem; font-weight:400; }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .field { min-width:0; }
+    label { display:block; margin-bottom:.35rem; font-weight:750; }
+    .required { color:var(--amber); }
+    .help { margin:.35rem 0 0; color:var(--muted); font-size:.82rem; }
+    input,select { width:100%; min-height:3rem; border:1px solid var(--line-strong); border-radius:.35rem; background:#071014; color:var(--ink); padding:.7rem .78rem; color-scheme:dark; }
+    input:focus,select:focus,button:focus-visible,a:focus-visible { outline:3px solid rgba(97,213,245,.38); outline-offset:2px; border-color:var(--sky); }
+    input[aria-invalid="true"],select[aria-invalid="true"] { border-color:var(--danger); }
+    .field-error { margin:.35rem 0 0; color:var(--danger); font-size:.84rem; }
+    .field-error[hidden],.error-summary[hidden] { display:none; }
+    details { border-top:1px solid var(--line); padding-top:.8rem; }
+    summary { width:max-content; cursor:pointer; color:var(--sky); font-weight:750; }
+    summary:focus-visible { outline:3px solid rgba(97,213,245,.38); outline-offset:3px; }
+    .consent { display:flex; gap:.7rem; align-items:flex-start; border-top:1px solid var(--line); padding-top:1rem; }
+    .consent input { width:1.25rem; min-width:1.25rem; height:1.25rem; min-height:1.25rem; margin-top:.15rem; accent-color:var(--sky); }
+    .consent label { margin:0; font-weight:600; }
+    .button-row { display:flex; align-items:center; flex-wrap:wrap; gap:.8rem; }
+    button { min-height:3rem; border:1px solid var(--sky); border-radius:.35rem; background:var(--sky); color:#061116; cursor:pointer; font-weight:850; padding:.7rem 1.1rem; transition:background-color .18s ease,border-color .18s ease,transform .18s ease,opacity .18s ease; }
+    button:hover { border-color:#a7ecff; background:#a7ecff; }
+    button:active { transform:translateY(1px); }
+    button[disabled] { cursor:wait; opacity:.62; }
+    .status-line { min-height:1.5rem; margin:0; color:var(--muted); font-size:.88rem; }
+    .status-line.success { color:var(--green); }
+    .error-summary { border:1px solid #b85d68; border-radius:.35rem; background:var(--danger-bg); color:var(--danger); padding:.8rem .9rem; }
+    .error-summary p { margin:0; font-weight:800; }
+    .error-summary ul { margin:.4rem 0 0 1.1rem; padding:0; }
+    .error-summary a { color:var(--danger); }
+    .side-panel { display:grid; align-content:start; gap:1.25rem; }
+    .side-panel > p { margin:0; color:var(--muted); }
+    .signal-card { border:1px solid var(--line-strong); border-radius:.4rem; background:rgba(7,16,20,.72); padding:1rem; }
+    .signal-card strong { display:block; margin:.35rem 0; }
+    .signal-card p { margin:0; color:var(--muted); font-size:.9rem; }
+    .result-shell { min-height:18rem; display:grid; align-content:start; gap:1rem; }
+    .result-shell.empty { place-items:center; text-align:center; border-style:dashed; }
+    .result-shell.empty p { margin:0; color:var(--muted); }
+    .result-shell.empty svg { width:2.4rem; height:2.4rem; color:var(--sky); }
+    .result-header { display:flex; align-items:start; justify-content:space-between; gap:1rem; }
+    .result-label { color:var(--green); font:700 .75rem ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; text-transform:uppercase; }
+    .decision-word { margin:.25rem 0 0; color:var(--ink); font-size:clamp(2.2rem,5vw,4.5rem); }
+    .decision-summary { margin:0; font-size:1.12rem; font-weight:750; }
+    .decision-rationale { margin:0; color:var(--muted); }
+    .result-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+    .result-facts div { border-top:1px solid var(--line-strong); padding-top:.6rem; }
+    .result-facts dt { color:var(--muted); font-size:.8rem; }
+    .result-facts dd { margin:.15rem 0 0; font-weight:800; overflow-wrap:anywhere; }
+    .evidence { border-top:1px solid var(--line); padding-top:.9rem; }
+    .evidence p { margin:.25rem 0 0; color:var(--muted); font-size:.86rem; }
+    .evidence-chip { display:inline-flex; margin-top:.65rem; border:1px solid var(--line-strong); border-radius:999px; padding:.3rem .55rem; color:var(--muted); font-size:.8rem; }
+    .boundary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+    .boundary-item { border-top:1px solid var(--line-strong); padding-top:.8rem; }
+    .boundary-item strong { display:block; margin-bottom:.25rem; }
+    .boundary-item p { margin:0; color:var(--muted); font-size:.9rem; }
+    footer { border-top:1px solid var(--line); padding-top:1.1rem; color:var(--muted); font-size:.88rem; }
+    @media (max-width:900px) { .hero,.workbench { grid-template-columns:1fr; } .hero-aside { max-width:36rem; } }
+    @media (max-width:680px) { .shell { width:min(100% - 1.25rem,1180px); } .topbar { align-items:flex-start; padding:.75rem 0; } .field-grid,.result-facts,.boundary { grid-template-columns:1fr; } h1 { max-width:13ch; font-size:clamp(2.8rem,14vw,4.5rem); } .section-heading { display:block; } .section-heading p { margin-top:.35rem; } .panel { padding:1rem; } .button-row button { width:100%; } }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { transition:none !important; animation:none !important; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="shell">
+    <header class="topbar">
+      <p class="brand"><img class="brand-mark" src="__LOGO_PATH__?v=__LOGO_VERSION__" width="192" height="192" alt="" aria-hidden="true">OathCast <span class="meta">/ Planning Desk</span></p>
+      <a class="status-link" href="/status">View system status</a>
+    </header>
+    <main id="main-content">
+      <section class="hero" aria-labelledby="page-heading">
+        <div>
+          <div class="hero-kicker eyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 16.5 8.5 12 12 15.5 19.5 8"/><path d="M15 8h4.5v4.5"/></svg> Weather intelligence for a real decision</div>
+          <span class="mode-badge __MODE_CLASS__">__MODE_LABEL__</span>
+          <h1 id="page-heading">__MODE_TITLE__</h1>
+          <p class="lede">__MODE_COPY__</p>
+        </div>
+        <aside class="hero-aside" aria-label="How OathCast works">
+          <div><span class="eyebrow">A simple three-step brief</span></div>
+          <div class="steps">
+            <div class="step"><span class="step-number">01</span><div><strong>Describe the plan</strong><p>Tell OathCast what could change if rain is likely.</p></div></div>
+            <div class="step"><span class="step-number">02</span><div><strong>Choose one hour</strong><p>Use the UTC hour when the decision matters.</p></div></div>
+            <div class="step"><span class="step-number">03</span><div><strong>Read the action</strong><p>Get a threshold-based recommendation with evidence.</p></div></div>
+          </div>
+        </aside>
+      </section>
+
+      <section aria-labelledby="brief-heading">
+        <div class="section-heading"><div><span class="eyebrow">Start here</span><h2 id="brief-heading">Build your planning brief</h2></div><p>About 30 seconds</p></div>
+        <div class="workbench">
+          <div class="panel">
+            <p class="signal-card"><strong>__MODE_NOTICE__</strong><span class="help">Only enter information needed for this one planning decision. Do not include passwords, payment details, or sensitive personal information.</span></p>
+            <form id="decision-form" novalidate>
+              <fieldset>
+                <legend>1. What are you deciding?<span class="legend-note">Name the activity in plain language.</span></legend>
+                <div class="field">
+                  <label for="activity">Activity <span class="required" aria-hidden="true">*</span></label>
+                  <input id="activity" name="activity" type="text" maxlength="120" autocomplete="off" value="Saturday market setup" required aria-describedby="activity-help activity-error">
+                  <p class="help" id="activity-help">Example: decide whether to move a market setup indoors.</p>
+                  <p class="field-error" id="activity-error" hidden></p>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>2. Where and when?<span class="legend-note">The location helps identify the forecast point. The hour is always UTC.</span></legend>
+                <div class="field">
+                  <label for="location">Location name <span class="required" aria-hidden="true">*</span></label>
+                  <input id="location" name="location" type="text" maxlength="200" autocomplete="address-level2" value="Lagos outdoor market" required aria-describedby="location-help location-error">
+                  <p class="help" id="location-help">A recognizable name is enough; no address is required.</p>
+                  <p class="field-error" id="location-error" hidden></p>
+                </div>
+                <div class="field-grid" style="margin-top:1rem">
+                  <div class="field"><label for="forecast-date">Date (UTC) <span class="required" aria-hidden="true">*</span></label><input id="forecast-date" type="date" value="__DEFAULT_DATE__" required aria-describedby="forecast-time-help date-error"><p class="field-error" id="date-error" hidden></p></div>
+                  <div class="field"><label for="forecast-hour">Hour (UTC) <span class="required" aria-hidden="true">*</span></label><select id="forecast-hour" required aria-describedby="forecast-time-help hour-error">__HOUR_OPTIONS__</select><p class="field-error" id="hour-error" hidden></p></div>
+                </div>
+                <p class="help" id="forecast-time-help">OathCast checks one exact hour, for example 16:00–17:00 UTC.</p>
+                <details>
+                  <summary>Change the map point</summary>
+                  <div class="field-grid" style="margin-top:1rem">
+                    <div class="field"><label for="latitude">Latitude</label><input id="latitude" type="number" min="-90" max="90" step="any" value="6.5244" aria-describedby="latitude-help latitude-error"><p class="help" id="latitude-help">Decimal degrees, north/south.</p><p class="field-error" id="latitude-error" hidden></p></div>
+                    <div class="field"><label for="longitude">Longitude</label><input id="longitude" type="number" min="-180" max="180" step="any" value="3.3792" aria-describedby="longitude-help longitude-error"><p class="help" id="longitude-help">Decimal degrees, east/west.</p><p class="field-error" id="longitude-error" hidden></p></div>
+                  </div>
+                </details>
+              </fieldset>
+
+              <fieldset>
+                <legend>3. Set your action threshold<span class="legend-note">At or above this risk, OathCast recommends a contingency.</span></legend>
+                <div class="field"><label for="risk-threshold">Rain-risk threshold (%) <span class="required" aria-hidden="true">*</span></label><input id="risk-threshold" type="number" min="0" max="100" step="1" value="30" inputmode="numeric" required aria-describedby="threshold-help threshold-error"><p class="help" id="threshold-help">30% means “prepare an alternative if risk reaches 30%.”</p><p class="field-error" id="threshold-error" hidden></p></div>
+              </fieldset>
+
+              <div class="consent"><input id="consent" type="checkbox" checked aria-describedby="consent-help consent-error"><div><label for="consent">__CONSENT_LABEL__ <span class="required" aria-hidden="true">*</span></label><p class="help" id="consent-help">This tool provides non-binding planning support. You remain responsible for the decision.</p><p class="field-error" id="consent-error" hidden></p></div></div>
+              <div id="form-errors" class="error-summary" role="alert" tabindex="-1" hidden><p>Check the highlighted fields.</p><ul id="form-errors-list"></ul></div>
+              <div class="button-row"><button id="run-decision" type="submit">__SUBMIT_LABEL__</button><p id="request-status" class="status-line" role="status" aria-live="polite">Ready for your brief.</p></div>
+            </form>
+          </div>
+
+          <aside class="side-panel">
+            <div class="panel result-shell empty" id="decision-result" aria-live="polite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 18h16M6 15.5l3-3 2.5 2.5L17.5 9"/><path d="M17.5 9H20v2.5"/></svg><div><h3>Your decision appears here</h3><p>Complete the brief to see the recommended action, risk estimate, and public evidence summary.</p></div></div>
+            <div class="panel"><span class="eyebrow">What the result means</span><div class="steps"><div class="step"><span class="step-number">A</span><div><strong>Go</strong><p>Risk is below your threshold for the selected hour.</p></div></div><div class="step"><span class="step-number">B</span><div><strong>Contingency</strong><p>Risk meets or exceeds your threshold; prepare the alternative.</p></div></div></div></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="boundary-heading"><div class="section-heading"><div><span class="eyebrow">Clear boundaries</span><h2 id="boundary-heading">Useful, inspectable, non-binding</h2></div></div><div class="boundary"><div class="boundary-item"><strong>One decision at a time</strong><p>The brief is narrowed to one place, one hour, and one threshold so the answer stays understandable.</p></div><div class="boundary-item"><strong>Evidence stays visible</strong><p>The result identifies how the signal was obtained without exposing raw credentials or wallet material.</p></div><div class="boundary-item"><strong>Weather is uncertain</strong><p>Use the result to plan responsibly; it is not an emergency alert or safety guarantee.</p></div></div></section>
+      <footer>__FOOTER__ <a href="/status">Open machine-readable status</a>.</footer>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const form = document.getElementById("decision-form");
+      const submit = document.getElementById("run-decision");
+      const status = document.getElementById("request-status");
+      const result = document.getElementById("decision-result");
+      const errorSummary = document.getElementById("form-errors");
+      const errorList = document.getElementById("form-errors-list");
+      const dateInput = document.getElementById("forecast-date");
+      const hourInput = document.getElementById("forecast-hour");
+      const fields = {
+        activity: document.getElementById("activity"),
+        location: document.getElementById("location"),
+        latitude: document.getElementById("latitude"),
+        longitude: document.getElementById("longitude"),
+        risk_threshold_percent: document.getElementById("risk-threshold"),
+        consent: document.getElementById("consent")
+      };
+      const errors = {
+        activity: document.getElementById("activity-error"),
+        location: document.getElementById("location-error"),
+        latitude: document.getElementById("latitude-error"),
+        longitude: document.getElementById("longitude-error"),
+        risk_threshold_percent: document.getElementById("threshold-error"),
+        local_datetime: document.getElementById("date-error"),
+        consent: document.getElementById("consent-error")
+      };
+      function safe(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (character) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[character]));
+      }
+      function clearErrors() {
+        errorSummary.hidden = true;
+        errorList.replaceChildren();
+        Object.entries(errors).forEach(([name, element]) => { element.hidden = true; element.textContent = ""; });
+        Object.values(fields).forEach((element) => element.setAttribute("aria-invalid", "false"));
+        dateInput.setAttribute("aria-invalid", "false");
+        hourInput.setAttribute("aria-invalid", "false");
+      }
+      function showErrors(fieldErrors) {
+        const visible = [];
+        Object.entries(fieldErrors || {}).forEach(([name, message]) => {
+          const error = errors[name] || errors.local_datetime;
+          const input = name === "local_datetime" ? dateInput : (fields[name] || fields.risk_threshold_percent);
+          if (!error || !input) return;
+          error.hidden = false;
+          error.textContent = String(message);
+          input.setAttribute("aria-invalid", "true");
+          visible.push({name, message: String(message), input});
+        });
+        if (visible.length) {
+          visible.forEach(({name, message, input}) => {
+            const item = document.createElement("li");
+            const link = document.createElement("a");
+            link.href = `#${input.id}`;
+            link.textContent = `${name === "local_datetime" ? "Date and hour" : name}: ${message}`;
+            item.append(link);
+            errorList.append(item);
+          });
+          errorSummary.hidden = false;
+          errorSummary.focus();
+        }
+      }
+      function payload() {
+        return {
+          activity: fields.activity.value.trim(),
+          location: fields.location.value.trim(),
+          latitude: Number(fields.latitude.value),
+          longitude: Number(fields.longitude.value),
+          local_datetime: `${dateInput.value}T${hourInput.value}:00:00+00:00`,
+          risk_threshold_percent: Number(fields.risk_threshold_percent.value),
+          consent: fields.consent.checked
+        };
+      }
+      function renderResult(body) {
+        const evidence = Array.isArray(body.miner_evidence) ? body.miner_evidence : [];
+        const evidenceCopy = evidence.length
+          ? evidence.map((item) => `${safe(item.miner_id)} · ${safe(item.status)} · ${item.payment_verified ? "payment verified" : "no payment"}`).join("<br>")
+          : "No public evidence record was returned.";
+        result.className = "panel result-shell";
+        result.innerHTML = `<div class="result-header"><div><span class="result-label">Decision returned</span><h3 class="decision-word">${safe(String(body.action || body.decision || "unknown").toUpperCase())}</h3></div><span class="mode-badge __MODE_CLASS__">__MODE_LABEL__</span></div><p class="decision-summary">${safe(body.summary || "No summary was returned.")}</p><p class="decision-rationale">${safe(body.rationale || "")}</p><dl class="result-facts"><div><dt>Risk estimate</dt><dd>${safe(body.risk_percent == null ? "Not available" : `${body.risk_percent}%`)}</dd></div><div><dt>Your threshold</dt><dd>${safe(`${body.risk_threshold_percent ?? fields.risk_threshold_percent.value}%`)}</dd></div><div><dt>Request ID</dt><dd>${safe(body.request_id || "Not available")}</dd></div></dl><div class="evidence"><strong>Evidence summary</strong><p>${evidenceCopy}</p><span class="evidence-chip">Raw responses and credentials stay private</span></div>`;
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        result.scrollIntoView({behavior: prefersReducedMotion ? "auto" : "smooth", block: "start"});
+      }
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        clearErrors();
+        status.className = "status-line";
+        status.textContent = "Checking the brief…";
+        submit.disabled = true;
+        form.setAttribute("aria-busy", "true");
+        try {
+          const response = await fetch("/api/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload())});
+          let body;
+          try { body = await response.json(); } catch { body = {message:"The service returned an unreadable response."}; }
+          if (!response.ok) {
+            showErrors(body.fields || {});
+            throw new Error(body.message || "The decision could not be completed.");
+          }
+          renderResult(body);
+          status.className = "status-line success";
+          status.textContent = "Decision ready. Review the evidence summary on the right.";
+        } catch (error) {
+          if (!errorSummary.hidden) status.textContent = "Update the highlighted fields and try again.";
+          else status.textContent = String(error.message || "The service is unavailable.");
+        } finally {
+          submit.disabled = false;
+          form.setAttribute("aria-busy", "false");
+        }
+      });
+    })();
+  </script>
+</body>
+</html>"""
+    return (
+        page
+        .replace("__MODE_LABEL__", escape(mode_label))
+        .replace("__MODE_CLASS__", mode_class)
+        .replace("__MODE_TITLE__", escape(mode_title))
+        .replace("__MODE_COPY__", escape(mode_copy))
+        .replace("__MODE_NOTICE__", escape(notice))
+        .replace("__CONSENT_LABEL__", escape(consent_label))
+        .replace("__SUBMIT_LABEL__", escape(submit_label))
+        .replace("__FOOTER__", escape(footer))
+        .replace("__DEFAULT_DATE__", planned.date().isoformat())
+        .replace("__HOUR_OPTIONS__", hour_options)
+        .replace("__LOGO_PATH__", LOGO_PATH)
+        .replace("__LOGO_VERSION__", LOGO_VERSION)
+    )
+
+
 def _inline_source_hash(page: str, tag: str) -> str:
     match = re.search(rf"<{tag}>(.*?)</{tag}>", page, flags=re.DOTALL)
     if match is None:
@@ -949,10 +1394,29 @@ CONTENT_SECURITY_POLICY = (
 )
 
 
-def render_page(*, result: DecisionResult | None = None, error: str | None = None) -> str:
-    """Return the cached static page or a dynamic result/error variant."""
+def _content_security_policy(page: str) -> str:
+    """Build the exact CSP for either the static or interactive page."""
+
+    connect_source = "'self'" if 'id="decision-form"' in page else "'none'"
+    return (
+        "default-src 'none'; img-src 'self'; "
+        f"style-src {_inline_source_hash(page, 'style')}; "
+        f"script-src {_inline_source_hash(page, 'script')}; "
+        f"connect-src {connect_source}; base-uri 'none'; form-action 'none'"
+    )
+
+
+def render_page(
+    *,
+    application: Any | None = None,
+    result: DecisionResult | None = None,
+    error: str | None = None,
+) -> str:
+    """Return the configured interactive page or the static fallback."""
 
     if result is None and error is None:
+        if application is not None and getattr(application, "runner_configured", False):
+            return _render_interactive_page(mode=getattr(application, "public_mode", "demo"))
         return _STATIC_PAGE
     return _render_page(result=result, error=error)
 
@@ -990,7 +1454,7 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
         self._headers(content_type="text/html; charset=utf-8")
         self.send_header(
             "Content-Security-Policy",
-            CONTENT_SECURITY_POLICY,
+            _content_security_policy(body),
         )
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
@@ -1017,7 +1481,7 @@ class DecisionRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
         path = urlsplit(self.path).path
         if path in {"/", "/index.html"}:
-            self._send_html(200, render_page())
+            self._send_html(200, render_page(application=self.application))
             return
         if path == LOGO_PATH:
             self._send_logo()
@@ -1189,6 +1653,7 @@ __all__ = [
     "DecisionResult",
     "DecisionRunner",
     "DecisionUnavailable",
+    "DemoDecisionRunner",
     "EVIDENCE_STATUSES",
     "LOGO_PATH",
     "MAX_BODY_BYTES",

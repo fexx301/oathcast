@@ -1,10 +1,19 @@
-# Public status and decision-fixture UI
+# Public status and Planning Desk UI
 
 `src/oathcast/decision_ui.py` is a small Python standard-library HTTP service.
-Its default public page is a read-only product/status surface with a
-client-only development fixture. The fixture makes no network request and is
-explicitly labeled as not Telegraph-routed, unpaid, non-qualifying demand, and
-not a safety guarantee.
+Its default public page is a read-only product/status surface. An explicit
+`OATHCAST_PUBLIC_DEMO=true` deployment opens the judge-facing Planning Desk:
+the form is fully interactive, but its deterministic scenario is still
+payment-free and explicitly labeled as not Telegraph-routed, unpaid,
+non-qualifying demand, and not a safety guarantee.
+
+For a reviewed live deployment, `scripts/run_decision_ui.py` can attach
+`oathcast.application_ui.LoopbackApplicationRunner`. That adapter only accepts
+the fixed loopback Application gateway path, rejects redirects, keeps the
+gateway token server-side, derives an idempotency key from the normalized brief,
+and requires the gateway health contract before the UI advertises live mode.
+The gateway and sidecar remain separate processes; the public UI never reads a
+wallet key.
 
 The header uses the transparent web asset at
 `src/oathcast/assets/oathcast-mark.webp`. It is derived from the supplied square
@@ -17,10 +26,10 @@ extra with `python -m pip install -e '.[logo-tools]'`, then run
 red-dominant texture while removing neutral black and never overwrites the
 source image.
 
-The bounded JSON API is retained for a future reviewed integration, but it
-remains fail-closed. When no reviewed runner is configured, the endpoint returns
-`503` before reading or parsing a request body. The public page has no live
-decision form or enabled live submit action.
+The bounded JSON API is retained for the reviewed integration. When no runner
+is configured, the endpoint returns `503` before reading or parsing a request
+body. Demo mode opens the same narrow API with a clearly labeled local runner;
+it does not create protocol traffic.
 
 ## Run locally
 
@@ -30,10 +39,17 @@ From the repository root:
 python scripts/run_decision_ui.py --host 127.0.0.1 --port 8787
 ```
 
-Open <http://127.0.0.1:8787/>. The page and health endpoints are available, but
-`POST /api/decision` intentionally returns `503` until a real Telegraph-backed
-decision runner is injected. The reviewed Track 3 gateway is a separate
-loopback-only service; it is not wired into this public endpoint.
+Open <http://127.0.0.1:8787/>. To preview the judge-facing flow locally without
+payment or network traffic:
+
+```sh
+OATHCAST_PUBLIC_DEMO=true python scripts/run_decision_ui.py \
+  --host 127.0.0.1 --port 8787
+```
+
+Without that explicit flag, `POST /api/decision` returns `503` before reading
+the body. A live deployment must provide `OATHCAST_APPLICATION_UI_TOKEN` and a
+healthy private gateway; the launcher otherwise stays read-only.
 
 Port `8787` is reserved for this public edge service. The separate local
 Planning Desk pilot defaults to `8788` and must not be placed behind Caddy's
@@ -71,8 +87,9 @@ public Miner evidence fields.
 
 ## Staging deployment
 
-The Docker image includes this launcher so the same immutable image can run two
-separate loopback-bound containers:
+The Docker image includes this launcher so the same immutable image can run a
+loopback-bound UI container. For a judge-facing payment-free deployment, add
+the explicit demo flag:
 
 ```sh
 docker run -d --name oathcast-decision-ui --restart unless-stopped \
@@ -80,6 +97,7 @@ docker run -d --name oathcast-decision-ui --restart unless-stopped \
   -e OATHCAST_IMAGE_DIGEST=<image-id> \
   --health-cmd='python -c "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8787/health\", timeout=3).read()"' \
   --health-interval=30s --health-timeout=5s --health-retries=3 \
+  -e OATHCAST_PUBLIC_DEMO=true \
   oathcast-ui:<release> \
   python /app/scripts/run_decision_ui.py --host 0.0.0.0 --port 8787
 ```
@@ -93,9 +111,10 @@ port 8080, and routes the public page, `/health`, `/status`, and `/api/decision`
 to this UI on port 8787. Because `/predict` and `/v1/*` belong to the Miner at
 the edge, use `/api/decision` for public fail-closed checks.
 
-Publishing this shell is not Track-3 demand. Its status remains degraded and
-its decision endpoint returns 503 until the reviewed live Telegraph payment
-runner is injected.
+Publishing demo mode is not Track-3 demand. Its status is healthy for the
+interactive demo, while `telegraph_routing_and_payment_configured` remains
+false. A live route must be armed separately and only after the payment
+boundary has passed its deployment checks.
 
 ## Endpoints
 
@@ -144,5 +163,6 @@ The page repeats the privacy boundary: send only details needed for one
 decision, do not submit secrets or sensitive personal information, and treat a
 decision as evidence for planning rather than a safety guarantee.
 
-The default public page accepts no planning details. That input contract only
-applies after a reviewed live integration is deliberately enabled.
+The default public page accepts no planning details. The input contract opens
+in explicit demo mode or after a reviewed live integration is deliberately
+enabled.

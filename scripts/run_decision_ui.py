@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -15,7 +16,26 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from oathcast.decision_ui import MAX_JSON_BODY_BYTES, make_server  # noqa: E402
+from oathcast.application_ui import LoopbackApplicationRunner  # noqa: E402
+from oathcast.decision_ui import (  # noqa: E402
+    DemoDecisionRunner,
+    MAX_JSON_BODY_BYTES,
+    TelegraphDecisionRunner,
+    make_server,
+)
+
+
+def _public_runner():
+    if os.environ.get("OATHCAST_PUBLIC_DEMO") == "true":
+        return DemoDecisionRunner()
+    gateway_runner = LoopbackApplicationRunner.from_environment()
+    if gateway_runner is None or not gateway_runner.configured:
+        return None
+    return TelegraphDecisionRunner(
+        gateway_runner,
+        routing_configured=True,
+        payment_configured=True,
+    )
 
 
 def main() -> int:
@@ -30,13 +50,17 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # No local provider, fixture, payment header, wallet, or fake runner is
-    # installed here.  A deployment must import make_server and inject its
-    # reviewed real Telegraph decision runner to enable POST /api/decision.
-    server = make_server(args.host, args.port, max_body_bytes=args.max_body_bytes)
+    runner = _public_runner()
+    server = make_server(
+        args.host,
+        args.port,
+        decision_runner=runner,
+        max_body_bytes=args.max_body_bytes,
+    )
+    mode = server.application.public_mode
     print(
         f"OathCast decision UI listening on http://{args.host}:{server.server_address[1]} "
-        "(decision API fail-closed until a real Telegraph runner is injected)"
+        f"(public mode: {mode})"
     )
     try:
         server.serve_forever()
