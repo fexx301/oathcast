@@ -1274,7 +1274,7 @@ def _render_interactive_page(*, mode: str) -> str:
         consent: document.getElementById("consent-error")
       };
       function safe(value) {
-        return String(value ?? "").replace(/[&<>"']/g, (character) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[character]));
+        return String(value ?? "").replace(/[&<>"']/g, (character) => character === '"' ? "&quot;" : ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;"}[character]));
       }
       function clearErrors() {
         errorSummary.hidden = true;
