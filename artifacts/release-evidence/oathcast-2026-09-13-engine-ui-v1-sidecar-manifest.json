@@ -1,0 +1,64 @@
+{
+  "artifact_type": "oathcast_payment_sidecar_manifest",
+  "files": [
+    {
+      "bytes": 669,
+      "path": "payment-canary/Dockerfile",
+      "sha256": "3e3b62c679bca3c9fecc1ccf009ac6c640777e54a844c1d33c5e8b31f66a87d5"
+    },
+    {
+      "bytes": 109118,
+      "path": "payment-canary/package-lock.json",
+      "sha256": "7db45cbcf4378d77fe908ba5d5641d8983c3a28b40ccd6a75b8e7ee6d571a37f"
+    },
+    {
+      "bytes": 652,
+      "path": "payment-canary/package.json",
+      "sha256": "8325cb327821b185c5790165ee8bbe66b3b52778751f88a372199259b3c64b4b"
+    },
+    {
+      "bytes": 44596,
+      "path": "payment-canary/src/application-sidecar.ts",
+      "sha256": "0be8c6b9df8cf5136a783b494b46251f5b73667c40b1a5ea8e926f446b1aa49b"
+    },
+    {
+      "bytes": 45876,
+      "path": "payment-canary/src/canary.ts",
+      "sha256": "9e8caaa644cf80d95747deafd73cb33fb5841b86283c250dbc93cc2cb9de2f36"
+    },
+    {
+      "bytes": 6613,
+      "path": "payment-canary/src/cli.ts",
+      "sha256": "0ae99e6870377e20d22da4af3c1140bb74df8068d2895c7a2b2d4180d7528924"
+    },
+    {
+      "bytes": 5613,
+      "path": "payment-canary/src/create-wallet.ts",
+      "sha256": "ad421d6ca77b69c1c90271eca5970f9244e5dbd8a602a8ac466790b98a26f68b"
+    },
+    {
+      "bytes": 21122,
+      "path": "payment-canary/src/journal.ts",
+      "sha256": "92f9215fedb99046bce27b8e6c2e5839a43845b9db3e784770b3b94c9ccb2588"
+    },
+    {
+      "bytes": 899,
+      "path": "payment-canary/src/wallet.ts",
+      "sha256": "9e150682a294b43d5b64fc0eb75ea907ad39e5a51861d26997c89fc04deb8521"
+    },
+    {
+      "bytes": 375,
+      "path": "payment-canary/tsconfig.json",
+      "sha256": "d4727a96781587556d12f8cc04b6b058e72160509cd566e2e54fa0557a890f58"
+    },
+    {
+      "bytes": 167,
+      "path": "payment-canary/vitest.config.ts",
+      "sha256": "46acc2c74864a273aee5c66c863be675f5a1e8f4ecb6547e8696717983e75641"
+    }
+  ],
+  "generated_at": "2026-09-13T10:00:23.853841Z",
+  "release_id": "2026-09-13-engine-ui-v1",
+  "schema_version": 1,
+  "source_sha256": "10dd0a956f3df2725148bc89091a0f552f61b50eb6bcb846b4b87070783b7f8d"
+}
