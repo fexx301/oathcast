@@ -73,6 +73,7 @@ export interface SidecarConfig {
   authToken: string;
   dispatcherUrl: string;
   route: TelegraphRoute;
+  expectedSignerAddress: string;
   rpcUrl: string;
   allowedMinerIds: readonly string[];
   allowedEndpoints: readonly string[];
@@ -223,6 +224,15 @@ function parseBoolean(value: string | undefined): boolean {
   return value === "true";
 }
 
+function validateSolanaAddress(value: string, name: string): void {
+  boundedString(value, name, 128, /^[1-9A-HJ-NP-Za-km-z]+$/);
+  try {
+    if (base58.decode(value).byteLength !== 32) throw new Error("invalid length");
+  } catch {
+    throw new SidecarConfigError(`${name} is invalid`);
+  }
+}
+
 function parseList(value: string | undefined, fallback: string[], name: string): string[] {
   const values = (value ?? fallback.join(","))
     .split(",")
@@ -285,6 +295,7 @@ function validateConfig(config: SidecarConfig): void {
   if (config.route !== "dispatcher" && config.route !== "engine") {
     throw new SidecarConfigError("Telegraph route is invalid");
   }
+  validateSolanaAddress(config.expectedSignerAddress, "expected signer address");
   validateTelegraphBaseUrl(
     config.dispatcherUrl,
     config.route,
@@ -355,6 +366,8 @@ export function configFromEnvironment(
   if (route !== "dispatcher" && route !== "engine") {
     throw new SidecarConfigError("OATHCAST_TELEGRAPH_ROUTE must be dispatcher or engine");
   }
+  const expectedSignerAddress = environment.OATHCAST_EXPECTED_SOLANA_SIGNER ?? "";
+  validateSolanaAddress(expectedSignerAddress, "OATHCAST_EXPECTED_SOLANA_SIGNER");
   const maxAmountMicroUsdc = positiveInteger(
     environment.OATHCAST_MAX_PAYMENT_MICRO_USDC ?? DEFAULT_MAX_AMOUNT.toString(),
     "OATHCAST_MAX_PAYMENT_MICRO_USDC",
@@ -390,6 +403,7 @@ export function configFromEnvironment(
     authToken,
     dispatcherUrl,
     route,
+    expectedSignerAddress,
     rpcUrl: environment.SOLANA_RPC_URL ?? DEFAULT_RPC_URL,
     allowedMinerIds,
     allowedEndpoints,
@@ -532,6 +546,7 @@ function policySha256(config: SidecarConfig, targetSha256: string): string {
     asset: SOLANA_DEVNET_USDC,
     pay_to: EXPECTED_PAY_TO,
     fee_payer: EXPECTED_FEE_PAYER,
+    expected_signer_address: config.expectedSignerAddress,
     allowed_miner_ids: [...config.allowedMinerIds].sort(),
     allowed_endpoints: [...config.allowedEndpoints].sort(),
     max_amount_micro_usdc: config.maxAmountMicroUsdc.toString(),
@@ -708,6 +723,13 @@ export class ApplicationPaymentSidecar {
         ? await this.dependencies.loadSigner()
         : await loadSignerFromEnvironment();
       const signerAddress = String(signer.address);
+      if (signerAddress !== this.config.expectedSignerAddress) {
+        return publicError(
+          "RECONCILIATION_SIGNER_MISMATCH",
+          "the configured signer does not match the authorized signer",
+          request.operation_id,
+        );
+      }
       const rpc = (this.dependencies.createRpc ?? createDevnetRpc)(this.config.rpcUrl);
       verification = await (this.dependencies.verifyPaymentOnChain ?? verifyPaymentOnChain)(
         rpc,
@@ -833,6 +855,7 @@ export class ApplicationPaymentSidecar {
         allowInsecureHttpDevnet: this.config.allowInsecureHttpDevnet,
         maxAmount: this.config.maxAmountMicroUsdc.toString(),
         rpcUrl: this.config.rpcUrl,
+        expectedSignerAddress: this.config.expectedSignerAddress,
         params: request.params,
       } as const;
       const builtTarget = (this.dependencies.buildTarget ?? buildTarget)(preflightOptions);
@@ -879,6 +902,7 @@ export class ApplicationPaymentSidecar {
         allowInsecureHttpDevnet: this.config.allowInsecureHttpDevnet,
         maxAmount: this.config.maxAmountMicroUsdc.toString(),
         rpcUrl: this.config.rpcUrl,
+        expectedSignerAddress: this.config.expectedSignerAddress,
         params: request.params,
       });
     } catch {
@@ -936,6 +960,7 @@ export class ApplicationPaymentSidecar {
         allowInsecureHttpDevnet: this.config.allowInsecureHttpDevnet,
         maxAmount: this.config.maxAmountMicroUsdc.toString(),
         rpcUrl: this.config.rpcUrl,
+        expectedSignerAddress: this.config.expectedSignerAddress,
         params: request.params,
         }, {
           beforePaidRequest: () => {
@@ -1143,6 +1168,12 @@ export async function main(): Promise<void> {
     const config = configFromEnvironment();
     if (!process.env.SOLANA_PRIVATE_KEY) {
       throw new SidecarConfigError("SOLANA_PRIVATE_KEY is required for the paid sidecar");
+    }
+    const signer = await loadSignerFromEnvironment();
+    if (String(signer.address) !== config.expectedSignerAddress) {
+      throw new SidecarConfigError(
+        "SOLANA_PRIVATE_KEY does not match OATHCAST_EXPECTED_SOLANA_SIGNER",
+      );
     }
     const sidecar = new ApplicationPaymentSidecar(config);
     await sidecar.listen();

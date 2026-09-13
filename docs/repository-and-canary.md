@@ -26,8 +26,8 @@ scheduled canary remains on its last pushed v11 configuration until this branch
 is pushed and the workflow is observed running successfully. Do not describe
 the remote schedule as v18-pinned before that happens.
 
-Local verification passes: focused canary tests `44/44`, full Python discovery
-`539/539`, and the v18 evidence identity loader accepts the retained bundle.
+Local verification passes: focused canary tests `51/51`, full Python discovery
+`561/561`, and the v18 evidence identity loader accepts the retained bundle.
 
 ## Local repository
 

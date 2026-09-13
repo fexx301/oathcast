@@ -47,8 +47,8 @@ relevant to that track.
   candidate restart; 2, 24, and 168 hours passed; and 169 hours returned HTTP
   400. Stopped `oathcast-v17-rollback-20260830` is retained, but the current
   database must be preserved because v17 may not replay v18's schema-4 receipt.
-- [x] V18 local verification: full Python discovery `539/539`, focused canary
-  tests `44/44`, and the retained evidence identity bundle loads successfully.
+- [x] V18 local verification: full Python discovery `561/561`, focused canary
+  tests `51/51`, and the retained evidence identity bundle loads successfully.
 - [x] At least three active `WEATHER_FORECAST` Miners observed in the live catalog on 2026-08-13. Recheck at submission; this does not satisfy the separate 100-request condition.
 - [~] Telegraph confirmed the earlier leaderboard zero came from `/predict`
   returning 404, which produced `miner_answer=""`. Release v7 fixed that route,
@@ -218,8 +218,12 @@ relevant to that track.
 - [x] Local Planning Desk intake pilot.
 - [x] One isolated, manually authorized x402 devnet settlement rehearsal independently verified; not Application demand.
 - [x] Reviewed Application payment boundary implemented and locally tested;
-  fresh discovery, operator authorization, and one real end-to-end devnet
-  payment are complete. The boundary remains disabled by default.
+  fresh discovery, operator authorization, and two real end-to-end devnet
+  payments are complete. The boundary remains disabled by default in source
+  builds and is explicitly enabled only in the reviewed production deployment.
+- [x] Production payment construction is aligned to Telegraph Engine:
+  `POST /engine/v1/ask/{miner_id}` with the logical `GET /forecast` request in
+  the JSON envelope. The retired dispatcher path remains historical only.
 - [x] One operator-authorized Application call routed through Telegraph and
   settled through x402; this is a local candidate, not official demand volume.
 - [~] Independent payment evidence retained per request in the sanitized

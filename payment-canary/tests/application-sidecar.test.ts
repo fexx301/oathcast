@@ -7,6 +7,7 @@ import { base58 } from "@scure/base";
 
 import {
   ApplicationPaymentSidecar,
+  configFromEnvironment,
   type SidecarConfig,
 } from "../src/application-sidecar.js";
 import { buildTarget, type CanaryResult } from "../src/canary.js";
@@ -19,6 +20,7 @@ function config(directory: string): SidecarConfig {
     authToken: "sidecar-token-" + "x".repeat(24),
     dispatcherUrl: "https://dispatcher.test/miner-dispatcher",
     route: "dispatcher",
+    expectedSignerAddress: base58.encode(new Uint8Array(32).fill(3)),
     rpcUrl: "https://api.devnet.solana.com",
     allowedMinerIds: ["212"],
     allowedEndpoints: ["forecast"],
@@ -36,7 +38,7 @@ function fingerprint(payload: {
   endpoint: string;
   params: Record<string, string>;
 }): string {
-  const canonical = JSON.stringify({
+  const canonical = canonicalJson({
     endpoint: payload.endpoint,
     idempotency_key: payload.idempotency_key,
     miner_id: payload.miner_id,
@@ -106,6 +108,72 @@ function evidence(ok: boolean, operationId: string): CanaryResult {
 }
 
 describe("application payment sidecar", () => {
+  it("maps Engine environment configuration to the exact POST envelope", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "oathcast-sidecar-engine-"));
+    const expectedSignerAddress = base58.encode(new Uint8Array(32).fill(3));
+    const sidecarConfig = configFromEnvironment({
+      OATHCAST_APPLICATION_ENABLE_PAID: "true",
+      OATHCAST_APPLICATION_SOCKET: join(directory, "payment.sock"),
+      OATHCAST_APPLICATION_PAYMENT_JOURNAL: join(directory, "payments.sqlite3"),
+      OATHCAST_APPLICATION_SIDECAR_TOKEN: "sidecar-token-" + "x".repeat(24),
+      OATHCAST_DISPATCHER_URL: "https://devnode.telegraphprotocol.com",
+      TELEGRAPH_DISPATCHER_URL: "https://devnode.telegraphprotocol.com",
+      OATHCAST_TELEGRAPH_ROUTE: "engine",
+      OATHCAST_EXPECTED_SOLANA_SIGNER: expectedSignerAddress,
+      OATHCAST_APPLICATION_ALLOWED_MINER_IDS: "212",
+      OATHCAST_APPLICATION_ALLOWED_ENDPOINTS: "forecast",
+      OATHCAST_APPLICATION_MAX_REQUESTS: "1",
+      OATHCAST_MAX_PAYMENT_MICRO_USDC: "10000",
+      OATHCAST_MAX_TOTAL_PAYMENT_MICRO_USDC: "10000",
+      SOLANA_RPC_URL: "https://api.devnet.solana.com",
+    });
+    const observed: Array<Record<string, unknown>> = [];
+    try {
+      const sidecar = new ApplicationPaymentSidecar(sidecarConfig, {
+        runCanary: (async (options, dependencies) => {
+          observed.push(options as unknown as Record<string, unknown>);
+          const target = buildTarget(options);
+          expect(target.requestUrl).toBe(
+            "https://devnode.telegraphprotocol.com/engine/v1/ask/212",
+          );
+          expect(target.method).toBe("POST");
+          expect(target.body).toBe(
+            JSON.stringify({
+              method: "GET",
+              endpoint: "/forecast",
+              payload: { q: "6.524400,3.379200", days: 1 },
+            }),
+          );
+          if (!options.execute) return evidence(true, options.operationId);
+          await dependencies?.beforePaidRequest?.();
+          return evidence(true, options.operationId);
+        }) as typeof import("../src/canary.js").runCanary,
+      });
+      const request = {
+        version: 1,
+        kind: "paid_miner_request",
+        authorization: sidecarConfig.authToken,
+        principal_id: "engine-user",
+        idempotency_key: "engine-request",
+        miner_id: "212",
+        endpoint: "forecast",
+        params: { q: "6.524400,3.379200", days: "1" },
+      } as const;
+      const fullRequest = {
+        ...request,
+        request_fingerprint: fingerprint(request),
+      };
+      const result = await sidecar.handle(fullRequest);
+      expect(result).toMatchObject({ ok: true, status: 200 });
+      expect(observed).toHaveLength(2);
+      expect(observed.every((options) => options.route === "engine")).toBe(true);
+      expect(observed.every((options) => options.expectedSignerAddress === expectedSignerAddress)).toBe(true);
+      await sidecar.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("keeps auth failures and idempotent replay inside the private boundary", async () => {
     const directory = mkdtempSync(join(tmpdir(), "oathcast-sidecar-"));
     let executeCalls = 0;

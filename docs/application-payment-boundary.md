@@ -5,10 +5,14 @@ Application request. The current Telegraph transport is the Engine API:
 `POST https://devnode.telegraphprotocol.com/engine/v1/ask/212`, carrying the
 logical upstream `GET /forecast` request in its JSON envelope. The retired
 `/miner-dispatcher/v1/{id}/...` route is not used for new Application traffic.
-The path remains disabled by default in the code. On 2026-09-06, one
-operator-authorized Solana Devnet request traversed the boundary and settled
-successfully through Telegraph; the retained sanitized evidence is explicitly
-incomplete and does not claim official demand, adoption, or a resolved score.
+The path remains disabled by default in source builds, while the reviewed
+production deployment enables it explicitly through owner-only configuration.
+The retained 2026-09-06 payment artifacts reference the pre-Engine dispatcher
+route; they are historical evidence and are intentionally not rewritten as
+Engine evidence. Two operator-authorized Solana Devnet requests have traversed
+the live boundary and settled successfully through Telegraph; the retained
+sanitized evidence is explicitly incomplete and does not claim official
+demand, adoption, or a resolved score.
 
 ## Decision
 
@@ -35,8 +39,9 @@ The initial rollout is intentionally narrow:
   idempotency key.
 
 The live path is disabled unless `OATHCAST_APPLICATION_ENABLE_PAID=true`.
-The public `/api/decision` endpoint remains a separate fail-closed surface and
-is not enabled by this build.
+The public `/api/decision` endpoint is enabled only by the explicit production
+UI configuration after the private gateway reports ready; source defaults and
+incomplete deployments remain fail-closed with HTTP 503.
 
 ## State and idempotency
 
@@ -104,7 +109,9 @@ An operator may prepare the environment without spending:
    response is resolved and independently reviewed.
 
 The repository tests use injected canary responses and never sign, contact a
-live Miner, or spend funds.
+live Miner, or spend funds. The sidecar-specific manifest must be captured
+alongside the Python release manifest because the payment image has its own
+Dockerfile, lockfile, and runtime source tree.
 
 ## Evidence packaging
 

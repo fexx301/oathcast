@@ -160,6 +160,9 @@ The sidecar performs the same unpaid preflight before reserving a payment,
 stores a bounded paid response and settlement/RPC evidence, and converts
 unfinished work to a non-retryable `unknown` state on restart. Duplicate
 settled requests replay the stored body. Unknown outcomes require an explicit
-operator reconciliation message; there is no automatic retry. The normal
+operator reconciliation message; there is no automatic retry. A live sidecar
+also requires `OATHCAST_EXPECTED_SOLANA_SIGNER`; it loads the injected key at
+startup and fails closed if the derived public address does not match that pin.
+The normal
 `npm run canary` command remains a one-shot diagnostic and does not start the
 sidecar.

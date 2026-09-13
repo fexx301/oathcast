@@ -2,8 +2,10 @@
 
 The Planning Desk is the first user-facing Application surface. OathCast Miner
 registration is complete and active. This local intake remains disconnected
-from Telegraph routing and payment; the reviewed private Application boundary
-is implemented separately and remains disabled by default.
+from Telegraph routing and payment; the live consumer-facing UI is a separate
+production deployment. The reviewed private Application boundary remains
+disabled by default in source builds and is enabled only by the explicit
+production configuration.
 
 ## Run locally
 
@@ -23,9 +25,9 @@ curl http://127.0.0.1:8788/api/healthz
 curl http://127.0.0.1:8788/api/pilot-requests
 ```
 
-Port `8787` belongs to the public decision/status UI at the Caddy edge. The
-planning-only intake uses `8788` so starting it locally cannot replace that
-fail-closed public surface.
+Port `8787` belongs to the public decision/status UI at the Caddy edge when the
+live deployment is configured. The planning-only intake uses `8788` so starting
+it locally cannot replace or impersonate that consumer surface.
 
 The intake contract is deliberately narrow: one location, one exact UTC hour,
 one cutoff before that hour, and the fixed event `measurable precipitation >

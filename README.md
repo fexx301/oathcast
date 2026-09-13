@@ -16,15 +16,18 @@ description re-registration on
 separate public UI exposes a consumer-facing Planning Desk in live mode. Its
 browser request crosses a private loopback Application gateway and a
 budgeted payment sidecar before it accepts a Telegraph Miner result; it fails
-closed with 503 whenever that boundary is not ready. The deployed application
-release is `2026-09-07-live-application-v2` from source `e86406c`.
+closed with 503 whenever that boundary is not ready. The application request
+uses Telegraph's current Engine transport, `POST /engine/v1/ask/{miner_id}`,
+with the logical upstream request carried in the JSON envelope. Source-checkout
+defaults remain fail-closed; the production deployment explicitly enables the
+reviewed gateway and sidecar and records its release identity at `/status`.
 
 The repository also contains provider adapters, a cross-Miner Application
 router, durable case and receipt stores, a development Script Author proxy,
 an isolated TypeScript Solana x402 canary, and leakage-safe evaluation tools.
 The paid Application path has a private loopback gateway and a TypeScript
-sidecar with an append-only journal. A live canary request has been settled and
-verified through Telegraph; additional paid demand remains explicitly
+sidecar with an append-only journal. Two live canary requests have been settled
+and verified through Telegraph; any further paid demand remains explicitly
 budgeted by the sidecar rather than being open-ended.
 
 The project deliberately separates two scoring paths:
@@ -210,7 +213,7 @@ wire replay, hourly boundary canary, receipt-backup metadata, v17 rollback
 rehearsal, and linked runtime evidence are retained under
 `artifacts/release-evidence/2026-08-30-hourly-v18-*`; stopped
 `oathcast-v17-rollback-20260830` is the immediate Miner rollback target.
-Full Python discovery passes `539/539`, focused canary tests pass `44/44`, and
+Full Python discovery passes `561/561`, focused canary tests pass `51/51`, and
 the v18 evidence identity loader accepts the retained bundle.
 
 `create_registration_draft.py` first requires that local check to pass, then
@@ -255,8 +258,10 @@ decision from external Miners when the owned OathCast Miner is disabled.
 
 `application_pilot.py` serves the local Planning Desk intake surface. It queues
 privacy-minimal planning questions in SQLite and makes no Miner, Telegraph, or
-payment call. See `docs/application-pilot.md` before sharing it with pilot
-users. `FileObservationSource` and `validate_observations.py` provide the
+payment call. The public consumer UI is a separate live deployment at the
+HTTPS edge; do not describe this local queue as live traffic. See
+`docs/application-pilot.md` before sharing it with pilot users.
+`FileObservationSource` and `validate_observations.py` provide the
 provider-neutral ingestion boundary for a later independent observation
 export; the bundled observation file is a development fixture and its
 independence is not asserted.

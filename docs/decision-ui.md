@@ -1,13 +1,13 @@
 # Public status and Planning Desk UI
 
 `src/oathcast/decision_ui.py` is a small Python standard-library HTTP service.
-Its default public page is a read-only product/status surface. An explicit
-`OATHCAST_PUBLIC_DEMO=true` deployment opens the judge-facing Planning Desk:
+Its default source-checkout page is a read-only product/status surface. An
+explicit `OATHCAST_PUBLIC_DEMO=true` deployment opens the judge-facing Planning Desk:
 the form is fully interactive, but its deterministic scenario is still
 payment-free and explicitly labeled as not Telegraph-routed, unpaid,
 non-qualifying demand, and not a safety guarantee.
 
-For a reviewed live deployment, `scripts/run_decision_ui.py` can attach
+For a reviewed live deployment, `scripts/run_decision_ui.py` attaches
 `oathcast.application_ui.LoopbackApplicationRunner`. That adapter only accepts
 the fixed loopback Application gateway path, rejects redirects, keeps the
 gateway token server-side, derives an idempotency key from the normalized brief,
@@ -113,8 +113,10 @@ the edge, use `/api/decision` for public fail-closed checks.
 
 Publishing demo mode is not Track-3 demand. Its status is healthy for the
 interactive demo, while `telegraph_routing_and_payment_configured` remains
-false. A live route must be armed separately and only after the payment
-boundary has passed its deployment checks.
+false. The production EC2 deployment is a separate explicit live configuration:
+it arms the gateway only after the payment-boundary checks, and falls back to
+503 if that private boundary or its finite budget is unavailable. The source
+defaults and local demo remain safe to run without payment.
 
 ## Endpoints
 

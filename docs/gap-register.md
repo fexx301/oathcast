@@ -1,12 +1,19 @@
 # OathCast gap register
 
-Last reviewed: 2026-09-06
+Last reviewed: 2026-09-13
 
 Current baseline: the public Miner runs `2026-08-30-hourly-v18`, source SHA-256
 `5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`, image
 `sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`.
-The separate decision UI provides a read-only status shell and development
-fixture while its live API remains fail-closed without a runner. V18 retains
+The separate consumer-facing decision UI is live at
+`https://oathcastcourt.duckdns.org` under release
+`2026-09-08-live-application-v4`, source SHA-256
+`e6a1b63137ac44a11712ab918c8f17c23d96b3faec021fc508c485483007e7a0`, and
+image digest
+`sha256:907ece70c40039b02983214366ae13161f742e5f20a0607f3c4d6abbd1f1d132`.
+Its browser route reaches the private gateway and payment sidecar through
+Telegraph Engine `POST /engine/v1/ask/212`; source defaults remain fail-closed.
+V18 retains
 the exact registered `/predict` route, the legacy one-hour precipitation
 contract, multi-hour `start`/`end` spans of 1 to 168 hours, and the additive
 `hourly=2t` compatibility path with
@@ -34,8 +41,10 @@ in the Telegraph dispatcher as
 routing ID `64173`, slug `oathcast-weather`. The prior registration ID `78` is
 deregistered. Current registration evidence is retained in
 `artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
-Full Python discovery passes `539/539`, focused canary tests pass `44/44`, and
-the v18 evidence identity loader accepts the retained bundle.
+Full Python discovery passes `561/561`, focused canary tests pass `51/51`, and
+the v18 evidence identity loader accepts the retained bundle. The retained
+2026-09-06 payment artifacts use the pre-Engine dispatcher target and remain
+historical; they are not current Engine-route evidence.
 
 On 2026-08-27, production logs correlated Telegraph epochs 286 and 287 with
 authenticated dispatcher requests from `13.237.89.59`. The requests reached
@@ -411,11 +420,13 @@ breakdown-layout blocker before a registration candidate can be frozen.
 - Establish an independently sourced observation pipeline and resolve the
   accumulated provider cases before using them for reliability weights or
   WeatherAPI failover.
-- Monitor `oathcast-weather` health, authenticated dispatcher traffic, request
-  counts, and the `WEATHER_FORECAST` leaderboard. Telegraph confirmed the old
-  zero came from its scorer receiving an empty answer after `/predict` returned
-  404. Registration, activation, and the route correction are complete; a
-  fresh non-empty scorer result is still pending.
+- Monitor `oathcast-weather` health, authenticated traffic, request counts, and
+  the `WEATHER_FORECAST` leaderboard. Telegraph confirmed the old zero came
+  from its scorer receiving an empty answer after `/predict` returned 404.
+  Registration, activation, and the route correction are complete. A read-only
+  Explorer snapshot on 2026-09-13 showed the active Miner at rank #3 in epoch
+  328 with score `0.0344` and two requests served; this is performance
+  corroboration, not a claim about the separate 100-request demand gate.
 - Preserve the superseded scalar artifact metadata and hashes as historical
   provenance only; the old bytes are not present in this workspace. Do not treat
   the historical scalar export or old `whitelistedUrls` ABI as a current
@@ -429,12 +440,13 @@ breakdown-layout blocker before a registration candidate can be frozen.
   explicit user authorization.
 - The private authenticated Application payment boundary, threat model, and
   append-only Solana journal are implemented and locally tested. It remains
-  disabled by default and is pinned to one reviewed external Miner/endpoint.
-  Fresh discovery, payee/route verification, explicit one-request
-  authorization, and one real end-to-end devnet payment are complete. The
-  remaining blockers are genuine request volume, independent observation and
-  resolution, and external Telegraph corroboration; do not enable the public
-  decision endpoint first.
+  disabled by default in source builds and is pinned to one reviewed external
+  Miner/endpoint through Engine. The reviewed production deployment explicitly
+  enables it with a pinned signer, finite budget, and preserved journal. Fresh
+  discovery, payee/route verification, explicit authorization, and two real
+  end-to-end devnet payments are complete. The remaining blockers are genuine
+  request volume, independent observation and resolution, and external
+  Telegraph corroboration.
 
 ## Blocked on authorization, external evidence, or remaining documentation
 

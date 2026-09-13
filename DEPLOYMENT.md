@@ -18,13 +18,19 @@ The deployed Miner is v18; stopped `oathcast-v17-rollback-20260830` is the
 immediate Miner rollback target. Caddy configuration did not change for v18 and
 remains pinned by its retained hash. The v17 and earlier sections below are
 historical release records. The public decision UI is deployed separately in
-live mode as `2026-09-07-live-application-v3` from the Engine-route migration
-commit. It serves
+live mode as `2026-09-08-live-application-v4` from source
+`e6a1b63137ac44a11712ab918c8f17c23d96b3faec021fc508c485483007e7a0` and image
+`sha256:907ece70c40039b02983214366ae13161f742e5f20a0607f3c4d6abbd1f1d132`.
+It serves
 the consumer-facing Planning Desk at
 `https://oathcastcourt.duckdns.org`, proxies browser requests to a loopback-only
 gateway, and reaches Miner 212 only through the authenticated payment sidecar.
 The browser never receives the gateway token or wallet material. If the gateway,
 sidecar, or budget guard is unavailable, `/api/decision` fails closed with 503.
+The sidecar's production route is the Engine API:
+`POST https://devnode.telegraphprotocol.com/engine/v1/ask/212`, with the logical
+`GET /forecast` call in the JSON body. The production sidecar also requires
+`OATHCAST_EXPECTED_SOLANA_SIGNER` to match the injected key before it starts.
 
 The live canary has two settled and independently verified 0.01 USDC Devnet
 requests in its append-only journal. The sidecar cap is deliberately finite;
@@ -54,7 +60,9 @@ On 2026-09-07, the live application cutover started
 port 8790 and the UI uses host-loopback port 8787; Caddy's public route stayed
 unchanged. The previous gateway and UI remain stopped under
 `*-rollback-20260907-v1` names. The public `/status` response reports
-`public_mode: live`, `live_decision_available: true`, and source `e86406c`.
+`public_mode: live`, `live_decision_available: true`, and the current release
+identity. The 2026-09-07 source `e86406c` is retained only as the superseded
+cutover record.
 
 V18 has persisted schema-4 receipts containing complete hourly weather fields
 that v17 cannot replay. If a rollback becomes necessary, preserve the current
@@ -135,7 +143,9 @@ the current signer.
 
 Set `OATHCAST_MINER_API_KEY` on the host to enforce the Bearer token declared in
 the canonical YAML. Keep the payment wallet local; never put its private key
-in the Miner container.
+in the Miner container. Set `OATHCAST_EXPECTED_SOLANA_SIGNER` on the sidecar
+host and require it to match the public address derived from
+`SOLANA_PRIVATE_KEY`; the sidecar refuses a missing or mismatched pin.
 
 The deployed service must also set `OATHCAST_REQUIRE_AUTH=true`; startup fails
 closed when the API secret is absent. Keep `/data/oathcast` on a durable host
@@ -169,6 +179,12 @@ Create a source manifest before each deployment:
       --release-id 2026-08-30-hourly-v18 \
       --output /tmp/oathcast-release-manifest.json
 
+Create the separate payment-sidecar manifest as well:
+
+    PYTHONPATH=src python3 scripts/create_sidecar_manifest.py \
+      --release-id 2026-09-13-engine-ui-v1 \
+      --output /tmp/oathcast-sidecar-manifest.json
+
 Build the image with the manifest's `source_sha256` and a unique release ID:
 
     docker build \
@@ -200,6 +216,14 @@ After deployment, verify the exact release without printing secrets:
 The smoke test is non-destructive with respect to Telegraph and uses one
 ordinary authenticated request against the OathCast service only; it does not
 create paid demand. Record its JSON output with the release manifest.
+
+The application cutover must preserve the existing sidecar journal and finite
+budget. Before replacing containers, record a read-only backup and integrity
+check of the application case/demand databases and payment journal, including
+row count, non-aborted count, and total `amount_micro_usdc`. After the cutover,
+repeat the same read-only checks and require the values to be unchanged. Do not
+point a new sidecar at a new journal path, restore an older journal, or run a
+paid smoke request as part of deployment.
 
 For a cutover, freeze one old-release question and its safe fingerprints before
 replacing the container, then replay that exact question after the new release
