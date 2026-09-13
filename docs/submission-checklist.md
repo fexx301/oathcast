@@ -218,14 +218,14 @@ relevant to that track.
 - [x] Local Planning Desk intake pilot.
 - [x] One isolated, manually authorized x402 devnet settlement rehearsal independently verified; not Application demand.
 - [x] Reviewed Application payment boundary implemented and locally tested;
-  fresh discovery, operator authorization, and two real end-to-end devnet
-  payments are complete. The boundary remains disabled by default in source
+  fresh discovery, operator authorization, and three settled end-to-end devnet
+  payment rows are preserved. The boundary remains disabled by default in source
   builds and is explicitly enabled only in the reviewed production deployment.
 - [x] Production payment construction is aligned to Telegraph Engine:
   `POST /engine/v1/ask/{miner_id}` with the logical `GET /forecast` request in
   the JSON envelope. The retired dispatcher path remains historical only.
-- [x] One operator-authorized Application call routed through Telegraph and
-  settled through x402; this is a local candidate, not official demand volume.
+- [x] Three settled Application payment rows are preserved through Telegraph
+  and x402; this is local candidate evidence, not official demand volume.
 - [~] Independent payment evidence retained per request in the sanitized
   `artifacts/application-evidence/` bundle; Explorer corroboration and a
   complete receipt chain remain pending. *(Telegraph

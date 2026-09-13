@@ -88,6 +88,7 @@ PYTHONPATH=src python3 -m unittest tests.test_application_payment
 cd payment-canary && npm run check
 ```
 
-These tests use injected responses. They do not perform a paid request. A
-real activation still requires fresh discovery and explicit authorization for
-one devnet attempt.
+These tests use injected responses. They do not perform a paid request. The
+reviewed production boundary is already activated separately; any future new
+paid request or configuration change still requires fresh discovery and
+explicit per-request authorization.

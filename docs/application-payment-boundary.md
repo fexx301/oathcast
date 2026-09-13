@@ -9,10 +9,11 @@ The path remains disabled by default in source builds, while the reviewed
 production deployment enables it explicitly through owner-only configuration.
 The retained 2026-09-06 payment artifacts reference the pre-Engine dispatcher
 route; they are historical evidence and are intentionally not rewritten as
-Engine evidence. Two operator-authorized Solana Devnet requests have traversed
-the live boundary and settled successfully through Telegraph; the retained
-sanitized evidence is explicitly incomplete and does not claim official
-demand, adoption, or a resolved score.
+Engine evidence. Three settled Solana Devnet payment rows are preserved in the
+live boundary journal, totaling `30000` micro-USDC; the retained sanitized
+evidence is explicitly incomplete and does not claim official demand,
+adoption, or a resolved score. The production sidecar also pins the expected
+Solana signer and fails closed if the injected key does not match it.
 
 ## Decision
 
@@ -37,6 +38,11 @@ The initial rollout is intentionally narrow:
   reviewed configuration;
 - a required application token, principal header, explicit consent, and
   idempotency key.
+
+These are the source and test defaults. The reviewed production deployment
+keeps the `10000` micro-USDC one-shot ceiling but explicitly sets a finite
+`100`-request limit and a `1000000` micro-USDC total cap. Those operator
+overrides do not authorize automatic demand or remove per-request consent.
 
 The live path is disabled unless `OATHCAST_APPLICATION_ENABLE_PAID=true`.
 The public `/api/decision` endpoint is enabled only by the explicit production

@@ -154,7 +154,10 @@ process. It owns the signer and the SQLite payment journal; the Python
 Application gateway never constructs a payment header. The sidecar is disabled
 unless `OATHCAST_APPLICATION_ENABLE_PAID=true`, requires a 32-byte-or-longer
 shared token and `SOLANA_PRIVATE_KEY`, and defaults to one allowlisted external
-Miner (`212` / `forecast`) and one paid request.
+Miner (`212` / `forecast`) and one paid request. The reviewed production
+deployment overrides only the finite envelope to 100 requests and
+`1000000` micro-USDC total, while retaining the `10000` micro-USDC one-shot
+ceiling; source and test defaults remain one request.
 
 The sidecar performs the same unpaid preflight before reserving a payment,
 stores a bounded paid response and settlement/RPC evidence, and converts

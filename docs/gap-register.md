@@ -5,12 +5,16 @@ Last reviewed: 2026-09-13
 Current baseline: the public Miner runs `2026-08-30-hourly-v18`, source SHA-256
 `5aca88c6890443bc086e0c078d3390eead10461fa734206fcc4937758d5e8b6b`, image
 `sha256:d3c29fa9f274d520635b6c3ca413c383ba1de958840ed1eb3105aedceda7e859`.
-The separate consumer-facing decision UI is live at
+The separate consumer-facing decision UI and Application gateway are live at
 `https://oathcastcourt.duckdns.org` under release
-`2026-09-08-live-application-v4`, source SHA-256
-`e6a1b63137ac44a11712ab918c8f17c23d96b3faec021fc508c485483007e7a0`, and
+`2026-09-13-engine-ui-v1`, source SHA-256
+`713aad8df5f4c7d3f199c2d6a7243577f9417ede332e94668cda5e5035c60a1d`, and main
 image digest
-`sha256:907ece70c40039b02983214366ae13161f742e5f20a0607f3c4d6abbd1f1d132`.
+`sha256:3be72f759f65ff8b324afa8613ef88fc2184e8b562ae89a47c3ef53d82390ca8`.
+The sidecar image digest is
+`sha256:03eb5097136afcd672b819eb913c55c183076739bd28e3070171f92be5642c24`,
+and its source manifest is pinned to
+`10dd0a956f3df2725148bc89091a0f552f61b50eb6bcb846b4b87070783b7f8d`.
 Its browser route reaches the private gateway and payment sidecar through
 Telegraph Engine `POST /engine/v1/ask/212`; source defaults remain fail-closed.
 V18 retains
@@ -42,7 +46,10 @@ routing ID `64173`, slug `oathcast-weather`. The prior registration ID `78` is
 deregistered. Current registration evidence is retained in
 `artifacts/registration-drafts/oathcast-weather-cutoff-v2-registration-postflight-2026-08-27.json`.
 Full Python discovery passes `561/561`, focused canary tests pass `51/51`, and
-the v18 evidence identity loader accepts the retained bundle. The retained
+the v18 evidence identity loader accepts the retained bundle. The Engine UI
+cutover preserved three settled and independently verified `0.01` USDC Devnet
+payments (`30000` micro-USDC total), with unchanged case, demand, and journal
+row counts and SQLite integrity. The retained
 2026-09-06 payment artifacts use the pre-Engine dispatcher target and remain
 historical; they are not current Engine-route evidence.
 

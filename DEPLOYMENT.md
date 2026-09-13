@@ -17,10 +17,14 @@ details are archived under
 The deployed Miner is v18; stopped `oathcast-v17-rollback-20260830` is the
 immediate Miner rollback target. Caddy configuration did not change for v18 and
 remains pinned by its retained hash. The v17 and earlier sections below are
-historical release records. The public decision UI is deployed separately in
-live mode as `2026-09-08-live-application-v4` from source
-`e6a1b63137ac44a11712ab918c8f17c23d96b3faec021fc508c485483007e7a0` and image
-`sha256:907ece70c40039b02983214366ae13161f742e5f20a0607f3c4d6abbd1f1d132`.
+historical release records. The public decision UI and Application gateway are
+deployed separately in live mode as `2026-09-13-engine-ui-v1` from source
+`713aad8df5f4c7d3f199c2d6a7243577f9417ede332e94668cda5e5035c60a1d` and main
+image `sha256:3be72f759f65ff8b324afa8613ef88fc2184e8b562ae89a47c3ef53d82390ca8`.
+The payment sidecar uses image
+`sha256:03eb5097136afcd672b819eb913c55c183076739bd28e3070171f92be5642c24`
+from sidecar source manifest
+`10dd0a956f3df2725148bc89091a0f552f61b50eb6bcb846b4b87070783b7f8d`.
 It serves
 the consumer-facing Planning Desk at
 `https://oathcastcourt.duckdns.org`, proxies browser requests to a loopback-only
@@ -32,9 +36,23 @@ The sidecar's production route is the Engine API:
 `GET /forecast` call in the JSON body. The production sidecar also requires
 `OATHCAST_EXPECTED_SOLANA_SIGNER` to match the injected key before it starts.
 
-The live canary has two settled and independently verified 0.01 USDC Devnet
-requests in its append-only journal. The sidecar cap is deliberately finite;
+The live canary has three settled and independently verified 0.01 USDC Devnet
+requests in its append-only journal, totaling `30000` micro-USDC. The sidecar
+cap is deliberately finite;
 new paid demand requires an explicit budget change and sidecar restart.
+
+On 2026-09-13, the Engine-route Application cutover replaced the prior live
+UI/gateway/sidecar containers with the pinned release above. The UI is healthy
+on its internal `/health` probe, the gateway reports `ready: true`, the payment
+socket remains mode `0600`, and the public `/status` endpoint reports
+`public_mode: live`, `live_decision_available: true`, and the exact release
+identity. The preserved post-cutover rollback backup is under
+`/home/ec2-user/oathcast-live-state/backups/oathcast-2026-09-13-engine-ui-v1/`;
+the row counts and SQLite integrity values matched before and after the
+cutover. The old containers remain stopped under the 2026-09-13 rollback
+names, and Miner, Caddy, registrations, and paid request state were not
+changed. Full deployment evidence is recorded in
+`artifacts/release-evidence/oathcast-2026-09-13-engine-ui-v1-deployment.json`.
 
 On 2026-09-04, the separate `oathcast-decision-ui` container was refreshed to
 the already verified `oathcast:2026-08-30-hourly-v18` image

@@ -1,0 +1,141 @@
+{
+  "artifact_type": "oathcast_application_deployment_evidence",
+  "captured_at_utc": "2026-09-13T14:10:36Z",
+  "schema_version": 1,
+  "release": {
+    "release_id": "2026-09-13-engine-ui-v1",
+    "source_git_commit": "924ef33dfbaf5f0ecfc11f984bbb4d78b1a31e4a",
+    "source_archive_sha256": "867e650bb75ef024f059cbd362f152b44ad83a96500bf71105ce5e64e5145648",
+    "main_manifest": {
+      "path": "artifacts/release-evidence/oathcast-2026-09-13-engine-ui-v1-manifest.json",
+      "file_sha256": "980453dc1c1a9bcb90c516ddd2ca17c376ffe227aa9991d66105fa95e138d599",
+      "source_sha256": "713aad8df5f4c7d3f199c2d6a7243577f9417ede332e94668cda5e5035c60a1d"
+    },
+    "sidecar_manifest": {
+      "path": "artifacts/release-evidence/oathcast-2026-09-13-engine-ui-v1-sidecar-manifest.json",
+      "file_sha256": "52be7ef183e5a8742490ed0a9971b84ef4deb585be4e982b287471e58d010794",
+      "source_sha256": "10dd0a956f3df2725148bc89091a0f552f61b50eb6bcb846b4b87070783b7f8d"
+    },
+    "images": [
+      {
+        "name": "oathcast",
+        "tag": "oathcast:2026-09-13-engine-ui-v1",
+        "image_id": "sha256:3be72f759f65ff8b324afa8613ef88fc2184e8b562ae89a47c3ef53d82390ca8",
+        "used_by": ["oathcast-decision-ui", "oathcast-application-gateway"]
+      },
+      {
+        "name": "oathcast-payment-sidecar",
+        "tag": "oathcast-payment-sidecar:2026-09-13-engine-ui-v1",
+        "image_id": "sha256:03eb5097136afcd672b819eb913c55c183076739bd28e3070171f92be5642c24",
+        "used_by": ["oathcast-application-sidecar"]
+      }
+    ]
+  },
+  "public_surface": {
+    "url": "https://oathcastcourt.duckdns.org",
+    "status_url": "https://oathcastcourt.duckdns.org/status",
+    "status": {
+      "public_mode": "live",
+      "ready": true,
+      "decision_api_available": true,
+      "live_decision_available": true,
+      "telegraph_routing_and_payment_configured": true,
+      "wallet_secrets_exposed": false,
+      "image_digest_recorded": true
+    },
+    "ui_health_path": "/health",
+    "ui_health": "healthy"
+  },
+  "payment_boundary": {
+    "transport": "telegraph_engine",
+    "method": "POST",
+    "url_template": "https://devnode.telegraphprotocol.com/engine/v1/ask/{miner_id}",
+    "path": "/engine/v1/ask/212",
+    "miner_id": "212",
+    "logical_method": "GET",
+    "logical_path": "/forecast",
+    "endpoint": "forecast",
+    "signer_pin": "HMVKUVQVZerso1XWcCRkPP4vBg8wufKNxGsawpZXEB5Y",
+    "socket_mode": "0600",
+    "sidecar_restarts": 0,
+    "paid_request_made_during_cutover": false
+  },
+  "runtime": {
+    "ui": {"name": "oathcast-decision-ui", "healthy": true, "restarts": 0},
+    "gateway": {"name": "oathcast-application-gateway", "ready": true, "restarts": 0},
+    "sidecar": {"name": "oathcast-application-sidecar", "running": true, "restarts": 0},
+    "miner_changed": false,
+    "caddy_changed": false,
+    "registrations_changed": false
+  },
+  "state_preservation": {
+    "database_integrity": "ok",
+    "before": {
+      "case": {
+        "application_cases": 4,
+        "request_bindings": 4,
+        "decisions": 2,
+        "miner_replies": 3,
+        "observations": 0,
+        "resolutions": 0
+      },
+      "demand": {"demand_events": 3},
+      "payment_journal": {
+        "payment_attempt_events": 9,
+        "payment_attempts": 3,
+        "settled_verified": 3,
+        "total_amount_micro_usdc": 30000
+      }
+    },
+    "after": {
+      "case": {
+        "application_cases": 4,
+        "request_bindings": 4,
+        "decisions": 2,
+        "miner_replies": 3,
+        "observations": 0,
+        "resolutions": 0
+      },
+      "demand": {"demand_events": 3},
+      "payment_journal": {
+        "payment_attempt_events": 9,
+        "payment_attempts": 3,
+        "settled_verified": 3,
+        "total_amount_micro_usdc": 30000
+      }
+    },
+    "backup_directory": "/home/ec2-user/oathcast-live-state/backups/oathcast-2026-09-13-engine-ui-v1",
+    "backup_files": [
+      {
+        "path": "case.sqlite3",
+        "bytes": 610304,
+        "sha256": "8b9aad01417a2e7468bc375554e2006d65c30f2a0e727f5a335afcc28ecf8f90"
+      },
+      {
+        "path": "demand.sqlite3",
+        "bytes": 20480,
+        "sha256": "daf0a4479bc4e7a36b205b7d6437b916ef0b5de4cd3b1171301aba10a0a53809"
+      },
+      {
+        "path": "payment-journal.sqlite3",
+        "bytes": 135168,
+        "sha256": "ed335e748ba6ea4edfe3942f484247d3403ab0cc78e32b295bd12d10e5c40e1f"
+      }
+    ]
+  },
+  "rollback": {
+    "retained_containers": [
+      "oathcast-application-sidecar-rollback-20260913",
+      "oathcast-application-gateway-rollback-20260913",
+      "oathcast-decision-ui-rollback-20260913",
+      "oathcast-decision-ui-pre-digest-20260913",
+      "oathcast-application-sidecar-failed-20260913"
+    ],
+    "state_restore_performed": false
+  },
+  "scope_confirmations": [
+    "No deregistration or registration transaction was made.",
+    "No paid Telegraph request was made during this deployment.",
+    "Existing payment journal and application databases were reused and preserved."
+  ]
+}

@@ -26,9 +26,10 @@ The repository also contains provider adapters, a cross-Miner Application
 router, durable case and receipt stores, a development Script Author proxy,
 an isolated TypeScript Solana x402 canary, and leakage-safe evaluation tools.
 The paid Application path has a private loopback gateway and a TypeScript
-sidecar with an append-only journal. Two live canary requests have been settled
-and verified through Telegraph; any further paid demand remains explicitly
-budgeted by the sidecar rather than being open-ended.
+sidecar with an append-only journal. Three live canary requests have been
+settled and verified through Telegraph, totaling `30000` micro-USDC in the
+preserved journal; any further paid demand remains explicitly budgeted by the
+sidecar rather than being open-ended.
 
 The project deliberately separates two scoring paths:
 
@@ -504,8 +505,11 @@ read-only payment journal, Application case, demand ledger, and fresh discovery
 snapshot, then emits an allow-listed JSON/Markdown package. Strict mode fails on
 missing or mismatched links; `--allow-incomplete` preserves unresolved gaps in
 the artifact without copying raw paid responses, payment headers, credentials,
-principals, or idempotency keys. The current one-request package is retained at
-`artifacts/application-evidence/track3-2026-09-06-payment.json`.
+principals, or idempotency keys. The retained 2026-09-06 one-request package is
+historical evidence at
+`artifacts/application-evidence/track3-2026-09-06-payment.json`; the current
+Engine/UI cutover evidence is
+`artifacts/release-evidence/oathcast-2026-09-13-engine-ui-v1-deployment.json`.
 
 When deployed behind a host such as Railway, the service honors the host's
 `PORT` value. Set `OATHCAST_MINER_API_KEY` to enable the Bearer protection that
