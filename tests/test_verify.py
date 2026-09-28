@@ -60,6 +60,20 @@ class ParseRequestTests(unittest.TestCase):
         self.assertEqual(request.variable.key, "precipitation")
         self.assertEqual((request.forecast_value, request.forecast_unit), (12.0, "mm"))
 
+    def test_place_forms_in_whole_questions(self):
+        cases = {
+            "Tokyo was forecast to reach 31°C on 5 September 2026. Did that forecast verify?": "Tokyo",
+            "São Paulo was forecast to get 5 mm of rain on 19 September 2026.": "São Paulo",
+            "Chicago's forecast for 12 September 2026 said winds would peak at 25 mph.": "Chicago",
+            "What fell in September 2026 in Cape Town against a dry forecast?": "Cape Town",
+            "The overnight low in Sydney on 14 September 2026 was forecast at 9°C.": "Sydney",
+            "Yesterday's forecast for Lagos called for 20 mm of rain.": "Lagos",
+        }
+        for question, place in cases.items():
+            with self.subTest(question=question):
+                request = parse_verify_request({"question": question, "date": "2026-09-15"}, today=TODAY)
+                self.assertEqual(request.location, place)
+
     def test_spoken_dates_and_fahrenheit(self):
         request = parse_verify_request(
             {"question": "The high in Denver on September 18, 2026 was forecast at 82°F. Did it verify?"},

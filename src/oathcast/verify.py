@@ -102,8 +102,21 @@ COORDINATES = re.compile(
     r"(?:lat(?:itude)?\s*[:=]?\s*)?(?P<lat>-?\d{1,2}(?:\.\d+)?)\s*,\s*"
     r"(?:lon(?:gitude)?\s*[:=]?\s*)?(?P<lon>-?\d{1,3}(?:\.\d+)?)"
 )
-PLACE_IN_QUESTION = re.compile(
-    r"\b(?:in|at|for|over)\s+((?:[A-Z][\w'’.-]*)(?:(?:\s+|,\s*)(?:de|da|do|la|le|of|[A-Z][\w'’.-]*))*)"
+_PLACE_WORDS = r"(?:[A-Z][\w.-]*)(?:(?:\s+|,\s*)(?:de|da|do|la|le|of|[A-Z][\w.-]*))*"
+# Tried in order; the first candidate that is not a month, weekday or sentence
+# opener wins. "in Lisbon", then "Chicago's forecast", then "Tokyo was ...".
+PLACE_PATTERNS = (
+    re.compile(rf"\b(?:in|at|for|over)\s+({_PLACE_WORDS})"),
+    re.compile(rf"\b({_PLACE_WORDS})['’]s\b"),
+    re.compile(rf"^\s*({_PLACE_WORDS})"),
+)
+NOT_PLACES = frozenset(
+    {
+        *MONTHS,
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        "the", "a", "an", "yesterday", "today", "last", "what", "did", "does", "was", "is",
+        "how", "which", "when", "will", "forecast", "forecasts", "observed", "actual",
+    }
 )
 
 
@@ -250,6 +263,19 @@ def _extract_claim(text: str) -> tuple[float, str] | None:
     return None
 
 
+def _place_from_question(text: str) -> str | None:
+    for pattern in PLACE_PATTERNS:
+        for match in pattern.finditer(text):
+            words = match[1].strip(" ,.").split()
+            # Drop a leading opener ("The", "Yesterday") but keep the rest.
+            while words and words[0].lower().strip(",.") in NOT_PLACES:
+                words.pop(0)
+            candidate = " ".join(words).strip(" ,.")
+            if candidate and candidate.split()[0].lower().strip(",.") not in NOT_PLACES:
+                return candidate
+    return None
+
+
 def _infer_variable(text: str) -> Variable:
     lowered = text.lower()
     for pattern, key in VARIABLE_KEYWORDS:
@@ -295,9 +321,7 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
     if not location and params.get("lat") and params.get("lon"):
         location = f"{params['lat']},{params['lon']}"
     if not location and text:
-        match = PLACE_IN_QUESTION.search(text)
-        if match:
-            location = match[1].strip(" ,.")
+        location = _place_from_question(text) or ""
     if not location:
         raise VerifyError("a location (place name or 'lat,lon') is required")
 

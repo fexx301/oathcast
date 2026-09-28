@@ -63,6 +63,18 @@ from oathcast.render import (
     public_window_response,
 )
 from oathcast.release import ReleaseInfo, current_release
+from oathcast.verify import (
+    Place,
+    VerifyRequest,
+    archive_url,
+    coordinates_from_location,
+    geocoding_url,
+    parse_archive,
+    parse_geocoding,
+    parse_verify_request,
+    render_answer,
+    verify,
+)
 
 
 UTC = timezone.utc
@@ -80,6 +92,28 @@ WINDOW_FORECAST_PATH = "/v1/forecast/window"
 FORECAST_PATHS = frozenset(
     {REGISTERED_FORECAST_PATH, POINT_FORECAST_PATH}
 )
+# WEATHER_FORECAST_VERIFY: opt-in, like the temperature window, so enabling it
+# is a deliberate deployment change rather than a side effect of a release.
+VERIFY_PATH = "/v1/forecast/verify"
+VERIFY_INTENT = "WEATHER_FORECAST_VERIFY"
+VERIFY_ANSWER_STYLE = "observed_only"  # measured; see scripts/benchmark_verify_wording.py
+KNOWN_VERIFY_QUERY_PARAMETERS = frozenset(
+    {
+        "location",
+        "lat",
+        "lon",
+        "date",
+        "start",
+        "end",
+        "variable",
+        "forecast_value",
+        "unit",
+        "tolerance",
+        "question",
+        "q",
+    }
+)
+MAX_VERIFY_QUESTION_LENGTH = 1000
 
 
 def _log_request_failure(
@@ -478,6 +512,46 @@ class ServiceTemperatureWindowForecast:
         return public_temperature_window_response(self.request, self.forecast)
 
 
+@dataclass(frozen=True)
+class ServiceVerification:
+    """One WEATHER_FORECAST_VERIFY answer and the receipt that pins it."""
+
+    event_id: str
+    public_response: dict[str, Any]
+    request_id: str
+    receipt_sha256: str | None = None
+
+    def to_public_response(self) -> dict[str, Any]:
+        return dict(self.public_response)
+
+
+def _verify_question(request: VerifyRequest, place: Place) -> dict[str, Any]:
+    """The canonical verify question; its digest is the receipt event_id.
+
+    Two requests that resolve to the same place, window, variable, claim and
+    tolerance are the same question, so a replay returns the stored answer
+    instead of a fresh archive read that may have been revised since.
+    """
+
+    question: dict[str, Any] = {
+        "intent": VERIFY_INTENT,
+        "place": place.label,
+        "latitude": round(place.latitude, 4),
+        "longitude": round(place.longitude, 4),
+        "start_date": request.start.isoformat(),
+        "end_date": request.end.isoformat(),
+        "variable": request.variable.key,
+        "forecast_value": request.forecast_value,
+        "forecast_unit": request.forecast_unit,
+        "tolerance": request.tolerance,
+    }
+    digest = hashlib.sha256(
+        json.dumps(question, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    question["event_id"] = f"verify-{digest}"
+    return question
+
+
 class ForecastService:
     """One public Miner service with provider failover behind it."""
 
@@ -517,8 +591,10 @@ class ForecastService:
         release: ReleaseInfo | None = None,
         receipt_write_probe_interval_seconds: float | None = None,
         temperature_window_enabled: bool = False,
+        verify_enabled: bool = False,
     ) -> None:
         self.fetcher = fetcher
+        self.verify_enabled = verify_enabled
         self.provider_order = provider_order or self._provider_order_from_env()
         unknown = set(self.provider_order) - set(self.adapters)
         if unknown:
@@ -1060,6 +1136,87 @@ class ForecastService:
                 raise ReceiptStoreUnavailable("receipt evidence is unavailable") from exc
         raise ProviderUnavailable("; ".join(failures))
 
+    def _fetch_verify_json(self, url: str) -> dict[str, Any]:
+        try:
+            return self.fetcher(url)
+        except Exception as exc:  # noqa: BLE001 - any upstream failure is a 502
+            raise ProviderUnavailable("open_meteo archive or geocoding request failed") from exc
+
+    def verify_forecast(self, params: dict[str, str], *, request_id: str) -> ServiceVerification:
+        """Answer one WEATHER_FORECAST_VERIFY request from the historical archive.
+
+        The scored ``content`` states only what was observed; the verdict, the
+        claimed value, the error and the tolerance are structured fields. That
+        split is a measured choice: under both proxy scorers a verdict in the
+        text did not reliably help and a claimed number in the text could hurt.
+        """
+
+        if not self.verify_enabled:
+            raise ValueError("forecast verification is disabled")
+        today = self.clock().astimezone(UTC).date()
+        request = parse_verify_request(params, today=today)
+        coordinates = coordinates_from_location(request.location)
+        if coordinates is not None:
+            place = Place(
+                name=f"{coordinates[0]:.4f}, {coordinates[1]:.4f}",
+                latitude=coordinates[0],
+                longitude=coordinates[1],
+            )
+        else:
+            place = parse_geocoding(
+                self._fetch_verify_json(geocoding_url(request.location)), request.location
+            )
+        question = _verify_question(request, place)
+        event_id = question["event_id"]
+
+        if self.receipt_store is not None:
+            try:
+                stored = self.receipt_store.get(event_id)
+            except ReceiptTampering:
+                raise
+            except (sqlite3.Error, OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+                raise ReceiptStoreUnavailable("receipt evidence is unavailable") from exc
+            if stored is not None:
+                if not isinstance(stored.get("public_response"), dict):
+                    raise ReceiptStoreUnavailable("stored receipt evidence is malformed")
+                return ServiceVerification(
+                    event_id=event_id,
+                    public_response=stored["public_response"],
+                    request_id=request_id,
+                    receipt_sha256=stored.get("receipt_sha256"),
+                )
+
+        raw_payload = self._fetch_verify_json(archive_url(place, request))
+        retrieved_at = self.clock().astimezone(UTC)
+        result = verify(request, parse_archive(raw_payload, place, request))
+        public = {"content": render_answer(result, VERIFY_ANSWER_STYLE), **result.to_dict()}
+        if self.receipt_store is None:
+            return ServiceVerification(event_id, public, request_id)
+
+        receipt = {
+            "schema_version": 1,
+            "kind": "forecast_verification",
+            "created_at": format_timestamp(self.clock()),
+            "request_id": request_id,
+            "question": question,
+            "retrieved_at": format_timestamp(retrieved_at),
+            "raw_payload": raw_payload,
+            "public_response": public,
+        }
+        receipt["receipt_sha256"] = receipt_digest(receipt)
+        try:
+            stored = self.receipt_store.save(receipt)
+        except (ReceiptConflict, ReceiptStoreFull, ReceiptTampering):
+            raise
+        except (sqlite3.Error, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            raise ReceiptStoreUnavailable("receipt evidence is unavailable") from exc
+        return ServiceVerification(
+            event_id=event_id,
+            public_response=stored["public_response"],
+            request_id=request_id,
+            receipt_sha256=stored.get("receipt_sha256"),
+        )
+
     def _service_forecast_from_receipt(
         self,
         receipt: dict[str, Any],
@@ -1303,6 +1460,27 @@ def _validate_query_params(params: dict[str, list[str]]) -> None:
             raise ValueError(f"query parameter {name!r} must not be empty")
         if any(ord(char) < 32 or ord(char) == 127 for char in value):
             raise ValueError(f"query parameter {name!r} contains control characters")
+
+
+def _verify_params_from_query(params: dict[str, list[str]]) -> dict[str, str]:
+    """Validate a verify query with the same strictness as the forecast routes."""
+
+    flattened: dict[str, str] = {}
+    for name, values in params.items():
+        if name not in KNOWN_VERIFY_QUERY_PARAMETERS:
+            raise ValueError(f"unknown query parameter: {name}")
+        if not isinstance(values, (list, tuple)) or len(values) != 1:
+            raise ValueError(f"query parameter {name!r} must appear exactly once")
+        value = values[0]
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"query parameter {name!r} must not be empty")
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError(f"query parameter {name!r} contains control characters")
+        limit = MAX_VERIFY_QUESTION_LENGTH if name in {"question", "q"} else MAX_LOCATION_NAME_LENGTH
+        if len(value) > limit:
+            raise ValueError(f"query parameter {name!r} must be at most {limit} characters")
+        flattened[name] = value
+    return flattened
 
 
 def _first_query_value(
@@ -1808,6 +1986,7 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                     "providers": self.service.provider_order,
                     "auth_required": self.service.require_auth,
                     "temperature_window_enabled": self.service.temperature_window_enabled,
+                    "verify_enabled": self.service.verify_enabled,
                     "release": self.service.release.to_dict(),
                 },
             )
@@ -1844,7 +2023,8 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 payload["ready"] = ready
             self._send_json(200 if ready else 503, payload)
             return
-        if parsed.path not in FORECAST_PATHS:
+        verify_route = parsed.path == VERIFY_PATH and self.service.verify_enabled
+        if parsed.path not in FORECAST_PATHS and not verify_route:
             self._send_json(404, {"error": "not_found"})
             return
 
@@ -1899,6 +2079,15 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                     f"request target must be at most {MAX_REQUEST_TARGET_LENGTH} characters"
                 )
             params = _parse_request_query(parsed.query)
+            if verify_route:
+                verification = self.service.verify_forecast(
+                    _verify_params_from_query(params), request_id=request_id
+                )
+                verify_headers = {"X-OathCast-Request-ID": request_id}
+                if verification.receipt_sha256 is not None:
+                    verify_headers["X-OathCast-Receipt-SHA256"] = verification.receipt_sha256
+                self._send_json(200, verification.to_public_response(), headers=verify_headers)
+                return
             requested_provider = params.get("provider", [None])[0]
             accepted_at: datetime | None = None
             if _uses_telegraph_2t_query(params):
@@ -2052,6 +2241,7 @@ def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
         temperature_window_enabled=env_flag(
             "OATHCAST_ENABLE_TEMPERATURE_WINDOW", False
         ),
+        verify_enabled=env_flag("OATHCAST_ENABLE_VERIFY", False),
         receipt_store=SqliteReceiptStore(
             receipt_path,
             max_rows=env_cap("OATHCAST_RECEIPT_MAX_ROWS", DEFAULT_MAX_RECEIPT_ROWS),
