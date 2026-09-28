@@ -1,0 +1,1381 @@
+{
+  "generated_at": "2026-09-28T13:20:12+00:00",
+  "rescored_from": "artifacts/s2-wfv-wording/run2-grammar-fix.json",
+  "wasm_sha256": "202186f8a2f1639307413b0de5d7b158ce29a09b32ac1735f3a61ce6ca3516aa",
+  "engine": "compiler",
+  "cases_scored": 12,
+  "case_errors": [],
+  "summary": {
+    "gt_data": {
+      "observed_only": {
+        "n": 12,
+        "mean": 0.0004,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": 0.0,
+        "passes": false
+      },
+      "observed_then_verdict": {
+        "n": 12,
+        "mean": 0.0003,
+        "wins_vs_observed_only": 1,
+        "worst_delta_vs_observed_only": -0.0002,
+        "passes": false
+      },
+      "raw_archive_json": {
+        "n": 12,
+        "mean": 0.0004,
+        "wins_vs_observed_only": 3,
+        "worst_delta_vs_observed_only": -0.0001,
+        "passes": false
+      },
+      "txlens_live": {
+        "n": 12,
+        "mean": 0.0004,
+        "wins_vs_observed_only": 3,
+        "worst_delta_vs_observed_only": -0.0001,
+        "passes": false
+      },
+      "verdict_first": {
+        "n": 12,
+        "mean": 0.0003,
+        "wins_vs_observed_only": 3,
+        "worst_delta_vs_observed_only": -0.0002,
+        "passes": false
+      }
+    },
+    "gt_sentence": {
+      "observed_only": {
+        "n": 12,
+        "mean": 1.0,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": 0.0,
+        "passes": false
+      },
+      "observed_then_verdict": {
+        "n": 12,
+        "mean": 0.2504,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": -0.9995,
+        "passes": false
+      },
+      "raw_archive_json": {
+        "n": 12,
+        "mean": 0.0004,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": -0.9998,
+        "passes": false
+      },
+      "txlens_live": {
+        "n": 12,
+        "mean": 0.3337,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": -0.9995,
+        "passes": false
+      },
+      "verdict_first": {
+        "n": 12,
+        "mean": 0.2504,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": -0.9995,
+        "passes": false
+      }
+    },
+    "gt_verdict": {
+      "observed_only": {
+        "n": 12,
+        "mean": 0.2504,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": 0.0,
+        "passes": false
+      },
+      "observed_then_verdict": {
+        "n": 12,
+        "mean": 0.1671,
+        "wins_vs_observed_only": 5,
+        "worst_delta_vs_observed_only": -0.9994,
+        "passes": false
+      },
+      "raw_archive_json": {
+        "n": 12,
+        "mean": 0.0003,
+        "wins_vs_observed_only": 0,
+        "worst_delta_vs_observed_only": -0.9997,
+        "passes": false
+      },
+      "txlens_live": {
+        "n": 12,
+        "mean": 0.1671,
+        "wins_vs_observed_only": 3,
+        "worst_delta_vs_observed_only": -0.9995,
+        "passes": false
+      },
+      "verdict_first": {
+        "n": 12,
+        "mean": 0.6668,
+        "wins_vs_observed_only": 10,
+        "worst_delta_vs_observed_only": -0.9994,
+        "passes": false
+      }
+    }
+  },
+  "gt_formats_passed": {
+    "verdict_first": 0,
+    "observed_then_verdict": 0
+  },
+  "decision": "unproven: ship observed_only text, verdict as a structured field",
+  "scores": {
+    "lisbon|gt_data|observed_only": 0.00031401461,
+    "lisbon|gt_data|verdict_first": 0.00029307732,
+    "lisbon|gt_data|observed_then_verdict": 0.00028771558,
+    "lisbon|gt_data|raw_archive_json": 0.00035829493,
+    "lisbon|gt_data|txlens_live": 0.00037184957,
+    "lisbon|gt_sentence|observed_only": 0.99998254,
+    "lisbon|gt_sentence|verdict_first": 0.0004575559,
+    "lisbon|gt_sentence|observed_then_verdict": 0.00047275724,
+    "lisbon|gt_sentence|raw_archive_json": 0.00035559802,
+    "lisbon|gt_sentence|txlens_live": 0.999969,
+    "lisbon|gt_verdict|observed_only": 0.9999681,
+    "lisbon|gt_verdict|verdict_first": 0.9999693,
+    "lisbon|gt_verdict|observed_then_verdict": 0.00057876325,
+    "lisbon|gt_verdict|raw_archive_json": 0.0002937066,
+    "lisbon|gt_verdict|txlens_live": 0.0004845947,
+    "london|gt_data|observed_only": 0.00039901934,
+    "london|gt_data|verdict_first": 0.00042109747,
+    "london|gt_data|observed_then_verdict": 0.00039877623,
+    "london|gt_data|raw_archive_json": 0.00035777615,
+    "london|gt_data|txlens_live": 0.00038159834,
+    "london|gt_sentence|observed_only": 0.999981,
+    "london|gt_sentence|verdict_first": 0.99998033,
+    "london|gt_sentence|observed_then_verdict": 0.9999799,
+    "london|gt_sentence|raw_archive_json": 0.00018357253,
+    "london|gt_sentence|txlens_live": 0.00059655786,
+    "london|gt_verdict|observed_only": 0.0005020709,
+    "london|gt_verdict|verdict_first": 0.999975,
+    "london|gt_verdict|observed_then_verdict": 0.999969,
+    "london|gt_verdict|raw_archive_json": 0.00030453174,
+    "london|gt_verdict|txlens_live": 0.9999732,
+    "tokyo|gt_data|observed_only": 0.00031193873,
+    "tokyo|gt_data|verdict_first": 0.0003188063,
+    "tokyo|gt_data|observed_then_verdict": 0.00028902813,
+    "tokyo|gt_data|raw_archive_json": 0.00035169531,
+    "tokyo|gt_data|txlens_live": 0.00037038414,
+    "tokyo|gt_sentence|observed_only": 0.9999743,
+    "tokyo|gt_sentence|verdict_first": 0.00056790165,
+    "tokyo|gt_sentence|observed_then_verdict": 0.0005644537,
+    "tokyo|gt_sentence|raw_archive_json": 0.00042339167,
+    "tokyo|gt_sentence|txlens_live": 0.0005999982,
+    "tokyo|gt_verdict|observed_only": 0.00044597613,
+    "tokyo|gt_verdict|verdict_first": 0.99997276,
+    "tokyo|gt_verdict|observed_then_verdict": 0.00056053296,
+    "tokyo|gt_verdict|raw_archive_json": 0.00029017974,
+    "tokyo|gt_verdict|txlens_live": 0.00050715136,
+    "chicago|gt_data|observed_only": 0.00045291436,
+    "chicago|gt_data|verdict_first": 0.0003078788,
+    "chicago|gt_data|observed_then_verdict": 0.0002976033,
+    "chicago|gt_data|raw_archive_json": 0.0003637292,
+    "chicago|gt_data|txlens_live": 0.00031328003,
+    "chicago|gt_sentence|observed_only": 0.99998593,
+    "chicago|gt_sentence|verdict_first": 0.0004806417,
+    "chicago|gt_sentence|observed_then_verdict": 0.0004858879,
+    "chicago|gt_sentence|raw_archive_json": 0.00050727214,
+    "chicago|gt_sentence|txlens_live": 0.00045374883,
+    "chicago|gt_verdict|observed_only": 0.00056472665,
+    "chicago|gt_verdict|verdict_first": 0.0005494785,
+    "chicago|gt_verdict|observed_then_verdict": 0.0004999247,
+    "chicago|gt_verdict|raw_archive_json": 0.00034529733,
+    "chicago|gt_verdict|txlens_live": 0.00040974218,
+    "lagos|gt_data|observed_only": 0.00045454266,
+    "lagos|gt_data|verdict_first": 0.00030794786,
+    "lagos|gt_data|observed_then_verdict": 0.0003065215,
+    "lagos|gt_data|raw_archive_json": 0.00036611935,
+    "lagos|gt_data|txlens_live": 0.00041078823,
+    "lagos|gt_sentence|observed_only": 0.9999784,
+    "lagos|gt_sentence|verdict_first": 0.00045407895,
+    "lagos|gt_sentence|observed_then_verdict": 0.0004625544,
+    "lagos|gt_sentence|raw_archive_json": 0.00056672096,
+    "lagos|gt_sentence|txlens_live": 0.9999688,
+    "lagos|gt_verdict|observed_only": 0.00055817195,
+    "lagos|gt_verdict|verdict_first": 0.0005729638,
+    "lagos|gt_verdict|observed_then_verdict": 0.00052806677,
+    "lagos|gt_verdict|raw_archive_json": 0.00037087162,
+    "lagos|gt_verdict|txlens_live": 0.0004973679,
+    "sydney|gt_data|observed_only": 0.0004510444,
+    "sydney|gt_data|verdict_first": 0.00038996094,
+    "sydney|gt_data|observed_then_verdict": 0.00037849453,
+    "sydney|gt_data|raw_archive_json": 0.0003639953,
+    "sydney|gt_data|txlens_live": 0.00041219784,
+    "sydney|gt_sentence|observed_only": 0.99998206,
+    "sydney|gt_sentence|verdict_first": 0.99996877,
+    "sydney|gt_sentence|observed_then_verdict": 0.999969,
+    "sydney|gt_sentence|raw_archive_json": 0.00050098065,
+    "sydney|gt_sentence|txlens_live": 0.9999684,
+    "sydney|gt_verdict|observed_only": 0.000545131,
+    "sydney|gt_verdict|verdict_first": 0.9999793,
+    "sydney|gt_verdict|observed_then_verdict": 0.9999726,
+    "sydney|gt_verdict|raw_archive_json": 0.00032197914,
+    "sydney|gt_verdict|txlens_live": 0.00049868756,
+    "mumbai|gt_data|observed_only": 0.0003990654,
+    "mumbai|gt_data|verdict_first": 0.00027175082,
+    "mumbai|gt_data|observed_then_verdict": 0.0002733306,
+    "mumbai|gt_data|raw_archive_json": 0.00035349056,
+    "mumbai|gt_data|txlens_live": 0.000343897,
+    "mumbai|gt_sentence|observed_only": 0.9999782,
+    "mumbai|gt_sentence|verdict_first": 0.00044486235,
+    "mumbai|gt_sentence|observed_then_verdict": 0.00046026064,
+    "mumbai|gt_sentence|raw_archive_json": 0.0004474144,
+    "mumbai|gt_sentence|txlens_live": 0.0005935968,
+    "mumbai|gt_verdict|observed_only": 0.00055434223,
+    "mumbai|gt_verdict|verdict_first": 0.0005706364,
+    "mumbai|gt_verdict|observed_then_verdict": 0.0005264774,
+    "mumbai|gt_verdict|raw_archive_json": 0.00028449084,
+    "mumbai|gt_verdict|txlens_live": 0.00046799844,
+    "denver|gt_data|observed_only": 0.00039090315,
+    "denver|gt_data|verdict_first": 0.00035932346,
+    "denver|gt_data|observed_then_verdict": 0.00034097818,
+    "denver|gt_data|raw_archive_json": 0.00035969174,
+    "denver|gt_data|txlens_live": 0.00037909835,
+    "denver|gt_sentence|observed_only": 0.99997985,
+    "denver|gt_sentence|verdict_first": 0.00059546815,
+    "denver|gt_sentence|observed_then_verdict": 0.0005993721,
+    "denver|gt_sentence|raw_archive_json": 0.00046129437,
+    "denver|gt_sentence|txlens_live": 0.0005970883,
+    "denver|gt_verdict|observed_only": 0.00049024343,
+    "denver|gt_verdict|verdict_first": 0.999973,
+    "denver|gt_verdict|observed_then_verdict": 0.00057949714,
+    "denver|gt_verdict|raw_archive_json": 0.00030053587,
+    "denver|gt_verdict|txlens_live": 0.0004847664,
+    "reykjavik|gt_data|observed_only": 0.00044902932,
+    "reykjavik|gt_data|verdict_first": 0.00032452267,
+    "reykjavik|gt_data|observed_then_verdict": 0.0003089186,
+    "reykjavik|gt_data|raw_archive_json": 0.00036788426,
+    "reykjavik|gt_data|txlens_live": 0.000345669,
+    "reykjavik|gt_sentence|observed_only": 0.99998695,
+    "reykjavik|gt_sentence|verdict_first": 0.00049361965,
+    "reykjavik|gt_sentence|observed_then_verdict": 0.0004941511,
+    "reykjavik|gt_sentence|raw_archive_json": 0.0005368851,
+    "reykjavik|gt_sentence|txlens_live": 0.0004796447,
+    "reykjavik|gt_verdict|observed_only": 0.00058879884,
+    "reykjavik|gt_verdict|verdict_first": 0.99996877,
+    "reykjavik|gt_verdict|observed_then_verdict": 0.00055805536,
+    "reykjavik|gt_verdict|raw_archive_json": 0.0003632194,
+    "reykjavik|gt_verdict|txlens_live": 0.00043549208,
+    "cape-town|gt_data|observed_only": 0.0004608649,
+    "cape-town|gt_data|verdict_first": 0.00029941776,
+    "cape-town|gt_data|observed_then_verdict": 0.00029530365,
+    "cape-town|gt_data|raw_archive_json": 0.00035306692,
+    "cape-town|gt_data|txlens_live": 0.00038144607,
+    "cape-town|gt_sentence|observed_only": 0.99998367,
+    "cape-town|gt_sentence|verdict_first": 0.0004601771,
+    "cape-town|gt_sentence|observed_then_verdict": 0.00047202103,
+    "cape-town|gt_sentence|raw_archive_json": 0.00045677475,
+    "cape-town|gt_sentence|txlens_live": 0.9999692,
+    "cape-town|gt_verdict|observed_only": 0.99997026,
+    "cape-town|gt_verdict|verdict_first": 0.9999705,
+    "cape-town|gt_verdict|observed_then_verdict": 0.00059190823,
+    "cape-town|gt_verdict|raw_archive_json": 0.00029702435,
+    "cape-town|gt_verdict|txlens_live": 0.00048590367,
+    "berlin|gt_data|observed_only": 0.0003518319,
+    "berlin|gt_data|verdict_first": 0.00037197839,
+    "berlin|gt_data|observed_then_verdict": 0.000352603,
+    "berlin|gt_data|raw_archive_json": 0.00036262078,
+    "berlin|gt_data|txlens_live": 0.00038767952,
+    "berlin|gt_sentence|observed_only": 0.9999752,
+    "berlin|gt_sentence|verdict_first": 0.99997467,
+    "berlin|gt_sentence|observed_then_verdict": 0.9999741,
+    "berlin|gt_sentence|raw_archive_json": 0.000188664,
+    "berlin|gt_sentence|txlens_live": 0.0005931573,
+    "berlin|gt_verdict|observed_only": 0.00047848822,
+    "berlin|gt_verdict|verdict_first": 0.999972,
+    "berlin|gt_verdict|observed_then_verdict": 0.0005940389,
+    "berlin|gt_verdict|raw_archive_json": 0.0003236599,
+    "berlin|gt_verdict|txlens_live": 0.9999772,
+    "sao-paulo|gt_data|observed_only": 0.00048386544,
+    "sao-paulo|gt_data|verdict_first": 0.00031237383,
+    "sao-paulo|gt_data|observed_then_verdict": 0.0003129321,
+    "sao-paulo|gt_data|raw_archive_json": 0.00035864522,
+    "sao-paulo|gt_data|txlens_live": 0.000393247,
+    "sao-paulo|gt_sentence|observed_only": 0.9999835,
+    "sao-paulo|gt_sentence|verdict_first": 0.00045057456,
+    "sao-paulo|gt_sentence|observed_then_verdict": 0.00046794777,
+    "sao-paulo|gt_sentence|raw_archive_json": 0.0005128918,
+    "sao-paulo|gt_sentence|txlens_live": 0.0005950698,
+    "sao-paulo|gt_verdict|observed_only": 0.99996835,
+    "sao-paulo|gt_verdict|verdict_first": 0.00059868407,
+    "sao-paulo|gt_verdict|observed_then_verdict": 0.0005550368,
+    "sao-paulo|gt_verdict|raw_archive_json": 0.00033237264,
+    "sao-paulo|gt_verdict|txlens_live": 0.00046448802
+  },
+  "cases": [
+    {
+      "id": "lisbon",
+      "question": "The forecast for Lisbon on 15 September 2026 called for 12 mm of rain. How much actually fell, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Lisbon, Portugal",
+        "latitude": 38.72509,
+        "longitude": -9.1498,
+        "grid_latitude": 38.69947,
+        "grid_longitude": -9.196167,
+        "timezone": "Europe/Lisbon",
+        "start_date": "2026-09-15",
+        "end_date": "2026-09-15",
+        "variable": "precipitation",
+        "unit": "mm",
+        "observed_value": 0.0,
+        "daily_values": [
+          0.0
+        ],
+        "forecast_value": 12.0,
+        "error": -12.0,
+        "tolerance": 3.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Lisbon, Portugal recorded 0 mm of precipitation on 15 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 12 mm did not verify, 12 mm too high, outside the ±3 mm tolerance. Lisbon, Portugal recorded 0 mm of precipitation on 15 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Lisbon, Portugal recorded 0 mm of precipitation on 15 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 12 mm did not verify, 12 mm too high, outside the ±3 mm tolerance.",
+        "raw_archive_json": "{\"latitude\":38.69947,\"longitude\":-9.196167,\"generationtime_ms\":0.06759166717529297,\"utc_offset_seconds\":3600,\"timezone\":\"Europe/Lisbon\",\"timezone_abbreviation\":\"GMT+1\",\"elevation\":54.0,\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-15\"],\"precipitation_sum\":[0.0]}}",
+        "txlens_live": "On 2026-09-15 in Lisbon, Lisbon District, Portugal, the recorded temperature ranged from 19.6°C to 29°C with mainly clear. Total precipitation was 0mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":38.69947,\"longitude\":-9.196167,\"timezone\":\"Europe/Lisbon\",\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-15\"],\"precipitation_sum\":[0.0]}}",
+        "gt_sentence": "Observed precipitation at Lisbon (2026-09-15): 0 mm.",
+        "gt_verdict": "Forecast 12 mm; observed 0 mm at Lisbon on 2026-09-15. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 38.69947,
+        "longitude": -9.196167,
+        "generationtime_ms": 0.06759166717529297,
+        "utc_offset_seconds": 3600,
+        "timezone": "Europe/Lisbon",
+        "timezone_abbreviation": "GMT+1",
+        "elevation": 54.0,
+        "daily_units": {
+          "time": "iso8601",
+          "precipitation_sum": "mm"
+        },
+        "daily": {
+          "time": [
+            "2026-09-15"
+          ],
+          "precipitation_sum": [
+            0.0
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 2267057,
+        "name": "Lisbon",
+        "latitude": 38.72509,
+        "longitude": -9.1498,
+        "elevation": 68.0,
+        "feature_code": "PPLC",
+        "country_code": "PT",
+        "admin1_id": 2267056,
+        "admin2_id": 6458923,
+        "timezone": "Europe/Lisbon",
+        "population": 517802,
+        "country_id": 2264397,
+        "country": "Portugal",
+        "admin1": "Lisbon District",
+        "admin2": "Lisbon Municipality"
+      }
+    },
+    {
+      "id": "london",
+      "question": "London's high on 10 September 2026 was forecast at 21°C. What was the observed maximum, and did the forecast verify?",
+      "result": {
+        "verdict": "verified",
+        "verified": true,
+        "location": "London, United Kingdom",
+        "latitude": 51.50853,
+        "longitude": -0.12574,
+        "grid_latitude": 51.493847,
+        "grid_longitude": -0.1630249,
+        "timezone": "Europe/London",
+        "start_date": "2026-09-10",
+        "end_date": "2026-09-10",
+        "variable": "temperature_max",
+        "unit": "°C",
+        "observed_value": 19.3,
+        "daily_values": [
+          19.3
+        ],
+        "forecast_value": 21.0,
+        "error": -1.7,
+        "tolerance": 2.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "London, United Kingdom recorded a maximum temperature of 19.3°C on 10 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Verified. The forecast of 21°C verified, 1.7°C too high, within the ±2°C tolerance. London, United Kingdom recorded a maximum temperature of 19.3°C on 10 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "London, United Kingdom recorded a maximum temperature of 19.3°C on 10 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 21°C verified, 1.7°C too high, within the ±2°C tolerance.",
+        "raw_archive_json": "{\"latitude\":51.493847,\"longitude\":-0.1630249,\"generationtime_ms\":0.0883340835571289,\"utc_offset_seconds\":3600,\"timezone\":\"Europe/London\",\"timezone_abbreviation\":\"GMT+1\",\"elevation\":23.0,\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_max\":\"°C\"},\"daily\":{\"time\":[\"2026-09-10\"],\"temperature_2m_max\":[19.3]}}",
+        "txlens_live": "On 2026-09-10 in London, England, United Kingdom, the recorded temperature ranged from 11.7°C to 19.3°C with light drizzle. Total precipitation was 0.1mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":51.493847,\"longitude\":-0.1630249,\"timezone\":\"Europe/London\",\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_max\":\"°C\"},\"daily\":{\"time\":[\"2026-09-10\"],\"temperature_2m_max\":[19.3]}}",
+        "gt_sentence": "Observed maximum temperature at London (2026-09-10): 19.3 °C.",
+        "gt_verdict": "Forecast 21 °C; observed 19.3 °C at London on 2026-09-10. Result: verified."
+      },
+      "archive_payload": {
+        "latitude": 51.493847,
+        "longitude": -0.1630249,
+        "generationtime_ms": 0.0883340835571289,
+        "utc_offset_seconds": 3600,
+        "timezone": "Europe/London",
+        "timezone_abbreviation": "GMT+1",
+        "elevation": 23.0,
+        "daily_units": {
+          "time": "iso8601",
+          "temperature_2m_max": "°C"
+        },
+        "daily": {
+          "time": [
+            "2026-09-10"
+          ],
+          "temperature_2m_max": [
+            19.3
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 2643743,
+        "name": "London",
+        "latitude": 51.50853,
+        "longitude": -0.12574,
+        "elevation": 25.0,
+        "feature_code": "PPLC",
+        "country_code": "GB",
+        "admin1_id": 6269131,
+        "admin2_id": 2648110,
+        "timezone": "Europe/London",
+        "population": 8961989,
+        "country_id": 2635167,
+        "country": "United Kingdom",
+        "admin1": "England",
+        "admin2": "Greater London"
+      }
+    },
+    {
+      "id": "tokyo",
+      "question": "Tokyo was forecast to reach 31°C on 5 September 2026. Did that forecast verify against what was observed?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Tokyo, Japan",
+        "latitude": 35.6895,
+        "longitude": 139.69171,
+        "grid_latitude": 35.676624,
+        "grid_longitude": 139.69112,
+        "timezone": "Asia/Tokyo",
+        "start_date": "2026-09-05",
+        "end_date": "2026-09-05",
+        "variable": "temperature_max",
+        "unit": "°C",
+        "observed_value": 25.7,
+        "daily_values": [
+          25.7
+        ],
+        "forecast_value": 31.0,
+        "error": -5.3,
+        "tolerance": 2.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Tokyo, Japan recorded a maximum temperature of 25.7°C on 5 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 31°C did not verify, 5.3°C too high, outside the ±2°C tolerance. Tokyo, Japan recorded a maximum temperature of 25.7°C on 5 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Tokyo, Japan recorded a maximum temperature of 25.7°C on 5 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 31°C did not verify, 5.3°C too high, outside the ±2°C tolerance.",
+        "raw_archive_json": "{\"latitude\":35.676624,\"longitude\":139.69112,\"generationtime_ms\":0.043272972106933594,\"utc_offset_seconds\":32400,\"timezone\":\"Asia/Tokyo\",\"timezone_abbreviation\":\"GMT+9\",\"elevation\":40.0,\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_max\":\"°C\"},\"daily\":{\"time\":[\"2026-09-05\"],\"temperature_2m_max\":[25.7]}}",
+        "txlens_live": "On 2026-09-05 in Tokyo, Tokyo, Japan, the recorded temperature ranged from 20.5°C to 25.7°C with moderate rain. Total precipitation was 16.5mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":35.676624,\"longitude\":139.69112,\"timezone\":\"Asia/Tokyo\",\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_max\":\"°C\"},\"daily\":{\"time\":[\"2026-09-05\"],\"temperature_2m_max\":[25.7]}}",
+        "gt_sentence": "Observed maximum temperature at Tokyo (2026-09-05): 25.7 °C.",
+        "gt_verdict": "Forecast 31 °C; observed 25.7 °C at Tokyo on 2026-09-05. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 35.676624,
+        "longitude": 139.69112,
+        "generationtime_ms": 0.043272972106933594,
+        "utc_offset_seconds": 32400,
+        "timezone": "Asia/Tokyo",
+        "timezone_abbreviation": "GMT+9",
+        "elevation": 40.0,
+        "daily_units": {
+          "time": "iso8601",
+          "temperature_2m_max": "°C"
+        },
+        "daily": {
+          "time": [
+            "2026-09-05"
+          ],
+          "temperature_2m_max": [
+            25.7
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 1850147,
+        "name": "Tokyo",
+        "latitude": 35.6895,
+        "longitude": 139.69171,
+        "elevation": 44.0,
+        "feature_code": "PPLC",
+        "country_code": "JP",
+        "admin1_id": 1850144,
+        "timezone": "Asia/Tokyo",
+        "population": 9733276,
+        "country_id": 1861060,
+        "country": "Japan",
+        "admin1": "Tokyo"
+      }
+    },
+    {
+      "id": "chicago",
+      "question": "Chicago's forecast for 12 September 2026 said winds would peak at 25 mph. What was the observed peak wind, and did it verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Chicago, United States",
+        "latitude": 41.85003,
+        "longitude": -87.65005,
+        "grid_latitude": 41.862915,
+        "grid_longitude": -87.64877,
+        "timezone": "America/Chicago",
+        "start_date": "2026-09-12",
+        "end_date": "2026-09-12",
+        "variable": "wind_max",
+        "unit": "km/h",
+        "observed_value": 11.4,
+        "daily_values": [
+          11.4
+        ],
+        "forecast_value": 40.23,
+        "error": -28.83,
+        "tolerance": 8.05,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Chicago, United States recorded a maximum wind speed of 11.4 km/h on 12 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 40.2 km/h did not verify, 28.8 km/h too high, outside the ±8.1 km/h tolerance. Chicago, United States recorded a maximum wind speed of 11.4 km/h on 12 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Chicago, United States recorded a maximum wind speed of 11.4 km/h on 12 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 40.2 km/h did not verify, 28.8 km/h too high, outside the ±8.1 km/h tolerance.",
+        "raw_archive_json": "{\"latitude\":41.862915,\"longitude\":-87.64877,\"generationtime_ms\":0.42688846588134766,\"utc_offset_seconds\":-18000,\"timezone\":\"America/Chicago\",\"timezone_abbreviation\":\"GMT-5\",\"elevation\":179.0,\"daily_units\":{\"time\":\"iso8601\",\"wind_speed_10m_max\":\"km/h\"},\"daily\":{\"time\":[\"2026-09-12\"],\"wind_speed_10m_max\":[11.4]}}",
+        "txlens_live": "On 2026-09-12 in Chicago, Illinois, United States, the recorded temperature ranged from 18.6°C to 29.1°C with overcast. Total precipitation was 0mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":41.862915,\"longitude\":-87.64877,\"timezone\":\"America/Chicago\",\"daily_units\":{\"time\":\"iso8601\",\"wind_speed_10m_max\":\"km/h\"},\"daily\":{\"time\":[\"2026-09-12\"],\"wind_speed_10m_max\":[11.4]}}",
+        "gt_sentence": "Observed maximum wind speed at Chicago (2026-09-12): 11.4 km/h.",
+        "gt_verdict": "Forecast 40.23 km/h; observed 11.4 km/h at Chicago on 2026-09-12. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 41.862915,
+        "longitude": -87.64877,
+        "generationtime_ms": 0.42688846588134766,
+        "utc_offset_seconds": -18000,
+        "timezone": "America/Chicago",
+        "timezone_abbreviation": "GMT-5",
+        "elevation": 179.0,
+        "daily_units": {
+          "time": "iso8601",
+          "wind_speed_10m_max": "km/h"
+        },
+        "daily": {
+          "time": [
+            "2026-09-12"
+          ],
+          "wind_speed_10m_max": [
+            11.4
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 4887398,
+        "name": "Chicago",
+        "latitude": 41.85003,
+        "longitude": -87.65005,
+        "elevation": 179.0,
+        "feature_code": "PPLA2",
+        "country_code": "US",
+        "admin1_id": 4896861,
+        "admin2_id": 4888671,
+        "admin3_id": 4887539,
+        "timezone": "America/Chicago",
+        "population": 2664452,
+        "postcodes": [
+          "60601",
+          "60602",
+          "60603",
+          "60604",
+          "60605",
+          "60606",
+          "60607",
+          "60608",
+          "60609",
+          "60610",
+          "60611",
+          "60612",
+          "60613",
+          "60614",
+          "60615",
+          "60616",
+          "60617",
+          "60618",
+          "60619",
+          "60620",
+          "60621",
+          "60622",
+          "60623",
+          "60624",
+          "60625",
+          "60626",
+          "60628",
+          "60629",
+          "60630",
+          "60631",
+          "60632",
+          "60633",
+          "60634",
+          "60636",
+          "60637",
+          "60638",
+          "60639",
+          "60640",
+          "60641",
+          "60642",
+          "60643",
+          "60644",
+          "60645",
+          "60646",
+          "60647",
+          "60649",
+          "60651",
+          "60652",
+          "60653",
+          "60654",
+          "60655",
+          "60656",
+          "60657",
+          "60659",
+          "60660",
+          "60661",
+          "60664",
+          "60668",
+          "60669",
+          "60670",
+          "60673",
+          "60674",
+          "60675",
+          "60677",
+          "60678",
+          "60680",
+          "60681",
+          "60684",
+          "60685",
+          "60687",
+          "60690",
+          "60691",
+          "60693",
+          "60694",
+          "60697",
+          "60699",
+          "60701"
+        ],
+        "country_id": 6252001,
+        "country": "United States",
+        "admin1": "Illinois",
+        "admin2": "Cook",
+        "admin3": "Chicago"
+      }
+    },
+    {
+      "id": "lagos",
+      "question": "Yesterday's forecast for Lagos on 8 September 2026 called for 20 mm of rain. What did stations record, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Lagos, Nigeria",
+        "latitude": 6.45407,
+        "longitude": 3.39467,
+        "grid_latitude": 6.4323373,
+        "grid_longitude": 3.3948028,
+        "timezone": "Africa/Lagos",
+        "start_date": "2026-09-08",
+        "end_date": "2026-09-08",
+        "variable": "precipitation",
+        "unit": "mm",
+        "observed_value": 2.1,
+        "daily_values": [
+          2.1
+        ],
+        "forecast_value": 20.0,
+        "error": -17.9,
+        "tolerance": 5.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Lagos, Nigeria recorded 2.1 mm of precipitation on 8 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 20 mm did not verify, 17.9 mm too high, outside the ±5 mm tolerance. Lagos, Nigeria recorded 2.1 mm of precipitation on 8 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Lagos, Nigeria recorded 2.1 mm of precipitation on 8 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 20 mm did not verify, 17.9 mm too high, outside the ±5 mm tolerance.",
+        "raw_archive_json": "{\"latitude\":6.4323373,\"longitude\":3.3948028,\"generationtime_ms\":0.11146068572998047,\"utc_offset_seconds\":3600,\"timezone\":\"Africa/Lagos\",\"timezone_abbreviation\":\"GMT+1\",\"elevation\":8.0,\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-08\"],\"precipitation_sum\":[2.1]}}",
+        "txlens_live": "On 2026-09-08 in Lagos, Lagos, Nigeria, the recorded temperature ranged from 25.2°C to 28°C with moderate drizzle. Total precipitation was 2.1mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":6.4323373,\"longitude\":3.3948028,\"timezone\":\"Africa/Lagos\",\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-08\"],\"precipitation_sum\":[2.1]}}",
+        "gt_sentence": "Observed precipitation at Lagos (2026-09-08): 2.1 mm.",
+        "gt_verdict": "Forecast 20 mm; observed 2.1 mm at Lagos on 2026-09-08. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 6.4323373,
+        "longitude": 3.3948028,
+        "generationtime_ms": 0.11146068572998047,
+        "utc_offset_seconds": 3600,
+        "timezone": "Africa/Lagos",
+        "timezone_abbreviation": "GMT+1",
+        "elevation": 8.0,
+        "daily_units": {
+          "time": "iso8601",
+          "precipitation_sum": "mm"
+        },
+        "daily": {
+          "time": [
+            "2026-09-08"
+          ],
+          "precipitation_sum": [
+            2.1
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 2332459,
+        "name": "Lagos",
+        "latitude": 6.45407,
+        "longitude": 3.39467,
+        "elevation": 11.0,
+        "feature_code": "PPLA2",
+        "country_code": "NG",
+        "admin1_id": 2332453,
+        "timezone": "Africa/Lagos",
+        "population": 15388000,
+        "country_id": 2328926,
+        "country": "Nigeria",
+        "admin1": "Lagos"
+      }
+    },
+    {
+      "id": "sydney",
+      "question": "The overnight low in Sydney on 14 September 2026 was forecast at 9°C. What was observed, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Sydney, Australia",
+        "latitude": -33.86785,
+        "longitude": 151.20732,
+        "grid_latitude": -33.848858,
+        "grid_longitude": 151.19551,
+        "timezone": "Australia/Sydney",
+        "start_date": "2026-09-14",
+        "end_date": "2026-09-14",
+        "variable": "temperature_min",
+        "unit": "°C",
+        "observed_value": 11.9,
+        "daily_values": [
+          11.9
+        ],
+        "forecast_value": 9.0,
+        "error": 2.9,
+        "tolerance": 2.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Sydney, Australia recorded a minimum temperature of 11.9°C on 14 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 9°C did not verify, 2.9°C too low, outside the ±2°C tolerance. Sydney, Australia recorded a minimum temperature of 11.9°C on 14 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Sydney, Australia recorded a minimum temperature of 11.9°C on 14 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 9°C did not verify, 2.9°C too low, outside the ±2°C tolerance.",
+        "raw_archive_json": "{\"latitude\":-33.848858,\"longitude\":151.19551,\"generationtime_ms\":0.12421607971191406,\"utc_offset_seconds\":36000,\"timezone\":\"Australia/Sydney\",\"timezone_abbreviation\":\"GMT+10\",\"elevation\":51.0,\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_min\":\"°C\"},\"daily\":{\"time\":[\"2026-09-14\"],\"temperature_2m_min\":[11.9]}}",
+        "txlens_live": "On 2026-09-14 in Sydney, New South Wales, Australia, the recorded temperature ranged from 11.9°C to 25.3°C with overcast. Total precipitation was 0mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":-33.848858,\"longitude\":151.19551,\"timezone\":\"Australia/Sydney\",\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_min\":\"°C\"},\"daily\":{\"time\":[\"2026-09-14\"],\"temperature_2m_min\":[11.9]}}",
+        "gt_sentence": "Observed minimum temperature at Sydney (2026-09-14): 11.9 °C.",
+        "gt_verdict": "Forecast 9 °C; observed 11.9 °C at Sydney on 2026-09-14. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": -33.848858,
+        "longitude": 151.19551,
+        "generationtime_ms": 0.12421607971191406,
+        "utc_offset_seconds": 36000,
+        "timezone": "Australia/Sydney",
+        "timezone_abbreviation": "GMT+10",
+        "elevation": 51.0,
+        "daily_units": {
+          "time": "iso8601",
+          "temperature_2m_min": "°C"
+        },
+        "daily": {
+          "time": [
+            "2026-09-14"
+          ],
+          "temperature_2m_min": [
+            11.9
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 2147714,
+        "name": "Sydney",
+        "latitude": -33.86785,
+        "longitude": 151.20732,
+        "elevation": 58.0,
+        "feature_code": "PPLA",
+        "country_code": "AU",
+        "admin1_id": 2155400,
+        "timezone": "Australia/Sydney",
+        "population": 5557233,
+        "country_id": 2077456,
+        "country": "Australia",
+        "admin1": "New South Wales"
+      }
+    },
+    {
+      "id": "mumbai",
+      "question": "Mumbai was forecast to get 45 mm of rain on 3 September 2026. How much fell, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Mumbai, India",
+        "latitude": 19.07283,
+        "longitude": 72.88261,
+        "grid_latitude": 19.086115,
+        "grid_longitude": 72.85291,
+        "timezone": "Asia/Kolkata",
+        "start_date": "2026-09-03",
+        "end_date": "2026-09-03",
+        "variable": "precipitation",
+        "unit": "mm",
+        "observed_value": 5.6,
+        "daily_values": [
+          5.6
+        ],
+        "forecast_value": 45.0,
+        "error": -39.4,
+        "tolerance": 11.25,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Mumbai, India recorded 5.6 mm of precipitation on 3 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 45 mm did not verify, 39.4 mm too high, outside the ±11.2 mm tolerance. Mumbai, India recorded 5.6 mm of precipitation on 3 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Mumbai, India recorded 5.6 mm of precipitation on 3 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 45 mm did not verify, 39.4 mm too high, outside the ±11.2 mm tolerance.",
+        "raw_archive_json": "{\"latitude\":19.086115,\"longitude\":72.85291,\"generationtime_ms\":0.08666515350341797,\"utc_offset_seconds\":19800,\"timezone\":\"Asia/Kolkata\",\"timezone_abbreviation\":\"GMT+5:30\",\"elevation\":8.0,\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-03\"],\"precipitation_sum\":[5.6]}}",
+        "txlens_live": "On 2026-09-03 in Mumbai, Maharashtra, India, the recorded temperature ranged from 25.2°C to 29.4°C with moderate drizzle. Total precipitation was 5.6mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":19.086115,\"longitude\":72.85291,\"timezone\":\"Asia/Kolkata\",\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-03\"],\"precipitation_sum\":[5.6]}}",
+        "gt_sentence": "Observed precipitation at Mumbai (2026-09-03): 5.6 mm.",
+        "gt_verdict": "Forecast 45 mm; observed 5.6 mm at Mumbai on 2026-09-03. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 19.086115,
+        "longitude": 72.85291,
+        "generationtime_ms": 0.08666515350341797,
+        "utc_offset_seconds": 19800,
+        "timezone": "Asia/Kolkata",
+        "timezone_abbreviation": "GMT+5:30",
+        "elevation": 8.0,
+        "daily_units": {
+          "time": "iso8601",
+          "precipitation_sum": "mm"
+        },
+        "daily": {
+          "time": [
+            "2026-09-03"
+          ],
+          "precipitation_sum": [
+            5.6
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 1275339,
+        "name": "Mumbai",
+        "latitude": 19.07283,
+        "longitude": 72.88261,
+        "elevation": 8.0,
+        "feature_code": "PPLA",
+        "country_code": "IN",
+        "admin1_id": 1264418,
+        "timezone": "Asia/Kolkata",
+        "population": 12691836,
+        "country_id": 1269750,
+        "country": "India",
+        "admin1": "Maharashtra"
+      }
+    },
+    {
+      "id": "denver",
+      "question": "The high in Denver on 18 September 2026 was forecast at 82°F. What was observed, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Denver, United States",
+        "latitude": 39.73915,
+        "longitude": -104.9847,
+        "grid_latitude": 39.753952,
+        "grid_longitude": -105.02086,
+        "timezone": "America/Denver",
+        "start_date": "2026-09-18",
+        "end_date": "2026-09-18",
+        "variable": "temperature_max",
+        "unit": "°C",
+        "observed_value": 30.4,
+        "daily_values": [
+          30.4
+        ],
+        "forecast_value": 27.78,
+        "error": 2.62,
+        "tolerance": 2.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Denver, United States recorded a maximum temperature of 30.4°C on 18 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 27.8°C did not verify, 2.6°C too low, outside the ±2°C tolerance. Denver, United States recorded a maximum temperature of 30.4°C on 18 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Denver, United States recorded a maximum temperature of 30.4°C on 18 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 27.8°C did not verify, 2.6°C too low, outside the ±2°C tolerance.",
+        "raw_archive_json": "{\"latitude\":39.753952,\"longitude\":-105.02086,\"generationtime_ms\":0.06508827209472656,\"utc_offset_seconds\":-21600,\"timezone\":\"America/Denver\",\"timezone_abbreviation\":\"GMT-6\",\"elevation\":1609.0,\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_max\":\"°C\"},\"daily\":{\"time\":[\"2026-09-18\"],\"temperature_2m_max\":[30.4]}}",
+        "txlens_live": "On 2026-09-18 in Denver, Colorado, United States, the recorded temperature ranged from 15.5°C to 30.4°C with light drizzle. Total precipitation was 0.1mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":39.753952,\"longitude\":-105.02086,\"timezone\":\"America/Denver\",\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_max\":\"°C\"},\"daily\":{\"time\":[\"2026-09-18\"],\"temperature_2m_max\":[30.4]}}",
+        "gt_sentence": "Observed maximum temperature at Denver (2026-09-18): 30.4 °C.",
+        "gt_verdict": "Forecast 27.78 °C; observed 30.4 °C at Denver on 2026-09-18. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 39.753952,
+        "longitude": -105.02086,
+        "generationtime_ms": 0.06508827209472656,
+        "utc_offset_seconds": -21600,
+        "timezone": "America/Denver",
+        "timezone_abbreviation": "GMT-6",
+        "elevation": 1609.0,
+        "daily_units": {
+          "time": "iso8601",
+          "temperature_2m_max": "°C"
+        },
+        "daily": {
+          "time": [
+            "2026-09-18"
+          ],
+          "temperature_2m_max": [
+            30.4
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 5419384,
+        "name": "Denver",
+        "latitude": 39.73915,
+        "longitude": -104.9847,
+        "elevation": 1609.0,
+        "feature_code": "PPLA",
+        "country_code": "US",
+        "admin1_id": 5417618,
+        "admin2_id": 5419396,
+        "timezone": "America/Denver",
+        "population": 729019,
+        "postcodes": [
+          "80201",
+          "80202",
+          "80203",
+          "80204",
+          "80205",
+          "80206",
+          "80207",
+          "80208",
+          "80209",
+          "80210",
+          "80211",
+          "80212",
+          "80216",
+          "80217",
+          "80218",
+          "80219",
+          "80220",
+          "80222",
+          "80223",
+          "80224",
+          "80227",
+          "80230",
+          "80231",
+          "80235",
+          "80236",
+          "80237",
+          "80238",
+          "80239",
+          "80243",
+          "80244",
+          "80246",
+          "80248",
+          "80249",
+          "80250",
+          "80251",
+          "80252",
+          "80256",
+          "80257",
+          "80259",
+          "80261",
+          "80262",
+          "80263",
+          "80264",
+          "80265",
+          "80266",
+          "80271",
+          "80273",
+          "80274",
+          "80281",
+          "80290",
+          "80291",
+          "80293",
+          "80294",
+          "80299"
+        ],
+        "country_id": 6252001,
+        "country": "United States",
+        "admin1": "Colorado",
+        "admin2": "Denver"
+      }
+    },
+    {
+      "id": "reykjavik",
+      "question": "Reykjavik's forecast for 11 September 2026 had maximum winds of 40 km/h. What was observed, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Reykjavik, Iceland",
+        "latitude": 64.13548,
+        "longitude": -21.89541,
+        "grid_latitude": 64.077324,
+        "grid_longitude": -21.957123,
+        "timezone": "Atlantic/Reykjavik",
+        "start_date": "2026-09-11",
+        "end_date": "2026-09-11",
+        "variable": "wind_max",
+        "unit": "km/h",
+        "observed_value": 22.2,
+        "daily_values": [
+          22.2
+        ],
+        "forecast_value": 40.0,
+        "error": -17.8,
+        "tolerance": 8.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Reykjavik, Iceland recorded a maximum wind speed of 22.2 km/h on 11 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 40 km/h did not verify, 17.8 km/h too high, outside the ±8 km/h tolerance. Reykjavik, Iceland recorded a maximum wind speed of 22.2 km/h on 11 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Reykjavik, Iceland recorded a maximum wind speed of 22.2 km/h on 11 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 40 km/h did not verify, 17.8 km/h too high, outside the ±8 km/h tolerance.",
+        "raw_archive_json": "{\"latitude\":64.077324,\"longitude\":-21.957123,\"generationtime_ms\":0.7524490356445312,\"utc_offset_seconds\":0,\"timezone\":\"Atlantic/Reykjavik\",\"timezone_abbreviation\":\"GMT\",\"elevation\":37.0,\"daily_units\":{\"time\":\"iso8601\",\"wind_speed_10m_max\":\"km/h\"},\"daily\":{\"time\":[\"2026-09-11\"],\"wind_speed_10m_max\":[22.2]}}",
+        "txlens_live": "On 2026-09-11 in Reykjavik, Capital Region, Iceland, the recorded temperature ranged from 5.1°C to 8.4°C with moderate snow fall. Total precipitation was 5.4mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":64.077324,\"longitude\":-21.957123,\"timezone\":\"Atlantic/Reykjavik\",\"daily_units\":{\"time\":\"iso8601\",\"wind_speed_10m_max\":\"km/h\"},\"daily\":{\"time\":[\"2026-09-11\"],\"wind_speed_10m_max\":[22.2]}}",
+        "gt_sentence": "Observed maximum wind speed at Reykjavik (2026-09-11): 22.2 km/h.",
+        "gt_verdict": "Forecast 40 km/h; observed 22.2 km/h at Reykjavik on 2026-09-11. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": 64.077324,
+        "longitude": -21.957123,
+        "generationtime_ms": 0.7524490356445312,
+        "utc_offset_seconds": 0,
+        "timezone": "Atlantic/Reykjavik",
+        "timezone_abbreviation": "GMT",
+        "elevation": 37.0,
+        "daily_units": {
+          "time": "iso8601",
+          "wind_speed_10m_max": "km/h"
+        },
+        "daily": {
+          "time": [
+            "2026-09-11"
+          ],
+          "wind_speed_10m_max": [
+            22.2
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 3413829,
+        "name": "Reykjavik",
+        "latitude": 64.13548,
+        "longitude": -21.89541,
+        "elevation": 37.0,
+        "feature_code": "PPLC",
+        "country_code": "IS",
+        "admin1_id": 3426182,
+        "admin2_id": 3413831,
+        "timezone": "Atlantic/Reykjavik",
+        "population": 118918,
+        "postcodes": [
+          "101",
+          "103",
+          "104",
+          "105",
+          "107",
+          "108",
+          "109",
+          "110",
+          "111",
+          "112",
+          "113",
+          "116",
+          "150",
+          "155"
+        ],
+        "country_id": 2629691,
+        "country": "Iceland",
+        "admin1": "Capital Region",
+        "admin2": "Reykjavíkurborg"
+      }
+    },
+    {
+      "id": "cape-town",
+      "question": "The forecast for Cape Town on 16 September 2026 said it would stay dry, with no rain. Did it rain, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "Cape Town, South Africa",
+        "latitude": -33.92584,
+        "longitude": 18.42322,
+        "grid_latitude": -33.989456,
+        "grid_longitude": 18.426968,
+        "timezone": "Africa/Johannesburg",
+        "start_date": "2026-09-16",
+        "end_date": "2026-09-16",
+        "variable": "precipitation",
+        "unit": "mm",
+        "observed_value": 4.6,
+        "daily_values": [
+          4.6
+        ],
+        "forecast_value": 0.0,
+        "error": 4.6,
+        "tolerance": 1.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Cape Town, South Africa recorded 4.6 mm of precipitation on 16 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 0 mm did not verify, 4.6 mm too low, outside the ±1 mm tolerance. Cape Town, South Africa recorded 4.6 mm of precipitation on 16 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Cape Town, South Africa recorded 4.6 mm of precipitation on 16 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 0 mm did not verify, 4.6 mm too low, outside the ±1 mm tolerance.",
+        "raw_archive_json": "{\"latitude\":-33.989456,\"longitude\":18.426968,\"generationtime_ms\":0.1518726348876953,\"utc_offset_seconds\":7200,\"timezone\":\"Africa/Johannesburg\",\"timezone_abbreviation\":\"GMT+2\",\"elevation\":25.0,\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-16\"],\"precipitation_sum\":[4.6]}}",
+        "txlens_live": "On 2026-09-16 in Cape Town, Western Cape, South Africa, the recorded temperature ranged from 12°C to 16.8°C with moderate rain. Total precipitation was 4.6mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":-33.989456,\"longitude\":18.426968,\"timezone\":\"Africa/Johannesburg\",\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-16\"],\"precipitation_sum\":[4.6]}}",
+        "gt_sentence": "Observed precipitation at Cape Town (2026-09-16): 4.6 mm.",
+        "gt_verdict": "Forecast 0 mm; observed 4.6 mm at Cape Town on 2026-09-16. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": -33.989456,
+        "longitude": 18.426968,
+        "generationtime_ms": 0.1518726348876953,
+        "utc_offset_seconds": 7200,
+        "timezone": "Africa/Johannesburg",
+        "timezone_abbreviation": "GMT+2",
+        "elevation": 25.0,
+        "daily_units": {
+          "time": "iso8601",
+          "precipitation_sum": "mm"
+        },
+        "daily": {
+          "time": [
+            "2026-09-16"
+          ],
+          "precipitation_sum": [
+            4.6
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 3369157,
+        "name": "Cape Town",
+        "latitude": -33.92584,
+        "longitude": 18.42322,
+        "elevation": 25.0,
+        "feature_code": "PPLA",
+        "country_code": "ZA",
+        "admin1_id": 1085599,
+        "admin2_id": 8334583,
+        "admin3_id": 8347437,
+        "timezone": "Africa/Johannesburg",
+        "population": 4772846,
+        "postcodes": [
+          "7945",
+          "8001"
+        ],
+        "country_id": 953987,
+        "country": "South Africa",
+        "admin1": "Western Cape",
+        "admin2": "City of Cape Town",
+        "admin3": "City of Cape Town"
+      }
+    },
+    {
+      "id": "berlin",
+      "question": "Berlin's minimum temperature on 7 September 2026 was forecast at 12°C. What was the observed low, and did the forecast verify?",
+      "result": {
+        "verdict": "verified",
+        "verified": true,
+        "location": "Berlin, Germany",
+        "latitude": 52.52437,
+        "longitude": 13.41053,
+        "grid_latitude": 52.54833,
+        "grid_longitude": 13.407822,
+        "timezone": "Europe/Berlin",
+        "start_date": "2026-09-07",
+        "end_date": "2026-09-07",
+        "variable": "temperature_min",
+        "unit": "°C",
+        "observed_value": 11.4,
+        "daily_values": [
+          11.4
+        ],
+        "forecast_value": 12.0,
+        "error": -0.6,
+        "tolerance": 2.0,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "Berlin, Germany recorded a minimum temperature of 11.4°C on 7 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Verified. The forecast of 12°C verified, 0.6°C too high, within the ±2°C tolerance. Berlin, Germany recorded a minimum temperature of 11.4°C on 7 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "Berlin, Germany recorded a minimum temperature of 11.4°C on 7 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 12°C verified, 0.6°C too high, within the ±2°C tolerance.",
+        "raw_archive_json": "{\"latitude\":52.54833,\"longitude\":13.407822,\"generationtime_ms\":0.046372413635253906,\"utc_offset_seconds\":7200,\"timezone\":\"Europe/Berlin\",\"timezone_abbreviation\":\"GMT+2\",\"elevation\":46.0,\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_min\":\"°C\"},\"daily\":{\"time\":[\"2026-09-07\"],\"temperature_2m_min\":[11.4]}}",
+        "txlens_live": "On 2026-09-07 in Berlin, State of Berlin, Germany, the recorded temperature ranged from 11.4°C to 20.4°C with light drizzle. Total precipitation was 0.2mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":52.54833,\"longitude\":13.407822,\"timezone\":\"Europe/Berlin\",\"daily_units\":{\"time\":\"iso8601\",\"temperature_2m_min\":\"°C\"},\"daily\":{\"time\":[\"2026-09-07\"],\"temperature_2m_min\":[11.4]}}",
+        "gt_sentence": "Observed minimum temperature at Berlin (2026-09-07): 11.4 °C.",
+        "gt_verdict": "Forecast 12 °C; observed 11.4 °C at Berlin on 2026-09-07. Result: verified."
+      },
+      "archive_payload": {
+        "latitude": 52.54833,
+        "longitude": 13.407822,
+        "generationtime_ms": 0.046372413635253906,
+        "utc_offset_seconds": 7200,
+        "timezone": "Europe/Berlin",
+        "timezone_abbreviation": "GMT+2",
+        "elevation": 46.0,
+        "daily_units": {
+          "time": "iso8601",
+          "temperature_2m_min": "°C"
+        },
+        "daily": {
+          "time": [
+            "2026-09-07"
+          ],
+          "temperature_2m_min": [
+            11.4
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 2950159,
+        "name": "Berlin",
+        "latitude": 52.52437,
+        "longitude": 13.41053,
+        "elevation": 74.0,
+        "feature_code": "PPLC",
+        "country_code": "DE",
+        "admin1_id": 2950157,
+        "admin3_id": 6547383,
+        "admin4_id": 6547539,
+        "timezone": "Europe/Berlin",
+        "population": 3426354,
+        "postcodes": [
+          "10967",
+          "13347"
+        ],
+        "country_id": 2921044,
+        "country": "Germany",
+        "admin1": "State of Berlin",
+        "admin3": "Berlin, Stadt",
+        "admin4": "Berlin"
+      }
+    },
+    {
+      "id": "sao-paulo",
+      "question": "São Paulo was forecast to get 5 mm of rain on 19 September 2026. How much actually fell, and did the forecast verify?",
+      "result": {
+        "verdict": "not_verified",
+        "verified": false,
+        "location": "São Paulo, Brazil",
+        "latitude": -23.5475,
+        "longitude": -46.63611,
+        "grid_latitude": -23.514938,
+        "grid_longitude": -46.610504,
+        "timezone": "America/Sao_Paulo",
+        "start_date": "2026-09-19",
+        "end_date": "2026-09-19",
+        "variable": "precipitation",
+        "unit": "mm",
+        "observed_value": 1.1,
+        "daily_values": [
+          1.1
+        ],
+        "forecast_value": 5.0,
+        "error": -3.9,
+        "tolerance": 1.25,
+        "source": "Open-Meteo historical weather archive (ERA5 reanalysis)"
+      },
+      "answers": {
+        "observed_only": "São Paulo, Brazil recorded 1.1 mm of precipitation on 19 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "verdict_first": "Not verified. The forecast of 5 mm did not verify, 3.9 mm too high, outside the ±1.2 mm tolerance. São Paulo, Brazil recorded 1.1 mm of precipitation on 19 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis).",
+        "observed_then_verdict": "São Paulo, Brazil recorded 1.1 mm of precipitation on 19 September 2026, according to the Open-Meteo historical weather archive (ERA5 reanalysis). The forecast of 5 mm did not verify, 3.9 mm too high, outside the ±1.2 mm tolerance.",
+        "raw_archive_json": "{\"latitude\":-23.514938,\"longitude\":-46.610504,\"generationtime_ms\":0.5319118499755859,\"utc_offset_seconds\":-10800,\"timezone\":\"America/Sao_Paulo\",\"timezone_abbreviation\":\"GMT-3\",\"elevation\":745.0,\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-19\"],\"precipitation_sum\":[1.1]}}",
+        "txlens_live": "On 2026-09-19 in São Paulo, São Paulo, Brazil, the recorded temperature ranged from 15.5°C to 26.8°C with moderate drizzle. Total precipitation was 1.1mm. This reports what actually happened, verified against the historical record; it is not a forecast."
+      },
+      "ground_truths": {
+        "gt_data": "{\"latitude\":-23.514938,\"longitude\":-46.610504,\"timezone\":\"America/Sao_Paulo\",\"daily_units\":{\"time\":\"iso8601\",\"precipitation_sum\":\"mm\"},\"daily\":{\"time\":[\"2026-09-19\"],\"precipitation_sum\":[1.1]}}",
+        "gt_sentence": "Observed precipitation at São Paulo (2026-09-19): 1.1 mm.",
+        "gt_verdict": "Forecast 5 mm; observed 1.1 mm at São Paulo on 2026-09-19. Result: not verified."
+      },
+      "archive_payload": {
+        "latitude": -23.514938,
+        "longitude": -46.610504,
+        "generationtime_ms": 0.5319118499755859,
+        "utc_offset_seconds": -10800,
+        "timezone": "America/Sao_Paulo",
+        "timezone_abbreviation": "GMT-3",
+        "elevation": 745.0,
+        "daily_units": {
+          "time": "iso8601",
+          "precipitation_sum": "mm"
+        },
+        "daily": {
+          "time": [
+            "2026-09-19"
+          ],
+          "precipitation_sum": [
+            1.1
+          ]
+        }
+      },
+      "geocoding_top": {
+        "id": 3448439,
+        "name": "São Paulo",
+        "latitude": -23.5475,
+        "longitude": -46.63611,
+        "elevation": 769.0,
+        "feature_code": "PPLA",
+        "country_code": "BR",
+        "admin1_id": 3448433,
+        "timezone": "America/Sao_Paulo",
+        "population": 12400232,
+        "postcodes": [
+          "82010-340",
+          "22640-101"
+        ],
+        "country_id": 3469034,
+        "country": "Brazil",
+        "admin1": "São Paulo"
+      }
+    }
+  ]
+}
