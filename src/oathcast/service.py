@@ -1189,7 +1189,18 @@ class ForecastService:
         raw_payload = self._fetch_verify_json(archive_url(place, request))
         retrieved_at = self.clock().astimezone(UTC)
         result = verify(request, parse_archive(raw_payload, place, request))
-        public = {"content": render_answer(result, VERIFY_ANSWER_STYLE), **result.to_dict()}
+        detail = result.to_dict()
+        # Kept small on purpose, as with the S1 forecast response: which part
+        # of the response the scorer reads is unpublished, and the claimed
+        # value next to the observed one measured as harmful in the text. The
+        # claim, error and tolerance live in the receipt.
+        public = {
+            "content": render_answer(result, VERIFY_ANSWER_STYLE),
+            "verified": detail["verified"],
+            "verdict": detail["verdict"],
+            "observed_value": detail["observed_value"],
+            "unit": detail["unit"],
+        }
         if self.receipt_store is None:
             return ServiceVerification(event_id, public, request_id)
 
@@ -1201,6 +1212,7 @@ class ForecastService:
             "question": question,
             "retrieved_at": format_timestamp(retrieved_at),
             "raw_payload": raw_payload,
+            "verification": detail,
             "public_response": public,
         }
         receipt["receipt_sha256"] = receipt_digest(receipt)

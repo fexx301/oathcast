@@ -89,12 +89,27 @@ class VerifyRouteTests(unittest.TestCase):
             "Lisbon, Portugal recorded 3.4 mm of precipitation on 15 September 2026, according to the "
             "Open-Meteo historical weather archive (ERA5 reanalysis).",
         )
-        self.assertNotIn("12", body["content"])
-        self.assertEqual(body["verdict"], "not_verified")
-        self.assertIs(body["verified"], False)
-        self.assertEqual((body["forecast_value"], body["observed_value"], body["tolerance"]), (12.0, 3.4, 3.0))
+        self.assertNotIn("12", json.dumps(body))
+        self.assertEqual(
+            set(body), {"content", "verified", "verdict", "observed_value", "unit"}
+        )
+        self.assertEqual((body["verdict"], body["verified"], body["observed_value"]), ("not_verified", False, 3.4))
         self.assertIn("x-oathcast-request-id", headers)
         self.assertEqual((upstream.count("geocoding-api"), upstream.count("archive-api")), (1, 1))
+
+    def test_receipt_keeps_the_full_comparison(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            service = make_service(FakeUpstream(daily_value=3.4), receipt_store=store)
+            result = service.verify_forecast(CLAIM, request_id="r1")
+            receipt = store.get(result.event_id)
+        self.assertEqual(receipt["kind"], "forecast_verification")
+        self.assertEqual(
+            (receipt["verification"]["forecast_value"], receipt["verification"]["error"],
+             receipt["verification"]["tolerance"]),
+            (12.0, -8.6, 3.0),
+        )
+        self.assertEqual(receipt["question"]["intent"], "WEATHER_FORECAST_VERIFY")
 
     def test_replay_serves_the_stored_receipt(self):
         upstream = FakeUpstream()
