@@ -1,0 +1,209 @@
+# SEASON II REGISTRATION DRAFT - WEATHER_FORECAST_VERIFY, a separate Miner so
+# the registered WEATHER_FORECAST Miner (64173) keeps its registration and rank.
+# id 64174 and the slug were free in the live /api/miners catalog on
+# 2026-09-28; the official identity pre-check at registration is authoritative.
+# The route is served only when the deployment sets OATHCAST_ENABLE_VERIFY=1.
+# Uses only fields documented in the 2026-09-09 YAML reference (closed schema).
+version: "1"
+kind: miner
+id: 64174
+slug: oathcast-forecast-verify
+protocol: generic
+name: OathCast Forecast Verification
+description: >-
+  Checks whether a previously issued weather forecast verified against what was
+  actually observed at a place over a past day or window, from the Open-Meteo
+  historical weather archive (ERA5 reanalysis).
+base_url: https://oathcastcourt.duckdns.org
+
+auth:
+  type: bearer
+
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+limitations:
+  - code: MAX_PARAM_SIZE
+    message: The question parameter may be at most 1000 characters; every other parameter at most 256.
+    param: question
+    property: length
+    value_num: 1000
+    operator: lte
+
+errors:
+  message_path: error
+
+endpoints:
+  - path: /verify
+    external_path: /v1/forecast/verify
+    method: GET
+    intents: [WEATHER_FORECAST_VERIFY]
+    description: >-
+      WEATHER_FORECAST_VERIFY. Answers "Yesterday's forecast called for 12 mm of
+      rain in Lisbon: what was recorded, and did it verify?", "London's high on
+      10 September 2026 was forecast at 21°C - did it verify?" and "What was the
+      maximum wind in Chicago on 2026-09-12?". Reports the observed value for
+      the named place and past day or window from the Open-Meteo historical
+      archive, and whether the supplied forecast verified within a stated
+      tolerance (default: precipitation and snowfall within max(1, 25% of the
+      forecast); temperature within 2°C; wind within max(5 km/h, 20%)). Send
+      the whole question as `question`, and also fill the other parameters when
+      they can be read from it. A date that is today or in the future is
+      refused with HTTP 400, because it cannot be verified yet; an unknown
+      place or a day with no archive value is also a 400, never a guess.
+    params:
+      query:
+        optional:
+          - name: location
+            type: string
+            intents: ["*"]
+            description: >-
+              The place: a name ("Lisbon", "Portland, Maine"), or coordinates
+              as "lat,lon" in decimal degrees. Required unless the question
+              names the place.
+          - name: date
+            type: string
+            intents: ["*"]
+            description: >-
+              The single past day to verify, YYYY-MM-DD, in the place's local
+              calendar. Use start and end instead for a multi-day window.
+          - name: start
+            type: string
+            intents: ["*"]
+            description: First day of a past window, YYYY-MM-DD. At most 31 days with end.
+          - name: end
+            type: string
+            intents: ["*"]
+            description: Last day of a past window, YYYY-MM-DD, before today.
+          - name: variable
+            type: string
+            intents: ["*"]
+            description: >-
+              What the forecast was about. Inferred from the question when
+              omitted.
+            accepted_fields:
+              precipitation:
+                intents: ["*"]
+                description: Total precipitation in mm (rain, showers, "dry" means 0 mm).
+              snowfall:
+                intents: ["*"]
+                description: Total snowfall in cm.
+              temperature_max:
+                intents: ["*"]
+                description: Daily maximum temperature (the "high") in °C.
+              temperature_min:
+                intents: ["*"]
+                description: Daily minimum temperature (the "low" or overnight low) in °C.
+              temperature_mean:
+                intents: ["*"]
+                description: Daily mean temperature in °C.
+              wind_max:
+                intents: ["*"]
+                description: Maximum 10 m wind speed in km/h.
+          - name: forecast_value
+            type: number
+            intents: ["*"]
+            description: >-
+              The value the forecast claimed, as a number (12 for "12 mm of
+              rain", 0 for "stay dry"). Omit to report the observation only.
+          - name: unit
+            type: string
+            intents: ["*"]
+            description: >-
+              Unit of forecast_value: mm, cm, in, C, F, km/h, mph, m/s or kn.
+              Converted before comparison. Defaults to the variable's unit.
+          - name: tolerance
+            type: number
+            intents: ["*"]
+            description: Optional allowed error, in the variable's unit, overriding the default tolerance.
+          - name: question
+            type: string
+            intents: ["*"]
+            description: >-
+              The whole natural-language question, up to 1000 characters. Used
+              to fill any parameter not supplied explicitly.
+
+input_schema:
+  type: object
+  properties:
+    location:
+      type: string
+      description: Place name or "lat,lon".
+    date:
+      type: string
+      format: date
+    start:
+      type: string
+      format: date
+    end:
+      type: string
+      format: date
+    variable:
+      type: string
+      enum: [precipitation, snowfall, temperature_max, temperature_min, temperature_mean, wind_max]
+    forecast_value:
+      type: number
+    unit:
+      type: string
+    tolerance:
+      type: number
+    question:
+      type: string
+      maxLength: 1000
+
+output_schema:
+  type: object
+  properties:
+    content:
+      type: string
+      description: One sentence stating the observed value, place, day or window, and source.
+    verified:
+      type: [boolean, "null"]
+      description: Whether the supplied forecast verified; null when no forecast value was supplied.
+    verdict:
+      type: string
+      enum: [verified, not_verified, no_forecast_supplied]
+    observed_value:
+      type: number
+    unit:
+      type: string
+  required: [content, verdict, observed_value, unit]
+
+semantics:
+  signal_mapping:
+    label_field: content
+    reason_field: verdict
+  supported_intents:
+    - WEATHER_FORECAST_VERIFY
+
+on_chain:
+  transform: direct
+  min_price_usdc: 0.01
+  fields:
+    strings:
+      - index: 0
+        name: content
+        source_path: content
+        description: Observed-value sentence.
+      - index: 1
+        name: verdict
+        source_path: verdict
+        description: verified, not_verified or no_forecast_supplied.
+    bools:
+      - index: 0
+        name: verified
+        source_path: verified
+        description: True when the supplied forecast verified.
+        transform_rule: bool_from_eq:true
+  request:
+    - endpoint: verify
+      method: GET
+      query_params:
+        location: { source: strings.0 }
+        date: { source: strings.1, optional: true }
+        variable: { source: strings.2, optional: true }
+        forecast_value: { source: strings.3, optional: true }
+        unit: { source: strings.4, optional: true }
+        question: { source: strings.5, optional: true }
