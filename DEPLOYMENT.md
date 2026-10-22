@@ -14,9 +14,9 @@ details are archived under
 
 ## Current deployment status
 
-The deployed Miner is v18; stopped `oathcast-v17-rollback-20260830` is the
-immediate Miner rollback target. Caddy configuration did not change for v18 and
-remains pinned by its retained hash. The v17 and earlier sections below are
+The deployed Miner is v19 (`2026-10-22-verify-v19`); stopped
+`oathcast-v18-rollback-20261022` is the immediate Miner rollback target. Caddy
+configuration did not change for v19 and remains pinned by its retained hash. The v17 and earlier sections below are
 historical release records. The public decision UI and Application gateway are
 deployed separately in live mode as `2026-09-13-engine-ui-v1` from source
 `713aad8df5f4c7d3f199c2d6a7243577f9417ede332e94668cda5e5035c60a1d` and main
@@ -400,7 +400,40 @@ DuckDNS currently maps
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-08-30 - complete hourly weather window release (CURRENT)
+## Release 2026-10-22 - WEATHER_FORECAST_VERIFY route (CURRENT)
+
+Release v19 adds the Season II WEATHER_FORECAST_VERIFY routes,
+`/v1/forecast/verify` and `/v1/forecast/verify/details`, behind
+`OATHCAST_ENABLE_VERIFY=1`. Source is commit `fa34abb` on branch
+`s2-forecast-verify`. The registered WEATHER_FORECAST routes, registration and
+routing ID 64173, the credentials and the Caddy configuration are unchanged.
+The WFV Miner (64174) is not registered yet.
+
+- Release ID: `2026-10-22-verify-v19`
+- Source SHA-256: `aeaaf3e91f3b1742545f501270df67716b4494f4bab4f5abbf9715b7f4b1d1ff`
+  (81 files; recomputed on the host from the uploaded tar, with zero per-file
+  mismatches).
+- Image: `sha256:d7c343da5fb844f2d1e3bc4051c86e3eb763a9ebe001847f1aff677894c662e4`,
+  built on the host on v18's pinned base
+  `python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217`.
+- Runtime env: the live v18 container's variables, compared by hash and never
+  printed. `OATHCAST_IMAGE_DIGEST` is replaced and `OATHCAST_ENABLE_VERIFY=1`
+  added. The env is kept in `releases/2026-10-22-verify-v19/runtime.env` (mode
+  600). The older `releases/2026-08-30-hourly-v18/runtime.env` still holds the
+  credentials retired on 2026-08-30. Do not reuse it.
+- Pre-cutover online backup: 810/810 rows, integrity `ok`.
+- The candidate (`127.0.0.1:8081`, on a copy of the data) passed the release
+  smoke 12/12 and the verify-route checks 8/8. Production then passed both over
+  public HTTPS. The cutover took about 35 seconds, from stop to healthy.
+- The release smoke needs `fixtures/question.json`, which the image does not
+  contain. Mount it read-only at `/app/fixtures` when running
+  `scripts/smoke_miner.py` from the image.
+- Evidence: `artifacts/release-evidence/2026-10-22-verify-v19-*`. The canary
+  now pins `2026-10-22-verify-v19-runtime-evidence.json`.
+- Rollback: `docker rm -f oathcast && docker rename oathcast-v18-rollback-20261022 oathcast && docker start oathcast`.
+  v18 never writes WFV receipts, and v19 leaves existing receipts untouched.
+
+## Release 2026-08-30 - complete hourly weather window release (HISTORICAL; SUPERSEDED BY V19)
 
 Release v18 supersedes v17 as the live runtime. It retains v17's registered
 one-hour precipitation behavior, historical receipt replay, and additive
