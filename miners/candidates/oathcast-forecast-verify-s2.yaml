@@ -60,8 +60,10 @@ endpoints:
       a Retry-After estimate in seconds); HTTP 502 for an upstream failure
       (provider_unavailable, upstream_malformed). The structured account of an
       answer (claim as supplied and converted, period, resolved place and grid
-      cell, tolerance rule, source, limitations) is at
-      /v1/forecast/verify/details with the same parameters.
+      cell, tolerance rule, source, limitations) is kept in OathCast's receipt
+      and served to holders of an OathCast bearer key at
+      /v1/forecast/verify/details with the same parameters. A window that has
+      not ended in the place's own calendar is refused as window_not_finished.
     params:
       query:
         optional:

@@ -17,7 +17,8 @@ LISBON = {"name": "Lisbon", "latitude": 38.71667, "longitude": -9.13333, "countr
 class FakeUpstream:
     """Open-Meteo geocoding and archive stand-in that records every URL."""
 
-    def __init__(self, daily_value=3.4, fail=False, places=(LISBON,)):
+    def __init__(self, daily_value=3.4, fail=False, places=(LISBON,), utc_offset_seconds=3600):
+        self.utc_offset_seconds = utc_offset_seconds
         self.urls = []
         self.daily_value = daily_value
         self.fail = fail
@@ -40,6 +41,7 @@ class FakeUpstream:
             "latitude": 38.7,
             "longitude": -9.1,
             "timezone": "Europe/Lisbon",
+            "utc_offset_seconds": self.utc_offset_seconds,
             "daily_units": {"time": "iso8601", field: unit},
             "daily": {"time": days, field: [self.daily_value] * len(days)},
         }
@@ -48,14 +50,14 @@ class FakeUpstream:
         return sum(urlparse(url).netloc.startswith(host_prefix) for url in self.urls)
 
 
-def make_service(upstream, *, receipt_store=None, verify_enabled=True, require_auth=False):
+def make_service(upstream, *, receipt_store=None, verify_enabled=True, require_auth=False, now=FIXED_NOW):
     return ForecastService(
         fetcher=upstream,
         provider_order=["open_meteo"],
         receipt_store=receipt_store,
         require_auth=require_auth,
         auth_tokens=["secret-token"] if require_auth else None,
-        clock=lambda: FIXED_NOW,
+        clock=lambda: now,
         verify_enabled=verify_enabled,
     )
 
@@ -206,6 +208,25 @@ class VerifyRouteTests(unittest.TestCase):
         self.assertEqual((status, body["code"]), (422, "window_not_finished"))
         self.assertEqual(body["retry_after"], 2 * 86_400)
         self.assertEqual(headers["retry-after"], str(2 * 86_400))
+
+    def test_window_unfinished_at_the_place_is_refused(self):
+        # 00:30 UTC on 28 September is still 19:30 on the 27th in Chicago (UTC-5),
+        # and the archive would fill the rest of the 27th from forecast hours.
+        just_after_utc_midnight = datetime(2026, 9, 28, 0, 30, tzinfo=timezone.utc)
+        upstream = FakeUpstream(utc_offset_seconds=-5 * 3600)
+        service = make_service(upstream, now=just_after_utc_midnight)
+        with RunningForecastServer(service) as address:
+            status, body, headers = get(address, {**CLAIM, "date": "2026-09-27"})
+        self.assertEqual((status, body["code"]), (422, "window_not_finished"))
+        self.assertEqual(body["retry_after"], 4 * 3600 + 30 * 60)  # local midnight is 05:00 UTC
+        self.assertEqual(headers["retry-after"], str(4 * 3600 + 30 * 60))
+
+    def test_window_finished_at_the_place_is_answered(self):
+        just_after_utc_midnight = datetime(2026, 9, 28, 0, 30, tzinfo=timezone.utc)
+        service = make_service(FakeUpstream(utc_offset_seconds=3 * 3600), now=just_after_utc_midnight)
+        with RunningForecastServer(service) as address:
+            status, body, _ = get(address, {**CLAIM, "date": "2026-09-27"})
+        self.assertEqual((status, body["verdict"]), (200, "not_verified"))
 
     def test_unknown_place_is_422(self):
         with RunningForecastServer(make_service(FakeUpstream(places=()))) as address:

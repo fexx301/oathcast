@@ -1227,7 +1227,7 @@ class ForecastService:
 
         raw_payload = self._fetch_verify_json(archive_url(place, request))
         retrieved_at = self.clock().astimezone(UTC)
-        result = verify(request, parse_archive(raw_payload, place, request))
+        result = verify(request, parse_archive(raw_payload, place, request, now=retrieved_at))
         detail = result.to_dict()
         # Kept small on purpose, as with the S1 forecast response: which part
         # of the response the scorer reads is unpublished, and both the claimed

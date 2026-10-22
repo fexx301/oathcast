@@ -16,7 +16,7 @@ only build URLs and parse payloads so they can be tested offline.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 import math
 import re
 from typing import Any
@@ -45,6 +45,8 @@ MAX_WINDOW_DAYS = 31
 
 
 DAY_SECONDS = 86_400
+# The most westerly civil offset (UTC-12), assumed when the archive omits its offset.
+WESTMOST_UTC_OFFSET_SECONDS = -12 * 3600
 
 
 class VerifyError(ValueError):
@@ -547,7 +549,39 @@ def archive_url(place: Place, request: VerifyRequest) -> str:
     return f"{ARCHIVE_ENDPOINT}?{urlencode(params)}"
 
 
-def parse_archive(payload: dict[str, Any], place: Place, request: VerifyRequest) -> Observation:
+def _require_finished_locally(payload: dict[str, Any], request: VerifyRequest, now: datetime) -> None:
+    """Refuse a window that has not ended in the place's own calendar.
+
+    The archive fills days that are still in progress, even today, from
+    forecast hours. A UTC date check alone would let "yesterday" in Chicago
+    or Honolulu, asked just after UTC midnight, compare one forecast with
+    another and call it verification.
+    """
+
+    offset = payload.get("utc_offset_seconds")
+    if isinstance(offset, bool) or not isinstance(offset, (int, float)):
+        offset = WESTMOST_UTC_OFFSET_SECONDS
+    shift = timedelta(seconds=offset)
+    now_utc = now.astimezone(timezone.utc)
+    if request.end < (now_utc + shift).date():
+        return
+    window_closes = datetime.combine(request.end + timedelta(days=1), time(), tzinfo=timezone.utc) - shift
+    raise VerifyError(
+        "the window has not finished yet at this place; verification needs a past date there",
+        code="window_not_finished",
+        status=422,
+        retry_after=max(1, math.ceil((window_closes - now_utc).total_seconds())),
+    )
+
+
+def parse_archive(
+    payload: dict[str, Any], place: Place, request: VerifyRequest, *, now: datetime | None = None
+) -> Observation:
+    """Read one observation from an archive payload. With ``now``, a window
+    that has not finished in the place's local calendar is refused first."""
+
+    if now is not None:
+        _require_finished_locally(payload, request, now)
     variable = request.variable
     daily = payload.get("daily")
     if not isinstance(daily, dict):
