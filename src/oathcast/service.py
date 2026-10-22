@@ -65,6 +65,7 @@ from oathcast.render import (
 from oathcast.release import ReleaseInfo, current_release
 from oathcast.verify import (
     Place,
+    VerifyError,
     VerifyRequest,
     archive_url,
     coordinates_from_location,
@@ -2149,6 +2150,24 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 }
             )
             self._send_json(200, result.to_public_response(), headers=headers)
+        except VerifyError as exc:
+            # Machine-readable and never 2xx, so a refusal is not billed as an answer.
+            refusal: dict[str, Any] = {"error": str(exc), "code": exc.code, "request_id": request_id}
+            refusal_headers = {"X-OathCast-Request-ID": request_id}
+            if exc.retry_after is not None:
+                refusal["retry_after"] = exc.retry_after
+                refusal_headers["Retry-After"] = str(exc.retry_after)
+            if exc.status >= 500:
+                _log_request_failure("verify_upstream_malformed", request_id=request_id, path=parsed.path, error=exc)
+            else:
+                _log_request_refused(
+                    request_id=request_id,
+                    path=parsed.path,
+                    status=exc.status,
+                    reason=exc.code,
+                    query=parsed.query,
+                )
+            self._send_json(exc.status, refusal, headers=refusal_headers)
         except ForecastCutoffPassed as exc:
             _log_request_refused(
                 request_id=request_id,
@@ -2194,7 +2213,10 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 headers={"X-OathCast-Request-ID": request_id},
             )
         except ProviderUnavailable:
-            self._send_json(502, {"error": "provider_unavailable", "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
+            unavailable = {"error": "provider_unavailable", "request_id": request_id}
+            if verify_route:
+                unavailable["code"] = "provider_unavailable"
+            self._send_json(502, unavailable, headers={"X-OathCast-Request-ID": request_id})
         except ValueError as exc:
             _log_request_refused(
                 request_id=request_id,
@@ -2203,7 +2225,10 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 reason=str(exc),
                 query=parsed.query,
             )
-            self._send_json(400, {"error": str(exc), "request_id": request_id}, headers={"X-OathCast-Request-ID": request_id})
+            invalid = {"error": str(exc), "request_id": request_id}
+            if verify_route:
+                invalid["code"] = "invalid_request"
+            self._send_json(400, invalid, headers={"X-OathCast-Request-ID": request_id})
         except Exception as exc:  # noqa: BLE001 - final HTTP safety boundary
             _log_request_failure(
                 "forecast_request_failed",

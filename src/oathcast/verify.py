@@ -44,8 +44,31 @@ LIMITATIONS: tuple[str, ...] = (
 MAX_WINDOW_DAYS = 31
 
 
+DAY_SECONDS = 86_400
+
+
 class VerifyError(ValueError):
-    """Raised when a verify request cannot be answered without guessing."""
+    """Raised when a verify request cannot be answered without guessing.
+
+    ``code`` is machine-readable and ``status`` is the HTTP status the service
+    returns. Every status is non-2xx, so a refusal is never billed as an
+    answer. 400 is a request the service cannot read, 422 a readable request
+    the data cannot settle, 502 an upstream response it cannot trust.
+    ``retry_after`` (seconds, an estimate) is set when waiting may fix it.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "invalid_request",
+        status: int = 400,
+        retry_after: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.status = status
+        self.retry_after = retry_after
 
 
 @dataclass(frozen=True)
@@ -248,7 +271,7 @@ def _parse_date_text(text: str, today: date) -> list[date]:
 def _parse_date_param(value: str, today: date) -> date:
     dates = _parse_date_text(value, today)
     if not dates:
-        raise VerifyError(f"could not read a date from {value!r}; use YYYY-MM-DD")
+        raise VerifyError(f"could not read a date from {value!r}; use YYYY-MM-DD", code="invalid_date")
     return dates[0]
 
 
@@ -298,7 +321,7 @@ def _infer_variable(text: str) -> Variable:
     for pattern, key in VARIABLE_KEYWORDS:
         if re.search(pattern, lowered):
             return VARIABLES[key]
-    raise VerifyError("could not tell which weather variable the forecast was about")
+    raise VerifyError("could not tell which weather variable the forecast was about", code="variable_unknown")
 
 
 def convert(value: float, unit: str, variable: Variable) -> float:
@@ -321,7 +344,9 @@ def convert(value: float, unit: str, variable: Variable) -> float:
     try:
         return conversions[(unit, target)](value)
     except KeyError as exc:
-        raise VerifyError(f"a forecast in {unit} cannot be compared with {variable.label}") from exc
+        raise VerifyError(
+            f"a forecast in {unit} cannot be compared with {variable.label}", code="unit_incompatible"
+        ) from exc
 
 
 def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyRequest:
@@ -340,7 +365,7 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
     if not location and text:
         location = _place_from_question(text) or ""
     if not location:
-        raise VerifyError("a location (place name or 'lat,lon') is required")
+        raise VerifyError("a location (place name or 'lat,lon') is required", code="location_required")
 
     if params.get("start") or params.get("date"):
         start = _parse_date_param(params.get("start") or params["date"], today)
@@ -348,14 +373,20 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
     else:
         dates = _parse_date_text(text, today)
         if not dates:
-            raise VerifyError("a past date or window (YYYY-MM-DD) is required")
+            raise VerifyError("a past date or window (YYYY-MM-DD) is required", code="date_required")
         start, end = dates[0], dates[-1]
     if end < start:
         start, end = end, start
     if end >= today:
-        raise VerifyError("the window has not finished yet; verification needs a past date")
+        raise VerifyError(
+            "the window has not finished yet; verification needs a past date",
+            code="window_not_finished",
+            status=422,
+            # Until the day after the window ends; the archive may need longer.
+            retry_after=((end - today).days + 1) * DAY_SECONDS,
+        )
     if (end - start).days + 1 > MAX_WINDOW_DAYS:
-        raise VerifyError(f"the window may cover at most {MAX_WINDOW_DAYS} days")
+        raise VerifyError(f"the window may cover at most {MAX_WINDOW_DAYS} days", code="window_too_long")
 
     variable_param = (params.get("variable") or "").strip().lower()
     if variable_param:
@@ -369,7 +400,7 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
         try:
             forecast_value = float(params["forecast_value"])
         except ValueError as exc:
-            raise VerifyError("forecast_value must be a number") from exc
+            raise VerifyError("forecast_value must be a number", code="invalid_number") from exc
         forecast_unit = _normalise_unit(params.get("unit") or variable.unit)
     elif text:
         claim = _extract_claim(text)
@@ -381,7 +412,7 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
         try:
             tolerance = abs(float(params["tolerance"]))
         except ValueError as exc:
-            raise VerifyError("tolerance must be a number") from exc
+            raise VerifyError("tolerance must be a number", code="invalid_number") from exc
 
     return VerifyRequest(
         location=location,
@@ -404,7 +435,7 @@ def coordinates_from_location(location: str) -> tuple[float, float] | None:
         return None
     latitude, longitude = float(match["lat"]), float(match["lon"])
     if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise VerifyError("coordinates are out of range")
+        raise VerifyError("coordinates are out of range", code="coordinates_out_of_range")
     return latitude, longitude
 
 
@@ -416,7 +447,7 @@ def geocoding_url(location: str) -> str:
 def parse_geocoding(payload: dict[str, Any], location: str) -> Place:
     results = payload.get("results")
     if not isinstance(results, list) or not results:
-        raise VerifyError(f"no place called {location!r} was found")
+        raise VerifyError(f"no place called {location!r} was found", code="place_not_found", status=422)
     qualifier = ",".join(location.split(",")[1:]).strip().lower()
     chosen = results[0]
     if qualifier:
@@ -436,7 +467,7 @@ def parse_geocoding(payload: dict[str, Any], location: str) -> Place:
             admin1=chosen.get("admin1"),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise VerifyError("the geocoding result was malformed") from exc
+        raise VerifyError("the geocoding result was malformed", code="upstream_malformed", status=502) from exc
 
 
 def archive_url(place: Place, request: VerifyRequest) -> str:
@@ -455,22 +486,29 @@ def parse_archive(payload: dict[str, Any], place: Place, request: VerifyRequest)
     variable = request.variable
     daily = payload.get("daily")
     if not isinstance(daily, dict):
-        raise VerifyError("the archive response has no daily block")
+        raise VerifyError("the archive response has no daily block", code="upstream_malformed", status=502)
     times = daily.get("time")
     values = daily.get(variable.archive_field)
     if not isinstance(times, list) or not isinstance(values, list) or len(times) != len(values):
-        raise VerifyError("the archive response is missing or misaligned daily arrays")
+        raise VerifyError("the archive response is missing or misaligned daily arrays", code="upstream_malformed", status=502)
     expected = [(request.start + timedelta(days=i)).isoformat() for i in range(request.days)]
     if times != expected:
-        raise VerifyError("the archive did not return exactly the requested days")
+        raise VerifyError("the archive did not return exactly the requested days", code="upstream_malformed", status=502)
     if any(value is None for value in values):
-        raise VerifyError("the archive has no observation yet for part of this window")
+        raise VerifyError(
+            "the archive has no value yet for part of this window",
+            code="no_archive_value",
+            status=422,
+            retry_after=DAY_SECONDS,
+        )
     numbers = tuple(float(value) for value in values)
     if not all(math.isfinite(value) for value in numbers):
-        raise VerifyError("the archive returned a non-finite value")
+        raise VerifyError("the archive returned a non-finite value", code="upstream_malformed", status=502)
     unit = (payload.get("daily_units") or {}).get(variable.archive_field)
     if unit and _normalise_unit(unit) != variable.unit:
-        raise VerifyError(f"the archive reported {unit}, expected {variable.unit}")
+        raise VerifyError(
+            f"the archive reported {unit}, expected {variable.unit}", code="upstream_malformed", status=502
+        )
 
     if variable.aggregate == "sum":
         value = sum(numbers)

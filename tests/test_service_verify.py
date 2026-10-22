@@ -17,10 +17,11 @@ LISBON = {"name": "Lisbon", "latitude": 38.71667, "longitude": -9.13333, "countr
 class FakeUpstream:
     """Open-Meteo geocoding and archive stand-in that records every URL."""
 
-    def __init__(self, daily_value=3.4, fail=False):
+    def __init__(self, daily_value=3.4, fail=False, places=(LISBON,)):
         self.urls = []
         self.daily_value = daily_value
         self.fail = fail
+        self.places = list(places)
 
     def __call__(self, url):
         self.urls.append(url)
@@ -29,7 +30,7 @@ class FakeUpstream:
         parsed = urlparse(url)
         query = {key: values[0] for key, values in parse_qs(parsed.query).items()}
         if parsed.netloc.startswith("geocoding-api"):
-            return {"results": [LISBON]}
+            return {"results": self.places} if self.places else {"generationtime_ms": 0.1}
         start = date.fromisoformat(query["start_date"])
         end = date.fromisoformat(query["end_date"])
         days = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
@@ -143,29 +144,47 @@ class VerifyRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["verdict"], "verified")
 
-    def test_bad_requests_are_400(self):
+    def test_bad_requests_are_400_with_a_code(self):
         cases = [
-            {**CLAIM, "provider": "open_meteo"},  # not a verify parameter
-            {**CLAIM, "date": "2026-09-28"},  # window not finished
-            {"date": "2026-09-15", "variable": "precipitation"},  # no location
+            ({**CLAIM, "provider": "open_meteo"}, "invalid_request"),  # not a verify parameter
+            ({"date": "2026-09-15", "variable": "precipitation"}, "location_required"),
+            ({**CLAIM, "date": "15/09/2026"}, "invalid_date"),
+            ({**CLAIM, "date": ""}, "invalid_request"),  # empty parameter
+            ({**{k: v for k, v in CLAIM.items() if k != "date"}, "start": "2026-08-01", "end": "2026-09-15"},
+             "window_too_long"),
+            ({**CLAIM, "forecast_value": "lots"}, "invalid_number"),
+            ({**CLAIM, "unit": "F"}, "unit_incompatible"),
         ]
         with RunningForecastServer(make_service(FakeUpstream())) as address:
-            for params in cases:
+            for params, code in cases:
                 with self.subTest(params=params):
-                    status, body, _ = get(address, params)
-                    self.assertEqual(status, 400)
+                    status, body, headers = get(address, params)
+                    self.assertEqual((status, body["code"]), (400, code))
                     self.assertIn("error", body)
+                    self.assertNotIn("retry-after", headers)
+
+    def test_unfinished_window_says_when_to_retry(self):
+        with RunningForecastServer(make_service(FakeUpstream())) as address:
+            status, body, headers = get(address, {**CLAIM, "date": "2026-09-29"})
+        self.assertEqual((status, body["code"]), (422, "window_not_finished"))
+        self.assertEqual(body["retry_after"], 2 * 86_400)
+        self.assertEqual(headers["retry-after"], str(2 * 86_400))
+
+    def test_unknown_place_is_422(self):
+        with RunningForecastServer(make_service(FakeUpstream(places=()))) as address:
+            status, body, _ = get(address, CLAIM)
+        self.assertEqual((status, body["code"]), (422, "place_not_found"))
 
     def test_upstream_failure_is_502(self):
         with RunningForecastServer(make_service(FakeUpstream(fail=True))) as address:
             status, body, _ = get(address, CLAIM)
-        self.assertEqual((status, body["error"]), (502, "provider_unavailable"))
+        self.assertEqual((status, body["error"], body["code"]), (502, "provider_unavailable", "provider_unavailable"))
 
     def test_archive_gap_is_refused_not_zeroed(self):
         with RunningForecastServer(make_service(FakeUpstream(daily_value=None))) as address:
             status, body, _ = get(address, CLAIM)
-        self.assertEqual(status, 400)
-        self.assertIn("no observation yet", body["error"])
+        self.assertEqual((status, body["code"], body["retry_after"]), (422, "no_archive_value", 86_400))
+        self.assertIn("no value yet", body["error"])
 
     def test_authentication_applies(self):
         service = make_service(FakeUpstream(), require_auth=True)

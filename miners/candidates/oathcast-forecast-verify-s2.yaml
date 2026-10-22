@@ -51,9 +51,14 @@ endpoints:
       tolerance (default: precipitation and snowfall within max(1, 25% of the
       forecast); temperature within 2°C; wind within max(5 km/h, 20%)). Send
       the whole question as `question`, and also fill the other parameters when
-      they can be read from it. A date that is today or in the future is
-      refused with HTTP 400, because it cannot be verified yet; an unknown
-      place or a day with no archive value is also a 400, never a guess.
+      they can be read from it. Nothing is guessed: a refusal is never a 2xx and
+      carries a machine-readable `code`. HTTP 400 for a request that cannot be
+      read (location_required, date_required, invalid_date, invalid_number,
+      variable_unknown, unit_incompatible, window_too_long,
+      coordinates_out_of_range, invalid_request); HTTP 422 when the data cannot
+      settle it (place_not_found; window_not_finished and no_archive_value with
+      a Retry-After estimate in seconds); HTTP 502 for an upstream failure
+      (provider_unavailable, upstream_malformed).
     params:
       query:
         optional:
