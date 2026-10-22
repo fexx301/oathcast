@@ -1,0 +1,76 @@
+{
+  "means": {
+    "s1_533|gt_data": {
+      "A": 0.4368,
+      "B": 0.4368,
+      "D": 0.4368,
+      "C": 0.4368
+    },
+    "s1_533|gt_sentence": {
+      "A": 0.641,
+      "B": 0.641,
+      "D": 0.641,
+      "C": 0.641
+    },
+    "s1_533|gt_verdict": {
+      "A": 0.3769,
+      "B": 0.3769,
+      "D": 0.3769,
+      "C": 0.3769
+    },
+    "wf_3173|gt_data": {
+      "A": 0.0004,
+      "B": 0.0005,
+      "D": 0.0004,
+      "C": 0.0004
+    },
+    "wf_3173|gt_sentence": {
+      "A": 0.1671,
+      "B": 0.0004,
+      "D": 0.0838,
+      "C": 1.0
+    },
+    "wf_3173|gt_verdict": {
+      "A": 0.0837,
+      "B": 0.0004,
+      "D": 0.0004,
+      "C": 0.2504
+    }
+  },
+  "B": [
+    false,
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0001,
+      -0.1667,
+      -0.0833
+    ]
+  ],
+  "D": [
+    false,
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      -0.0833,
+      -0.0833
+    ]
+  ],
+  "n_per_mean": {
+    "s1_533|gt_data": 12,
+    "s1_533|gt_sentence": 12,
+    "s1_533|gt_verdict": 12,
+    "wf_3173|gt_data": 12,
+    "wf_3173|gt_sentence": 12,
+    "wf_3173|gt_verdict": 12
+  },
+  "wasm_sha256": {
+    "s1_533": "2b867f04a69eb1f88f209c7a67e81ee94f4c8ea1391004f674595cab9501ad0a",
+    "wf_3173": "202186f8a2f1639307413b0de5d7b158ce29a09b32ac1735f3a61ce6ca3516aa"
+  },
+  "generated": "2026-10-22, verify.py with details() on top of 157f6b6",
+  "decision": "Neither B nor D met the predeclared rule (champion #3173 drops 0.08-0.17); keep the compact body A and serve details from /v1/forecast/verify/details. Note: plain content text (C) scored far above any JSON body under #3173."
+}

@@ -6,7 +6,7 @@ import unittest
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from oathcast.receipts import SqliteReceiptStore
-from oathcast.service import ForecastService, VERIFY_PATH
+from oathcast.service import ForecastService, VERIFY_DETAILS_PATH, VERIFY_PATH
 from tests.test_service import RunningForecastServer, socket_get
 
 
@@ -78,7 +78,9 @@ class VerifyRouteTests(unittest.TestCase):
     def test_route_is_hidden_when_disabled(self):
         with RunningForecastServer(make_service(FakeUpstream(), verify_enabled=False)) as address:
             status, body, _ = get(address, CLAIM)
+            details_status, _, _ = socket_get(address, f"{VERIFY_DETAILS_PATH}?{urlencode(CLAIM)}", [])
         self.assertEqual((status, body), (404, {"error": "not_found"}))
+        self.assertEqual(details_status, 404)
 
     def test_answer_keeps_the_claim_out_of_the_scored_text(self):
         upstream = FakeUpstream(daily_value=3.4)
@@ -111,6 +113,41 @@ class VerifyRouteTests(unittest.TestCase):
             (12.0, -8.6, 3.0),
         )
         self.assertEqual(receipt["question"]["intent"], "WEATHER_FORECAST_VERIFY")
+
+    def test_details_route_serves_the_structured_account(self):
+        upstream = FakeUpstream(daily_value=3.4)
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            with RunningForecastServer(make_service(upstream, receipt_store=store)) as address:
+                unanswered = socket_get(address, f"{VERIFY_DETAILS_PATH}?{urlencode(CLAIM)}", [])
+                answer = get(address, CLAIM)
+                status, raw, _ = socket_get(address, f"{VERIFY_DETAILS_PATH}?{urlencode(CLAIM)}", [])
+        self.assertEqual((unanswered[0], json.loads(unanswered[1])["code"]), (404, "not_answered"))
+        self.assertEqual(upstream.count("archive-api"), 1)  # the details route never fetches the archive
+        body = json.loads(raw)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["answer"], answer[1])
+        self.assertEqual(body["receipt_sha256"], answer[2]["x-oathcast-receipt-sha256"])
+        details = body["details"]
+        self.assertEqual(details["kind"], "verification")
+        self.assertEqual(details["claim"], {"value": 12.0, "unit": "mm", "as_supplied": {"value": 12.0, "unit": "mm"}})
+        self.assertEqual(details["period"], {"start": "2026-09-15", "end": "2026-09-15", "days": 1,
+                                             "timezone": "Europe/Lisbon"})
+        self.assertEqual((details["location"]["resolved"], details["location"]["grid_latitude"]),
+                         ("Lisbon, Portugal", 38.7))
+        self.assertEqual(details["comparison"], {"error": -8.6, "tolerance": 3.0,
+                                                 "tolerance_rule": "max(1 mm, 25% of the forecast)",
+                                                 "within_tolerance": False})
+        self.assertIn("not a station measurement", details["source"]["kind"])
+        self.assertTrue(details["limitations"])
+
+    def test_details_route_requires_the_same_auth(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteReceiptStore(Path(directory) / "receipts.sqlite3")
+            service = make_service(FakeUpstream(), receipt_store=store, require_auth=True)
+            with RunningForecastServer(service) as address:
+                status, _, _ = socket_get(address, f"{VERIFY_DETAILS_PATH}?{urlencode(CLAIM)}", [])
+        self.assertEqual(status, 401)
 
     def test_replay_serves_the_stored_receipt(self):
         upstream = FakeUpstream()

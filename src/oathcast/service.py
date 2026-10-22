@@ -96,6 +96,11 @@ FORECAST_PATHS = frozenset(
 # WEATHER_FORECAST_VERIFY: opt-in, like the temperature window, so enabling it
 # is a deliberate deployment change rather than a side effect of a release.
 VERIFY_PATH = "/v1/forecast/verify"
+# The structured account behind an answer, for the same query. It is not in the
+# answer body: under the live WEATHER_FORECAST champion any JSON around the
+# sentence scored far below the sentence alone, and the details scored lowest
+# (artifacts/s2-wfv-wording/body-shape.json).
+VERIFY_DETAILS_PATH = "/v1/forecast/verify/details"
 VERIFY_INTENT = "WEATHER_FORECAST_VERIFY"
 VERIFY_ANSWER_STYLE = "observed_only"  # measured; see scripts/benchmark_verify_wording.py
 KNOWN_VERIFY_QUERY_PARAMETERS = frozenset(
@@ -1143,30 +1148,63 @@ class ForecastService:
         except Exception as exc:  # noqa: BLE001 - any upstream failure is a 502
             raise ProviderUnavailable("open_meteo archive or geocoding request failed") from exc
 
-    def verify_forecast(self, params: dict[str, str], *, request_id: str) -> ServiceVerification:
-        """Answer one WEATHER_FORECAST_VERIFY request from the historical archive.
-
-        The scored ``content`` states only what was observed; the verdict, the
-        claimed value, the error and the tolerance are structured fields. That
-        split is a measured choice: under both proxy scorers a verdict in the
-        text did not reliably help and a claimed number in the text could hurt.
-        """
-
+    def _resolve_verify_request(self, params: dict[str, str]) -> tuple[VerifyRequest, Place]:
         if not self.verify_enabled:
             raise ValueError("forecast verification is disabled")
         today = self.clock().astimezone(UTC).date()
         request = parse_verify_request(params, today=today)
         coordinates = coordinates_from_location(request.location)
         if coordinates is not None:
-            place = Place(
+            return request, Place(
                 name=f"{coordinates[0]:.4f}, {coordinates[1]:.4f}",
                 latitude=coordinates[0],
                 longitude=coordinates[1],
             )
-        else:
-            place = parse_geocoding(
-                self._fetch_verify_json(geocoding_url(request.location)), request.location
+        return request, parse_geocoding(
+            self._fetch_verify_json(geocoding_url(request.location)), request.location
+        )
+
+    def verify_details(self, params: dict[str, str]) -> dict[str, Any]:
+        """Return the stored structured account of an answered verify question.
+
+        Takes the same parameters as the verify route and never fetches the
+        archive: a question that has not been answered is a 404, not a lookup.
+        """
+
+        request, place = self._resolve_verify_request(params)
+        event_id = _verify_question(request, place)["event_id"]
+        if self.receipt_store is None:
+            raise ReceiptStoreUnavailable("details are kept only in receipts")
+        try:
+            stored = self.receipt_store.get(event_id)
+        except ReceiptTampering:
+            raise
+        except (sqlite3.Error, OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            raise ReceiptStoreUnavailable("receipt evidence is unavailable") from exc
+        if stored is None or not isinstance(stored.get("details"), dict):
+            raise VerifyError(
+                f"no answer with details is recorded for this question; ask {VERIFY_PATH} first",
+                code="not_answered",
+                status=404,
             )
+        return {
+            "event_id": event_id,
+            "receipt_sha256": stored.get("receipt_sha256"),
+            "answer": stored["public_response"],
+            "details": stored["details"],
+        }
+
+    def verify_forecast(self, params: dict[str, str], *, request_id: str) -> ServiceVerification:
+        """Answer one WEATHER_FORECAST_VERIFY request from the historical archive.
+
+        The scored ``content`` states only the historical estimate; the body
+        adds the verdict, and everything else (the claim, period, grid cell,
+        tolerance rule, source and limitations) is in the receipt and served
+        by ``verify_details``. Both splits were measured: a claimed number in
+        the text could hurt, and any extra JSON in the body did.
+        """
+
+        request, place = self._resolve_verify_request(params)
         question = _verify_question(request, place)
         event_id = question["event_id"]
 
@@ -1192,9 +1230,9 @@ class ForecastService:
         result = verify(request, parse_archive(raw_payload, place, request))
         detail = result.to_dict()
         # Kept small on purpose, as with the S1 forecast response: which part
-        # of the response the scorer reads is unpublished, and the claimed
-        # value next to the observed one measured as harmful in the text. The
-        # claim, error and tolerance live in the receipt.
+        # of the response the scorer reads is unpublished, and both the claimed
+        # value in the text and structured details in the body measured as
+        # harmful. The details live in the receipt and the details route.
         public = {
             "content": render_answer(result, VERIFY_ANSWER_STYLE),
             "verified": detail["verified"],
@@ -1214,6 +1252,7 @@ class ForecastService:
             "retrieved_at": format_timestamp(retrieved_at),
             "raw_payload": raw_payload,
             "verification": detail,
+            "details": result.details(),
             "public_response": public,
         }
         receipt["receipt_sha256"] = receipt_digest(receipt)
@@ -2036,7 +2075,7 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                 payload["ready"] = ready
             self._send_json(200 if ready else 503, payload)
             return
-        verify_route = parsed.path == VERIFY_PATH and self.service.verify_enabled
+        verify_route = parsed.path in (VERIFY_PATH, VERIFY_DETAILS_PATH) and self.service.verify_enabled
         if parsed.path not in FORECAST_PATHS and not verify_route:
             self._send_json(404, {"error": "not_found"})
             return
@@ -2092,6 +2131,13 @@ class ForecastRequestHandler(BaseHTTPRequestHandler):
                     f"request target must be at most {MAX_REQUEST_TARGET_LENGTH} characters"
                 )
             params = _parse_request_query(parsed.query)
+            if verify_route and parsed.path == VERIFY_DETAILS_PATH:
+                self._send_json(
+                    200,
+                    self.service.verify_details(_verify_params_from_query(params)),
+                    headers={"X-OathCast-Request-ID": request_id},
+                )
+                return
             if verify_route:
                 verification = self.service.verify_forecast(
                     _verify_params_from_query(params), request_id=request_id

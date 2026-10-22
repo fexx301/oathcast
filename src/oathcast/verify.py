@@ -93,6 +93,15 @@ class Variable:
             return 2.0
         return max(5.0, 0.2 * abs(forecast_value))
 
+    def tolerance_rule(self) -> str:
+        """The default tolerance above, in words."""
+
+        if self.key in {"precipitation", "snowfall"}:
+            return f"max(1 {self.unit}, 25% of the forecast)"
+        if self.key.startswith("temperature"):
+            return "±2°C"
+        return "max(5 km/h, 20% of the forecast)"
+
 
 VARIABLES: dict[str, Variable] = {
     variable.key: variable
@@ -234,6 +243,62 @@ class VerifyResult:
             "forecast_value": self.forecast_value,
             "error": self.error,
             "tolerance": self.tolerance,
+            "source": dict(ARCHIVE_SOURCE),
+            "limitations": list(LIMITATIONS),
+        }
+
+    def details(self) -> dict[str, Any]:
+        """What a consumer needs to check the answer: the claim as supplied and
+        as compared, the period, the resolved place and grid cell, the rule
+        that decided the verdict, the source and the limitations."""
+
+        obs, request, variable = self.observation, self.request, self.observation.variable
+        claim = None
+        if self.forecast_value is not None:
+            claim = {
+                "value": self.forecast_value,
+                "unit": variable.unit,
+                "as_supplied": {
+                    "value": request.forecast_value,
+                    "unit": request.forecast_unit or variable.unit,
+                },
+            }
+        comparison = None
+        if self.error is not None and self.tolerance is not None:
+            comparison = {
+                "error": self.error,  # estimate minus forecast
+                "tolerance": self.tolerance,
+                "tolerance_rule": (
+                    "supplied with the request" if request.tolerance is not None else variable.tolerance_rule()
+                ),
+                "within_tolerance": self.verdict == "verified",
+            }
+        return {
+            "kind": "lookup" if claim is None else "verification",
+            "claim": claim,
+            "period": {
+                "start": obs.start.isoformat(),
+                "end": obs.end.isoformat(),
+                "days": request.days,
+                "timezone": obs.timezone,
+            },
+            "location": {
+                "requested": request.location,
+                "resolved": obs.place.label,
+                "admin1": obs.place.admin1,
+                "latitude": obs.place.latitude,
+                "longitude": obs.place.longitude,
+                "grid_latitude": obs.grid_latitude,
+                "grid_longitude": obs.grid_longitude,
+            },
+            "variable": {
+                "key": variable.key,
+                "label": variable.label,
+                "unit": variable.unit,
+                "aggregate": variable.aggregate,
+                "daily_values": list(obs.daily_values),
+            },
+            "comparison": comparison,
             "source": dict(ARCHIVE_SOURCE),
             "limitations": list(LIMITATIONS),
         }

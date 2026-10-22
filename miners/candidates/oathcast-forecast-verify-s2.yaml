@@ -58,7 +58,10 @@ endpoints:
       coordinates_out_of_range, invalid_request); HTTP 422 when the data cannot
       settle it (place_not_found; window_not_finished and no_archive_value with
       a Retry-After estimate in seconds); HTTP 502 for an upstream failure
-      (provider_unavailable, upstream_malformed).
+      (provider_unavailable, upstream_malformed). The structured account of an
+      answer (claim as supplied and converted, period, resolved place and grid
+      cell, tolerance rule, source, limitations) is at
+      /v1/forecast/verify/details with the same parameters.
     params:
       query:
         optional:
