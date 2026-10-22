@@ -1,9 +1,11 @@
 """Forecast verification for Telegraph's WEATHER_FORECAST_VERIFY intent.
 
 A verify request supplies a previously issued forecast and a past window and
-asks whether the forecast verified against what was observed. This module
-turns such a request into one observed value from the Open-Meteo historical
-archive and compares it with the claim under a stated tolerance.
+asks whether the forecast verified against what happened. This module turns
+such a request into one value from Open-Meteo's historical weather data and
+compares it with the claim under a stated tolerance. That data is a model and
+reanalysis estimate for a grid cell (Open-Meteo's "best match" of ECMWF IFS,
+ERA5-Land and ERA5), not a station reading, and the answers say so.
 
 Like the rest of OathCast it refuses to guess: an unresolvable place, a window
 that has not finished, or an archive day with no value is an explicit outcome,
@@ -23,7 +25,22 @@ from urllib.parse import urlencode
 
 ARCHIVE_ENDPOINT = "https://archive-api.open-meteo.com/v1/archive"
 GEOCODING_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search"
-ARCHIVE_SOURCE = "Open-Meteo historical weather archive (ERA5 reanalysis)"
+# What the archive values are, stated as Open-Meteo documents them. Default
+# "best match" combines IFS HRES, ERA5 and ERA5-Land (open-meteo.com/en/docs/historical-weather-api).
+ARCHIVE_SOURCE: dict[str, str] = {
+    "provider": "Open-Meteo Historical Weather API",
+    "datasets": "best match of ECMWF IFS HRES (9 km), ERA5-Land (~11 km) and ERA5 (~25 km)",
+    "kind": "model and reanalysis estimate for a grid cell, not a station measurement",
+}
+LIMITATIONS: tuple[str, ...] = (
+    "Values are model and reanalysis estimates for the nearest grid cell, not station observations, "
+    "and can differ from a local gauge or thermometer.",
+    "The forecast is verified as supplied: OathCast does not attest when, or by whom, it was issued.",
+    "The verdict applies the stated tolerance; a different tolerance can change it.",
+    "Days are calendar days in the location's local time zone.",
+    "Recent days can be revised as the datasets update (ERA5 arrives about five days late); "
+    "OathCast replays its first answer to an identical question.",
+)
 MAX_WINDOW_DAYS = 31
 
 
@@ -163,7 +180,6 @@ class Observation:
     end: date
     value: float
     daily_values: tuple[float, ...]
-    source: str = ARCHIVE_SOURCE
 
 
 @dataclass(frozen=True)
@@ -195,7 +211,8 @@ class VerifyResult:
             "forecast_value": self.forecast_value,
             "error": self.error,
             "tolerance": self.tolerance,
-            "source": obs.source,
+            "source": dict(ARCHIVE_SOURCE),
+            "limitations": list(LIMITATIONS),
         }
 
 
@@ -516,7 +533,7 @@ def _observed_sentence(result: VerifyResult) -> str:
         measured = f"{quantity} of {total}{obs.variable.label}"
     else:
         measured = f"a {obs.variable.label} of {quantity}"
-    return f"{obs.place.label} recorded {measured} {_window(obs)}, according to the {obs.source}."
+    return f"Open-Meteo's historical weather model data estimates {measured} for {obs.place.label} {_window(obs)}."
 
 
 def _verdict_sentence(result: VerifyResult) -> str:

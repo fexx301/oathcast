@@ -202,8 +202,8 @@ class RenderTests(unittest.TestCase):
         observed = render_answer(self.result, "observed_only")
         self.assertEqual(
             observed,
-            "Lisbon, Portugal recorded 3.4 mm of precipitation on 15 September 2026, according to the "
-            "Open-Meteo historical weather archive (ERA5 reanalysis).",
+            "Open-Meteo's historical weather model data estimates 3.4 mm of precipitation for "
+            "Lisbon, Portugal on 15 September 2026.",
         )
         verdict_first = render_answer(self.result, "verdict_first")
         self.assertTrue(verdict_first.startswith("Not verified. The forecast of 12 mm did not verify, 8.6 mm too high"))
@@ -219,7 +219,8 @@ class RenderTests(unittest.TestCase):
         result = verify(request, parse_archive(archive_payload("temperature_2m_max", [19.3], "°C"), LISBON, request))
         self.assertTrue(
             render_answer(result, "observed_only").startswith(
-                "Lisbon, Portugal recorded a maximum temperature of 19.3°C on 15 September 2026"
+                "Open-Meteo's historical weather model data estimates a maximum temperature of 19.3°C "
+                "for Lisbon, Portugal on 15 September 2026"
             )
         )
 
@@ -229,6 +230,13 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(result.verdict, "no_forecast_supplied")
         self.assertEqual(render_answer(result, "verdict_first"), render_answer(result, "observed_only"))
         self.assertIsNone(result.to_dict()["verified"])
+
+    def test_answer_never_claims_a_station_measurement(self):
+        for style in ("observed_only", "verdict_first", "observed_then_verdict"):
+            self.assertNotIn("recorded", render_answer(self.result, style))
+        detail = self.result.to_dict()
+        self.assertIn("not a station measurement", detail["source"]["kind"])
+        self.assertTrue(any("does not attest when" in item for item in detail["limitations"]))
 
 
 if __name__ == "__main__":

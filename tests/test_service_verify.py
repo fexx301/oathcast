@@ -86,8 +86,8 @@ class VerifyRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(
             body["content"],
-            "Lisbon, Portugal recorded 3.4 mm of precipitation on 15 September 2026, according to the "
-            "Open-Meteo historical weather archive (ERA5 reanalysis).",
+            "Open-Meteo's historical weather model data estimates 3.4 mm of precipitation for "
+            "Lisbon, Portugal on 15 September 2026.",
         )
         self.assertNotIn("12", json.dumps(body))
         self.assertEqual(
@@ -133,7 +133,7 @@ class VerifyRouteTests(unittest.TestCase):
             status, body, _ = get(address, params)
         self.assertEqual(status, 200)
         self.assertEqual(upstream.count("geocoding-api"), 0)
-        self.assertTrue(body["content"].startswith("38.7167, -9.1333 recorded"))
+        self.assertIn("for 38.7167, -9.1333 on", body["content"])
 
     def test_question_only_request(self):
         upstream = FakeUpstream(daily_value=11.0)

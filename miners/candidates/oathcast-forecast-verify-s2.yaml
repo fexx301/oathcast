@@ -11,9 +11,10 @@ slug: oathcast-forecast-verify
 protocol: generic
 name: OathCast Forecast Verification
 description: >-
-  Checks whether a previously issued weather forecast verified against what was
-  actually observed at a place over a past day or window, from the Open-Meteo
-  historical weather archive (ERA5 reanalysis).
+  Checks whether a previously issued weather forecast verified for a place over
+  a past day or window, against Open-Meteo's historical weather data: a model and
+  reanalysis estimate for the location's grid cell (ECMWF IFS, ERA5-Land, ERA5),
+  not a station reading.
 base_url: https://oathcastcourt.duckdns.org
 
 auth:
@@ -42,11 +43,11 @@ endpoints:
     intents: [WEATHER_FORECAST_VERIFY]
     description: >-
       WEATHER_FORECAST_VERIFY. Answers "Yesterday's forecast called for 12 mm of
-      rain in Lisbon: what was recorded, and did it verify?", "London's high on
+      rain in Lisbon: how much fell, and did it verify?", "London's high on
       10 September 2026 was forecast at 21°C - did it verify?" and "What was the
-      maximum wind in Chicago on 2026-09-12?". Reports the observed value for
-      the named place and past day or window from the Open-Meteo historical
-      archive, and whether the supplied forecast verified within a stated
+      maximum wind in Chicago on 2026-09-12?". Reports Open-Meteo's historical
+      model estimate for the named place's grid cell over the past day or
+      window, and whether the supplied forecast verified within a stated
       tolerance (default: precipitation and snowfall within max(1, 25% of the
       forecast); temperature within 2°C; wind within max(5 km/h, 20%)). Send
       the whole question as `question`, and also fill the other parameters when
@@ -158,7 +159,7 @@ output_schema:
   properties:
     content:
       type: string
-      description: One sentence stating the observed value, place, day or window, and source.
+      description: One sentence stating the historical model estimate, its source, the place, and the day or window.
     verified:
       type: [boolean, "null"]
       description: Whether the supplied forecast verified; null when no forecast value was supplied.
@@ -186,7 +187,7 @@ on_chain:
       - index: 0
         name: content
         source_path: content
-        description: Observed-value sentence.
+        description: Historical-estimate sentence.
       - index: 1
         name: verdict
         source_path: verdict
