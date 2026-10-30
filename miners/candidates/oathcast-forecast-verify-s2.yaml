@@ -1,9 +1,11 @@
-# SEASON II REGISTRATION DRAFT - WEATHER_FORECAST_VERIFY, a separate Miner so
+# SEASON II REGISTRATION DRAFT - WEATHER_FORECAST_VERIFY_GENERAL, a separate Miner so
 # the registered WEATHER_FORECAST Miner (64173) keeps its registration and rank.
 # id 64174 and the slug were free in the live /api/miners catalog on
 # 2026-09-28; the official identity pre-check at registration is authoritative.
 # The route is served only when the deployment sets OATHCAST_ENABLE_VERIFY=1.
 # Uses only fields documented in the 2026-09-09 YAML reference (closed schema).
+# 2026-10-30: the live catalog renamed the Intent WEATHER_FORECAST_VERIFY_GENERAL (judgment class);
+# the testnet is now Ethereum Sepolia (chain 11155111). The chain is a registration input, not a YAML field.
 version: "1"
 kind: miner
 id: 64174
@@ -40,9 +42,9 @@ endpoints:
   - path: /verify
     external_path: /v1/forecast/verify
     method: GET
-    intents: [WEATHER_FORECAST_VERIFY]
+    intents: [WEATHER_FORECAST_VERIFY_GENERAL]
     description: >-
-      WEATHER_FORECAST_VERIFY. Answers "Yesterday's forecast called for 12 mm of
+      WEATHER_FORECAST_VERIFY_GENERAL. Answers "Yesterday's forecast called for 12 mm of
       rain in Lisbon: how much fell, and did it verify?", "London's high on
       10 September 2026 was forecast at 21°C - did it verify?" and "What was the
       maximum wind in Chicago on 2026-09-12?". Reports Open-Meteo's historical
@@ -187,7 +189,7 @@ semantics:
     label_field: content
     reason_field: verdict
   supported_intents:
-    - WEATHER_FORECAST_VERIFY
+    - WEATHER_FORECAST_VERIFY_GENERAL
 
 on_chain:
   transform: direct
