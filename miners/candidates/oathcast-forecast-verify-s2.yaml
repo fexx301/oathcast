@@ -6,6 +6,9 @@
 # Uses only fields documented in the 2026-09-09 YAML reference (closed schema).
 # 2026-10-30: the live catalog renamed the Intent WEATHER_FORECAST_VERIFY_GENERAL (judgment class);
 # the testnet is now Ethereum Sepolia (chain 11155111). The chain is a registration input, not a YAML field.
+# 2026-11-06: the Intent's request is now location + date and it scores temp_max_c (temp_min_c,
+# precipitation_mm; condition off-chain). Answers carry those fields; intent_mapping reads them by path.
+# The legacy on_chain block is dropped (jobs no longer read it).
 version: "1"
 kind: miner
 id: 64174
@@ -13,10 +16,11 @@ slug: oathcast-forecast-verify
 protocol: generic
 name: OathCast Forecast Verification
 description: >-
-  Checks whether a previously issued weather forecast verified for a place over
-  a past day or window, against Open-Meteo's historical weather data: a model and
-  reanalysis estimate for the location's grid cell (ECMWF IFS, ERA5-Land, ERA5),
-  not a station reading.
+  Recorded weather for a named place and past day: the day's high and low in
+  °C, precipitation in mm and the weather condition, from Open-Meteo's
+  historical weather data. That is a model and reanalysis estimate for the
+  location's grid cell (ECMWF IFS, ERA5-Land, ERA5), not a station reading.
+  Also checks whether a supplied forecast verified within a stated tolerance.
 base_url: https://oathcastcourt.duckdns.org
 
 auth:
@@ -44,7 +48,10 @@ endpoints:
     method: GET
     intents: [WEATHER_FORECAST_VERIFY_GENERAL]
     description: >-
-      WEATHER_FORECAST_VERIFY_GENERAL. Answers "Yesterday's forecast called for 12 mm of
+      WEATHER_FORECAST_VERIFY_GENERAL. Given only location and date (a past
+      YYYY-MM-DD day), returns that day's recorded weather: temp_max_c,
+      temp_min_c, precipitation_mm and condition, plus a one-sentence content.
+      Also answers "Yesterday's forecast called for 12 mm of
       rain in Lisbon: how much fell, and did it verify?", "London's high on
       10 September 2026 was forecast at 21°C - did it verify?" and "What was the
       maximum wind in Chicago on 2026-09-12?". Reports Open-Meteo's historical
@@ -171,18 +178,38 @@ output_schema:
   properties:
     content:
       type: string
-      description: One sentence stating the historical model estimate, its source, the place, and the day or window.
+      description: One sentence stating the historical estimate, its source, the place and the day or window.
+    location:
+      type: string
+      description: The resolved place, "name, country". Present for a place-and-day request.
+    date:
+      type: string
+      format: date
+      description: The past day answered. Present for a place-and-day request.
+    temp_max_c:
+      type: number
+      description: The day's high in °C. Present for a place-and-day request.
+    temp_min_c:
+      type: number
+      description: The day's low in °C. Present for a place-and-day request.
+    precipitation_mm:
+      type: number
+      description: The day's precipitation in mm. Present for a place-and-day request.
+    condition:
+      type: [string, "null"]
+      description: The day's most severe WMO weather condition in words; null for an unknown code.
     verified:
       type: [boolean, "null"]
-      description: Whether the supplied forecast verified; null when no forecast value was supplied.
+      description: Whether a supplied forecast verified. Present only when a forecast variable was asked.
     verdict:
       type: string
       enum: [verified, not_verified, no_forecast_supplied]
     observed_value:
       type: number
+      description: The asked variable's value. Present only when a forecast variable was asked.
     unit:
       type: string
-  required: [content, verdict, observed_value, unit]
+  required: [content, verdict]
 
 semantics:
   signal_mapping:
@@ -191,32 +218,29 @@ semantics:
   supported_intents:
     - WEATHER_FORECAST_VERIFY_GENERAL
 
-on_chain:
-  transform: direct
-  min_price_usdc: 0.01
-  fields:
-    strings:
-      - index: 0
-        name: content
-        source_path: content
-        description: Historical-estimate sentence.
-      - index: 1
-        name: verdict
-        source_path: verdict
-        description: verified, not_verified or no_forecast_supplied.
-    bools:
-      - index: 0
-        name: verified
-        source_path: verified
-        description: True when the supplied forecast verified.
-        transform_rule: bool_from_eq:true
-  request:
-    - endpoint: verify
-      method: GET
-      query_params:
-        location: { source: strings.0 }
-        date: { source: strings.1, optional: true }
-        variable: { source: strings.2, optional: true }
-        forecast_value: { source: strings.3, optional: true }
-        unit: { source: strings.4, optional: true }
-        question: { source: strings.5, optional: true }
+intent_mapping:
+  WEATHER_FORECAST_VERIFY_GENERAL:
+    endpoint: /verify
+    input:
+      location:
+        from: location
+        how: The requested place, verbatim (a name such as "Portland, Maine", or "lat,lon").
+      date:
+        from: date
+        how: The requested past day as YYYY-MM-DD, verbatim; never today or a future day.
+    output:
+      location:
+        path: location
+      date:
+        path: date
+      condition:
+        path: condition
+      temp_max_c:
+        path: temp_max_c
+        unit: degrees Celsius
+      temp_min_c:
+        path: temp_min_c
+        unit: degrees Celsius
+      precipitation_mm:
+        path: precipitation_mm
+        unit: mm
