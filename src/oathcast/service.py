@@ -73,7 +73,9 @@ from oathcast.verify import (
     parse_archive,
     parse_geocoding,
     parse_verify_request,
+    recorded_day_fields,
     render_answer,
+    render_recorded_day,
     verify,
 )
 
@@ -551,6 +553,8 @@ def _verify_question(request: VerifyRequest, place: Place) -> dict[str, Any]:
         "forecast_unit": request.forecast_unit,
         "tolerance": request.tolerance,
     }
+    if request.recorded_day:  # only when set, so earlier questions keep their event ids
+        question["recorded_day"] = True
     digest = hashlib.sha256(
         json.dumps(question, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -1240,6 +1244,16 @@ class ForecastService:
             "observed_value": detail["observed_value"],
             "unit": detail["unit"],
         }
+        if request.recorded_day:
+            day = recorded_day_fields(raw_payload)
+            public = {
+                "content": render_recorded_day(result.observation, day),
+                "location": result.observation.place.label,
+                "date": request.start.isoformat(),
+                **day,
+                "verdict": detail["verdict"],
+            }
+            detail["recorded_day"] = day
         if self.receipt_store is None:
             return ServiceVerification(event_id, public, request_id)
 

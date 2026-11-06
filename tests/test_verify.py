@@ -108,6 +108,20 @@ class ParseRequestTests(unittest.TestCase):
         with self.assertRaises(VerifyError):
             parse_verify_request({"location": "Lisbon", "variable": "precipitation"}, today=TODAY)
 
+    def test_place_and_one_day_alone_is_a_recorded_day(self):
+        request = parse_verify_request({"location": "Lisbon", "date": "2026-09-15"}, today=TODAY)
+        self.assertTrue(request.recorded_day)
+        for params in (
+            {"location": "Lisbon", "start": "2026-09-14", "end": "2026-09-15"},  # a window still needs a variable
+            {"location": "Lisbon", "date": "2026-09-15", "forecast_value": "12"},  # a claim needs a variable
+        ):
+            with self.subTest(params=params), self.assertRaises(VerifyError) as caught:
+                parse_verify_request(params, today=TODAY)
+            self.assertEqual(caught.exception.code, "variable_unknown")
+        self.assertFalse(
+            parse_verify_request({"location": "Lisbon", "date": "2026-09-15", "variable": "rain"}, today=TODAY).recorded_day
+        )
+
     def test_no_claim_is_allowed(self):
         request = parse_verify_request({"location": "Lisbon", "date": "2026-09-15", "variable": "wind"}, today=TODAY)
         self.assertEqual(request.variable.key, "wind_max")

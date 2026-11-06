@@ -42,6 +42,23 @@ LIMITATIONS: tuple[str, ...] = (
     "OathCast replays its first answer to an identical question.",
 )
 MAX_WINDOW_DAYS = 31
+# Archive field -> (answer field, unit) for a recorded-day answer.
+RECORDED_DAY_FIELDS: dict[str, tuple[str, str]] = {
+    "temperature_2m_max": ("temp_max_c", "°C"),
+    "temperature_2m_min": ("temp_min_c", "°C"),
+    "precipitation_sum": ("precipitation_mm", "mm"),
+    "weather_code": ("condition", "wmo code"),
+}
+# WMO weather interpretation codes, as Open-Meteo documents them; the daily code is the day's most severe.
+WMO_CONDITIONS: dict[int, str] = {
+    0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 48: "depositing rime fog",
+    51: "light drizzle", 53: "moderate drizzle", 55: "dense drizzle", 56: "light freezing drizzle",
+    57: "dense freezing drizzle", 61: "slight rain", 63: "moderate rain", 65: "heavy rain",
+    66: "light freezing rain", 67: "heavy freezing rain", 71: "slight snow", 73: "moderate snow",
+    75: "heavy snow", 77: "snow grains", 80: "slight rain showers", 81: "moderate rain showers",
+    82: "violent rain showers", 85: "slight snow showers", 86: "heavy snow showers", 95: "thunderstorm",
+    96: "thunderstorm with slight hail", 99: "thunderstorm with heavy hail",
+}
 
 
 DAY_SECONDS = 86_400
@@ -197,6 +214,9 @@ class VerifyRequest:
     forecast_unit: str | None
     tolerance: float | None
     question: str | None = None
+    # The Intent's own request: a place and one past day, no variable or claim.
+    # Answered with the whole recorded day (high, low, precipitation, condition).
+    recorded_day: bool = False
 
     @property
     def days(self) -> int:
@@ -456,10 +476,17 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
         raise VerifyError(f"the window may cover at most {MAX_WINDOW_DAYS} days", code="window_too_long")
 
     variable_param = (params.get("variable") or "").strip().lower()
+    recorded_day = False
     if variable_param:
         variable = VARIABLES.get(variable_param) or _infer_variable(variable_param)
     else:
-        variable = _infer_variable(text)
+        try:
+            variable = _infer_variable(text)
+        except VerifyError:
+            has_claim = params.get("forecast_value") not in (None, "") or (text and _extract_claim(text))
+            if start != end or has_claim:
+                raise
+            variable, recorded_day = VARIABLES["temperature_max"], True
 
     forecast_value: float | None = None
     forecast_unit: str | None = None
@@ -490,6 +517,7 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
         forecast_unit=forecast_unit,
         tolerance=tolerance,
         question=question,
+        recorded_day=recorded_day,
     )
 
 
@@ -543,7 +571,7 @@ def archive_url(place: Place, request: VerifyRequest) -> str:
         "longitude": f"{place.longitude:.4f}",
         "start_date": request.start.isoformat(),
         "end_date": request.end.isoformat(),
-        "daily": request.variable.archive_field,
+        "daily": ",".join(RECORDED_DAY_FIELDS) if request.recorded_day else request.variable.archive_field,
         "timezone": "auto",
     }
     return f"{ARCHIVE_ENDPOINT}?{urlencode(params)}"
@@ -627,6 +655,43 @@ def parse_archive(
         end=request.end,
         value=round(value, 2),
         daily_values=numbers,
+    )
+
+
+def recorded_day_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """The whole recorded day from an archive payload already checked by parse_archive.
+
+    A missing number is refused, never zeroed; an unknown weather code leaves
+    condition null rather than guessing a word for it.
+    """
+
+    daily, units = payload.get("daily") or {}, payload.get("daily_units") or {}
+    out: dict[str, Any] = {}
+    for archive_field, (name, unit) in RECORDED_DAY_FIELDS.items():
+        values = daily.get(archive_field)
+        if not isinstance(values, list) or len(values) != 1:
+            raise VerifyError(f"the archive response has no single {archive_field} value", code="upstream_malformed", status=502)
+        value = values[0]
+        if name == "condition":
+            out[name] = WMO_CONDITIONS.get(int(value)) if isinstance(value, (int, float)) else None
+            continue
+        if value is None:
+            raise VerifyError("the archive has no value yet for this day", code="no_archive_value", status=422, retry_after=DAY_SECONDS)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise VerifyError("the archive returned a non-numeric value", code="upstream_malformed", status=502)
+        reported = units.get(archive_field)
+        if reported and _normalise_unit(reported) != unit:
+            raise VerifyError(f"the archive reported {reported}, expected {unit}", code="upstream_malformed", status=502)
+        out[name] = round(float(value), 2)
+    return out
+
+
+def render_recorded_day(observation: Observation, fields: dict[str, Any]) -> str:
+    condition = f" ({fields['condition']})" if fields.get("condition") else ""
+    return (
+        f"Open-Meteo's historical weather model data estimates a high of {_number(fields['temp_max_c'])}°C, "
+        f"a low of {_number(fields['temp_min_c'])}°C and {_number(fields['precipitation_mm'])} mm of precipitation "
+        f"for {observation.place.label} {_window(observation)}{condition}."
     )
 
 

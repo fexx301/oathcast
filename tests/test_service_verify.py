@@ -23,6 +23,7 @@ class FakeUpstream:
         self.daily_value = daily_value
         self.fail = fail
         self.places = list(places)
+        self.weather_code = 61
 
     def __call__(self, url):
         self.urls.append(url)
@@ -35,15 +36,21 @@ class FakeUpstream:
         start = date.fromisoformat(query["start_date"])
         end = date.fromisoformat(query["end_date"])
         days = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
-        field = query["daily"]
-        unit = "°C" if "temperature" in field else "km/h" if "wind" in field else "mm"
+        fields = query["daily"].split(",")
+
+        def unit(field):
+            return "°C" if "temperature" in field else "km/h" if "wind" in field else "wmo code" if "code" in field else "mm"
+
+        def value(field):
+            return self.weather_code if field == "weather_code" else self.daily_value
+
         return {
             "latitude": 38.7,
             "longitude": -9.1,
             "timezone": "Europe/Lisbon",
             "utc_offset_seconds": self.utc_offset_seconds,
-            "daily_units": {"time": "iso8601", field: unit},
-            "daily": {"time": days, field: [self.daily_value] * len(days)},
+            "daily_units": {"time": "iso8601", **{f: unit(f) for f in fields}},
+            "daily": {"time": days, **{f: [value(f)] * len(days) for f in fields}},
         }
 
     def count(self, host_prefix):
@@ -182,6 +189,37 @@ class VerifyRouteTests(unittest.TestCase):
             status, body, _ = get(address, params)
         self.assertEqual(status, 200)
         self.assertEqual(body["verdict"], "verified")
+
+    def test_place_and_date_alone_get_the_recorded_day(self):
+        """The Intent's request is only location and date; the answer carries its scored fields."""
+        upstream = FakeUpstream(daily_value=3.4)
+        with RunningForecastServer(make_service(upstream)) as address:
+            status, body, _ = get(address, {"location": "Lisbon", "date": "2026-09-15"})
+            again, replay, _ = get(address, {"location": "Lisbon", "date": "2026-09-15"})
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            body,
+            {
+                "content": "Open-Meteo's historical weather model data estimates a high of 3.4°C, a low of 3.4°C "
+                "and 3.4 mm of precipitation for Lisbon, Portugal on 15 September 2026 (slight rain).",
+                "location": "Lisbon, Portugal",
+                "date": "2026-09-15",
+                "temp_max_c": 3.4,
+                "temp_min_c": 3.4,
+                "precipitation_mm": 3.4,
+                "condition": "slight rain",
+                "verdict": "no_forecast_supplied",
+            },
+        )
+        self.assertEqual((again, replay), (200, body))
+        archive = [u for u in upstream.urls if "archive-api" in u][0]
+        self.assertIn("daily=temperature_2m_max%2Ctemperature_2m_min%2Cprecipitation_sum%2Cweather_code", archive)
+
+    def test_recorded_day_refuses_a_missing_value(self):
+        upstream = FakeUpstream(daily_value=None)
+        with RunningForecastServer(make_service(upstream)) as address:
+            status, body, _ = get(address, {"location": "Lisbon", "date": "2026-09-15"})
+        self.assertEqual((status, body["code"]), (422, "no_archive_value"))
 
     def test_bad_requests_are_400_with_a_code(self):
         cases = [
