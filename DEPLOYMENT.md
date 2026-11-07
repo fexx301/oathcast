@@ -14,9 +14,9 @@ details are archived under
 
 ## Current deployment status
 
-The deployed Miner is v19 (`2026-10-22-verify-v19`); stopped
-`oathcast-v18-rollback-20261022` is the immediate Miner rollback target. Caddy
-configuration did not change for v19 and remains pinned by its retained hash. The v17 and earlier sections below are
+The deployed Miner is v20 (`2026-11-07-verify-v20`; previously v19 `2026-10-22-verify-v19`); stopped
+`oathcast-v19-rollback-20261107` is the immediate Miner rollback target. Caddy
+configuration did not change for v19 or v20 and remains pinned by its retained hash. The v17 and earlier sections below are
 historical release records. The public decision UI and Application gateway are
 deployed separately in live mode as `2026-09-13-engine-ui-v1` from source
 `713aad8df5f4c7d3f199c2d6a7243577f9417ede332e94668cda5e5035c60a1d` and main
@@ -400,7 +400,39 @@ DuckDNS currently maps
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-10-22 - WEATHER_FORECAST_VERIFY route (CURRENT)
+## Release 2026-11-07 - WFV recorded-day answer (CURRENT)
+
+Release v20 answers WEATHER_FORECAST_VERIFY_GENERAL's current request (only
+`location` and a past `date`) with the recorded day: `temp_max_c`,
+`temp_min_c`, `precipitation_mm`, `condition`, `location`, `date` and a
+one-sentence `content`. Before this, that request was refused as
+`variable_unknown`. Claim and verify requests are unchanged, and earlier
+questions keep their receipt event ids. Source is commit `c051cdb` on branch
+`s2-wfv-recorded-day`. Registration 64173, the credentials and Caddy are
+unchanged. The WFV Miner (64174) is not registered yet.
+
+- Release ID: `2026-11-07-verify-v20`
+- Source SHA-256: `c56883e060a82720cbb8b228bf9639c9e8a1c5c61263c82b4f69f93df930281d`
+  (81 files, recomputed on the host from the uploaded tar; tar SHA-256
+  `51f5c6c9…0c08173`).
+- Image: `sha256:4817f5a283f97976ccd2728a402dfa0c87212663cbb108372faa937a549cef64`,
+  built on the host on the same pinned base as v18 and v19.
+- Runtime env: v19's `runtime.env` with only `OATHCAST_IMAGE_DIGEST` replaced
+  (same keys, never printed), kept in `releases/2026-11-07-verify-v20/runtime.env`
+  (mode 600).
+- Online backups: 916/916 rows before the candidate and at cutover, integrity
+  `ok` both times.
+- The candidate (`127.0.0.1:8081`, on a copy of the data) passed the release
+  smoke 10/10, the v19 verify checks 8/8 and the recorded-day checks 4/4.
+  Production then passed all three over public HTTPS. The cutover took 43
+  seconds, from 07:29:17Z to 07:30:00Z.
+- The temporary SSH rule (`sgr-0f1ac37fc8e933a45`, one /32) was revoked after
+  the release. Only 80 and 443 remain open.
+- Evidence: `artifacts/release-evidence/2026-11-07-verify-v20-*`.
+- Rollback: `docker rm -f oathcast && docker rename oathcast-v19-rollback-20261107 oathcast && docker start oathcast`.
+  v19 refuses recorded-day questions; it replays every other receipt.
+
+## Release 2026-10-22 - WEATHER_FORECAST_VERIFY route (HISTORICAL; SUPERSEDED BY V20)
 
 Release v19 adds the Season II WEATHER_FORECAST_VERIFY routes,
 `/v1/forecast/verify` and `/v1/forecast/verify/details`, behind
