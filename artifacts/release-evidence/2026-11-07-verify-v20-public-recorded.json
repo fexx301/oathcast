@@ -1,0 +1,36 @@
+{
+ "base_url": "https://oathcastcourt.duckdns.org",
+ "ok": true,
+ "checks": [
+  {
+   "name": "recorded_day_200",
+   "ok": true,
+   "status": 200,
+   "body": {
+    "condition": "overcast",
+    "content": "Open-Meteo's historical weather model data estimates a high of 19.8°C, a low of 12.3°C and 0 mm of precipitation for London, United Kingdom on 20 September 2026 (overcast).",
+    "date": "2026-09-20",
+    "location": "London, United Kingdom",
+    "precipitation_mm": 0.0,
+    "temp_max_c": 19.8,
+    "temp_min_c": 12.3,
+    "verdict": "no_forecast_supplied"
+   }
+  },
+  {
+   "name": "recorded_day_replay_identical",
+   "ok": true,
+   "status": 200
+  },
+  {
+   "name": "window_without_variable_400",
+   "ok": true,
+   "status": 400
+  },
+  {
+   "name": "no_auth_401",
+   "ok": true,
+   "status": 401
+  }
+ ]
+}
