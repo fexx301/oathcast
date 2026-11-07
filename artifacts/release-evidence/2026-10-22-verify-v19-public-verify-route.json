@@ -1,0 +1,73 @@
+{
+ "base_url": "https://oathcastcourt.duckdns.org",
+ "ok": true,
+ "checks": [
+  {
+   "name": "verify_200",
+   "ok": true,
+   "status": 200,
+   "body": {
+    "content": "Open-Meteo's historical weather model data estimates 0 mm of precipitation for Lisbon, Portugal on 15 September 2026.",
+    "observed_value": 0.0,
+    "unit": "mm",
+    "verdict": "not_verified",
+    "verified": false
+   }
+  },
+  {
+   "name": "verify_replay_identical",
+   "ok": true,
+   "status": 200
+  },
+  {
+   "name": "details_200",
+   "ok": true,
+   "status": 200,
+   "details_keys": [
+    "claim",
+    "comparison",
+    "kind",
+    "limitations",
+    "location",
+    "period",
+    "source",
+    "variable"
+   ]
+  },
+  {
+   "name": "future_422_retry",
+   "ok": true,
+   "status": 422,
+   "code": "window_not_finished"
+  },
+  {
+   "name": "unknown_param_400_code",
+   "ok": true,
+   "status": 400,
+   "code": "invalid_request"
+  },
+  {
+   "name": "no_auth_401",
+   "ok": true,
+   "status": 401
+  },
+  {
+   "name": "question_only_200",
+   "ok": true,
+   "status": 200,
+   "body": {
+    "content": "Open-Meteo's historical weather model data estimates a maximum temperature of 25.7°C for Tokyo, Japan on 5 September 2026.",
+    "observed_value": 25.7,
+    "unit": "°C",
+    "verdict": "not_verified",
+    "verified": false
+   }
+  },
+  {
+   "name": "details_unanswered_404",
+   "ok": true,
+   "status": 404,
+   "code": "not_answered"
+  }
+ ]
+}

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-22T16:49:38Z",
+  "release_id": "2026-10-22-verify-v19",
+  "source_sha256": "aeaaf3e91f3b1742545f501270df67716b4494f4bab4f5abbf9715b7f4b1d1ff",
+  "source_verification": {
+    "build_root": "/home/ec2-user/oathcast/releases/2026-10-22-verify-v19/source-clean",
+    "source_tar_sha256": "1cd674d20e4aef3bb853a02d9dafd8ab61076a600d558080a934ea3867a31517",
+    "source_tar_bytes": 1044480,
+    "file_count": 81,
+    "expected_source_sha256": "aeaaf3e91f3b1742545f501270df67716b4494f4bab4f5abbf9715b7f4b1d1ff",
+    "host_recomputed_source_sha256": "aeaaf3e91f3b1742545f501270df67716b4494f4bab4f5abbf9715b7f4b1d1ff",
+    "per_file_mismatches": 0,
+    "manifest_path": "artifacts/release-evidence/2026-10-22-verify-v19-manifest.json",
+    "manifest_file_sha256": "20a9f08bd3a8631dbf1a10e340f7f5b023d3c9c587491b8842714b528e290c5b",
+    "git_commit": "fa34abb (branch s2-forecast-verify)",
+    "verified": true
+  },
+  "image": {
+    "name": "oathcast:2026-10-22-verify-v19",
+    "image_id": "sha256:d7c343da5fb844f2d1e3bc4051c86e3eb763a9ebe001847f1aff677894c662e4",
+    "image_digest": "sha256:d7c343da5fb844f2d1e3bc4051c86e3eb763a9ebe001847f1aff677894c662e4",
+    "base_image_reference": "docker.io/library/python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217",
+    "labels": {
+      "org.opencontainers.image.title": "OathCast Miner",
+      "org.opencontainers.image.version": "2026-10-22-verify-v19",
+      "org.opencontainers.image.revision": "aeaaf3e91f3b1742545f501270df67716b4494f4bab4f5abbf9715b7f4b1d1ff"
+    }
+  },
+  "runtime": {
+    "public_base_url": "https://oathcastcourt.duckdns.org",
+    "container": "oathcast",
+    "status": "running",
+    "port_binding": "127.0.0.1:8080:8080",
+    "receipt_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+    "restart_policy": "unless-stopped",
+    "user": "1000:1000",
+    "env_names": [
+      "OATHCAST_MINER_API_KEY",
+      "OATHCAST_MINER_API_KEYS",
+      "OATHCAST_ENABLE_TEMPERATURE_WINDOW",
+      "OATHCAST_REQUIRE_AUTH",
+      "OATHCAST_IMAGE_DIGEST",
+      "OATHCAST_ENABLE_VERIFY"
+    ],
+    "credentials": "unchanged from the live v18 container (compared by hash only)",
+    "verify_enabled": true,
+    "rollback_container": "oathcast-v18-rollback-20261022",
+    "candidate_container": "oathcast-v19-candidate-20261022 (stopped after evidence capture)",
+    "cutover_started": "2026-10-22T16:48:55Z",
+    "cutover_healthy": "2026-10-22T16:49:38Z"
+  },
+  "edge": {
+    "caddy_image_id": "sha256:af555904a0961945f16bb323a501457b13a4f7e9bde969b145b97da80b38ecbe",
+    "caddyfile_sha256": "29495257def97638a8d14e92d593320f3124d1effff1f7e8a62b58864d4406a1",
+    "config_changed": false,
+    "verify_routing": "existing @miner matcher /v1/* reaches /v1/forecast/verify and /v1/forecast/verify/details"
+  },
+  "verification": {
+    "candidate_release_smoke": "12/12",
+    "candidate_verify_route": "8/8",
+    "public_release_smoke": "12/12",
+    "public_verify_route": "8/8"
+  },
+  "database": {
+    "pre_cutover_backup": {
+      "table": "forecast_receipts",
+      "source_rows": 810,
+      "backup_rows": 810,
+      "integrity": "ok",
+      "backup_sha256": "e2f3dcc3c07909f6c4dec8427f43506b8024235f0c22e130f5e8e7264bf4fa7f"
+    },
+    "candidate_used_copy": true
+  },
+  "evidence": {
+    "manifest": "artifacts/release-evidence/2026-10-22-verify-v19-manifest.json",
+    "candidate_smoke": "artifacts/release-evidence/2026-10-22-verify-v19-candidate-smoke.json",
+    "candidate_verify": "artifacts/release-evidence/2026-10-22-verify-v19-candidate-verify-route.json",
+    "public_smoke": "artifacts/release-evidence/2026-10-22-verify-v19-public-smoke.json",
+    "public_verify": "artifacts/release-evidence/2026-10-22-verify-v19-public-verify-route.json",
+    "receipt_backup": "artifacts/release-evidence/2026-10-22-verify-v19-receipt-backup.json"
+  },
+  "evidence_capture_sha256": {
+    "manifest": "20a9f08bd3a8631dbf1a10e340f7f5b023d3c9c587491b8842714b528e290c5b",
+    "candidate_smoke": "ae85856a3bc6a04166c36dd3239df00105afba4abe9bebbe84be259c72351a68",
+    "candidate_verify": "0f00aa8446c9af835195427abf8d8495320220f7df17d424451065e7d02d45e1",
+    "public_smoke": "96609c48cdd8566c2c2d6315477fe2ee9fdf2aac7d225946d86d165addaeafca",
+    "public_verify": "d13d554c55874366fce899133049f6190841bf24a50fe07b80f17ba7f554377c",
+    "receipt_backup": "076b5897d30fb1b0ad46b89b73633e2c60fca940c45620359ec63bdecc1e7ef5"
+  },
+  "scope": "Adds WEATHER_FORECAST_VERIFY (/v1/forecast/verify and /details) behind OATHCAST_ENABLE_VERIFY=1. The registered WEATHER_FORECAST routes and registration 64173 are unchanged; the WFV miner (64174) is not registered yet."
+}
