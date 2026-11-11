@@ -157,8 +157,10 @@ export async function escrowAsk(options: AskOptions): Promise<AskOutcome> {
     throw new OutcomeUnknown(`paid request did not complete: ${(error as Error).message}`, authorization.nonce);
   }
   const receipt = decodeReceipt(paid.headers.get("X-PAYMENT-RESPONSE"));
-  if (paid.status >= 200 && paid.status < 300 && paidBody && typeof paidBody === "object") {
-    return { kind: "served", status: paid.status, body: paidBody as Json, receipt, nonce: authorization.nonce };
+  // A 2xx with an object body, or any 2xx carrying a receipt, was billed.
+  const isObject = Boolean(paidBody) && typeof paidBody === "object" && !Array.isArray(paidBody);
+  if (paid.status >= 200 && paid.status < 300 && (isObject || receipt)) {
+    return { kind: "served", status: paid.status, body: isObject ? (paidBody as Json) : {}, receipt, nonce: authorization.nonce };
   }
   return { kind: "paid_refusal", status: paid.status, reason: reasonOf(paidBody, `status ${paid.status}`), nonce: authorization.nonce };
 }

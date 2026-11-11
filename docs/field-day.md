@@ -39,7 +39,8 @@ weather through Telegraph and says whether the weather window held.
 - **Signer pin.** The service refuses to start if the key doesn't match
   `OATHCAST_S2_ESCROW_ADDRESS`.
 - **Caps.** 40 calls in total, 12 per UTC day and 4 per IP per hour. Paid
-  calls run one at a time.
+  calls run one at a time. The per-IP cap applies to our own follow-up runs too
+  (about 4 an hour from one address).
 - **Ledger rows.** An attempt row is written before the paid request leaves,
   so a crash or timeout is counted as possibly charged and is never resent.
   The ledger holds no IP addresses.
@@ -65,6 +66,9 @@ The service runs from the payment-canary image as a separate container, so the
 reviewed Solana sidecar is untouched.
 
 ```bash
+# The env file must be plain KEY=value (docker keeps quotes and "export" literally). Expect 1 and 1:
+grep -cE '^OATHCAST_S2_ESCROW_PRIVATE_KEY=0x[0-9a-fA-F]{64}$' ~/oathcast-live-secrets/s2-escrow-wallet.env
+grep -cE '^OATHCAST_S2_ESCROW_ADDRESS=0x[0-9a-fA-F]{40}$' ~/oathcast-live-secrets/s2-escrow-wallet.env
 docker build -f payment-canary/Dockerfile -t oathcast-field-day:2026-11-10 .
 mkdir -p ~/oathcast-live-state/field-day && sudo chown 1000:1000 ~/oathcast-live-state/field-day
 docker run -d --name oathcast-field-day --restart unless-stopped \
@@ -79,10 +83,21 @@ Then update Caddy. Never `mv` over the bind-mounted Caddyfile; see
 DEPLOYMENT.md:
 
 ```bash
+cp Caddyfile Caddyfile.pre-field-day-20261111          # backup
 cat Caddyfile.new > Caddyfile
+docker exec oathcast-caddy grep -c field-day /etc/caddy/Caddyfile   # the mount sees it
 docker exec oathcast-caddy caddy validate --config /etc/caddy/Caddyfile
 docker exec oathcast-caddy caddy reload --config /etc/caddy/Caddyfile
+# Public checks: the Miner still answers and the app is reachable.
+curl -s -o /dev/null -w '%{http_code}\n' https://oathcastcourt.duckdns.org/healthz      # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://oathcastcourt.duckdns.org/readyz       # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://oathcastcourt.duckdns.org/field-day    # 200
+# Rollback: cat Caddyfile.pre-field-day-20261111 > Caddyfile && docker exec oathcast-caddy caddy reload --config /etc/caddy/Caddyfile
 ```
+
+The public canary checks only the Miner's reported release identity, not the
+Caddyfile, so this change needs no canary repin. The release evidence's
+`caddyfile_sha256` will be stale until the next Miner release records it.
 
 ## Honest accounting
 

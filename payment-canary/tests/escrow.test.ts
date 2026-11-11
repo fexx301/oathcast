@@ -93,6 +93,15 @@ describe("escrowAsk", () => {
     expect(out).toMatchObject({ kind: "paid_refusal", status: 402 });
   });
 
+  it("counts a 2xx with a receipt as served even when the body isn't an object", async () => {
+    let calls = 0;
+    const receipt = Buffer.from(JSON.stringify({ receipt_hash: "0x1", miner: "9" })).toString("base64");
+    const fetchFn = (async () =>
+      ++calls === 1 ? json(402, challenge()) : new Response("plain text", { status: 200, headers: { "X-PAYMENT-RESPONSE": receipt } })) as unknown as typeof fetch;
+    const out = await escrowAsk({ node: "https://node.test", signer: account, body: {}, fetchFn });
+    expect(out).toMatchObject({ kind: "served", receipt: { receipt_hash: "0x1" } });
+  });
+
   it("turns a dropped paid request into OutcomeUnknown", async () => {
     let calls = 0;
     const fetchFn = (async () => {
