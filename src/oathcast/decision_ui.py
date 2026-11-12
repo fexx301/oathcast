@@ -1244,7 +1244,7 @@ def _render_interactive_page(*, mode: str) -> str:
         microsecond=0,
     )
     hour_options = "".join(
-        f'<option value="{hour:02d}"{' selected' if hour == planned.hour else ''}>{hour:02d}:00</option>'
+        f'<option value="{hour:02d}"{" selected" if hour == planned.hour else ""}>{hour:02d}:00</option>'
         for hour in range(24)
     )
     page = """<!doctype html>
