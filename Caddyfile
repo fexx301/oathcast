@@ -49,6 +49,20 @@ oathcastcourt.duckdns.org {
         }
     }
 
+    # Field-day review app (S2 consumer app); its own loopback service.
+    handle /field-day* {
+        request_body {
+            max_size 8KB
+        }
+        reverse_proxy 127.0.0.1:8791 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 90s
+            }
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
     handle {
         request_body {
             max_size 64KB

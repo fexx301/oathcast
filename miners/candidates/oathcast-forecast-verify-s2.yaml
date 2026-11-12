@@ -1,0 +1,246 @@
+# SEASON II REGISTRATION DRAFT - WEATHER_FORECAST_VERIFY_GENERAL, a separate Miner so
+# the registered WEATHER_FORECAST Miner (64173) keeps its registration and rank.
+# id 64174 and the slug were free in the live /api/miners catalog on
+# 2026-09-28; the official identity pre-check at registration is authoritative.
+# The route is served only when the deployment sets OATHCAST_ENABLE_VERIFY=1.
+# Uses only fields documented in the 2026-09-09 YAML reference (closed schema).
+# 2026-10-30: the live catalog renamed the Intent WEATHER_FORECAST_VERIFY_GENERAL (judgment class);
+# the testnet is now Ethereum Sepolia (chain 11155111). The chain is a registration input, not a YAML field.
+# 2026-11-06: the Intent's request is now location + date and it scores temp_max_c (temp_min_c,
+# precipitation_mm; condition off-chain). Answers carry those fields; intent_mapping reads them by path.
+# The legacy on_chain block is dropped (jobs no longer read it).
+version: "1"
+kind: miner
+id: 64174
+slug: oathcast-forecast-verify
+protocol: generic
+name: OathCast Forecast Verification
+description: >-
+  Recorded weather for a named place and past day: the day's high and low in
+  °C, precipitation in mm and the weather condition, from Open-Meteo's
+  historical weather data. That is a model and reanalysis estimate for the
+  location's grid cell (ECMWF IFS, ERA5-Land, ERA5), not a station reading.
+  Also checks whether a supplied forecast verified within a stated tolerance.
+base_url: https://oathcastcourt.duckdns.org
+
+auth:
+  type: bearer
+
+rate_limit_per_sec: 2
+cache_ttl_sec: 0
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+limitations:
+  - code: MAX_PARAM_SIZE
+    message: The question parameter may be at most 1000 characters; every other parameter at most 256.
+    param: question
+    property: length
+    value_num: 1000
+    operator: lte
+
+errors:
+  message_path: error
+
+endpoints:
+  - path: /verify
+    external_path: /v1/forecast/verify
+    method: GET
+    intents: [WEATHER_FORECAST_VERIFY_GENERAL]
+    description: >-
+      WEATHER_FORECAST_VERIFY_GENERAL. Given only location and date (a past
+      YYYY-MM-DD day), returns that day's recorded weather: temp_max_c,
+      temp_min_c, precipitation_mm and condition, plus a one-sentence content.
+      Also answers "Yesterday's forecast called for 12 mm of
+      rain in Lisbon: how much fell, and did it verify?", "London's high on
+      10 September 2026 was forecast at 21°C - did it verify?" and "What was the
+      maximum wind in Chicago on 2026-09-12?". Reports Open-Meteo's historical
+      model estimate for the named place's grid cell over the past day or
+      window, and whether the supplied forecast verified within a stated
+      tolerance (default: precipitation and snowfall within max(1, 25% of the
+      forecast); temperature within 2°C; wind within max(5 km/h, 20%)). Send
+      the whole question as `question`, and also fill the other parameters when
+      they can be read from it. Nothing is guessed: a refusal is never a 2xx and
+      carries a machine-readable `code`. HTTP 400 for a request that cannot be
+      read (location_required, date_required, invalid_date, invalid_number,
+      variable_unknown, unit_incompatible, window_too_long,
+      coordinates_out_of_range, invalid_request); HTTP 422 when the data cannot
+      settle it (place_not_found; window_not_finished and no_archive_value with
+      a Retry-After estimate in seconds); HTTP 502 for an upstream failure
+      (provider_unavailable, upstream_malformed). The structured account of an
+      answer (claim as supplied and converted, period, resolved place and grid
+      cell, tolerance rule, source, limitations) is kept in OathCast's receipt
+      and served to holders of an OathCast bearer key at
+      /v1/forecast/verify/details with the same parameters. A window that has
+      not ended in the place's own calendar is refused as window_not_finished.
+    params:
+      query:
+        optional:
+          - name: location
+            type: string
+            intents: ["*"]
+            description: >-
+              The place: a name ("Lisbon", "Portland, Maine"), or coordinates
+              as "lat,lon" in decimal degrees. Required unless the question
+              names the place.
+          - name: date
+            type: string
+            intents: ["*"]
+            description: >-
+              The single past day to verify, YYYY-MM-DD, in the place's local
+              calendar. Use start and end instead for a multi-day window.
+          - name: start
+            type: string
+            intents: ["*"]
+            description: First day of a past window, YYYY-MM-DD. At most 31 days with end.
+          - name: end
+            type: string
+            intents: ["*"]
+            description: Last day of a past window, YYYY-MM-DD, before today.
+          - name: variable
+            type: string
+            intents: ["*"]
+            description: >-
+              What the forecast was about. Inferred from the question when
+              omitted.
+            accepted_fields:
+              precipitation:
+                intents: ["*"]
+                description: Total precipitation in mm (rain, showers, "dry" means 0 mm).
+              snowfall:
+                intents: ["*"]
+                description: Total snowfall in cm.
+              temperature_max:
+                intents: ["*"]
+                description: Daily maximum temperature (the "high") in °C.
+              temperature_min:
+                intents: ["*"]
+                description: Daily minimum temperature (the "low" or overnight low) in °C.
+              temperature_mean:
+                intents: ["*"]
+                description: Daily mean temperature in °C.
+              wind_max:
+                intents: ["*"]
+                description: Maximum 10 m wind speed in km/h.
+          - name: forecast_value
+            type: number
+            intents: ["*"]
+            description: >-
+              The value the forecast claimed, as a number (12 for "12 mm of
+              rain", 0 for "stay dry"). Omit to report the observation only.
+          - name: unit
+            type: string
+            intents: ["*"]
+            description: >-
+              Unit of forecast_value: mm, cm, in, C, F, km/h, mph, m/s or kn.
+              Converted before comparison. Defaults to the variable's unit.
+          - name: tolerance
+            type: number
+            intents: ["*"]
+            description: Optional allowed error, in the variable's unit, overriding the default tolerance.
+          - name: question
+            type: string
+            intents: ["*"]
+            description: >-
+              The whole natural-language question, up to 1000 characters. Used
+              to fill any parameter not supplied explicitly.
+
+input_schema:
+  type: object
+  properties:
+    location:
+      type: string
+      description: Place name or "lat,lon".
+    date:
+      type: string
+      format: date
+    start:
+      type: string
+      format: date
+    end:
+      type: string
+      format: date
+    variable:
+      type: string
+      enum: [precipitation, snowfall, temperature_max, temperature_min, temperature_mean, wind_max]
+    forecast_value:
+      type: number
+    unit:
+      type: string
+    tolerance:
+      type: number
+    question:
+      type: string
+      maxLength: 1000
+
+output_schema:
+  type: object
+  properties:
+    content:
+      type: string
+      description: One sentence stating the historical estimate, its source, the place and the day or window.
+    location:
+      type: string
+      description: The resolved place, "name, country". Present for a place-and-day request.
+    date:
+      type: string
+      format: date
+      description: The past day answered. Present for a place-and-day request.
+    temp_max_c:
+      type: number
+      description: The day's high in °C. Present for a place-and-day request.
+    temp_min_c:
+      type: number
+      description: The day's low in °C. Present for a place-and-day request.
+    precipitation_mm:
+      type: number
+      description: The day's precipitation in mm. Present for a place-and-day request.
+    condition:
+      type: [string, "null"]
+      description: The day's most severe WMO weather condition in words; null for an unknown code.
+    verified:
+      type: [boolean, "null"]
+      description: Whether a supplied forecast verified. Present only when a forecast variable was asked.
+    verdict:
+      type: string
+      enum: [verified, not_verified, no_forecast_supplied]
+    observed_value:
+      type: number
+      description: The asked variable's value. Present only when a forecast variable was asked.
+    unit:
+      type: string
+  required: [content, verdict]
+
+semantics:
+  signal_mapping:
+    label_field: content
+    reason_field: verdict
+  supported_intents:
+    - WEATHER_FORECAST_VERIFY_GENERAL
+
+intent_mapping:
+  WEATHER_FORECAST_VERIFY_GENERAL:
+    endpoint: /verify
+    input:
+      location:
+        from: location
+        how: The requested place, verbatim (a name such as "Portland, Maine", or "lat,lon").
+      date:
+        from: date
+        how: The requested past day as YYYY-MM-DD, verbatim; never today or a future day.
+    output:
+      location:
+        path: location
+      date:
+        path: date
+      condition:
+        path: condition
+      temp_max_c:
+        path: temp_max_c
+        unit: degrees Celsius
+      temp_min_c:
+        path: temp_min_c
+        unit: degrees Celsius
+      precipitation_mm:
+        path: precipitation_mm
+        unit: mm

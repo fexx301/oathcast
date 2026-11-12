@@ -12,13 +12,15 @@
     "canary": "tsx src/cli.ts",
     "sidecar": "tsx src/application-sidecar.ts",
     "wallet:create": "tsx src/create-wallet.ts",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "field-day": "tsx src/field-day.ts"
   },
   "dependencies": {
     "@scure/base": "1.2.6",
     "@solana/kit": "5.5.1",
     "@x402/fetch": "2.11.0",
-    "@x402/svm": "2.11.0"
+    "@x402/svm": "2.11.0",
+    "viem": "2.55.11"
   },
   "devDependencies": {
     "@types/node": "22.13.4",

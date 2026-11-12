@@ -1155,3 +1155,24 @@ Application is not demo-complete until it has made a
 paid request to at least one independent external Miner and its decision is
 still functional when OathCast is disabled. Do not count local, discovery, or
 fixture traffic as hackathon demand.
+
+## 2026-11-11: Field-day review app (`2026-11-11-field-day-v1`)
+
+A new container, `oathcast-field-day`, built from the payment-canary image and
+running `npm run field-day` on loopback `:8791`. Caddy adds `handle /field-day*`
+in front of the catch-all. The Miner, the Planning Desk UI, the gateway and the
+Solana sidecar were not touched.
+
+- **Source and image:** source `166fa5a`, image `sha256:e39a4836…`.
+- **Caddyfile:** `29495257…` → `71d53964…`. The backup is
+  `Caddyfile.pre-field-day-20261111`.
+- **Public checks:** `/healthz`, `/readyz`, `/`, `/field-day` and the ledger all
+  returned 200.
+- **First paid call:** a ranked ask served by 64174 (receipt `0x70868e11…`,
+  epoch 2065).
+- **Evidence:** `artifacts/release-evidence/2026-11-11-field-day-v1.json`.
+- **Runbook:** `docs/field-day.md`.
+- **Rollback:** `docker stop oathcast-field-day`, then
+  `cat Caddyfile.pre-field-day-20261111 > Caddyfile` and reload Caddy.
+- **Note:** the v20 runtime evidence's `caddyfile_sha256` is now stale. The
+  canary doesn't read it.

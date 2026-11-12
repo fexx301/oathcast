@@ -1,0 +1,27 @@
+{
+  "release_id": "2026-11-11-field-day-v1",
+  "recorded_at": "2026-11-11",
+  "source_commit": "166fa5a",
+  "source_archive_sha256_prefix": "3811f6c3c8154b7d",
+  "image": "oathcast-field-day:2026-11-11-v1",
+  "image_id": "sha256:e39a483614d357576356538bf7c72d0ba982bdf53cb270937c60b05c5d95c507",
+  "container": "oathcast-field-day (127.0.0.1:8791, uid 1000, --memory 256m, restart unless-stopped)",
+  "ledger": "/home/ec2-user/oathcast-live-state/field-day/field-day-ledger.jsonl",
+  "payer": "0x74041A982529b9757a121b48Bc2F98B129dE7842",
+  "escrow_funded_uusdc": 2000000,
+  "caddyfile_sha256_prefix_before": "29495257def97638",
+  "caddyfile_sha256_prefix_after": "71d53964749f68fd",
+  "caddy_backup": "/home/ec2-user/oathcast/Caddyfile.pre-field-day-20261111",
+  "public_checks": {"/healthz": 200, "/readyz": 200, "/": 200, "/field-day": 200, "/field-day/api/ledger": 200},
+  "first_paid_call": {
+    "params": {"location": "Lleida, Spain", "date": "2026-11-05"},
+    "miner_id": "64174",
+    "receipt_miner": "5130",
+    "signal_hash": "0xa6e17777b0f9fa33868cccda90b62f6450dab8e0233e81c6ed167383b5952cfa",
+    "receipt_hash": "0x70868e113948939d6e54cbac0697cbe11cdd2a9de24f8523c27044de59cdf89e",
+    "epoch_id": 2065,
+    "amount_uusdc": "10000",
+    "rail": "escrow"
+  },
+  "unchanged": ["Miner container oathcast (v20)", "Planning Desk UI, gateway and Solana sidecar"]
+}
