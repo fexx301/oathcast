@@ -332,7 +332,9 @@ class CanaryWorkflowIntegrityTests(unittest.TestCase):
 
         if "evidence_capture_sha256" in evidence:
             drifted = json.loads(json.dumps(evidence))
-            drifted["evidence_capture_sha256"]["restart_replay"] = "0" * 64
+            # Tamper with a capture this release actually links; an unlinked label is never hashed.
+            linked_label = next(iter(evidence["evidence"]))
+            drifted["evidence_capture_sha256"][linked_label] = "0" * 64
             with tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / evidence_path.name
                 path.write_text(json.dumps(drifted), encoding="utf-8")
