@@ -1,0 +1,64 @@
+{
+ "fetched_at": "2026-11-13T02:56:37Z",
+ "call": {
+  "at": "2026-11-12T02:47:47.993Z",
+  "id": "fd-1794451654730-g7nktd",
+  "location": "Christchurch, New Zealand",
+  "date": "2026-10-29",
+  "operation": "frost",
+  "nonce": "23afb09a-2bca-4405-908d-882cbdb0ea3d",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x2b16e3f944178863b586434c0ec9151d8a7212fc9adf0c2e5e830ecca1b2f7b4",
+  "result_shape": "intent",
+  "result": {
+   "location": "Christchurch, New Zealand",
+   "date": "2026-10-29",
+   "temp_max_c": 13.6,
+   "temp_min_c": 6.6,
+   "precipitation_mm": 6.8,
+   "condition": "slight rain"
+  },
+  "receipt": {
+   "receipt_hash": "0x4da71fed237fe068e3235f74ecc38c00368ad2220eb0bc375544874dffde94e3",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2070,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794451667
+  }
+ },
+ "proof": {
+  "block_data_root": "0xced2442bc1534b4bfdf3ebf33062f99d2235bb092182a65b1d778e37a2f20e2b",
+  "deliveries_root": "0x64634fa3d274bd29ef1d9faeaf8292fe3faa7a38472a459cb57c224737d55a4c",
+  "delivery": {
+   "receipt_hash": "0x4da71fed237fe068e3235f74ecc38c00368ad2220eb0bc375544874dffde94e3",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2068
+  },
+  "epoch_id": 2070,
+  "proof": [
+   "0x1f05ea09e868f3b22fc040c9f099ffd04834853a688f38ab1180a449cadced94",
+   "0x17b95410baa76b8221e792939173d0e6c1d18daf43297919dcf12b134d519e38",
+   "0xc9afa3047a7267bbb378bee98e914a694cba41f6fd208483f2c38ab7d70339e4",
+   "0x70d52cba24243425c3141c8a5fb0f992d0a54aeea60a5a18b65f9c5fcdf5fbb0",
+   "0x1673de42621071f53ed194f7f7b3948845585f45b909710b00cf27c6e86ba831",
+   "0x23d4bc4d12ba861f7316a879178ccf5ee6df2651df3caaa67b0165441bc9e68a",
+   "0x7d87b99265208c909f3d98326b7ff97010641eb79b854e77e83964b1347e2b45",
+   "0x636db1a45fdf839c09481b52e502ab77184a793eee1be493ce6405a889febf61"
+  ],
+  "protocol_state_root": "0x6e4a0c14a2634592d02ab5cdc35f7c044f133347616eebe35514b770aac5772d"
+ }
+}

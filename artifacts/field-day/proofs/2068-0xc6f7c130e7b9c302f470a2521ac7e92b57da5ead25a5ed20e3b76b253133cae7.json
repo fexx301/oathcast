@@ -1,0 +1,62 @@
+{
+ "fetched_at": "2026-11-13T02:56:40Z",
+ "call": {
+  "at": "2026-11-11T20:47:41.446Z",
+  "id": "fd-1794430054729-dtnbp7",
+  "location": "Bordeaux, France",
+  "date": "2026-11-06",
+  "operation": "spray",
+  "nonce": "bab0e148-d5f1-47ea-afc0-82d302bbf152",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x9222e00c5d8a4c059857006516934c19e7bdd7e1889390429fb4e768eb153e21",
+  "result_shape": "intent",
+  "result": {
+   "location": "Bordeaux, France",
+   "date": "2026-11-06",
+   "temp_max_c": 14.9,
+   "temp_min_c": 4,
+   "precipitation_mm": 0,
+   "condition": "overcast"
+  },
+  "receipt": {
+   "receipt_hash": "0xc6f7c130e7b9c302f470a2521ac7e92b57da5ead25a5ed20e3b76b253133cae7",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2068,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794430061
+  }
+ },
+ "proof": {
+  "block_data_root": "0x7ae53b511c67301180e9c21eca81bfaefa44eb6b962fd7a4a65fe1d33f254941",
+  "deliveries_root": "0x2a69ede9008c36532aaa024a2bf455e66519a404a288655cb6ea74b47dc4c4aa",
+  "delivery": {
+   "receipt_hash": "0xc6f7c130e7b9c302f470a2521ac7e92b57da5ead25a5ed20e3b76b253133cae7",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2067
+  },
+  "epoch_id": 2068,
+  "proof": [
+   "0x96a251d491f321d37617b69c347608b4af4ffb1746abd811e221855bb74ee366",
+   "0xf9731ee73815ff0533303d93019d8317f9ab08a322302b2d1ffe30842168e85e",
+   "0xc284b49c0bab544852b2f8824c9c336d0247c0912daeed6ea31e0153aefcea6c",
+   "0x1050e59bd4e535139d1544806f783f179c90a5962cd63fb77df3e3068ae952a6",
+   "0x1df2f5bbcc205813d2ba979dd312be0c232cd9fd0c5c1da3b0b06b3b17bfff88",
+   "0xbca877c300b468d452bceada5adbccc25c3b08bee6451796958f71a5904b51f9"
+  ],
+  "protocol_state_root": "0x8c0d63b81dc53bf3e7b900eb070c3b6efecc83b6e48a4646a0d6c0e4ae437e59"
+ }
+}

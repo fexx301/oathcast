@@ -1,0 +1,59 @@
+{
+ "fetched_at": "2026-11-13T02:56:36Z",
+ "call": {
+  "at": "2026-11-12T04:47:47.548Z",
+  "id": "fd-1794458854735-ca6c30",
+  "location": "Kano, Nigeria",
+  "date": "2026-10-27",
+  "operation": "harvest",
+  "nonce": "36fa48f8-b1af-4ce5-b2b8-e9c89debf1b0",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0xf60530de374aa76062cad46c7980a3cc213a460edb4d5b374b039ca3de1dced1",
+  "result_shape": "intent",
+  "result": {
+   "location": "Kano, Nigeria",
+   "date": "2026-10-27",
+   "temp_max_c": 36,
+   "temp_min_c": 21.6,
+   "precipitation_mm": 0,
+   "condition": "overcast"
+  },
+  "receipt": {
+   "receipt_hash": "0xfe0094c2866847999a4e1a589f722a7fed6190f6a969a48f721a43e291e9aca1",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2071,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794458867
+  }
+ },
+ "proof": {
+  "block_data_root": "0x1d4a4bc4153609aac166ceec544dcf744e2cd0592f10cebb582960376366009f",
+  "deliveries_root": "0xa7a068cefb2ab89a86672f3a4f446d459fffe5fddc4bd1f11ad443cb2f50f417",
+  "delivery": {
+   "receipt_hash": "0xfe0094c2866847999a4e1a589f722a7fed6190f6a969a48f721a43e291e9aca1",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2068
+  },
+  "epoch_id": 2071,
+  "proof": [
+   "0xe880ad6d08880749209c324e584f3b65c6ea5ac83e3df1eebf27fc4718e8510d",
+   "0x1ffa2b929ddfa2270e411c4a0823c60a217ee5777c6aa8b80461367321bc24c1",
+   "0xdfa2c9489872a4ac7ef10d33fb93001fe157584e4e69e5637ff5aa64b738b3b9"
+  ],
+  "protocol_state_root": "0xc6d21a66d77b4d4e0800351fca09fbde0da0485e2fb2af4382113a6a5055806c"
+ }
+}

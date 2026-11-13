@@ -1,0 +1,62 @@
+{
+ "fetched_at": "2026-11-11T17:12:05Z",
+ "call": {
+  "at": "2026-11-11T12:47:41.791Z",
+  "id": "fd-1794401254774-6wkv3b",
+  "location": "Mendoza, Argentina",
+  "date": "2026-10-28",
+  "operation": "frost",
+  "nonce": "37ef1511-2283-4bac-af3b-c08507987e51",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x8975b0c3925689571a4526ec61acb9a8541806472ac9653361f61d4d087068af",
+  "result_shape": "intent",
+  "result": {
+   "location": "Mendoza, Argentina",
+   "date": "2026-10-28",
+   "temp_max_c": 24,
+   "temp_min_c": 12.9,
+   "precipitation_mm": 0,
+   "condition": "partly cloudy"
+  },
+  "receipt": {
+   "receipt_hash": "0xe235a951a4b63e3f3b57e587832da2cf3c2d5586c18acd5b0c0d4dc25b1c70dd",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2066,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794401261
+  }
+ },
+ "proof": {
+  "block_data_root": "0x0c49dc70182237fad2565221ca6d6edcd228b6fe1cfae7191608f33044a2df54",
+  "deliveries_root": "0xb94f1a4b4b4829172cc3260c5255372ba353d59870c9f8431c5718f4b8489b59",
+  "delivery": {
+   "receipt_hash": "0xe235a951a4b63e3f3b57e587832da2cf3c2d5586c18acd5b0c0d4dc25b1c70dd",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2065
+  },
+  "epoch_id": 2066,
+  "proof": [
+   "0x9f3a835a494d19290816bb66bcf5e0e71d39fb446fb1f29dfffc319d64d3b680",
+   "0xc28bf855387c85f2cdb30a21d1b76e041f8661d026eda729756d97cff4c9c2a9",
+   "0x58a522b5df99f68d8aee8e07c5d54c6c361a4c645382bc63d63e1cb117d39195",
+   "0x1f6d73ed02b048b78e55496247d1ee11770cfb956cb86d474097432f1a147a6c",
+   "0x32a77ffbb93b6615cb0833b412b19ca909ad17f142c7843870afa4f526e041ba",
+   "0x8d30493fc5296dc152a2772a290aa109f1a863a4b19ed6ebf172fe1cd8d05436"
+  ],
+  "protocol_state_root": "0x401452e914cec79829c1198ad595b1fbb4f351c75406be58908bd8f7b0dcc4b6"
+ }
+}

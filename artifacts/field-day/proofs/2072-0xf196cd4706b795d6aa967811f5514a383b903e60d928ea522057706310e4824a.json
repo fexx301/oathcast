@@ -1,0 +1,63 @@
+{
+ "fetched_at": "2026-11-13T02:56:34Z",
+ "call": {
+  "at": "2026-11-12T06:48:03.631Z",
+  "id": "fd-1794466054775-k6kv72",
+  "location": "Salinas, California",
+  "date": "2026-11-07",
+  "operation": "spray",
+  "nonce": "fa6aaa46-0eed-46fb-b51d-59fbb31b575c",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "78131",
+  "miner_name": "SkyWire Recorded Weather Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x5be7777c820713bd32244ff9c8d4e4e746e715c3467a8497154dfd51426a8f4c",
+  "result_shape": "intent",
+  "result": {
+   "location": "Salinas, California",
+   "date": "2026-11-07",
+   "temp_max_c": 26.111111,
+   "temp_min_c": 9.444444,
+   "precipitation_mm": 0,
+   "condition": "NO SIGNIFICANT WEATHER WAS OBSERVED."
+  },
+  "receipt": {
+   "receipt_hash": "0xf196cd4706b795d6aa967811f5514a383b903e60d928ea522057706310e4824a",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "4929",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2072,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794466083
+  }
+ },
+ "proof": {
+  "block_data_root": "0x66bff227524a623b7f63ad48eba71f8e6ca61bacd3ad9e47a2a33dd5f01910b2",
+  "deliveries_root": "0x8557ad4a963826cb0c7f8d4cb8fa2db978999f8e09aa73c686b54ca00da83218",
+  "delivery": {
+   "receipt_hash": "0xf196cd4706b795d6aa967811f5514a383b903e60d928ea522057706310e4824a",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "4929",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2068
+  },
+  "epoch_id": 2072,
+  "proof": [
+   "0x5d224e6eeec273852b2403b326b1a4f80253d50cd79c228e47117597a2127b59",
+   "0xf38fb622d38f7e5796acbe0e1289025933cb9d5495c23d265e8bd85e7158d140",
+   "0x08189956703cf0cbf553b261a29ef8a45364544c2aaea68516b9499927c1d90f",
+   "0x823d18836fee8d1b5c6d3b89a057dad161e5bfa1d798ad53adb109bb67fcd04d",
+   "0x8112088554d0540b95c397d154c866633e9a21a77026cb8b100ddefb932a98e9",
+   "0x2c81ab2086bcb0d49aa51db18fb18ee035484ce2d722ab3610a5a6f22bb62607",
+   "0x8ff7afcd593ca1b8e6f14331d0388d2eba14de860b9e0cf6878dd7e76760537b"
+  ],
+  "protocol_state_root": "0x3b897da3cdde365f1c8d52e904508bd422f7aa7df0b97037069afac5bdc0f8f9"
+ }
+}

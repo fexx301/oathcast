@@ -1,0 +1,63 @@
+{
+ "fetched_at": "2026-11-13T02:56:33Z",
+ "call": {
+  "at": "2026-11-12T08:48:22.561Z",
+  "id": "fd-1794473254768-ugtyo6",
+  "location": "Wagga Wagga, Australia",
+  "date": "2026-11-08",
+  "operation": "harvest",
+  "nonce": "fac73e5f-94b4-4245-84e3-66600f443b15",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "20260828",
+  "miner_name": "PREFLIGHT Infrastructure Signals",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x230d0af84bd240b7e63bc82777b494627cd7266caab28c2b3627f166c4a6751b",
+  "result_shape": "intent",
+  "result": {
+   "location": "Wagga Wagga, Western Australia, Australia",
+   "date": "2026-11-08",
+   "temp_max_c": 32.5,
+   "temp_min_c": 17.2,
+   "precipitation_mm": 0,
+   "condition": "overcast"
+  },
+  "receipt": {
+   "receipt_hash": "0x81549d0166c9e08c107834b7b2b057f9e8afb3cda5552dbfe147851f443a0062",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5176",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2072,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794473302
+  }
+ },
+ "proof": {
+  "block_data_root": "0x66bff227524a623b7f63ad48eba71f8e6ca61bacd3ad9e47a2a33dd5f01910b2",
+  "deliveries_root": "0x8557ad4a963826cb0c7f8d4cb8fa2db978999f8e09aa73c686b54ca00da83218",
+  "delivery": {
+   "receipt_hash": "0x81549d0166c9e08c107834b7b2b057f9e8afb3cda5552dbfe147851f443a0062",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5176",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2068
+  },
+  "epoch_id": 2072,
+  "proof": [
+   "0x8f848be14096cddcc63007bd84bc52d1f3af796b622240705f15a9113e831f00",
+   "0x79b9292dba44edb4c49d61bb0aa7d25014108b4759fefbdc1e872f255e018ad2",
+   "0xf022304197b7c441a6fc83d1f0a811da4c2d3c82771f22f2dd56cfbd93bc8091",
+   "0xc39f3575f2a371f209901dfb691caa6e6047a74069fec011e78ef5bbb44809df",
+   "0xdb1d0e0695d99780f2399c29b40ee5b3bddd3678eef394cf23f9865344101dc7",
+   "0x8b734fc83d7e55598aa16f89628d78deb11e5898d53b67034a277fe5165190f9",
+   "0x9fcb33696c33cfae56bdf314c02ce5ee8621b4efeec8e2bdc5a5ce181820f209"
+  ],
+  "protocol_state_root": "0x3b897da3cdde365f1c8d52e904508bd422f7aa7df0b97037069afac5bdc0f8f9"
+ }
+}

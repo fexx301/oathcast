@@ -1,0 +1,63 @@
+{
+ "fetched_at": "2026-11-13T02:56:42Z",
+ "call": {
+  "at": "2026-11-11T16:47:52.836Z",
+  "id": "fd-1794415654813-yadsbn",
+  "location": "Nakuru, Kenya",
+  "date": "2026-11-02",
+  "operation": "spray",
+  "nonce": "2209051a-2489-4222-903b-2da9874009e5",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x38ca0470ee85929263230f94e852dacb3104eb69168fa5c97a87fd91fdd0d578",
+  "result_shape": "intent",
+  "result": {
+   "location": "Nakuru, Kenya",
+   "date": "2026-11-02",
+   "temp_max_c": 24.5,
+   "temp_min_c": 14.7,
+   "precipitation_mm": 1.8,
+   "condition": "light drizzle"
+  },
+  "receipt": {
+   "receipt_hash": "0x9e75c0942d04ce2048aaf56ce12b1fe873a20df48fd9e540e715cc26288c5e21",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2067,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794415672
+  }
+ },
+ "proof": {
+  "block_data_root": "0xf4086bc2d5ecb4602bbb68e2fa4b3c9e1076172bcb3e4e17ac6f12fe721ebee9",
+  "deliveries_root": "0x9dca7478d867a6697cbbd34b76d54fe1f2cb9537fe2eb1f73fe2ce73ab1ca592",
+  "delivery": {
+   "receipt_hash": "0x9e75c0942d04ce2048aaf56ce12b1fe873a20df48fd9e540e715cc26288c5e21",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2065
+  },
+  "epoch_id": 2067,
+  "proof": [
+   "0x44513100eb3c71503c9e26572855a62588fbe08416ecaa952a5c934e7cefe3fa",
+   "0x2404a89f5ce447766e05ed30480525a3908c4fe4a24191930d58fb05384e067e",
+   "0x9de96cddee83e21f9e128a7b16b08748ce856c58b948fd72b8676fd1281a394d",
+   "0x0f6824991d54ff91a044925c2c2bab94784787ae01f3804b05b8a089349880fd",
+   "0x96a853af5064816401875bb2e703b7b2ea925dcabfd228344f3e9df03711f9b3",
+   "0x86e8e43383a3ba8564aacabeddff97cf8519cb56451601846d99ded270726141",
+   "0x2ec3c3452d2b6fdd7b41c548b1a16d398ea30ad5bda6d0f65d3a68561347dfdd"
+  ],
+  "protocol_state_root": "0x128f92c29a7b2a1dd4c0eaf10faeea1d50dcc5100b16756e9c8ca95b39d13dcb"
+ }
+}

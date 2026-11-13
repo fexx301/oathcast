@@ -1,0 +1,62 @@
+{
+ "fetched_at": "2026-11-11T17:12:08Z",
+ "call": {
+  "at": "2026-11-11T11:37:14.492Z",
+  "id": "fd-1794397026603-70z14b",
+  "location": "Fresno, California",
+  "date": "2026-11-05",
+  "operation": "harvest",
+  "nonce": "6abbfdf0-612f-47d9-97e5-7016784fa371",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0x43953f508545a500b6f4217a99bb3b45b1a3931bcdbac28a29bab00e07c4c58a",
+  "result_shape": "intent",
+  "result": {
+   "location": "Fresno, United States",
+   "date": "2026-11-05",
+   "temp_max_c": 19.4,
+   "temp_min_c": 7.6,
+   "precipitation_mm": 0,
+   "condition": "overcast"
+  },
+  "receipt": {
+   "receipt_hash": "0xb8fda96ef43be458497730028827237b4d13f267977698be707b286cefc63a83",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2065,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794397034
+  }
+ },
+ "proof": {
+  "block_data_root": "0x49f3163ac2dc1ca01c7b6309eb97c4681e0ccee2adf6a57cf8ba372172536c59",
+  "deliveries_root": "0xc0586db2e781d9c9f86a363699aeaa3c2c77643ed55cfd873104d02580c264b2",
+  "delivery": {
+   "receipt_hash": "0xb8fda96ef43be458497730028827237b4d13f267977698be707b286cefc63a83",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2064
+  },
+  "epoch_id": 2065,
+  "proof": [
+   "0x6a898c214ed3f6ee506c3872b00ba0fd5c0b6d47d83083bfc3a8de2c6a1c56cd",
+   "0x0e7a2d4158131a6e9eccd6c28316c65571db8a52e2874ec0f3a463b0556d4bfc",
+   "0xc68deed5491e10b8402cf77cc94d58b797329d0efcbd77d7e9357a814e76fa67",
+   "0x5f809259c6c86ec699d6ece74493da0f131f891ed5f3891b33989df936096f49",
+   "0x74ba879991b09935d360a553cdc1298be752229e9a2ae45712a67d866c37de2f",
+   "0x7f2d5fab31f4a83b79fbe074f8c505282f798ec8547aeef45b11f15540da6e49"
+  ],
+  "protocol_state_root": "0x96295e76ec27ea858e69635c8bf2174547b565c565f83c84afd48ff0857d482a"
+ }
+}

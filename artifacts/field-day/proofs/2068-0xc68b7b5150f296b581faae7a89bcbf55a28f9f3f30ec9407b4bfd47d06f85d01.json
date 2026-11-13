@@ -1,0 +1,62 @@
+{
+ "fetched_at": "2026-11-13T02:56:41Z",
+ "call": {
+  "at": "2026-11-11T18:47:45.546Z",
+  "id": "fd-1794422854770-t1toip",
+  "location": "Ballarat, Australia",
+  "date": "2026-10-25",
+  "operation": "frost",
+  "nonce": "548e5881-56d2-437e-a88c-a5ea750461e2",
+  "amount_uusdc": "10000",
+  "kind": "served",
+  "status": 200,
+  "miner_id": "64174",
+  "miner_name": "OathCast Forecast Verification",
+  "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+  "signal_hash": "0xaf09f88838679b5e42c5450ef1d09c4f49b41d31d2ac75c7489c9d6d4d303aff",
+  "result_shape": "intent",
+  "result": {
+   "location": "Ballarat, Australia",
+   "date": "2026-10-25",
+   "temp_max_c": 15.9,
+   "temp_min_c": 5.3,
+   "precipitation_mm": 33.6,
+   "condition": "moderate rain"
+  },
+  "receipt": {
+   "receipt_hash": "0xc68b7b5150f296b581faae7a89bcbf55a28f9f3f30ec9407b4bfd47d06f85d01",
+   "rail": "escrow",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "amount_uusdc": "10000",
+   "epoch_id": 2068,
+   "settlement": "epoch",
+   "chain": "telegraph",
+   "timestamp": 1794422865
+  }
+ },
+ "proof": {
+  "block_data_root": "0x7ae53b511c67301180e9c21eca81bfaefa44eb6b962fd7a4a65fe1d33f254941",
+  "deliveries_root": "0x2a69ede9008c36532aaa024a2bf455e66519a404a288655cb6ea74b47dc4c4aa",
+  "delivery": {
+   "receipt_hash": "0xc68b7b5150f296b581faae7a89bcbf55a28f9f3f30ec9407b4bfd47d06f85d01",
+   "payer": "0x74041a982529b9757a121b48bc2f98b129de7842",
+   "miner_id": "5130",
+   "intent": "WEATHER_FORECAST_VERIFY_GENERAL",
+   "usdc": 10000,
+   "class": "paid_consumer",
+   "ranking_round": 2067
+  },
+  "epoch_id": 2068,
+  "proof": [
+   "0xab3741019c77f4710907889f604b71281c3c7f636b0169c65d4b40c09d523847",
+   "0xf9731ee73815ff0533303d93019d8317f9ab08a322302b2d1ffe30842168e85e",
+   "0xc284b49c0bab544852b2f8824c9c336d0247c0912daeed6ea31e0153aefcea6c",
+   "0x1050e59bd4e535139d1544806f783f179c90a5962cd63fb77df3e3068ae952a6",
+   "0x1df2f5bbcc205813d2ba979dd312be0c232cd9fd0c5c1da3b0b06b3b17bfff88",
+   "0xbca877c300b468d452bceada5adbccc25c3b08bee6451796958f71a5904b51f9"
+  ],
+  "protocol_state_root": "0x8c0d63b81dc53bf3e7b900eb070c3b6efecc83b6e48a4646a0d6c0e4ae437e59"
+ }
+}
