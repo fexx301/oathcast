@@ -1,0 +1,119 @@
+# SEASON II REGISTRATION DRAFT - SANCTIONS_SCREENING_MATCH_GENERAL, a third OathCast Miner.
+# id 64175 and the slug were free in the live /api/miners catalog on 2026-11-15; the official
+# identity pre-check at registration is authoritative. Keyless (auth: none), like the public
+# truth source it serves from. Fields follow the Intent's response fields (name, matched,
+# matches, lists, match_score); summary and confidence feed signal_mapping.
+version: "1"
+kind: miner
+id: 64175
+slug: oathcast-sanctions
+protocol: generic
+name: OathCast Sanctions Screen
+description: >-
+  Screens a person, company, vessel or crypto wallet against the official OFAC SDN,
+  OFAC non-SDN (consolidated), UN Security Council and EU consolidated financial
+  sanctions lists, rebuilt daily from the official files with each list's
+  publication date. Names match on primary names and aliases after accents,
+  punctuation and legal-form words are removed; wallets match exactly. A name
+  match is an alert that needs identity review, and no match is not a clearance.
+  UK lists are not covered.
+base_url: https://ngrgakvwtxioa2kkdllvhn5pza0fxqcb.lambda-url.eu-north-1.on.aws
+auth:
+  type: none
+rate_limit_per_sec: 2
+cache_ttl_sec: 300
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+limitations:
+  - code: MAX_PARAM_SIZE
+    message: The name may be at most 256 characters.
+    param: name
+    property: length
+    value_num: 256
+    operator: lte
+errors:
+  message_path: error
+input_schema:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: >-
+        The person, company or vessel name, or a wallet address. Extra details such
+        as "DOB 1974" or a country after a comma are tolerated and ignored.
+  required: [name]
+output_schema:
+  type: object
+  properties:
+    name:
+      type: string
+    matched:
+      type: boolean
+    matches:
+      type: array
+      items:
+        type: object
+    lists:
+      type: array
+      items:
+        type: object
+    match_score:
+      type: number
+      minimum: 0
+      maximum: 1
+    summary:
+      type: string
+      description: One sentence - match or no match, the listed name and list, the score, and each list's publication date.
+    confidence:
+      type: number
+      minimum: 0
+      maximum: 1
+  required: [name, matched, match_score, summary]
+endpoints:
+  - path: /screen
+    external_path: /screen
+    method: GET
+    intents: [SANCTIONS_SCREENING_MATCH_GENERAL]
+    description: >-
+      SANCTIONS_SCREENING_MATCH_GENERAL. Pass one person, company or vessel name,
+      or a wallet address, as ?name=. Answers "Screen 'Ivan Petrov, DOB 1974,
+      Cyprus' against the OFAC SDN and EU lists", "is wallet T... sanctioned?" and
+      "is the vessel HORMUZ 2 listed?". Returns matched, the matching listed names
+      with list, program and score, the lists checked with their publication dates,
+      and a one-sentence summary. HTTP 400 when the name is missing or longer than
+      256 characters.
+    params:
+      query:
+        required:
+          - name: name
+            type: string
+            intents: [SANCTIONS_SCREENING_MATCH_GENERAL]
+            description: Person, company or vessel name, or a wallet address; 1 to 256 characters.
+intent_mapping:
+  SANCTIONS_SCREENING_MATCH_GENERAL:
+    endpoint: /screen
+    input:
+      name:
+        from: name
+        how: The name or wallet address to screen, verbatim.
+    output:
+      name:
+        path: name
+      matched:
+        path: matched
+      matches:
+        path: matches
+      lists:
+        path: lists
+      match_score:
+        path: match_score
+        unit: fraction (0-1)
+semantics:
+  signal_mapping:
+    label_field: summary
+    reason_field: summary
+    confidence_field: confidence
+  supported_intents:
+    - SANCTIONS_SCREENING_MATCH_GENERAL
