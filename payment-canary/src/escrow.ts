@@ -3,8 +3,8 @@
 // No per-call chain transaction; the node bills the deposit at epoch close.
 
 export const SEPOLIA = "eip155:11155111";
-// The Telegraph Diamond on Sepolia, lowercased as the node compares it.
-export const DIAMOND = "0x3624eb012b5e998bb57b6be6c9cfc9c4bc5eb99b";
+// The Telegraph Diamond on Sepolia (new Diamond of 17 Nov 2026; it replaced 0x3624…b99b), lowercased as the node compares it.
+export const DIAMOND = "0x72a70e949362670bf8bcead24efc5b8f950aa08b";
 export const MAX_AMOUNT_UUSDC = 10_000n;
 const MAX_WINDOW_SECONDS = 100; // the node's limit is 120
 
