@@ -1,7 +1,10 @@
 // The Gold Rush page: a Queensland map of historical gold workings, search and quick picks, a site panel and the
 // investigation report. Single file: inline CSS/JS, Leaflet from cdnjs, OpenStreetMap tiles darkened with a CSS filter.
-const MARK = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 19 11 8l10-2 6 9-4 11-12 1z" fill="#c9952b"/><path d="M11 8l10-2 6 9-9 2z" fill="#f2c45a"/><path d="M11 8l7 9-7 10-5-8z" fill="#a8761c"/><path d="M18 17l9-2-4 11-12 1z" fill="#e0ad3f"/></svg>`;
-const FAVICON = "data:image/svg+xml," + encodeURIComponent(MARK.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" '));
+// The Gold Rush mark (user-supplied, 2026-11-20): a folded map with a mine entrance and track.
+const MARK_PATHS = `<g fill="#F6E8D0"><path d="M158 430 271.5 384.5V586.5L158 633Z"/><path d="M280 380.5 288 377 416 421Q421 422.5 421 427V615 L392.5 576V496L371 472H326.5L304.5 496V570L290.5 589.5 L280 586Z"/><path d="M430 420 516.5 381Q519 380 523 384V585L434 623 Q432 624 430 622Z"/></g><path fill="#D7A548" d="M252 640.5H269.5L324.5 563H333.5L329 586 L305 640.5H388L366 585L363 563H372.5L422 640.5H439V658H252Z"/>`;
+const MARK = `<svg viewBox="150 370 380 296" aria-hidden="true">${MARK_PATHS}</svg>`;
+// Tab icon: the same mark on a dark rounded square, so the cream stays visible on light browser tabs.
+const FAVICON = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="130 308 420 420"><rect x="130" y="308" width="420" height="420" rx="84" fill="#1c1914"/>${MARK_PATHS}</svg>`);
 
 export const PAGE = `<!doctype html>
 <html lang="en">
@@ -33,7 +36,7 @@ a { color: var(--gold); text-underline-offset: 2px; }
 
 header { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: var(--space-3); text-decoration: none; color: var(--ink); }
-.brand svg { width: 34px; height: 34px; }
+.brand svg { width: 44px; height: 34px; }
 .brand b { font-size: 24px; letter-spacing: -0.02em; font-weight: 800; } .brand b span { color: var(--gold); }
 header p { margin: 0; color: var(--mute); font-size: 15px; flex: 1 1 360px; min-width: 0; }
 
