@@ -8,6 +8,14 @@ way to test the result without a wallet.
 Disclosure: I built this for the Telegraph Hackathon Season II, which has
 prizes. Everything here was run on the Ethereum Sepolia testnet in November 2026.
 
+> **Updated 20 Nov 2026: Telegraph moved to a new Diamond on 17 Nov.**
+> - **Address:** `0x72a70e949362670Bf8bceAd24eFC5b8f950aa08b`, which replaces `0x3624…b99b`. No node reads the old
+>   one, so a registration sent there is never seen.
+> - **Bonds:** paid in test USDC, not MACHINA.
+> - **Balances:** escrow balances didn't carry over; deposit again.
+> - The commands below use the new address. The costs I paid on the old Diamond are kept as history and marked.
+> - Source: [Addresses & Parameters](https://anjoman.ai/docs/protocol/addresses-and-params).
+
 ## What Telegraph does here
 
 Telegraph is a network that sells answers. An app sends a request that names an
@@ -25,7 +33,7 @@ the spec.
 - A public HTTPS endpoint that answers the Intent's question.
 - [Foundry](https://getfoundry.sh) for `cast`.
 - A throwaway wallet with a little Sepolia ETH for gas.
-- About $1 of MACHINA for the bond. It is returned when you deregister.
+- About $1 of test USDC for the bond (anyone can mint test USDC). It is returned after you deregister.
 - A place to host one YAML file at a URL that never changes. I used a GitHub
   raw link pinned to a commit.
 
@@ -131,7 +139,7 @@ These checks are free. Each one catches a mistake that would otherwise cost a
 transaction.
 
 ```bash
-DIAMOND=0x3624EB012B5E998BB57B6bE6C9Cfc9c4bc5eb99b
+DIAMOND=0x72a70e949362670Bf8bceAd24eFC5b8f950aa08b   # the 17 Nov 2026 Diamond
 RPC=https://ethereum-sepolia-rpc.publicnode.com
 
 # The Intent name must be the full one. A family name reverts the registration.
@@ -158,17 +166,26 @@ the YAML, sends `registerMiner` and stores your API key. I used it. The same
 thing by hand with `cast` is in
 [Registering as a Miner](https://anjoman.ai/docs/miners/miner-registration).
 
-What it cost me on 2026-11-07:
+What it costs on the current Diamond (read on 2026-11-20):
 
 | Item | Cost |
 |---|---|
-| Bond for the first Intent | $1, which took about 0.167 MACHINA |
+| Bond for the first Intent | 1 test USDC (`minerBondParams()`, first value, 6 decimals) |
 | Gas | a fraction of a cent of Sepolia ETH |
 | Price floor I set | $0.01 per request, the minimum |
 
-There is no MACHINA faucet. I minted test USDC and swapped it for MACHINA on
-the Sepolia Uniswap pool. The rate was poor: 14 test USDC bought about 2.5
-MACHINA.
+Read the bond from the Diamond rather than trusting a page, then mint the test
+USDC you need (the token lets anyone mint):
+
+```bash
+cast call $DIAMOND "minerBondParams()(uint256,uint256,uint256,uint256,uint256)" --rpc-url $RPC   # 1000000 = $1 for the first Intent
+USDC=0xcc194e1a843B658526D0D5C431f670028582Ae17
+cast send $USDC "mint(address,uint256)" <your address> 2000000 --rpc-url $RPC --interactive
+```
+
+History: on the old Diamond (2026-11-07) the bond was paid in MACHINA. There was no
+faucet, so I swapped test USDC on the Sepolia Uniswap pool; 14 test USDC bought
+about 2.5 MACHINA, and the $1 bond took about 0.167. None of that is needed now.
 
 ## Step 6: Install the API key
 
@@ -217,10 +234,14 @@ miner that answered and carries a receipt. About an hour after a call, the
 receipt can be checked against the network's block for that epoch:
 
 ```bash
-curl -s https://devnode.telegraphprotocol.com/v1/blocks/2065/deliveries/0x70868e113948939d6e54cbac0697cbe11cdd2a9de24f8523c27044de59cdf89e \
-  | jq .delivery
-# payer: the app's wallet; miner_id: 5130; class: paid_consumer; usdc: 10000
+# Use the epoch_id and receipt_hash from the receipt your paid call returned.
+curl -s https://devnode.telegraphprotocol.com/v1/blocks/<epoch_id>/deliveries/<receipt_hash> | jq .delivery
+# fields: the payer (your wallet), the miner_id that served, class paid_consumer, usdc 10000
 ```
+
+The network was reset around 16–17 Nov, and delivery records from before then
+now return 404, including the ones this app collected on 11–12 Nov. Keep your own
+copy of each record if you need it later.
 
 As of 2026-11-12 00:49 UTC the app had made 10 paid calls over two days, and the
 router sent all 10 to this miner.
@@ -228,7 +249,8 @@ router sent all 10 to this miner.
 To pay for requests from your own code, the escrow method is the simplest: one
 deposit, then one signature per call and no per-call transaction. A working
 client in about 160 lines is
-[escrow.ts](https://github.com/fexx301/oathcast/blob/166fa5a/payment-canary/src/escrow.ts).
+[escrow.ts](https://github.com/fexx301/oathcast/blob/2495caa/payment-canary/src/escrow.ts)
+(pinned to the new Diamond; it refuses to pay any other address).
 
 ## Troubleshooting
 
@@ -244,7 +266,8 @@ client in about 160 lines is
 
 ## Costs and limits
 
-- **Bond:** $1 in MACHINA for the first Intent, returned after you deregister.
+- **Bond:** 1 test USDC for the first Intent on the current Diamond, returned after you deregister
+  (`withdrawMinerBond()` after a 2-day delay).
 - **Data:** my source, Open-Meteo's historical weather API, is free and needs
   no key. Its numbers are model estimates for a grid cell, not station
   readings. Its reanalysis data arrives about five days late, so recent days
