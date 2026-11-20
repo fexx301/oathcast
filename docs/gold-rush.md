@@ -13,6 +13,17 @@ it. The report shows each answer with its source, cost and receipt, and which qu
     related-party.
   - The app pays from its own testnet escrow.
 
+## Words used here, in plain English
+
+- **Telegraph:** a network that sells answers. An app pays a little per question, and a **miner** (a service that
+  answers one kind of question, called an **Intent**) replies.
+- **Specialist:** a miner that covers this subject (gold, mining, geology or Queensland).
+- **Ranked route:** letting Telegraph pick the miner for you. A **direct ask** names the miner yourself.
+- **Escrow:** a prepaid balance the app keeps with Telegraph; each answer is deducted from it, with no blockchain
+  transaction per question.
+- **Receipt:** the proof Telegraph returns with each paid answer (a hash and the epoch it was recorded in).
+- **Test USDC / Sepolia:** play money on Ethereum's test network. Nothing here costs real money.
+
 ## 1. Use it (no wallet needed)
 
 1. Open the page. The map shows the **8,132** historical workings with gold in the Geological Survey of Queensland's
