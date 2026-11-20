@@ -288,7 +288,9 @@ const fmtT = (t) => t >= 10 ? t.toFixed(0) + " t" : t >= 1 ? t.toFixed(1) + " t"
 
 // The report: what's known and missing, every structured fact with its miner and source, conflicts flagged, then the answers.
 function renderReport() {
-  const r = current, s = r.site, served = r.answers.filter((a) => a.kind === "served");
+  const r = current, s = r.site;
+  // Known/missing and facts come from specialists only; the ranked-route answer is shown for contrast, never counted.
+  const served = r.answers.filter((a) => a.kind === "served" && a.path === "direct");
   const TOP = ["ownership", "production", "closure", "gold price"];
   const who = Object.fromEntries(TOP.map((t) => [t, served.filter((a) => (a.topics || {})[t]).map((a) => a.miner_name)]));
   const known = ["location and size class (survey record)"].concat(TOP.filter((t) => who[t].length));
@@ -330,7 +332,7 @@ function renderReport() {
     '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.map(([k, v, m, src, flag]) =>
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
       "</td><td>" + esc(m) + (src ? "<br><small>" + link(src) + "</small>" : "") + "</td></tr>").join("") + "</table>" +
-    '<p class="mute small">Topics without structured facts come from a keyword check of sentences that name the mine. Read the answers below.</p>';
+    '<p class="mute small">Known and missing count specialist answers only (the ranked-route answer is for contrast). Topics without structured facts come from a keyword check of sentences that name the mine; read the answers below.</p>';
   const card = (a) => {
     const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
       '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") + "</div>";
