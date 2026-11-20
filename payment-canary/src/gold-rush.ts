@@ -153,7 +153,8 @@ export class GoldRush {
 
   private async askOne(site: Site, miner: Specialist, question: string, ip: string): Promise<Record<string, unknown>> {
     const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner === miner.id);
-    if (cached) return { ...cached, type: undefined, reused: true };
+    // A reused answer is re-checked with the current topic rule.
+    if (cached) return { ...cached, type: undefined, reused: true, topics: topicsCovered(String(cached.answer ?? ""), site.name) };
     const now = this.now();
     if (this.ledger.attempts() >= this.limits.maxCalls) return { kind: "skipped", miner_id: miner.id, miner_name: miner.name, reason: "This demo's call budget is used up." };
     if (this.ledger.attempts(Math.floor(now / DAY_MS) * DAY_MS) >= this.limits.maxPerDay) return { kind: "skipped", miner_id: miner.id, miner_name: miner.name, reason: "Today's call budget is used up." };
