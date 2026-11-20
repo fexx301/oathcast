@@ -45,8 +45,19 @@ export const TOPICS: Record<string, RegExp> = {
 // A sentence saying the fact is missing ("holds no owners", "not production figures") doesn't answer it.
 const SAYS_MISSING = /\b(holds?|has|gives?|contains?|records?) no\b|\bno (owners?|ownership|production|closure)\b|\bnot (production|owners?|closure)\b|\bunknown\b/i;
 
-export function topicsCovered(answer: string): Record<string, boolean> {
-  const kept = answer.split(/(?<=[.;!?])\s+/).filter((s) => !SAYS_MISSING.test(s)).join(" ");
+const GENERIC = new Set(["MOUNT", "MT", "NO", "LODE", "THE", "GOLD", "MINE", "REEF", "NORTH", "SOUTH", "EAST", "WEST", "AND", "OF"]);
+
+// The most distinctive word of a site name ("MOUNT MORGAN" -> "MORGAN"), to find sentences about this mine.
+export function keyWord(name: string): string {
+  const words = name.toUpperCase().split(/[^A-Z]+/).filter((w) => w.length > 2 && !GENERIC.has(w));
+  return words.sort((a, b) => b.length - a.length)[0] ?? name.toUpperCase();
+}
+
+// A topic counts only in a sentence that names this mine and doesn't say the fact is missing.
+export function topicsCovered(answer: string, siteName = ""): Record<string, boolean> {
+  const key = siteName ? keyWord(siteName) : "";
+  const kept = answer.split(/(?<=[.;!?])\s+/)
+    .filter((s) => !SAYS_MISSING.test(s) && (!key || s.toUpperCase().includes(key))).join(" ");
   return Object.fromEntries(Object.entries(TOPICS).map(([k, re]) => [k, re.test(kept)]));
 }
 
@@ -59,8 +70,13 @@ export function specialistsFrom(catalogue: unknown): Specialist[] {
     .slice(0, MAX_SPECIALISTS);
 }
 
+export function titled(s: string): string {
+  return s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
 export function questionFor(site: Pick<Site, "name" | "sheet">): string {
-  const q = `Tell me about the ${site.name} gold mine near ${site.sheet}, Queensland: who owned it, how much gold it produced, ` +
+  const near = site.sheet && site.sheet.toUpperCase() !== site.name.toUpperCase() ? ` near ${titled(site.sheet)}` : "";
+  const q = `Tell me about the ${titled(site.name)} gold mine${near}, Queensland: who owned it, how much gold it produced, ` +
     "and when and why it closed.";
   return q.length <= 256 ? q : q.slice(0, 256);
 }
@@ -169,7 +185,7 @@ export class GoldRush {
       const row = {
         ...base, kind: "served", miner_id: b.miner_id ?? miner.id, miner_name: b.miner_name ?? miner.name,
         answer, brief: result.brief ?? null, sources: Array.isArray(result.sources) ? result.sources.slice(0, 10) : [],
-        topics: topicsCovered(answer), signal_hash: b.signal_hash ?? null, receipt: outcome.receipt,
+        topics: topicsCovered(answer, site.name), signal_hash: b.signal_hash ?? null, receipt: outcome.receipt,
       };
       this.ledger.append({ type: "outcome", at, ...row });
       return row;

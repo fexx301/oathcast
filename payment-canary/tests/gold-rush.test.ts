@@ -3,7 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
-import { GoldRush, questionFor, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
+import { GoldRush, keyWord, questionFor, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -36,7 +36,7 @@ function world() {
     const direct = url.endsWith("/64176");
     const receipt = Buffer.from(JSON.stringify({ receipt_hash: `0x${paid}`, epoch_id: 23, miner: direct ? "64176" : "20260828" })).toString("base64");
     return json(200, { miner_id: direct ? "64176" : "20260828", miner_name: direct ? "OathCast Queensland Gold Mines" : "Generalist",
-      result: { answer: direct ? "Mount Leyshon (site 38940) is an abandoned mine; the record holds no owners or closure dates." : "Owned by a company; produced 30,000 oz.", sources: ["https://example.test/a"] } },
+      result: { answer: direct ? "Mount Leyshon (site 38940) is an abandoned mine; the record holds no owners or closure dates." : "Mount Leyshon was owned by a company. Mount Leyshon produced 30,000 oz. Other mines closed.", sources: ["https://example.test/a"] } },
     { "X-PAYMENT-RESPONSE": receipt });
   }) as unknown as typeof fetch;
   return { fetchFn, asked, paidCount: () => paid };
@@ -53,6 +53,17 @@ describe("gold rush", () => {
     expect(topicsCovered("gold classed large, 50-150 t").production).toBe(false); // a size band is not production
     expect(topicsCovered("Site 38940 is abandoned. The record gives a size band, not production figures, and holds no owners or closure dates."))
       .toEqual({ ownership: false, production: false, closure: false, "gold price": false });
+  });
+
+  it("only credits sentences that name the mine", () => {
+    expect(keyWord("MOUNT MORGAN")).toBe("MORGAN");
+    expect(topicsCovered("The Mount Morgan mine history. Charters Towers was owned by many companies.", "MOUNT MORGAN").ownership).toBe(false);
+    expect(topicsCovered("Mount Morgan Ltd owned the Mount Morgan mine until 1990.", "MOUNT MORGAN").ownership).toBe(true);
+  });
+
+  it("asks a clean question and drops 'near' when the sheet is the mine's own name", () => {
+    expect(questionFor({ name: "MOUNT MORGAN", sheet: "MOUNT MORGAN" })).toMatch(/^Tell me about the Mount Morgan gold mine, Queensland:/);
+    expect(questionFor({ name: "MOUNT LEYSHON", sheet: "CHARTERS TOWERS" })).toMatch(/Mount Leyshon gold mine near Charters Towers,/);
   });
 
   it("keeps the question within the intent's 256 bytes", () => {
