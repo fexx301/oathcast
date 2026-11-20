@@ -55,6 +55,11 @@ a { color:var(--gold); }
   the Miners whose catalogue entry for RESEARCH_QUERY_GENERAL names gold, mining, geology or Queensland; they're asked
   directly. <strong>Disclosure:</strong> this app is run by the OathCast team, which also runs Miner 64176, one of the
   specialists, so those calls are related-party.</p>
+  <p><strong>Proof.</strong> The escrow rail has no blockchain transaction per answer: each call is charged to the app's
+  escrow and settled at the epoch close. Its proof is the receipt and the node's delivery record (linked on each
+  answer; it appears about an hour after the call). The app wallet's on-chain funding:
+  <a href="https://sepolia.etherscan.io/tx/0xf9afd87bbf3675d875867adcf5259f523f5f9a526ced432c02e29964f2f3c756" target="_blank" rel="noopener">deposit tx 0xf9afd87b…c756</a>
+  (2 test USDC into the Telegraph Diamond, 20 Nov 2026).</p>
   <p>Map data: Geological Survey of Queensland, MINOCC historical workings, CC BY 4.0, State of Queensland. Tiles ©
   OpenStreetMap contributors. Every paid call: <a href="/gold-rush/api/ledger">public ledger</a>.</p>
 </footer>
@@ -108,6 +113,20 @@ function facts(f) {
   return '<table class="small">' + rows.map(([k, v, s]) => "<tr><td>" + esc(k) + "</td><td>" + esc(v) + (s ? '<br><span class="mute">' + esc(s) + "</span>" : "") + "</td></tr>").join("") + "</table>";
 }
 
+// Request, miner, amount, network and clickable proof for one paid answer.
+const NODE = "https://devnode.telegraphprotocol.com";
+function proof(a) {
+  const rc = a.receipt || {};
+  const amt = rc.amount_uusdc ? "$" + (Number(rc.amount_uusdc) / 1e6).toFixed(2) : "$0.01";
+  const links = [];
+  if (rc.receipt_hash && rc.epoch_id != null && /^0x[0-9a-f]{64}$/i.test(rc.receipt_hash))
+    links.push('<a href="' + NODE + "/v1/blocks/" + encodeURIComponent(rc.epoch_id) + "/deliveries/" + rc.receipt_hash + '" target="_blank" rel="noopener">delivery record</a>');
+  if (a.signal_hash && /^0x[0-9a-f]{64}$/i.test(a.signal_hash))
+    links.push('<a href="' + NODE + "/engine/v1/signal/" + a.signal_hash + '" target="_blank" rel="noopener">signal record</a>');
+  return '<p class="mono">' + esc(amt) + " test USDC · Ethereum Sepolia testnet · escrow · receipt " + esc(rc.receipt_hash || "—") +
+    " · epoch " + esc(rc.epoch_id ?? "—") + (links.length ? " · " + links.join(" · ") : "") + "</p>";
+}
+
 function render(r) {
   const rows = Object.entries(r.covered).map(([t, who]) =>
     "<tr><td>" + esc(t) + "</td><td>" + (who.length ? '<span class="yes">' + esc(who.join(", ")) + "</span>" : '<span class="no">nobody</span>') + "</td></tr>").join("");
@@ -117,7 +136,7 @@ function render(r) {
     if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
     const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
     return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + facts(a.facts) + (src ? '<p class="small">' + src + "</p>" : "") +
-      '<p class="mono">receipt ' + esc((a.receipt || {}).receipt_hash || "—") + " · epoch " + esc((a.receipt || {}).epoch_id ?? "—") + "</p></div>";
+      proof(a) + "</div>";
   }).join("");
   document.getElementById("report").innerHTML =
     "<h3>Who answered what</h3><table><tr><th>Question</th><th>Answered by</th></tr>" + rows + "</table>" +
