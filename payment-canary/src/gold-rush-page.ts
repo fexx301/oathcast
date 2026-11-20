@@ -96,6 +96,18 @@ async function investigate(s) {
   finally { btn.disabled = false; }
 }
 
+// Structured fields a specialist returned (production, closure, gold price, not found), shown as rows.
+function facts(f) {
+  if (!f) return "";
+  const rows = [];
+  for (const p of (Array.isArray(f.production) ? f.production : [])) rows.push(["production", [p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== "").join(" "), p.source_url || p.source_ref]);
+  if (f.closure && typeof f.closure === "object") rows.push(["closure", [f.closure.year, f.closure.reason_class, f.closure.reason_text ? "“" + f.closure.reason_text + "”" : ""].filter(Boolean).join(" · "), f.closure.source_ref]);
+  if (f.gold_price && typeof f.gold_price === "object") rows.push(["gold price", [f.gold_price.month, f.gold_price.usd_per_oz && "US$" + f.gold_price.usd_per_oz + "/oz", f.gold_price.aud_per_oz && "A$" + f.gold_price.aud_per_oz + "/oz"].filter(Boolean).join(" · "), f.gold_price.source_url || f.gold_price.series]);
+  if (Array.isArray(f.not_found) && f.not_found.length) rows.push(["looked, not found", f.not_found.join(", "), ""]);
+  if (!rows.length) return "";
+  return '<table class="small">' + rows.map(([k, v, s]) => "<tr><td>" + esc(k) + "</td><td>" + esc(v) + (s ? '<br><span class="mute">' + esc(s) + "</span>" : "") + "</td></tr>").join("") + "</table>";
+}
+
 function render(r) {
   const rows = Object.entries(r.covered).map(([t, who]) =>
     "<tr><td>" + esc(t) + "</td><td>" + (who.length ? '<span class="yes">' + esc(who.join(", ")) + "</span>" : '<span class="no">nobody</span>') + "</td></tr>").join("");
@@ -104,7 +116,7 @@ function render(r) {
       '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") + "</div>";
     if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
     const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
-    return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + (src ? '<p class="small">' + src + "</p>" : "") +
+    return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + facts(a.facts) + (src ? '<p class="small">' + src + "</p>" : "") +
       '<p class="mono">receipt ' + esc((a.receipt || {}).receipt_hash || "—") + " · epoch " + esc((a.receipt || {}).epoch_id ?? "—") + "</p></div>";
   }).join("");
   document.getElementById("report").innerHTML =

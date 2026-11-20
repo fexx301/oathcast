@@ -74,6 +74,24 @@ export function titled(s: string): string {
   return s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
+// Structured fields a specialist may return beside answer/sources (agreed with the NFT KING team, 2026-11-20).
+export const FACT_KEYS = ["site_no", "production", "closure", "gold_price", "not_found"] as const;
+
+export function structured(raw: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  const out = Object.fromEntries(FACT_KEYS.filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
+  // shortcut: drops oversized fact blocks (> 8 KB) rather than truncating them; revisit if real miners send more
+  return Object.keys(out).length && JSON.stringify(out).length <= 8192 ? out : null;
+}
+
+const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v && typeof v === "object" && Object.keys(v).length));
+
+export function factTopics(facts: Record<string, unknown> | null): Record<string, boolean> {
+  if (!facts) return {};
+  return Object.fromEntries(Object.entries({ production: "production", closure: "closure", "gold price": "gold_price" })
+    .filter(([, k]) => nonEmpty(facts[k])).map(([t]) => [t, true]));
+}
+
 export function questionFor(site: Pick<Site, "name" | "sheet">): string {
   const near = site.sheet && site.sheet.toUpperCase() !== site.name.toUpperCase() ? ` near ${titled(site.sheet)}` : "";
   const q = `Tell me about the ${titled(site.name)} gold mine${near}, Queensland: who owned it, how much gold it produced, ` +
@@ -151,6 +169,19 @@ export class GoldRush {
     return { status: 200, body: { site, question, answers, covered } };
   }
 
+  // GET /engine/v1/signal/{hash} -> payload.response: the miner's raw answer, extra fields included. Free; best effort.
+  private async rawResponse(hash: unknown): Promise<Record<string, unknown> | null> {
+    if (typeof hash !== "string" || !/^0x[0-9a-f]{64}$/i.test(hash)) return null;
+    try {
+      const r = await this.fetchFn(`${NODE}/engine/v1/signal/${hash}`, { signal: AbortSignal.timeout(15_000) });
+      const body = (await r.json()) as { payload?: { response?: unknown } };
+      const resp = body?.payload?.response;
+      return resp && typeof resp === "object" && !Array.isArray(resp) ? (resp as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+
   private async askOne(site: Site, miner: Specialist, question: string, ip: string): Promise<Record<string, unknown>> {
     const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner === miner.id);
     // A reused answer is re-checked with the current topic rule.
@@ -182,11 +213,16 @@ export class GoldRush {
       }
       const b = outcome.body;
       const result = (b.result && typeof b.result === "object" ? b.result : {}) as Record<string, unknown>;
-      const answer = String(result.answer ?? "");
+      // The node reshapes (and may reword) the answer; the miner's own response is kept under its signal hash.
+      const raw = await this.rawResponse(b.signal_hash);
+      const answer = String(raw?.answer ?? result.answer ?? "");
+      const facts = structured(raw);
       const row = {
         ...base, kind: "served", miner_id: b.miner_id ?? miner.id, miner_name: b.miner_name ?? miner.name,
-        answer, brief: result.brief ?? null, sources: Array.isArray(result.sources) ? result.sources.slice(0, 10) : [],
-        topics: topicsCovered(answer, site.name), signal_hash: b.signal_hash ?? null, receipt: outcome.receipt,
+        answer, shaped_answer: raw?.answer ? String(result.answer ?? "") : null, brief: result.brief ?? null,
+        sources: Array.isArray(raw?.sources ?? result.sources) ? ((raw?.sources ?? result.sources) as unknown[]).slice(0, 10) : [],
+        facts, topics: { ...topicsCovered(answer, site.name), ...factTopics(facts) },
+        signal_hash: b.signal_hash ?? null, receipt: outcome.receipt,
       };
       this.ledger.append({ type: "outcome", at, ...row });
       return row;

@@ -30,12 +30,13 @@ function world() {
   const fetchFn = (async (url: string, init?: RequestInit) => {
     if (url.includes("arcgis")) return json(200, GSQ_ROWS);
     if (url.includes("/api/miners")) return json(200, CATALOGUE);
+    if (url.includes("/engine/v1/signal/")) return json(200, { payload: { response: { answer: "Mount Leyshon raw answer, site 38940.", production: [] } } });
     asked.push(url);
     if (!(init?.headers as Record<string, string>)?.["X-PAYMENT"]) return json(402, CHALLENGE);
     paid++;
     const direct = url.endsWith("/64176");
     const receipt = Buffer.from(JSON.stringify({ receipt_hash: `0x${paid}`, epoch_id: 23, miner: direct ? "64176" : "20260828" })).toString("base64");
-    return json(200, { miner_id: direct ? "64176" : "20260828", miner_name: direct ? "OathCast Queensland Gold Mines" : "Generalist",
+    return json(200, { signal_hash: direct ? "0x" + "ab".repeat(32) : undefined, miner_id: direct ? "64176" : "20260828", miner_name: direct ? "OathCast Queensland Gold Mines" : "Generalist",
       result: { answer: direct ? "Mount Leyshon (site 38940) is an abandoned mine; the record holds no owners or closure dates." : "Mount Leyshon was owned by a company. Mount Leyshon produced 30,000 oz. Other mines closed.", sources: ["https://example.test/a"] } },
     { "X-PAYMENT-RESPONSE": receipt });
   }) as unknown as typeof fetch;
@@ -81,6 +82,8 @@ describe("gold rush", () => {
     expect(w.asked.filter((u) => u.endsWith("/engine/v1/ask/64176")).length).toBe(2); // 402 then paid
     expect(w.asked.filter((u) => u.endsWith("/engine/v1/ask")).length).toBe(2);
     expect((r.body.covered as Record<string, string[]>).ownership).toEqual(["Generalist"]);
+    expect(answers[0].answer).toBe("Mount Leyshon raw answer, site 38940."); // the miner's own words, not the reshaped text
+    expect(answers[1].shaped_answer).toBeNull(); // no signal hash: the reshaped answer is all there is
     expect(ledger.attempts()).toBe(2);
     expect(w.paidCount()).toBe(2);
     const again = await app.investigate({ site_no: 38940 }, "1.2.3.4");
@@ -103,5 +106,17 @@ describe("gold rush", () => {
     await expect(app.investigate({ site_no: "1; drop" }, "ip")).rejects.toBeInstanceOf(InputError);
     await expect(app.investigate({ site_no: 1 }, "ip")).rejects.toThrow("No Queensland gold working");
     expect(w.paidCount()).toBe(0);
+  });
+});
+
+describe("specialist facts", () => {
+  it("reads the miner's raw answer and structured fields from the signal record", async () => {
+    const { structured, factTopics } = await import("../src/gold-rush.js");
+    const raw = { answer: "Mount Morgan reported 7.6 Moz gold.", production: [{ commodity: "gold", amount: 7.6, unit: "Moz" }],
+      closure: { year: 1990, reason_class: "economic" }, not_found: ["gold_price"], secret: "ignored" };
+    const f = structured(raw);
+    expect(Object.keys(f ?? {})).toEqual(["production", "closure", "not_found"]);
+    expect(factTopics(f)).toEqual({ production: true, closure: true });
+    expect(structured({ answer: "x" })).toBeNull();
   });
 });
