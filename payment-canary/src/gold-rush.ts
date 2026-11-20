@@ -152,11 +152,40 @@ export class GoldRush {
     return run;
   }
 
-  private async investigateOne(raw: unknown, ip: string) {
+  private async siteFor(raw: unknown): Promise<Site> {
     const siteNo = Number((raw as { site_no?: unknown })?.site_no);
     if (!Number.isInteger(siteNo) || siteNo <= 0) throw new InputError("site_no must be a positive integer.");
     const site = (await this.sites()).find((s) => s.site_no === siteNo);
     if (!site) throw new InputError("No Queensland gold working has that site number.");
+    return site;
+  }
+
+  // Step-by-step investigation, part 1: who will be asked, and the question. Free.
+  async plan(raw: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+    const site = await this.siteFor(raw);
+    const specialists = await this.specialists();
+    if (!specialists.length) return { status: 503, body: { error: "No specialist Miner for Queensland gold mines is registered right now." } };
+    const steps = [...specialists.map((m) => ({ miner: m.id, miner_name: m.name, path: "direct" })),
+      { miner: "ranked", miner_name: ROUTED.name, path: "ranked route" }];
+    return { status: 200, body: { site, question: questionFor(site), steps } };
+  }
+
+  // Part 2: one paid ask. Only a current specialist or "ranked", so the page can't be used to pay arbitrary miners.
+  ask(raw: unknown, ip: string): Promise<{ status: number; body: Record<string, unknown> }> {
+    const run = this.queue.then(async () => {
+      const site = await this.siteFor(raw);
+      const want = String((raw as { miner?: unknown })?.miner ?? "");
+      const miner = want === "ranked" ? ROUTED : (await this.specialists()).find((m) => m.id === want);
+      if (!miner) throw new InputError("miner must be a current specialist or \"ranked\".");
+      const answer = await this.askOne(site, miner, questionFor(site), ip);
+      return { status: 200, body: { ...answer, path: want === "ranked" ? "ranked route" : "direct" } };
+    });
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async investigateOne(raw: unknown, ip: string) {
+    const site = await this.siteFor(raw);
     const specialists = await this.specialists();
     if (!specialists.length) return { status: 503, body: { error: "No specialist Miner for Queensland gold mines is registered right now." } };
     const question = questionFor(site);
@@ -269,6 +298,16 @@ export function handler(app: GoldRush) {
       if (req.method === "GET" && path === "/gold-rush/api/sites") return send(res, 200, JSON.stringify({ source: "Geological Survey of Queensland, MINOCC historical workings (CC BY 4.0)", sites: await app.sites() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/specialists") return send(res, 200, JSON.stringify({ intent: INTENT, specialists: await app.specialists() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/ledger") return send(res, 200, JSON.stringify({ node: NODE, intent: INTENT, calls: app.ledger.public() }), jsonType);
+      if (req.method === "GET" && path === "/gold-rush/api/plan") {
+        const out = await app.plan({ site_no: new URL(req.url ?? "/", "http://x").searchParams.get("site_no") });
+        return send(res, out.status, JSON.stringify(out.body), jsonType);
+      }
+      if (req.method === "POST" && path === "/gold-rush/api/ask") {
+        if (!String(req.headers["content-type"] ?? "").startsWith(jsonType)) return send(res, 415, JSON.stringify({ error: "Send JSON." }), jsonType);
+        const ip = String(req.headers["x-real-ip"] ?? req.socket.remoteAddress ?? "unknown");
+        const out = await app.ask(await readBody(req), ip);
+        return send(res, out.status, JSON.stringify(out.body), jsonType);
+      }
       if (req.method === "POST" && path === "/gold-rush/api/investigate") {
         if (!String(req.headers["content-type"] ?? "").startsWith(jsonType)) return send(res, 415, JSON.stringify({ error: "Send JSON." }), jsonType);
         const ip = String(req.headers["x-real-ip"] ?? req.socket.remoteAddress ?? "unknown");

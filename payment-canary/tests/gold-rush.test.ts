@@ -120,3 +120,27 @@ describe("specialist facts", () => {
     expect(structured({ answer: "x" })).toBeNull();
   });
 });
+
+describe("step-by-step investigation", () => {
+  it("plans the specialists plus the ranked route, then asks one at a time", async () => {
+    const w = world();
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, w.fetchFn, () => 1_800_000_000_000);
+    const plan = await app.plan({ site_no: "38940" });
+    expect(plan.status).toBe(200);
+    expect((plan.body.steps as { miner: string }[]).map((s) => s.miner)).toEqual(["64176", "ranked"]);
+    expect(w.paidCount()).toBe(0); // planning is free
+    const one = await app.ask({ site_no: 38940, miner: "64176" }, "ip");
+    expect([one.body.kind, one.body.path, one.body.miner_id]).toEqual(["served", "direct", "64176"]);
+    const routed = await app.ask({ site_no: 38940, miner: "ranked" }, "ip");
+    expect([routed.body.kind, routed.body.path]).toEqual(["served", "ranked route"]);
+    expect(w.paidCount()).toBe(2);
+  });
+
+  it("refuses to pay a miner that isn't a current specialist", async () => {
+    const w = world();
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, w.fetchFn);
+    await expect(app.ask({ site_no: 38940, miner: "9" }, "ip")).rejects.toBeInstanceOf(InputError); // in the catalogue, not a specialist
+    await expect(app.ask({ site_no: 38940, miner: "../x" }, "ip")).rejects.toBeInstanceOf(InputError);
+    expect(w.paidCount()).toBe(0);
+  });
+});

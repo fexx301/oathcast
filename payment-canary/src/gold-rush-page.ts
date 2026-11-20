@@ -100,6 +100,18 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; } td, th { text
 th { color: var(--faint); font-weight: 600; font-size: 13px; }
 .yes { color: var(--ok); } .no { color: var(--bad); } .mute { color: var(--mute); } .small { font-size: 13px; }
 
+.q { color: var(--mute); font-size: 14px; margin: 0 0 var(--space-3); }
+.run { list-style: none; padding: 0; margin: 0 0 var(--space-4); }
+.run li { display: flex; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.run li small { color: var(--mute); overflow-wrap: anywhere; }
+.run .st { width: 18px; flex: none; text-align: center; font-weight: 800; color: var(--faint); }
+.run .busy .st { color: var(--gold); } .run .done .st { color: var(--ok); } .run .fail .st { color: var(--bad); }
+.verdict { background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: var(--space-3) var(--space-4); margin: var(--space-3) 0; }
+.verdict p { margin: 4px 0; font-size: 14px; } .verdict span { font-weight: 800; margin-right: 6px; }
+.warn { color: var(--gold); } .facts tr.flag td { background: oklch(80% 0.14 82 / .06); }
+.facts small { color: var(--mute); }
+.ghost { background: none; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+.ghost:hover { border-color: var(--gold-deep); }
 footer { padding: 0 var(--space-5) var(--space-6); color: var(--faint); font-size: 13px; max-width: 1100px; }
 footer strong { color: var(--mute); }
 
@@ -224,29 +236,123 @@ function select(s) {
   document.getElementById("back").onclick = home;
 }
 
+// Step-by-step investigation: plan (free), then one paid ask per miner, each rendered as it lands.
+let current = null;
 async function investigate(s) {
   const btn = document.getElementById("go");
-  btn.disabled = true; btn.textContent = "Buying answers through Telegraph…";
-  document.getElementById("report").innerHTML = "";
+  btn.disabled = true; btn.textContent = "Investigating…";
+  const rep = document.getElementById("report");
   try {
-    const res = await fetch(BASE + "api/investigate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ site_no: s.site_no }) });
-    const r = await res.json();
-    if (!res.ok) { document.getElementById("report").innerHTML = '<p class="no">' + esc(r.error) + "</p>"; return; }
-    render(r);
-  } catch { document.getElementById("report").innerHTML = '<p class="no">The request failed. Try again.</p>'; }
-  finally { btn.disabled = false; btn.textContent = "Investigate again (reuses paid answers)"; }
+    const pr = await fetch(BASE + "api/plan?site_no=" + s.site_no);
+    const plan = await pr.json();
+    if (!pr.ok) { rep.innerHTML = '<p class="no">' + esc(plan.error) + "</p>"; return; }
+    current = { site: s, question: plan.question, answers: [], started: new Date().toISOString() };
+    rep.innerHTML = '<h3>Investigation</h3><p class="q">“' + esc(plan.question) + '”</p><ol class="run" id="run">' +
+      plan.steps.map((st, i) => '<li id="step-' + i + '" class="wait"><span class="st">○</span><span><b>' + esc(st.miner_name) +
+        '</b> <span class="tag">' + esc(st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
+      '<div id="summary"></div><div id="answers"></div>';
+    for (let i = 0; i < plan.steps.length; i++) {
+      const st = plan.steps[i], row = document.getElementById("step-" + i);
+      row.className = "busy"; row.querySelector(".st").textContent = "◌"; row.querySelector("small").textContent = "asking through Telegraph…";
+      let a;
+      try {
+        const res = await fetch(BASE + "api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ site_no: s.site_no, miner: st.miner }) });
+        a = await res.json();
+        if (!res.ok) a = { kind: "refused", reason: a.error, miner_name: st.miner_name, path: st.path };
+      } catch { a = { kind: "refused", reason: "The request failed.", miner_name: st.miner_name, path: st.path }; }
+      current.answers.push(a);
+      const rc = a.receipt || {};
+      row.className = a.kind === "served" ? "done" : "fail";
+      row.querySelector(".st").textContent = a.kind === "served" ? "✓" : "✕";
+      row.querySelector("small").textContent = a.kind === "served"
+        ? (a.reused ? "answered · reused, no new charge" : "answered · paid $0.01") + (rc.receipt_hash ? " · receipt " + rc.receipt_hash.slice(0, 10) + "…" : "") +
+          (a.path === "ranked route" && a.miner_name ? " · router picked " + a.miner_name : "")
+        : (a.reason || a.kind) + (a.kind === "paid_refusal" || a.kind === "refused" ? " · not charged" : "");
+      renderReport();
+    }
+    document.getElementById("answers").insertAdjacentHTML("afterend", '<p><button class="ghost" id="dl">Download report (JSON)</button></p>');
+    document.getElementById("dl").onclick = download;
+  } catch { rep.innerHTML = '<p class="no">The request failed. Try again.</p>'; }
+  finally { btn.disabled = false; btn.textContent = "Investigate again · reuses paid answers"; }
 }
 
-// Structured fields a specialist returned (production, closure, gold price, not found), shown as rows.
-function facts(f) {
-  if (!f) return "";
-  const rows = [];
-  for (const p of (Array.isArray(f.production) ? f.production : [])) rows.push(["production", [p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== "").join(" "), p.source_url || p.source_ref]);
-  if (f.closure && typeof f.closure === "object") rows.push(["closure", [f.closure.year, f.closure.reason_class, f.closure.reason_text ? "“" + f.closure.reason_text + "”" : ""].filter(Boolean).join(" · "), f.closure.source_ref]);
-  if (f.gold_price && typeof f.gold_price === "object") rows.push(["gold price", [f.gold_price.month, f.gold_price.usd_per_oz && "US$" + f.gold_price.usd_per_oz + "/oz", f.gold_price.aud_per_oz && "A$" + f.gold_price.aud_per_oz + "/oz"].filter(Boolean).join(" · "), f.gold_price.source_url || f.gold_price.series]);
-  if (Array.isArray(f.not_found) && f.not_found.length) rows.push(["looked, not found", f.not_found.join(", "), ""]);
-  if (!rows.length) return "";
-  return '<table class="small">' + rows.map(([k, v, s]) => "<tr><td>" + esc(k) + "</td><td>" + esc(v) + (s ? '<br><span class="mute">' + esc(s) + "</span>" : "") + "</td></tr>").join("") + "</table>";
+// Survey size classes in tonnes of gold, for checking reported production against the record.
+const BAND_T = { "very small": [0, 0.5], small: [0.5, 5], medium: [5, 50], large: [50, 150], giant: [150, Infinity] };
+const OZ_PER_T = 32150.7466;
+function tonnes(p) {
+  const n = Number(p.amount), u = String(p.unit || "").toLowerCase();
+  if (!isFinite(n)) return null;
+  return u === "t" || u === "tonnes" ? n : u === "kg" ? n / 1000 : u === "oz" ? n / OZ_PER_T : u === "koz" ? n * 1e3 / OZ_PER_T : u === "moz" ? n * 1e6 / OZ_PER_T : null;
+}
+const fmtT = (t) => t >= 10 ? t.toFixed(0) + " t" : t >= 1 ? t.toFixed(1) + " t" : (t * 1000).toFixed(0) + " kg";
+
+// The report: what's known and missing, every structured fact with its miner and source, conflicts flagged, then the answers.
+function renderReport() {
+  const r = current, s = r.site, served = r.answers.filter((a) => a.kind === "served");
+  const TOP = ["ownership", "production", "closure", "gold price"];
+  const who = Object.fromEntries(TOP.map((t) => [t, served.filter((a) => (a.topics || {})[t]).map((a) => a.miner_name)]));
+  const known = ["location and size class (survey record)"].concat(TOP.filter((t) => who[t].length));
+  const missing = TOP.filter((t) => !who[t].length);
+  const rows = [], flags = [];
+  rows.push(["size class", (s.band || "unsized") + (BAND_T[s.band] ? " (" + (BAND_T[s.band][1] === Infinity ? "over " + BAND_T[s.band][0] : BAND_T[s.band][0] + "–" + BAND_T[s.band][1]) + " t of gold)" : ""), "GSQ MINOCC record", ""]);
+  const prod = [];
+  for (const a of served) {
+    const f = a.facts || {};
+    for (const p of (Array.isArray(f.production) ? f.production : [])) {
+      const t = tonnes(p), period = (p.period_from || "") + "–" + (p.period_to || "");
+      prod.push({ t, a, period });
+      const range = BAND_T[s.band];
+      let flag = "";
+      // The survey's class is the mine's lifetime total: a figure above it is suspect; a lifetime figure (no period) below it too.
+      if (t != null && range && (t > range[1] || (period === "–" && t < range[0]))) {
+        flag = t > range[1] ? "more than the survey's size class allows" : "below the survey's size class for a lifetime total";
+        flags.push(a.miner_name + ": " + fmtT(t) + " reported vs " + s.band + " in the survey");
+      }
+      rows.push(["production", [p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== "").join(" ") + (t != null ? " ≈ " + fmtT(t) : ""), a.miner_name, p.source_url || p.source_ref || "", flag]);
+    }
+    if (f.closure && typeof f.closure === "object") rows.push(["closure", [f.closure.year, f.closure.reason_class, f.closure.reason_text ? "“" + f.closure.reason_text + "”" : ""].filter(Boolean).join(" · "), a.miner_name, f.closure.source_ref || "", ""]);
+    if (f.gold_price && typeof f.gold_price === "object") rows.push(["gold price", [f.gold_price.month, f.gold_price.usd_per_oz && "US$" + f.gold_price.usd_per_oz + "/oz", f.gold_price.aud_per_oz && "A$" + f.gold_price.aud_per_oz + "/oz"].filter(Boolean).join(" · "), a.miner_name, f.gold_price.source_url || f.gold_price.series || "", ""]);
+  }
+  // Different miners, same period, values more than 10% apart: a real disagreement.
+  const byPeriod = {};
+  for (const x of prod) if (x.t != null) (byPeriod[x.period] = byPeriod[x.period] || []).push(x);
+  for (const [period, xs] of Object.entries(byPeriod)) {
+    const names = new Set(xs.map((x) => x.a.miner_name));
+    const ts = xs.map((x) => x.t);
+    if (names.size > 1 && Math.max(...ts) > Math.min(...ts) * 1.1)
+      flags.push("miners disagree on production" + (period !== "–" ? " for " + period : "") + ": " + xs.map((x) => x.a.miner_name + " " + fmtT(x.t)).join(" vs "));
+  }
+  const link = (u) => /^https?:/.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">source</a>' : esc(u);
+  document.getElementById("summary").innerHTML =
+    '<div class="verdict"><p><span class="yes">Known</span> ' + esc(known.join(" · ")) + "</p>" +
+    '<p><span class="no">Missing</span> ' + (missing.length ? esc(missing.join(" · ")) : "nothing from the four questions") + "</p>" +
+    (flags.length ? '<p><span class="warn">Check</span> ' + esc(flags.join("; ")) + "</p>" : "") + "</div>" +
+    '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.map(([k, v, m, src, flag]) =>
+      "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
+      "</td><td>" + esc(m) + (src ? "<br><small>" + link(src) + "</small>" : "") + "</td></tr>").join("") + "</table>" +
+    '<p class="mute small">Topics without structured facts come from a keyword check of sentences that name the mine. Read the answers below.</p>';
+  const card = (a) => {
+    const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
+      '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") + "</div>";
+    if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
+    const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
+    return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + (src ? '<p class="small">' + src + "</p>" : "") + proof(a) + "</div>";
+  };
+  const spec = r.answers.filter((a) => a.path === "direct"), ranked = r.answers.filter((a) => a.path === "ranked route");
+  document.getElementById("answers").innerHTML = (spec.length ? "<h3>Specialist answers</h3>" + spec.map(card).join("") : "") +
+    (ranked.length ? '<h3>Ranked-route comparison</h3><p class="mute small">The same question with Telegraph choosing the miner. Shown for contrast.</p>' + ranked.map(card).join("") : "");
+}
+
+function download() {
+  const r = current;
+  const out = { app: "Gold Rush", url: location.origin + "/gold-rush#site=" + r.site.site_no, generated_at: new Date().toISOString(),
+    network: "Ethereum Sepolia testnet · Telegraph escrow", site: r.site, question: r.question,
+    answers: r.answers.map((a) => ({ path: a.path, kind: a.kind, miner_id: a.miner_id ?? null, miner_name: a.miner_name ?? null, reused: !!a.reused,
+      answer: a.answer ?? null, sources: a.sources ?? [], facts: a.facts ?? null, topics: a.topics ?? null, reason: a.reason ?? null,
+      receipt: a.receipt ?? null, signal_hash: a.signal_hash ?? null })) };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
+  const el = document.createElement("a"); el.href = url; el.download = "gold-rush-" + r.site.site_no + ".json";
+  document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // Request, miner, amount, network and clickable proof for one paid answer.
@@ -261,23 +367,6 @@ function proof(a) {
     links.push('<a href="' + NODE + "/engine/v1/signal/" + a.signal_hash + '" target="_blank" rel="noopener">signal record</a>');
   return '<p class="mono">' + esc(amt) + " test USDC · Ethereum Sepolia testnet · escrow · receipt " + esc(rc.receipt_hash || "—") +
     " · epoch " + esc(rc.epoch_id ?? "—") + (links.length ? " · " + links.join(" · ") : "") + "</p>";
-}
-
-function render(r) {
-  const rows = Object.entries(r.covered).map(([t, who]) =>
-    "<tr><td>" + esc(t) + "</td><td>" + (who.length ? '<span class="yes">' + esc(who.join(", ")) + "</span>" : '<span class="no">nobody</span>') + "</td></tr>").join("");
-  const cards = r.answers.map((a) => {
-    const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
-      '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") + "</div>";
-    if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
-    const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
-    return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + facts(a.facts) + (src ? '<p class="small">' + src + "</p>" : "") +
-      proof(a) + "</div>";
-  }).join("");
-  document.getElementById("report").innerHTML =
-    "<h3>Who answered what</h3><table><tr><th>Question</th><th>Answered by</th></tr>" + rows + "</table>" +
-    '<p class="mute small">A keyword check of each answer, plus any structured fields. Read the answers; "nobody" marks a gap for the next miner to fill.</p>' +
-    "<h3>Answers</h3>" + cards;
 }
 
 // Size filter: the survey's gold classes; "very small" (most of the 8,000) starts hidden so the larger sites stand out.
