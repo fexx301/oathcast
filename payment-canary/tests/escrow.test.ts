@@ -74,6 +74,18 @@ describe("escrowAsk", () => {
     expect(calls[1].body).toBe(calls[0].body);
   });
 
+  it("sends a direct ask to /engine/v1/ask/{minerId} and refuses a non-numeric id", async () => {
+    const urls: string[] = [];
+    const fetchFn = (async (url: string) => {
+      urls.push(url);
+      return json(400, { error: "invalid_params" });
+    }) as unknown as typeof fetch;
+    await escrowAsk({ node: "https://node.test", signer: account, body: {}, minerId: "64176", fetchFn });
+    await escrowAsk({ node: "https://node.test", signer: account, body: {}, fetchFn });
+    expect(urls).toEqual(["https://node.test/engine/v1/ask/64176", "https://node.test/engine/v1/ask"]);
+    await expect(escrowAsk({ node: "https://node.test", signer: account, body: {}, minerId: "1/../x", fetchFn })).rejects.toThrow("numeric");
+  });
+
   it("does not sign when the unpaid ask is refused (bad params cost nothing)", async () => {
     let calls = 0;
     const fetchFn = (async () => {

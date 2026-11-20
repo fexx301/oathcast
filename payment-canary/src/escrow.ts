@@ -49,6 +49,8 @@ export interface AskOptions {
   node: string;
   signer: Signer;
   body: Record<string, unknown>;
+  // Direct ask: name the miner (POST /engine/v1/ask/{minerId}); omit for the ranked route.
+  minerId?: string;
   fetchFn?: typeof fetch;
   now?: () => number;
   nonce?: () => string;
@@ -117,7 +119,8 @@ export function decodeReceipt(header: string | null): EscrowReceipt | null {
 
 export async function escrowAsk(options: AskOptions): Promise<AskOutcome> {
   const fetchFn = options.fetchFn ?? fetch;
-  const url = `${options.node}/engine/v1/ask`;
+  if (options.minerId !== undefined && !/^\d{1,20}$/.test(options.minerId)) throw new Error("minerId must be numeric");
+  const url = `${options.node}/engine/v1/ask${options.minerId ? `/${options.minerId}` : ""}`;
   const body = JSON.stringify(options.body);
   const headers = { "Content-Type": "application/json" };
 
