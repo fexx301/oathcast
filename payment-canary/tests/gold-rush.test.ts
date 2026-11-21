@@ -123,6 +123,47 @@ describe("specialist facts", () => {
   });
 });
 
+describe("review fixes (Astra, 2026-11-21)", () => {
+  it("never pays twice for a site and miner whose earlier payment has no settled outcome", async () => {
+    const w = world();
+    const ledger = new Ledger(null);
+    // A paid attempt that timed out: logged before paying, then only an "unknown" outcome.
+    ledger.append({ type: "attempt", at: new Date(1_800_000_000_000).toISOString(), id: "gr-1", site_no: 38940, site_name: "MOUNT LEYSHON", asked_miner: "64176", question: "q" });
+    ledger.append({ type: "outcome", at: new Date(1_800_000_000_000).toISOString(), id: "gr-1", kind: "unknown", reason: "timeout" });
+    const app = new GoldRush(ledger, account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, w.fetchFn, () => 1_800_000_000_000);
+    const r = await app.ask({ site_no: 38940, miner: "64176" }, "ip");
+    expect(r.body.kind).toBe("unknown");
+    expect(w.paidCount()).toBe(0);
+    const ranked = await app.ask({ site_no: 38940, miner: "ranked" }, "ip"); // other miners are unaffected
+    expect(ranked.body.kind).toBe("served");
+  });
+
+  it("counts a topic only from facts about this mine, not a neighbouring working", async () => {
+    const { factTopics, aboutSite } = await import("../src/gold-rush.js");
+    const facts = { ownership: [{ owner: "Brilliant Deep Levels GM Co", entity: "Brilliant Deeps" }],
+      production: [{ commodity: "gold", amount: 51482.73, unit: "kg", entity: "Brilliant Lode" }], closure: [{ year: 1917, entity: "Brilliant Extended" }] };
+    expect(factTopics(facts, "BRILLIANT LODE")).toEqual({ production: true });
+    expect(factTopics(facts)).toEqual({ ownership: true, production: true, closure: true }); // no site name: unchanged behaviour
+    expect(aboutSite({ entity: "Mount Morgan mine" }, "MOUNT MORGAN")).toBe(true);
+    expect(aboutSite({}, "MOUNT MORGAN")).toBe(true);
+  });
+
+  it("drops structured fields that name a different survey site", async () => {
+    const w = world();
+    const fetchFn = (async (url: string, init?: RequestInit) => url.includes("/engine/v1/signal/")
+      ? json(200, { payload: { response: { answer: "x", site_no: 1, ownership: [{ owner: "Someone" }] } } })
+      : w.fetchFn(url, init)) as unknown as typeof fetch;
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, fetchFn, () => 1_800_000_000_000);
+    const r = await app.ask({ site_no: 38940, miner: "64176" }, "ip");
+    expect(r.body.facts).toBeNull();
+  });
+
+  it("lists each active specialist once", () => {
+    const dup = [...CATALOGUE, { ...CATALOGUE[0] }, { ...CATALOGUE[0], id: "65000", activation_status: "pending" }];
+    expect(specialistsFrom(dup).map((m) => m.id)).toEqual(["64176"]);
+  });
+});
+
 describe("step-by-step investigation", () => {
   it("plans the specialists plus the ranked route, then asks one at a time", async () => {
     const w = world();

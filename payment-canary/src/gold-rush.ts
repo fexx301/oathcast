@@ -64,9 +64,10 @@ export function topicsCovered(answer: string, siteName = ""): Record<string, boo
 export function specialistsFrom(catalogue: unknown): Specialist[] {
   const items = Array.isArray(catalogue) ? catalogue : ((catalogue as { miners?: unknown[] })?.miners ?? []);
   return (items as Record<string, unknown>[])
-    .filter((m) => Array.isArray(m.supported_intents) && m.supported_intents.includes(INTENT) && m.activation_status !== "rejected")
+    .filter((m) => Array.isArray(m.supported_intents) && m.supported_intents.includes(INTENT) && m.activation_status === "active")
     .map((m) => ({ id: String(m.id), name: String(m.name ?? ""), description: String(m.description ?? "") }))
     .filter((m) => /^\d+$/.test(m.id) && SPECIALIST.test(`${m.name} ${m.description}`) && !NOT_SPECIALIST.test(`${m.name} ${m.description}`))
+    .filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i)
     .slice(0, MAX_SPECIALISTS);
 }
 
@@ -87,10 +88,17 @@ export function structured(raw: Record<string, unknown> | null): Record<string, 
 
 const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v && typeof v === "object" && Object.keys(v).length));
 
-export function factTopics(facts: Record<string, unknown> | null): Record<string, boolean> {
+// A fact row is about this mine unless the miner names a different working (e.g. Brilliant Deeps beside Brilliant Lode).
+export function aboutSite(row: unknown, siteName = ""): boolean {
+  const e = (row as { entity?: unknown } | null)?.entity;
+  return !siteName || typeof e !== "string" || !e.trim() || e.toLowerCase().includes(siteName.toLowerCase());
+}
+
+export function factTopics(facts: Record<string, unknown> | null, siteName = ""): Record<string, boolean> {
   if (!facts) return {};
+  const rows = (v: unknown) => (Array.isArray(v) ? v : v && typeof v === "object" ? [v] : []).filter((x) => aboutSite(x, siteName));
   return Object.fromEntries(Object.entries({ ownership: "ownership", production: "production", closure: "closure", "gold price": "gold_price" })
-    .filter(([, k]) => nonEmpty(facts[k])).map(([t]) => [t, true]));
+    .filter(([, k]) => (k === "gold_price" ? nonEmpty(facts[k]) : rows(facts[k]).length > 0)).map(([t]) => [t, true]));
 }
 
 export function questionFor(site: Pick<Site, "name" | "sheet"> & { site_no?: number }): string {
@@ -215,9 +223,16 @@ export class GoldRush {
   }
 
   private async askOne(site: Site, miner: Specialist, question: string, ip: string): Promise<Record<string, unknown>> {
-    const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner === miner.id);
-    // A reused answer is re-checked with the current topic rule.
-    if (cached) return { ...cached, type: undefined, reused: true, topics: topicsCovered(String(cached.answer ?? ""), site.name) };
+    const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id;
+    const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && mine(r));
+    // A reused answer is re-checked with the same topic rule as a fresh one.
+    if (cached) return { ...cached, type: undefined, reused: true,
+      topics: { ...topicsCovered(String(cached.answer ?? ""), site.name), ...factTopics((cached.facts ?? null) as Record<string, unknown> | null, site.name) } };
+    // An earlier payment for this site and miner with no settled outcome may have been charged: never pay for it twice.
+    // shortcut: it stays blocked until the ledger row is reconciled by hand; automate if timeouts become common.
+    const settled = new Set(this.ledger.rows.filter((r) => r.type === "outcome" && r.kind !== "unknown").map((r) => r.id));
+    if (this.ledger.rows.some((r) => r.type === "attempt" && mine(r) && !settled.has(r.id)))
+      return { kind: "unknown", miner_id: miner.id, miner_name: miner.name, reason: "An earlier payment for this question has no recorded outcome, so it isn't paid again." };
     const now = this.now();
     if (this.ledger.attempts() >= this.limits.maxCalls) return { kind: "skipped", miner_id: miner.id, miner_name: miner.name, reason: "This demo's call budget is used up." };
     if (this.ledger.attempts(Math.floor(now / DAY_MS) * DAY_MS) >= this.limits.maxPerDay) return { kind: "skipped", miner_id: miner.id, miner_name: miner.name, reason: "Today's call budget is used up." };
@@ -248,19 +263,21 @@ export class GoldRush {
       // The node reshapes (and may reword) the answer; the miner's own response is kept under its signal hash.
       const raw = await this.rawResponse(b.signal_hash);
       const answer = String(raw?.answer ?? result.answer ?? "");
-      const facts = structured(raw);
+      const parsed = structured(raw);
+      // Structured fields for a different survey site number are dropped rather than credited to this one.
+      const facts = parsed && parsed.site_no != null && Number(parsed.site_no) !== site.site_no ? null : parsed;
       const row = {
         ...base, kind: "served", miner_id: b.miner_id ?? miner.id, miner_name: b.miner_name ?? miner.name,
         answer, shaped_answer: raw?.answer ? String(result.answer ?? "") : null, brief: result.brief ?? null,
         sources: Array.isArray(raw?.sources ?? result.sources) ? ((raw?.sources ?? result.sources) as unknown[]).slice(0, 10) : [],
-        facts, topics: { ...topicsCovered(answer, site.name), ...factTopics(facts) },
+        facts, topics: { ...topicsCovered(answer, site.name), ...factTopics(facts, site.name) },
         signal_hash: b.signal_hash ?? null, receipt: outcome.receipt,
       };
       this.ledger.append({ type: "outcome", at, ...row });
       return row;
     } catch (error) {
       if (error instanceof OutcomeUnknown) {
-        this.ledger.append({ type: "outcome", at: new Date(this.now()).toISOString(), id, kind: "unknown", reason: error.message });
+        this.ledger.append({ type: "outcome", at: new Date(this.now()).toISOString(), ...base, kind: "unknown", reason: error.message });
         return { ...base, kind: "unknown", miner_id: miner.id, miner_name: miner.name, reason: "No answer in time; counted as possibly charged." };
       }
       return { ...base, kind: "refused", miner_id: miner.id, miner_name: miner.name, reason: `payment offer failed our checks: ${(error as Error).message}` };

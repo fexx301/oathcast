@@ -197,6 +197,7 @@ function syncVerySmall() {
 }
 
 function home() {
+  current = null;
   history.replaceState(null, "", location.pathname);
   if (ring) { ring.remove(); ring = null; }
   document.getElementById("report").innerHTML = "";
@@ -204,7 +205,7 @@ function home() {
     "<h1>Pick a gold working</h1>" +
     '<p class="mute">' + (sites.length ? sites.length.toLocaleString() + " historical workings with gold, from the Geological Survey of Queensland." : "Loading the survey's sites…") + "</p>" +
     '<ol class="steps"><li>Pick a site on the map, search above, or try one below.</li>' +
-    "<li>Investigate: the app asks every specialist miner on Telegraph who owned it, how much gold it produced, and when and why it closed.</li>" +
+    "<li>Investigate: the app asks the matching specialist miners on Telegraph (up to four) who owned it, how much gold it produced, and when and why it closed.</li>" +
     "<li>Read who answered what, with sources and receipts, and what's still missing.</li></ol>" +
     '<div class="picks">' + PICKS.filter(([n]) => byNo.has(n)).map(([n, note]) => {
       const s = byNo.get(n);
@@ -221,6 +222,7 @@ function focusSite(s) {
 }
 
 function select(s) {
+  current = null; // leaving a run stops its remaining asks
   const n = specialists.length;
   history.replaceState(null, "", "#site=" + s.site_no);
   if (ring) ring.remove();
@@ -243,16 +245,18 @@ async function investigate(s) {
   const btn = document.getElementById("go");
   btn.disabled = true; btn.textContent = "Investigating…";
   const rep = document.getElementById("report");
+  let run = null;
   try {
     const pr = await fetch(BASE + "api/plan?site_no=" + s.site_no);
     const plan = await pr.json();
     if (!pr.ok) { rep.innerHTML = '<p class="no">' + esc(plan.error) + "</p>"; return; }
-    current = { site: s, question: plan.question, answers: [], started: new Date().toISOString() };
+    run = current = { site: s, question: plan.question, answers: [], started: new Date().toISOString() };
     rep.innerHTML = '<h3>Investigation</h3><p class="q">“' + esc(plan.question) + '”</p><ol class="run" id="run">' +
       plan.steps.map((st, i) => '<li id="step-' + i + '" class="wait"><span class="st">○</span><span><b>' + esc(st.miner_name) +
         '</b> <span class="tag">' + esc(st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
       '<div id="summary"></div><div id="answers"></div>';
     for (let i = 0; i < plan.steps.length; i++) {
+      if (current !== run) return; // the user moved on: don't pay for the rest of this run
       const st = plan.steps[i], row = document.getElementById("step-" + i);
       row.className = "busy"; row.querySelector(".st").textContent = "◌"; row.querySelector("small").textContent = "asking through Telegraph…";
       let a;
@@ -261,7 +265,8 @@ async function investigate(s) {
         a = await res.json();
         if (!res.ok) a = { kind: "refused", reason: a.error, miner_name: st.miner_name, path: st.path };
       } catch { a = { kind: "refused", reason: "The request failed.", miner_name: st.miner_name, path: st.path }; }
-      current.answers.push(a);
+      if (current !== run) return;
+      run.answers.push(a);
       const rc = a.receipt || {};
       row.className = a.kind === "served" ? "done" : "fail";
       row.querySelector(".st").textContent = a.kind === "served" ? "✓" : "✕";
@@ -269,11 +274,11 @@ async function investigate(s) {
         ? (a.reused ? "answered · reused, no new charge" : "answered · paid $0.01") + (rc.receipt_hash ? " · receipt " + rc.receipt_hash.slice(0, 10) + "…" : "") +
           (a.path === "ranked route" && a.miner_name ? " · router picked " + a.miner_name : "")
         : (a.reason || a.kind) + (a.kind === "paid_refusal" || a.kind === "refused" ? " · not charged" : "");
-      renderReport();
+      renderReport(run);
     }
     document.getElementById("answers").insertAdjacentHTML("afterend", '<p><button class="ghost" id="dl">Download report (JSON)</button></p>');
     document.getElementById("dl").onclick = download;
-  } catch { rep.innerHTML = '<p class="no">The request failed. Try again.</p>'; }
+  } catch { if (current === run) rep.innerHTML = '<p class="no">The request failed. Try again.</p>'; }
   finally { btn.disabled = false; btn.textContent = "Investigate again · reuses paid answers"; }
 }
 
@@ -284,6 +289,7 @@ const src = (x) => x.source_url || x.source_title || x.source_ref || "";
 const BAND_T = { "very small": [0, 0.5], small: [0.5, 5], medium: [5, 50], large: [50, 150], giant: [150, Infinity] };
 const OZ_PER_T = 32150.7466;
 function tonnes(p) {
+  if (p.amount === null || p.amount === undefined || p.amount === "") return null;
   const n = Number(p.amount), u = String(p.unit || "").toLowerCase();
   if (!isFinite(n)) return null;
   return u === "t" || u === "tonnes" ? n : u === "kg" ? n / 1000 : u === "g" ? n / 1e6 : (u === "oz" || u === "troy oz") ? n / OZ_PER_T :
@@ -292,36 +298,43 @@ function tonnes(p) {
 const fmtT = (t) => t >= 10 ? t.toFixed(0) + " t" : t >= 1 ? t.toFixed(1) + " t" : (t * 1000).toFixed(0) + " kg";
 
 // The report: what's known and missing, every structured fact with its miner and source, conflicts flagged, then the answers.
-function renderReport() {
-  const r = current, s = r.site;
+function renderReport(r) {
+  const s = r.site;
+  // A fact names another working (e.g. Brilliant Deeps beside Brilliant Lode): shown apart and never counted for this site.
+  const here = (x) => !x.entity || String(x.entity).toLowerCase().includes(String(s.name).toLowerCase());
   // Known/missing and facts come from specialists only; the ranked-route answer is shown for contrast, never counted.
   const served = r.answers.filter((a) => a.kind === "served" && a.path === "direct");
-  const TOP = ["ownership", "production", "closure", "gold price"];
+  const TOP = ["ownership", "production", "closure"];
+  const gp = served.some((a) => (a.topics || {})["gold price"]);
   const who = Object.fromEntries(TOP.map((t) => [t, served.filter((a) => (a.topics || {})[t]).map((a) => a.miner_name)]));
-  const known = ["location and size class (survey record)"].concat(TOP.filter((t) => who[t].length));
+  const known = ["location and size class (survey record)"].concat(TOP.filter((t) => who[t].length), gp ? ["gold price"] : []);
   const missing = TOP.filter((t) => !who[t].length);
-  const rows = [], flags = [];
+  const rows = [], near = [], flags = [];
+  const add = (x, k, v, a, from, flag) => here(x) ? rows.push([k, v, a.miner_name, from, flag || ""]) : near.push([k, x.entity + ": " + v, a.miner_name, from, ""]);
   rows.push(["size class", (s.band || "unsized") + (BAND_T[s.band] ? " (" + (BAND_T[s.band][1] === Infinity ? "over " + BAND_T[s.band][0] : BAND_T[s.band][0] + "–" + BAND_T[s.band][1]) + " t of gold)" : ""), "GSQ MINOCC record", ""]);
   const prod = [];
   for (const a of served) {
     const f = a.facts || {};
     for (const p of (Array.isArray(f.production) ? f.production : [])) {
-      if (String(p.commodity || "gold").toLowerCase() !== "gold") continue; // the report is about gold
+      if (String(p.commodity || "").toLowerCase() !== "gold") continue; // the report is about gold; unlabelled rows aren't assumed
       const t = tonnes(p), period = (p.period_from || "") + "–" + (p.period_to || "");
-      prod.push({ t, a, period });
       const range = BAND_T[s.band];
       let flag = "";
       // The survey's class is the mine's lifetime total: a figure above it is suspect; a lifetime figure (no period) below it too.
       // Rows a miner marks as partial (scope other than a site total) are shown but not checked against the class.
       const partial = p.scope && p.scope !== "site_total";
-      if (!partial && t != null && range && (t > range[1] || (period === "–" && t < range[0]))) {
+      // Only like-for-like figures are compared across miners: this site, whole-site scope, a stated period.
+      if (here(p) && !partial && t != null && period !== "–") prod.push({ t, a, period });
+      if (here(p) && !partial && t != null && range && (t > range[1] || (period === "–" && t < range[0]))) {
         flag = t > range[1] ? "more than the survey's size class allows" : "below the survey's size class for a lifetime total";
         flags.push(a.miner_name + ": " + fmtT(t) + " reported vs " + s.band + " in the survey");
       }
-      rows.push(["production", [p.qualifier, p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== null && x !== "").join(" ") + (t != null ? " ≈ " + fmtT(t) : "") + (partial ? " · " + String(p.scope).replace(/_/g, " ") : ""), a.miner_name, src(p), flag]);
+      add(p, "production", [p.qualifier, p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== null && x !== "").join(" ") + (t != null ? " ≈ " + fmtT(t) : "") + (partial ? " · " + String(p.scope).replace(/_/g, " ") : ""), a, src(p), flag);
     }
-    for (const c of arr(f.closure)) rows.push(["closure", [c.year, c.reason_class, c.reason_text ? "“" + c.reason_text + "”" : ""].filter(Boolean).join(" · "), a.miner_name, src(c), ""]);
-    for (const o of arr(f.ownership)) rows.push(["ownership", [o.owner, o.role, (o.period_from || "") + (o.period_to ? "–" + o.period_to : "")].filter(Boolean).join(" · "), a.miner_name, src(o), ""]);
+    // The survey's mine-history year is the last recorded working, not necessarily a closure.
+    for (const c of arr(f.closure)) add(c, "closure", [c.year, /MineHist/.test(String(c.source_ref || "")) ? "last recorded working year (survey)" : "",
+      c.reason_class && c.reason_class !== "unknown" ? c.reason_class : c.reason_text ? "" : "reason not recorded", c.reason_text ? "“" + c.reason_text + "”" : ""].filter(Boolean).join(" · "), a, src(c));
+    for (const o of arr(f.ownership)) add(o, "ownership", [o.owner, o.role, (o.period_from || "") + (o.period_to ? "–" + o.period_to : "")].filter(Boolean).join(" · "), a, src(o));
     for (const g of arr(f.gold_price)) rows.push(["gold price", [g.month, g.usd_per_oz && "US$" + g.usd_per_oz + "/oz", g.aud_per_oz && "A$" + g.aud_per_oz + "/oz"].filter(Boolean).join(" · "), a.miner_name, src(g) || g.series || "", ""]);
     // What the miner looked for and couldn't source, stated by the miner rather than left blank.
     const nf = arr(f.not_found).map((x) => typeof x === "string" ? x : JSON.stringify(x));
@@ -342,15 +355,19 @@ function renderReport() {
   const link = (u) => /^https?:/.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">source</a>' : esc(u);
   document.getElementById("summary").innerHTML =
     '<div class="verdict"><p><span class="yes">Known</span> ' + esc(known.join(" · ")) + "</p>" +
-    '<p><span class="no">Missing</span> ' + (missing.length ? esc(missing.join(" · ")) : "nothing from the four questions") + "</p>" +
+    '<p><span class="no">Missing</span> ' + (missing.length ? esc(missing.join(" · ")) : "nothing from the three questions") + "</p>" +
+    (gp ? "" : '<p class="mute small">Not covered yet: the gold price at the time, which needs a gold-price miner.</p>') +
     (flags.length ? '<p><span class="warn">Check</span></p><ul class="checks">' + flags.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul>" : "") + "</div>" +
-    '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.map(([k, v, m, src, flag]) =>
+    '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.concat(near.length ? [["#near"]] : [], near).map(([k, v, m, src, flag]) => k === "#near" ?
+      '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
       "</td><td>" + esc(m) + (src ? "<br><small>" + link(src) + "</small>" : "") + "</td></tr>").join("") + "</table>" +
     '<p class="mute small">Known and missing count specialist answers only (the ranked-route answer is for contrast). Topics without structured facts come from a keyword check of sentences that name the mine; read the answers below.</p>';
   const card = (a) => {
     const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
-      '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") + "</div>";
+      '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") +
+      (a.miner_id === "64176" ? '<span class="tag">run by the OathCast team</span>' : "") + "</div>" +
+      (a.question && a.question !== r.question ? '<p class="mute small">Asked earlier with different wording: “' + esc(a.question) + "”</p>" : "");
     if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
     const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
     return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + (src ? '<p class="small">' + src + "</p>" : "") + proof(a) + "</div>";
@@ -362,9 +379,10 @@ function renderReport() {
 
 function download() {
   const r = current;
+  if (!r) return;
   const out = { app: "Gold Rush", url: location.origin + "/gold-rush#site=" + r.site.site_no, generated_at: new Date().toISOString(),
     network: "Ethereum Sepolia testnet · Telegraph escrow", site: r.site, question: r.question,
-    answers: r.answers.map((a) => ({ path: a.path, kind: a.kind, miner_id: a.miner_id ?? null, miner_name: a.miner_name ?? null, reused: !!a.reused,
+    answers: r.answers.map((a) => ({ question: a.question ?? r.question, asked_at: a.at ?? null, path: a.path, kind: a.kind, miner_id: a.miner_id ?? null, miner_name: a.miner_name ?? null, reused: !!a.reused,
       answer: a.answer ?? null, sources: a.sources ?? [], facts: a.facts ?? null, topics: a.topics ?? null, reason: a.reason ?? null,
       receipt: a.receipt ?? null, signal_hash: a.signal_hash ?? null })) };
   const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
@@ -376,13 +394,13 @@ function download() {
 const NODE = "https://devnode.telegraphprotocol.com";
 function proof(a) {
   const rc = a.receipt || {};
-  const amt = rc.amount_uusdc ? "$" + (Number(rc.amount_uusdc) / 1e6).toFixed(2) : "$0.01";
+  const amt = rc.amount_uusdc ? "$" + (Number(rc.amount_uusdc) / 1e6).toFixed(2) + " test USDC" : "amount not in receipt";
   const links = [];
   if (rc.receipt_hash && rc.epoch_id != null && /^0x[0-9a-f]{64}$/i.test(rc.receipt_hash))
-    links.push('<a href="' + NODE + "/v1/blocks/" + encodeURIComponent(rc.epoch_id) + "/deliveries/" + rc.receipt_hash + '" target="_blank" rel="noopener">delivery record</a>');
+    links.push('<a href="' + NODE + "/v1/blocks/" + encodeURIComponent(rc.epoch_id) + "/deliveries/" + rc.receipt_hash + '" target="_blank" rel="noopener">delivery record</a> (published once epoch ' + esc(rc.epoch_id) + " is recorded)");
   if (a.signal_hash && /^0x[0-9a-f]{64}$/i.test(a.signal_hash))
     links.push('<a href="' + NODE + "/engine/v1/signal/" + a.signal_hash + '" target="_blank" rel="noopener">signal record</a>');
-  return '<p class="mono">' + esc(amt) + " test USDC · Ethereum Sepolia testnet · escrow · receipt " + esc(rc.receipt_hash || "—") +
+  return '<p class="mono">' + esc(amt) + " · Ethereum Sepolia testnet · escrow · receipt " + esc(rc.receipt_hash || "—") +
     " · epoch " + esc(rc.epoch_id ?? "—") + (links.length ? " · " + links.join(" · ") : "") + "</p>";
 }
 
@@ -405,7 +423,7 @@ const q = document.getElementById("q"), list = document.getElementById("results"
 let hits = [], cursor = -1;
 function showResults() {
   const t = q.value.trim().toLowerCase();
-  if (t.length < 2) { list.hidden = true; q.setAttribute("aria-expanded", "false"); return; }
+  if (t.length < 2) { hits = []; list.hidden = true; q.setAttribute("aria-expanded", "false"); return; }
   const rank = (s) => BANDS.indexOf(s.band || "very small");
   hits = sites.filter((s) => s.name.toLowerCase().includes(t) || s.sheet.toLowerCase().includes(t))
     .sort((a, b) => (b.name.toLowerCase().startsWith(t) - a.name.toLowerCase().startsWith(t)) || rank(a) - rank(b)).slice(0, 8);
@@ -415,7 +433,11 @@ function showResults() {
   list.hidden = false; q.setAttribute("aria-expanded", "true");
   list.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => pick(hits[Number(b.dataset.i)])));
 }
-function pick(s) { list.hidden = true; q.setAttribute("aria-expanded", "false"); q.value = title(s.name); focusSite(s); }
+function pick(s) {
+  list.hidden = true; q.setAttribute("aria-expanded", "false"); q.value = title(s.name); focusSite(s);
+  // On narrow screens the panel sits below the map: bring the Investigate button into view.
+  if (matchMedia("(max-width: 900px)").matches) document.getElementById("panel").scrollIntoView({ block: "start", behavior: REDUCED ? "auto" : "smooth" });
+}
 q.addEventListener("input", showResults);
 q.addEventListener("keydown", (e) => {
   const btns = [...list.querySelectorAll("button")];
@@ -444,6 +466,8 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".search")) li
     sizeChips();
     map.on("zoomend", syncVerySmall);
     if (byNo.has(LINKED)) focusSite(byNo.get(LINKED)); else home();
+    // A pasted #site= link in an open tab opens that site too.
+    addEventListener("hashchange", () => { const n = Number((/site=(\\d+)/.exec(location.hash) || [])[1]); if (byNo.has(n) && n !== current?.site?.site_no) focusSite(byNo.get(n)); });
   } catch { document.getElementById("panel").innerHTML = '<p class="no">Could not load the survey sites. Reload to try again.</p>'; }
 })();
 </script>

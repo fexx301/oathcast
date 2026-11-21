@@ -31,7 +31,7 @@ it. The report shows each answer with its source, cost and receipt, and which qu
    (5–50 t), large (50–150 t) or giant (>150 t, Mount Morgan).
 2. Click a site. The panel shows its survey site number, map sheet, gold class and coordinates, and what an
    investigation will cost (one $0.01 test-USDC call per specialist, plus one for comparison).
-3. Click **Investigate**. The app asks every specialist the same question (who owned it, how much gold it produced,
+3. Click **Investigate**. The app asks each matching specialist (up to four) the same question (who owned it, how much gold it produced,
    and when and why it closed) and also asks Telegraph's ranked route once, for comparison.
 4. Read the report:
    - each answer, its miner and sources, and its receipt (hash and epoch);
