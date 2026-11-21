@@ -323,6 +323,9 @@ function renderReport() {
     for (const c of arr(f.closure)) rows.push(["closure", [c.year, c.reason_class, c.reason_text ? "“" + c.reason_text + "”" : ""].filter(Boolean).join(" · "), a.miner_name, src(c), ""]);
     for (const o of arr(f.ownership)) rows.push(["ownership", [o.owner, o.role, (o.period_from || "") + (o.period_to ? "–" + o.period_to : "")].filter(Boolean).join(" · "), a.miner_name, src(o), ""]);
     for (const g of arr(f.gold_price)) rows.push(["gold price", [g.month, g.usd_per_oz && "US$" + g.usd_per_oz + "/oz", g.aud_per_oz && "A$" + g.aud_per_oz + "/oz"].filter(Boolean).join(" · "), a.miner_name, src(g) || g.series || "", ""]);
+    // What the miner looked for and couldn't source, stated by the miner rather than left blank.
+    const nf = arr(f.not_found).map((x) => typeof x === "string" ? x : JSON.stringify(x));
+    if (nf.length) rows.push(["looked, not found", nf.join("; "), a.miner_name, "", ""]);
     // Conflicts the miner found between its own sources: shown as reported, credited to that miner.
     for (const c of arr(f.conflicts)) if (/gold/i.test(String(c.field || "")) || !/copper|silver|lead|zinc/i.test(String(c.field || "")))
       flags.push((c.field || "sources disagree") + ": " + arr(c.values).map((v) => v.value + (v.source_ref ? " (" + v.source_ref + (v.period ? ", " + v.period : "") + ")" : "")).join(" vs ") + " · reported by " + a.miner_name);
