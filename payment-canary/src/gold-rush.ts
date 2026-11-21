@@ -17,6 +17,7 @@ const GSQ =
 const SPECIALIST = /\b(gold|goldfields?|mining|mines?|geolog\w*|queensland|minerals?|ore)\b/i;
 const NOT_SPECIALIST = /\b(bitcoin|hashprice|hash ?rate|crypto|token|defi|blockchain)\b/i;
 export const MAX_SPECIALISTS = 4;
+const TAKAR = "https://takar-telegraph.vercel.app";
 const ROUTED = { id: "", name: "Telegraph ranked route", description: "" };
 
 export interface Specialist {
@@ -170,6 +171,7 @@ export class GoldRush {
   private sitesCache: { at: number; sites: Site[] } | null = null;
   private specialistsCache: { at: number; list: Specialist[] } | null = null;
   private deliveryCache = new Map<string, { at: number; status: string }>();
+  private crossCache: { at: number; map: Record<string, string> } | null = null;
 
   constructor(
     readonly ledger: Ledger,
@@ -273,6 +275,22 @@ export class GoldRush {
     const covered = Object.fromEntries(Object.keys(TOPICS).map((t) => [t,
       answers.filter((a) => a.kind === "served" && (a.topics as Record<string, boolean>)?.[t]).map((a) => a.miner_name)]));
     return { status: 200, body: { site, question, answers, covered } };
+  }
+
+  // Another team's per-mine dossiers (Takar, by Bangdrop), linked from the site panel as a cross-check, never merged into
+  // this report. Refreshed hourly; a failed fetch keeps the last good list.
+  async crossChecks(): Promise<Record<string, string>> {
+    if (this.crossCache && this.now() - this.crossCache.at < 3_600_000) return this.crossCache.map;
+    let map = this.crossCache?.map ?? {};
+    try {
+      const r = await this.fetchFn(`${TAKAR}/dossiers/index.json`, { signal: AbortSignal.timeout(10_000) });
+      const items = (await r.json()) as unknown;
+      if (Array.isArray(items)) map = Object.fromEntries((items as { site_no?: unknown; slug?: unknown }[])
+        .filter((x) => Number.isInteger(x?.site_no) && /^[a-z0-9-]{1,80}$/.test(String(x?.slug)))
+        .map((x) => [String(x.site_no), `${TAKAR}/goldrush.html#${x.slug}`]));
+    } catch { /* keep the last good list */ }
+    this.crossCache = { at: this.now(), map };
+    return map;
   }
 
   // Has the node published the delivery record for one of our receipts? Only receipts in this app's ledger are checked.
@@ -408,6 +426,7 @@ export function handler(app: GoldRush) {
     try {
       if (req.method === "GET" && (path === "/gold-rush" || path === "/gold-rush/")) return send(res, 200, PAGE, "text/html; charset=utf-8");
       if (req.method === "GET" && path === "/gold-rush/api/sites") return send(res, 200, JSON.stringify({ source: "Geological Survey of Queensland, MINOCC historical workings (CC BY 4.0)", sites: await app.sites() }), jsonType);
+      if (req.method === "GET" && path === "/gold-rush/api/crosschecks") return send(res, 200, JSON.stringify({ by: "Takar (Bangdrop), another team", sites: await app.crossChecks() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/specialists") return send(res, 200, JSON.stringify({ intent: INTENT, specialists: await app.specialists() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/ledger") return send(res, 200, JSON.stringify({ node: NODE, intent: INTENT, calls: app.ledger.public() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/delivery") {

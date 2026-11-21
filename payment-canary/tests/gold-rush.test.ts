@@ -245,6 +245,22 @@ describe("gold price step", () => {
   });
 });
 
+describe("cross-checks", () => {
+  it("links another team's dossier by site number, with only well-formed slugs, and keeps the last good list on failure", async () => {
+    let up = true;
+    const fetchFn = (async (url: string) => {
+      if (!url.includes("takar")) throw new Error("unexpected " + url);
+      if (!up) throw new Error("down");
+      return json(200, [{ slug: "mount-morgan", site_no: 494270 }, { slug: "bad\"><script>", site_no: 1 }, { slug: "x", site_no: "2" }]);
+    }) as unknown as typeof fetch;
+    let t = 1_800_000_000_000;
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 1, maxPerDay: 1, maxPerIpHour: 1 }, fetchFn, () => t);
+    expect(await app.crossChecks()).toEqual({ "494270": "https://takar-telegraph.vercel.app/goldrush.html#mount-morgan" });
+    up = false; t += 4_000_000;
+    expect(Object.keys(await app.crossChecks())).toEqual(["494270"]);
+  });
+});
+
 describe("delivery records", () => {
   it("checks only this app's receipts and reads recorded, pending and unknown from the node", async () => {
     const w = world();

@@ -134,9 +134,11 @@ OATHCAST_S2_ESCROW_PRIVATE_KEY=0x… OATHCAST_S2_ESCROW_ADDRESS=$APP GOLD_RUSH_L
 ```
 
 **Spend caps** (environment, with defaults):
-- `GOLD_RUSH_MAX_CALLS` 80 in total;
-- `GOLD_RUSH_MAX_PER_DAY` 24;
-- `GOLD_RUSH_MAX_PER_IP_HOUR` 8.
+- `GOLD_RUSH_MAX_CALLS` 180 in total;
+- `GOLD_RUSH_MAX_PER_DAY` 60;
+- `GOLD_RUSH_MAX_PER_IP_HOUR` 20.
+
+A full report on a new site is up to 8 paid calls (two site answers, five extra questions, one ranked-route answer).
 
 Paid calls run one at a time. An attempt row is written before each paid request leaves, so a crash counts as
 possibly charged and is never resent. Our deployment runs it as its own container behind Caddy at `/gold-rush`.

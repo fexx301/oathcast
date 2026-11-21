@@ -236,12 +236,14 @@ function select(s) {
     "<p>Ask " + n + " specialist" + (n === 1 ? "" : "s") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed" +
     (np ? ", then " + [...new Set(extra.map((t) => TOPIC_LABEL[t] || t))].join(", ") : "") + ".</p>" +
     '<button class="go" id="go">Investigate · up to $' + ((n + np + 1) * 0.01).toFixed(2) + " test USDC</button>";
+  if (CROSS[s.site_no]) document.getElementById("go").insertAdjacentHTML("afterend", '<p class="small">Cross-check: <a href="' + esc(CROSS[s.site_no]) +
+    '" target="_blank" rel="noopener">Takar’s dossier for this mine</a> (another team’s checks, not part of this report)</p>');
   document.getElementById("go").onclick = () => investigate(s);
   document.getElementById("back").onclick = home;
 }
 
 // Step-by-step investigation: plan (free), then one paid ask per miner, each rendered as it lands.
-let current = null;
+let current = null, CROSS = {};
 async function investigate(s) {
   const btn = document.getElementById("go");
   btn.disabled = true; btn.textContent = "Investigating…";
@@ -393,7 +395,8 @@ function renderReport(r) {
     if (nf.length) rows.push(["looked, not found", nf.join("; "), a.miner_name, "", ""]);
     // Conflicts the miner found between its own sources: shown as reported, credited to that miner.
     for (const c of arr(f.conflicts)) if (/gold/i.test(String(c.field || "")) || !/copper|silver|lead|zinc/i.test(String(c.field || "")))
-      flags.push((c.field || "sources disagree") + ": " + arr(c.values).map((v) => v.value + (v.source_ref ? " (" + v.source_ref + (v.period ? ", " + v.period : "") + ")" : "")).join(" vs ") + " · reported by " + a.miner_name);
+      // Values over different periods may both be right (e.g. 250 t to 1990 vs 262 t to 1981): say so rather than call it a contradiction.
+      flags.push((c.field || "sources disagree") + (new Set(arr(c.values).map((v) => v.period).filter(Boolean)).size > 1 ? " (different periods covered, not necessarily a contradiction)" : "") + ": " + arr(c.values).map((v) => v.value + (v.source_ref ? " (" + v.source_ref + (v.period ? ", " + v.period : "") + ")" : "")).join(" vs ") + " · reported by " + a.miner_name);
   }
   // Different miners, same period, values more than 10% apart: a real disagreement.
   const byPeriod = {};
@@ -529,6 +532,7 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".search")) li
 (async () => {
   home();
   try {
+    fetch(BASE + "api/crosschecks").then((r) => r.json()).then((d) => { CROSS = d.sites || {}; }).catch(() => {});
     specialists = (await (await fetch(BASE + "api/specialists")).json()).specialists || [];
     sites = (await (await fetch(BASE + "api/sites")).json()).sites || [];
     byNo = new Map(sites.map((s) => [s.site_no, s]));
