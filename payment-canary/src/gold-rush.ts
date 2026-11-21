@@ -23,14 +23,25 @@ export interface Specialist {
   id: string;
   name: string;
   description: string;
-  prices?: boolean; // also answers "gold price in <year>"
+  topics?: string[]; // extra questions it answers besides the site question (keys of EXTRA_TOPICS)
 }
 
-// shortcut: 7310050 answers gold-price questions (NFT KING, 21 Nov) but its catalogue text doesn't say so yet; drop once it does.
-const PRICE_MINERS = new Set(["7310050"]);
+type SiteRef = Pick<Site, "site_no" | "name">;
+const named = (s: SiteRef) => `${titled(s.name)} (site ${s.site_no})`;
+// Extra questions a specialist may answer, each returning its own top-level rows (agreed with NFT KING, 21 Nov).
+export const EXTRA_TOPICS: Record<string, { label: string; rows: string; re: RegExp; question: (s: SiteRef, year: number) => string }> = {
+  price: { label: "gold price", rows: "gold_price", re: /gold[ -]price/i, question: (_s, year) => `Gold price in ${year}` },
+  price_real: { label: "gold price then vs today", rows: "gold_price_real", re: /(closure|then) vs today|inflation-adjusted/i,
+    question: (s) => `Gold price at closure vs today for ${named(s)}` },
+  tenure: { label: "tenure", rows: "tenure", re: /current (mining )?tenure|tenure holder/i, question: (s) => `Who holds the tenure at ${named(s)}?` },
+  native_title: { label: "native title", rows: "native_title", re: /native title/i, question: (s) => `Native title at ${named(s)}` },
+  land_status: { label: "land status", rows: "land_status", re: /land status|protected area/i, question: (s) => `Land status of ${named(s)}` },
+};
+// shortcut: 7310050 answers all of these (NFT KING, 21 Nov) but its catalogue text doesn't say so yet; drop once it does.
+const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "tenure", "native_title", "land_status"] };
 
 // The year to price: the latest closure or last-working year this site's specialists reported for the site itself.
-export function priceYear(rows: Record<string, unknown>[], site: Pick<Site, "site_no" | "name">): number | null {
+export function priceYear(rows: Record<string, unknown>[], site: SiteRef): number | null {
   const years = rows.filter((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner && !r.topic)
     .flatMap((r) => { const c = (r.facts as Record<string, unknown> | null)?.closure; return Array.isArray(c) ? c : c ? [c] : []; })
     .filter((c) => aboutSite(c, site.name)).map((c) => Number((c as { year?: unknown }).year))
@@ -79,7 +90,7 @@ export function specialistsFrom(catalogue: unknown): Specialist[] {
   return (items as Record<string, unknown>[])
     .filter((m) => Array.isArray(m.supported_intents) && m.supported_intents.includes(INTENT) && m.activation_status === "active")
     .map((m) => ({ id: String(m.id), name: String(m.name ?? ""), description: String(m.description ?? "") }))
-    .map((m) => ({ ...m, prices: PRICE_MINERS.has(m.id) || /gold[ -]price/i.test(m.description) }))
+    .map((m) => ({ ...m, topics: Object.keys(EXTRA_TOPICS).filter((t) => KNOWN_TOPICS[m.id]?.includes(t) || EXTRA_TOPICS[t].re.test(m.description)) }))
     .filter((m) => /^\d+$/.test(m.id) && SPECIALIST.test(`${m.name} ${m.description}`) && !NOT_SPECIALIST.test(`${m.name} ${m.description}`))
     .filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i)
     .slice(0, MAX_SPECIALISTS);
@@ -91,10 +102,14 @@ export function titled(s: string): string {
 
 // Structured fields a specialist may return beside answer/sources (agreed with the NFT KING team, 2026-11-20).
 export const FACT_KEYS = ["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found"] as const;
+// The answer envelope, not facts. Any other top-level rows (tenure, events, people, ...) are kept, so a new miner's fields show up.
+const NOT_FACTS = new Set(["answer", "sources", "source_count", "brief", "question", "intent", "params"]);
 
 export function structured(raw: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!raw) return null;
-  const out: Record<string, unknown> = Object.fromEntries(FACT_KEYS.filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
+  const extra = Object.keys(raw).filter((k) => !NOT_FACTS.has(k) && !(FACT_KEYS as readonly string[]).includes(k) && /^[a-z][a-z0-9_]{0,40}$/.test(k)
+    && raw[k] !== null && typeof raw[k] === "object");
+  const out: Record<string, unknown> = Object.fromEntries([...FACT_KEYS, ...extra].filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
   // Keep the ledger row bounded: the long narrative fields go first, the facts stay.
   for (const k of ["years_worked", "references"]) if (JSON.stringify(out).length > 24_576) delete out[k];
   return Object.keys(out).length && JSON.stringify(out).length <= 24_576 ? out : null;
@@ -108,9 +123,10 @@ export function aboutSite(row: unknown, siteName = ""): boolean {
   return !siteName || typeof e !== "string" || !e.trim() || e.toLowerCase().includes(siteName.toLowerCase());
 }
 
-// A price answer covers only the gold price; a site answer is checked by sentence and by its structured fields.
-function topicsOf(answer: string, facts: Record<string, unknown> | null, siteName: string, topic?: "price"): Record<string, boolean> {
-  if (topic === "price") return { "gold price": Boolean(facts && nonEmpty(facts.gold_price)) };
+// An extra-topic answer covers only its own rows; a site answer is checked by sentence and by its structured fields.
+function topicsOf(answer: string, facts: Record<string, unknown> | null, siteName: string, topic?: string): Record<string, boolean> {
+  const t = topic ? EXTRA_TOPICS[topic] : undefined;
+  if (t) return { [t.label]: Boolean(facts && nonEmpty(facts[t.rows])) };
   return { ...topicsCovered(answer, siteName), ...factTopics(facts, siteName) };
 }
 
@@ -198,8 +214,8 @@ export class GoldRush {
     const specialists = await this.specialists();
     if (!specialists.length) return { status: 503, body: { error: "No specialist Miner for Queensland gold mines is registered right now." } };
     const steps = [...specialists.map((m) => ({ miner: m.id, miner_name: m.name, path: "direct" })),
-      // After the site answers, so the year comes from them.
-      ...specialists.filter((m) => m.prices).map((m) => ({ miner: m.id, miner_name: m.name, path: "direct", topic: "price" })),
+      // After the site answers, so the gold-price year comes from them.
+      ...specialists.flatMap((m) => (m.topics ?? []).map((t) => ({ miner: m.id, miner_name: m.name, path: "direct", topic: t, label: EXTRA_TOPICS[t].label }))),
       { miner: "ranked", miner_name: ROUTED.name, path: "ranked route" }];
     return { status: 200, body: { site, question: questionFor(site), steps } };
   }
@@ -211,12 +227,13 @@ export class GoldRush {
       const want = String((raw as { miner?: unknown })?.miner ?? "");
       const miner = want === "ranked" ? ROUTED : (await this.specialists()).find((m) => m.id === want);
       if (!miner) throw new InputError("miner must be a current specialist or \"ranked\".");
-      if ((raw as { topic?: unknown })?.topic === "price") {
-        if (!(miner as Specialist).prices) throw new InputError("That miner doesn't answer gold-price questions.");
+      const topic = (raw as { topic?: unknown })?.topic;
+      if (topic !== undefined && topic !== null && topic !== "") {
+        if (typeof topic !== "string" || !EXTRA_TOPICS[topic] || !(miner as Specialist).topics?.includes(topic)) throw new InputError("That miner doesn't answer that question.");
         const year = priceYear(this.ledger.rows, site);
-        if (year === null) return { status: 200, body: { kind: "skipped", topic: "price", miner_id: miner.id, miner_name: miner.name, path: "direct",
+        if (topic === "price" && year === null) return { status: 200, body: { kind: "skipped", topic, miner_id: miner.id, miner_name: miner.name, path: "direct",
           reason: "No closure or last-working year in this site's answers yet, so there's no year to price (nothing charged)." } };
-        return { status: 200, body: { ...(await this.askOne(site, miner, `Gold price in ${year}`, ip, "price")), path: "direct" } };
+        return { status: 200, body: { ...(await this.askOne(site, miner, EXTRA_TOPICS[topic].question(site, year ?? 0), ip, topic)), path: "direct" } };
       }
       const answer = await this.askOne(site, miner, questionFor(site), ip);
       return { status: 200, body: { ...answer, path: want === "ranked" ? "ranked route" : "direct" } };
@@ -273,7 +290,7 @@ export class GoldRush {
     }
   }
 
-  private async askOne(site: Site, miner: Specialist, question: string, ip: string, topic?: "price"): Promise<Record<string, unknown>> {
+  private async askOne(site: Site, miner: Specialist, question: string, ip: string, topic?: string): Promise<Record<string, unknown>> {
     // A site's price answer is cached apart from its site answer (same miner, different question).
     const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id && (r.topic ?? undefined) === topic;
     const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && mine(r));
@@ -413,9 +430,10 @@ export function main(): void {
   delete process.env.OATHCAST_S2_ESCROW_PRIVATE_KEY;
   const ledger = new Ledger(process.env.GOLD_RUSH_LEDGER ?? "/data/gold-rush-ledger.jsonl");
   const app = new GoldRush(ledger, account, {
-    maxCalls: envInt("GOLD_RUSH_MAX_CALLS", 80),
-    maxPerDay: envInt("GOLD_RUSH_MAX_PER_DAY", 24),
-    maxPerIpHour: envInt("GOLD_RUSH_MAX_PER_IP_HOUR", 8),
+    // A full report is up to 8 calls (site, gold price, land and rights, ranked): about 20 new sites in all, 7 a day.
+    maxCalls: envInt("GOLD_RUSH_MAX_CALLS", 180),
+    maxPerDay: envInt("GOLD_RUSH_MAX_PER_DAY", 60),
+    maxPerIpHour: envInt("GOLD_RUSH_MAX_PER_IP_HOUR", 20),
   });
   const port = envInt("GOLD_RUSH_PORT", 8792);
   const host = process.env.GOLD_RUSH_HOST ?? "127.0.0.1";

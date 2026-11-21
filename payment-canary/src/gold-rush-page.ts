@@ -223,7 +223,7 @@ function focusSite(s) {
 
 function select(s) {
   current = null; // leaving a run stops its remaining asks
-  const n = specialists.length, np = specialists.filter((m) => m.prices).length;
+  const n = specialists.length, extra = specialists.flatMap((m) => m.topics || []), np = extra.length;
   history.replaceState(null, "", "#site=" + s.site_no);
   if (ring) ring.remove();
   ring = L.circleMarker([s.lat, s.lon], { radius: (RADIUS[s.band || "very small"]) + 7, color: "oklch(94% 0.012 85)", weight: 2, fill: false, interactive: false }).addTo(map);
@@ -234,7 +234,7 @@ function select(s) {
     '<p class="meta"><span>Survey site <b>' + s.site_no + "</b></span><span>Gold <b>" + esc(s.band || "unsized") + "</b></span><span>" +
     esc(title(s.sheet)) + " sheet</span><span>" + s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + "</span></p>" +
     "<p>Ask " + n + " specialist" + (n === 1 ? "" : "s") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed" +
-    (np ? ", then the gold price in its last recorded year" : "") + ".</p>" +
+    (np ? ", then " + [...new Set(extra.map((t) => TOPIC_LABEL[t] || t))].join(", ") : "") + ".</p>" +
     '<button class="go" id="go">Investigate · up to $' + ((n + np + 1) * 0.01).toFixed(2) + " test USDC</button>";
   document.getElementById("go").onclick = () => investigate(s);
   document.getElementById("back").onclick = home;
@@ -254,7 +254,7 @@ async function investigate(s) {
     run = current = { site: s, question: plan.question, answers: [], started: new Date().toISOString() };
     rep.innerHTML = '<h3>Investigation</h3><p class="q">“' + esc(plan.question) + '”</p><ol class="run" id="run">' +
       plan.steps.map((st, i) => '<li id="step-' + i + '" class="wait"><span class="st">○</span><span><b>' + esc(st.miner_name) +
-        '</b> <span class="tag">' + esc(st.topic === "price" ? "gold price" : st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
+        '</b> <span class="tag">' + esc(st.label || st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
       '<div id="summary"></div><div id="answers"></div>';
     for (let i = 0; i < plan.steps.length; i++) {
       if (current !== run) return; // the user moved on: don't pay for the rest of this run
@@ -284,7 +284,15 @@ async function investigate(s) {
 }
 
 const arr = (v) => Array.isArray(v) ? v : v && typeof v === "object" ? [v] : [];
-const src = (x) => x.source_url || x.source_title || x.source_ref || "";
+const src = (x) => (x && typeof x === "object" && (x.source_url || x.query_url || x.source_title || x.source_ref)) || "";
+const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", tenure: "tenure", native_title: "native title", land_status: "land status" };
+// Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
+const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found"]);
+const LAND = new Set(["tenure", "native_title", "land_status"]);
+const SKIP = new Set(["source_ref", "source_url", "source_title", "query_url", "entity", "checked_at", "note"]);
+const brief = (x) => x === null || typeof x !== "object" ? String(x) :
+  Object.entries(x).filter(([k, v]) => !SKIP.has(k) && v !== null && v !== "" && typeof v !== "object").map(([k, v]) => k.replace(/_/g, " ") + " " + v).join(" · ") +
+  (x.note ? " · " + x.note : "") + (x.checked_at ? " · checked " + String(x.checked_at).slice(0, 10) : "");
 
 // Survey size classes in tonnes of gold, for checking reported production against the record.
 const BAND_T = { "very small": [0, 0.5], small: [0.5, 5], medium: [5, 50], large: [50, 150], giant: [150, Infinity] };
@@ -310,7 +318,7 @@ function renderReport(r) {
   const who = Object.fromEntries(TOP.map((t) => [t, served.filter((a) => (a.topics || {})[t]).map((a) => a.miner_name)]));
   const known = ["location and size class (survey record)"].concat(TOP.filter((t) => who[t].length), gp ? ["gold price"] : []);
   const missing = TOP.filter((t) => !who[t].length);
-  const rows = [], near = [], flags = [];
+  const rows = [], near = [], land = [], flags = [];
   const add = (x, k, v, a, from, flag) => here(x) ? rows.push([k, v, a.miner_name, from, flag || ""]) : near.push([k, x.entity + ": " + v, a.miner_name, from, ""]);
   rows.push(["size class", (s.band || "unsized") + (BAND_T[s.band] ? " (" + (BAND_T[s.band][1] === Infinity ? "over " + BAND_T[s.band][0] : BAND_T[s.band][0] + "–" + BAND_T[s.band][1]) + " t of gold)" : ""), "GSQ MINOCC record", ""]);
   const prod = [];
@@ -352,6 +360,17 @@ function renderReport(r) {
         range(gs.map((g) => g.usd_per_oz), "US$"), range(gs.map((g) => g.aud_per_oz), "A$"), basis, ...notes].filter(Boolean).join(" · "),
         a.miner_name, src(gs[0]) || gs[0].series || "", ""]);
     }
+    // Any other rows (tenure, native title, events, people, ...): at most 6 per kind here, all of them in the JSON download.
+    for (const [key, val] of Object.entries(f)) {
+      if (HANDLED.has(key)) continue;
+      const items = arr(val), label = key === "gold_price_real" ? "gold price then vs today" : key.replace(/_/g, " ");
+      for (const x of items.slice(0, 6)) {
+        if (!LAND.has(key)) add(x, label, brief(x), a, src(x));
+        else if (here(x)) land.push([label, brief(x), a.miner_name, src(x), ""]);
+        else near.push([label, x.entity + ": " + brief(x), a.miner_name, src(x), ""]);
+      }
+      if (items.length > 6) (LAND.has(key) ? land : rows).push([label, "+" + (items.length - 6) + " more in the JSON download", a.miner_name, "", ""]);
+    }
     // What the miner looked for and couldn't source, stated by the miner rather than left blank.
     const nf = arr(f.not_found).map((x) => typeof x === "string" ? x : JSON.stringify(x));
     if (nf.length) rows.push(["looked, not found", nf.join("; "), a.miner_name, "", ""]);
@@ -369,21 +388,26 @@ function renderReport(r) {
       flags.push("miners disagree on production" + (period !== "–" ? " for " + period : "") + ": " + xs.map((x) => x.a.miner_name + " " + fmtT(x.t)).join(" vs "));
   }
   const link = (u) => /^https?:/.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">source</a>' : esc(u);
+  if (land.length) known.push("land and rights today");
+  const tr = ([k, v, m, src, flag]) => k === "#near" ?
+      '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
+      "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
+      "</td><td>" + esc(m) + (src ? "<br><small>" + link(src) + "</small>" : "") + "</td></tr>";
   document.getElementById("summary").innerHTML =
     '<div class="verdict"><p><span class="yes">Known</span> ' + esc(known.join(" · ")) + "</p>" +
     '<p><span class="no">Missing</span> ' + (missing.length ? esc(missing.join(" · ")) : "nothing from the three questions") + "</p>" +
     (gp ? "" : '<p class="mute small">Not covered yet: the gold price at the time, which needs a gold-price miner.</p>') +
     (flags.length ? '<p><span class="warn">Check</span></p><ul class="checks">' + flags.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul>" : "") + "</div>" +
-    '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.concat(near.length ? [["#near"]] : [], near).map(([k, v, m, src, flag]) => k === "#near" ?
-      '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
-      "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
-      "</td><td>" + esc(m) + (src ? "<br><small>" + link(src) + "</small>" : "") + "</td></tr>").join("") + "</table>" +
+    '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.concat(near.length ? [["#near"]] : [], near).map(tr).join("") + "</table>" +
+    (land.length ? "<h3>Land and rights today</h3>" +
+      '<p class="mute small">From public registers, as of each row’s check date. An expiry date or a gap in tenure doesn’t mean the ground is available; that needs legal confirmation.</p>' +
+      '<table class="facts"><tr><th>Register</th><th>Record</th><th>From</th></tr>' + land.map(tr).join("") + "</table>" : "") +
     '<p class="mute small">Known and missing count specialist answers only (the ranked-route answer is for contrast). Topics without structured facts come from a keyword check of sentences that name the mine; read the answers below.</p>';
   const card = (a) => {
     const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
-      '<span class="tag">' + esc(a.topic === "price" ? "gold price" : a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") +
+      '<span class="tag">' + esc(a.topic ? TOPIC_LABEL[a.topic] || a.topic : a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") +
       (a.miner_id === "64176" ? '<span class="tag">run by the OathCast team</span>' : "") + "</div>" +
-      (a.topic === "price" ? '<p class="mute small">Asked: “' + esc(a.question || "") + "”</p>" :
+      (a.topic ? '<p class="mute small">Asked: “' + esc(a.question || "") + "”</p>" :
         a.question && a.question !== r.question ? '<p class="mute small">Asked earlier with different wording: “' + esc(a.question) + "”</p>" : "");
     if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
     const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");

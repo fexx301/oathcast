@@ -33,8 +33,9 @@ it. The report shows each answer with its source, cost and receipt, and which qu
    investigation will cost (one $0.01 test-USDC call per specialist, one per gold-price specialist, plus one for
    comparison). Answers someone already paid for are reused at no charge.
 3. Click **Investigate**. The app asks each matching specialist (up to four) the same question (who owned it, how much gold it produced,
-   and when and why it closed). A specialist that also answers gold prices (today 7310050) is then asked for the gold
-   price in the site's last recorded year, taken from the answers it just got. Telegraph's ranked route is asked the
+   and when and why it closed). A specialist that answers more (today 7310050) is then asked its extra questions:
+   the gold price in the site's last recorded year (taken from the answers it just got), the gold price then vs today,
+   and who holds the tenure, native title and land status at the site. Telegraph's ranked route is asked the
    site question once, for comparison.
 4. Read the report:
    - each answer, its miner and sources, and its receipt (hash and epoch);
@@ -43,6 +44,10 @@ it. The report shows each answer with its source, cost and receipt, and which qu
    - a **facts table:** every structured field a specialist returned (production, closure, ownership, gold price,
      "looked, not found"), each with its miner and source. Facts the miner labels as another working (for Brilliant
      Lode: Brilliant Deeps, Brilliant Extended) are listed apart and never counted for this site;
+   - **land and rights today:** tenure, native title and land status rows, each with its register, record ID and check
+     date. An expiry date or a gap in tenure doesn't mean the ground is available; that needs legal confirmation;
+   - any other structured rows a miner returns (for example events or people) appear in the facts table with their
+     source, with no change to the app;
    - each answer, its miner and sources, its receipt, and whether the node has published its delivery record yet.
 
 A site that was investigated before reuses the earlier paid answers at no charge.
