@@ -223,6 +223,18 @@ describe("gold price step", () => {
     expect(Object.keys(t.body.facts as object)).toEqual(["tenure", "events"]); // a new field (events) is kept too
   });
 
+  it("trims an oversized answer: diagnostics first, then rows over the site point kept ahead of nearby ones", async () => {
+    const { structured } = await import("../src/gold-rush.js");
+    const row = (i: number, relation: string) => ({ record_id: `EPM ${i}`, relation, holders: ["X"], source_url: "https://example.test/" + "q".repeat(900) });
+    const raw = { answer: "x", checks: [{ big: "c".repeat(6000) }],
+      tenure: [...Array.from({ length: 28 }, (_, i) => row(i, "within_buffer")), row(100, "contains_site_point"), row(101, "contains_site_point")] };
+    const f = structured(raw) as { tenure: { record_id: string }[]; omitted: Record<string, number>; checks?: unknown };
+    expect(f.checks).toBeUndefined();
+    expect(f.tenure.slice(0, 2).map((t) => t.record_id)).toEqual(["EPM 100", "EPM 101"]);
+    expect(f.tenure.length + f.omitted.tenure).toBe(30);
+    expect(JSON.stringify(f).length).toBeLessThanOrEqual(24_576);
+  });
+
   it("refuses price questions to a miner that doesn't answer them", async () => {
     const w = world();
     const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, w.fetchFn);

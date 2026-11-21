@@ -110,9 +110,19 @@ export function structured(raw: Record<string, unknown> | null): Record<string, 
   const extra = Object.keys(raw).filter((k) => !NOT_FACTS.has(k) && !(FACT_KEYS as readonly string[]).includes(k) && /^[a-z][a-z0-9_]{0,40}$/.test(k)
     && raw[k] !== null && typeof raw[k] === "object");
   const out: Record<string, unknown> = Object.fromEntries([...FACT_KEYS, ...extra].filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
-  // Keep the ledger row bounded: the long narrative fields go first, the facts stay.
-  for (const k of ["years_worked", "references"]) if (JSON.stringify(out).length > 24_576) delete out[k];
-  return Object.keys(out).length && JSON.stringify(out).length <= 24_576 ? out : null;
+  // Keep the ledger row bounded: the long narrative and diagnostic fields go first, the facts stay.
+  const LIMIT = 24_576, size = () => JSON.stringify(out).length;
+  for (const k of ["years_worked", "references", "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage"]) if (size() > LIMIT) delete out[k];
+  // Still too big (e.g. 30 tenures within 2 km): keep rows over the site point first, then fewer nearby ones, and say how many were left out.
+  const before = Object.fromEntries(Object.entries(out).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).length]));
+  const over = (x: unknown) => Number((x as { relation?: unknown } | null)?.relation === "contains_site_point");
+  for (const keep of [12, 6, 3]) {
+    if (size() <= LIMIT) break;
+    for (const [k, v] of Object.entries(out)) if (Array.isArray(v) && v.length > keep) out[k] = [...v].sort((a, b) => over(b) - over(a)).slice(0, keep);
+  }
+  const omitted = Object.fromEntries(Object.entries(before).map(([k, n]) => [k, n - (out[k] as unknown[]).length]).filter(([, d]) => (d as number) > 0));
+  if (Object.keys(omitted).length) out.omitted = omitted;
+  return Object.keys(out).length && size() <= LIMIT ? out : null;
 }
 
 const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v && typeof v === "object" && Object.keys(v).length));
@@ -295,7 +305,12 @@ export class GoldRush {
     const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id && (r.topic ?? undefined) === topic;
     const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && mine(r));
     // A reused answer is re-checked with the same topic rule as a fresh one.
-    if (cached) return { ...cached, type: undefined, reused: true, topics: topicsOf(String(cached.answer ?? ""), (cached.facts ?? null) as Record<string, unknown> | null, site.name, topic) };
+    if (cached) {
+      let facts = (cached.facts ?? null) as Record<string, unknown> | null;
+      // Stored before its rows fit the size cap: re-read them from the miner's signal record (free, not charged again).
+      if (!facts && cached.signal_hash) facts = structured(await this.rawResponse(cached.signal_hash));
+      return { ...cached, facts, type: undefined, reused: true, topics: topicsOf(String(cached.answer ?? ""), facts, site.name, topic) };
+    }
     // An earlier payment for this site and miner with no settled outcome may have been charged: never pay for it twice.
     // shortcut: it stays blocked until the ledger row is reconciled by hand; automate if timeouts become common.
     const settled = new Set(this.ledger.rows.filter((r) => r.type === "outcome" && r.kind !== "unknown").map((r) => r.id));

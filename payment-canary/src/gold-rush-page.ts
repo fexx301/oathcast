@@ -287,10 +287,24 @@ const arr = (v) => Array.isArray(v) ? v : v && typeof v === "object" ? [v] : [];
 const src = (x) => (x && typeof x === "object" && (x.source_url || x.query_url || x.source_title || x.source_ref)) || "";
 const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", tenure: "tenure", native_title: "native title", land_status: "land status" };
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
-const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found"]);
+const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
+  "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by"]);
 const LAND = new Set(["tenure", "native_title", "land_status"]);
 const SKIP = new Set(["source_ref", "source_url", "source_title", "query_url", "entity", "checked_at", "note"]);
-const brief = (x) => x === null || typeof x !== "object" ? String(x) :
+// Register rows (tenure, native title, heritage...): the identifying fields only, in reading order.
+const PREFER = ["record_id", "name", "holders", "holder", "outcome", "register_status", "status", "sub_status", "grant_date", "expiry_date", "determination_date", "entry_date", "relation"];
+const show = (k, v) => k === "relation" ? (v === "contains_site_point" ? "over the site point" : v === "within_buffer" ? "within 2 km" : String(v)) :
+  Array.isArray(v) ? v.join(", ") : String(v);
+const brief = (x) => {
+  if (x && typeof x === "object" && x.real_usd_per_oz_in_latest_dollars != null) // gold price then vs today
+    return x.closure_year + ": US$" + x.nominal_usd_per_oz + "/oz then, about US$" + x.real_usd_per_oz_in_latest_dollars + " in " + (x.cpi_latest_month || "today's") +
+      " dollars; today US$" + x.today_usd_per_oz + " (" + x.today_vs_closure_real_ratio + "× in real terms)" + (x.label ? " · " + x.label : "");
+  const pick = x && typeof x === "object" ? PREFER.filter((k) => x[k] != null && x[k] !== "" && !(Array.isArray(x[k]) && !x[k].length)) : [];
+  if (pick.length >= 2) return pick.map((k) => (k === "record_id" || k === "name" || k === "holders" || k === "relation" ? "" : k.replace(/_/g, " ") + " ") + show(k, x[k])).join(" · ") +
+    (x.checked_at ? " · checked " + String(x.checked_at).slice(0, 10) : "");
+  return briefAll(x);
+};
+const briefAll = (x) => x === null || typeof x !== "object" ? String(x) :
   Object.entries(x).filter(([k, v]) => !SKIP.has(k) && v !== null && v !== "" && typeof v !== "object").map(([k, v]) => k.replace(/_/g, " ") + " " + v).join(" · ") +
   (x.note ? " · " + x.note : "") + (x.checked_at ? " · checked " + String(x.checked_at).slice(0, 10) : "");
 
@@ -363,13 +377,15 @@ function renderReport(r) {
     // Any other rows (tenure, native title, events, people, ...): at most 6 per kind here, all of them in the JSON download.
     for (const [key, val] of Object.entries(f)) {
       if (HANDLED.has(key)) continue;
-      const items = arr(val), label = key === "gold_price_real" ? "gold price then vs today" : key.replace(/_/g, " ");
+      const over = (x) => Number(x && x.relation === "contains_site_point");
+      const items = arr(val).slice().sort((p, q) => over(q) - over(p)), label = key === "gold_price_real" ? "gold price then vs today" : key.replace(/_/g, " ");
+      const more = (items.length > 6 ? items.length - 6 : 0) + Number((f.omitted || {})[key] || 0);
       for (const x of items.slice(0, 6)) {
         if (!LAND.has(key)) add(x, label, brief(x), a, src(x));
         else if (here(x)) land.push([label, brief(x), a.miner_name, src(x), ""]);
         else near.push([label, x.entity + ": " + brief(x), a.miner_name, src(x), ""]);
       }
-      if (items.length > 6) (LAND.has(key) ? land : rows).push([label, "+" + (items.length - 6) + " more in the JSON download", a.miner_name, "", ""]);
+      if (more) (LAND.has(key) ? land : rows).push([label, "+" + more + " more nearby (full list in the miner's signal record)", a.miner_name, "", ""]);
     }
     // What the miner looked for and couldn't source, stated by the miner rather than left blank.
     const nf = arr(f.not_found).map((x) => typeof x === "string" ? x : JSON.stringify(x));
