@@ -3,8 +3,8 @@
 // No per-call chain transaction; the node bills the deposit at epoch close.
 
 export const SEPOLIA = "eip155:11155111";
-// The Telegraph Diamond on Sepolia, lowercased as the node compares it.
-export const DIAMOND = "0x3624eb012b5e998bb57b6be6c9cfc9c4bc5eb99b";
+// The Telegraph Diamond on Sepolia (new Diamond of 17 Nov 2026; it replaced 0x3624…b99b), lowercased as the node compares it.
+export const DIAMOND = "0x72a70e949362670bf8bcead24efc5b8f950aa08b";
 export const MAX_AMOUNT_UUSDC = 10_000n;
 const MAX_WINDOW_SECONDS = 100; // the node's limit is 120
 
@@ -49,6 +49,8 @@ export interface AskOptions {
   node: string;
   signer: Signer;
   body: Record<string, unknown>;
+  // Direct ask: name the miner (POST /engine/v1/ask/{minerId}); omit for the ranked route.
+  minerId?: string;
   fetchFn?: typeof fetch;
   now?: () => number;
   nonce?: () => string;
@@ -117,7 +119,8 @@ export function decodeReceipt(header: string | null): EscrowReceipt | null {
 
 export async function escrowAsk(options: AskOptions): Promise<AskOutcome> {
   const fetchFn = options.fetchFn ?? fetch;
-  const url = `${options.node}/engine/v1/ask`;
+  if (options.minerId !== undefined && !/^\d{1,20}$/.test(options.minerId)) throw new Error("minerId must be numeric");
+  const url = `${options.node}/engine/v1/ask${options.minerId ? `/${options.minerId}` : ""}`;
   const body = JSON.stringify(options.body);
   const headers = { "Content-Type": "application/json" };
 

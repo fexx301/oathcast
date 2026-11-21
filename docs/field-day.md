@@ -35,7 +35,7 @@ weather through Telegraph and says whether the weather window held.
   be 2–80 plain characters. The day must be at least two UTC days ago and
   within the last year. Bad input costs nothing.
 - **Payment pins.** The network must be `eip155:11155111`. The payee must be
-  the Diamond `0x3624…b99b`. The quote may not exceed 10000 µUSDC.
+  the Diamond `0x72a7…a08b` (the 17 Nov 2026 Diamond; it replaced `0x3624…b99b`, whose balances did not carry over). The quote may not exceed 10000 µUSDC.
 - **Signer pin.** The service refuses to start if the key doesn't match
   `OATHCAST_S2_ESCROW_ADDRESS`.
 - **Caps.** 40 calls in total, 12 per UTC day and 4 per IP per hour. Paid
@@ -53,11 +53,11 @@ The app wallet needs no ETH: the owner deposits on its behalf.
 ```bash
 R=https://ethereum-sepolia-rpc.publicnode.com
 USDC=0xcc194e1a843B658526D0D5C431f670028582Ae17
-DIAMOND=0x3624eb012b5e998bb57b6be6c9cfc9c4bc5eb99b
+DIAMOND=0x72a70e949362670bf8bcead24efc5b8f950aa08b
 APP=0x74041A982529b9757a121b48Bc2F98B129dE7842
 cast send $USDC "approve(address,uint256)" $DIAMOND 2000000 --rpc-url $R --private-key $KEY
 cast send $DIAMOND "depositUSDCFor(address,uint256)" $APP 2000000 --rpc-url $R --private-key $KEY
-cast call $DIAMOND "escrowBalance(address)(uint256)" $APP --rpc-url $R   # expect 2000000
+curl -s https://devnode.telegraphprotocol.com/v1/ledger/account/$APP   # "deposited" shows it once the ledger block lands
 ```
 
 ## Deploy (server, one SSH window)
