@@ -2,6 +2,21 @@
 
 [![CI](https://github.com/fexx301/oathcast/actions/workflows/ci.yml/badge.svg)](https://github.com/fexx301/oathcast/actions/workflows/ci.yml)
 
+## Telegraph Hackathon Season II (November 2026)
+
+Two apps in this repo run live on Telegraph's testnet escrow (Ethereum Sepolia), each with a beginner tutorial:
+
+- **Gold Rush** (Apps entry): investigate Queensland's historical gold mines. Pick one of 8,132 sites from the
+  Geological Survey's map; the app asks the specialist Miners directly (history, production, closure, gold price
+  then and now, land and rights today), shows each fact with its source and receipt, and flags disagreements.
+  Live: <https://oathcastcourt.duckdns.org/gold-rush> · tutorial: [docs/gold-rush.md](docs/gold-rush.md) · code:
+  `payment-canary/src/gold-rush.ts`, `gold-rush-page.ts`.
+- **Field-day review**: did a past day's spray or harvest window hold? Asks Telegraph for the recorded weather and
+  says why. Live: <https://oathcastcourt.duckdns.org/field-day> · tutorial: [docs/field-day.md](docs/field-day.md).
+
+Disclosure: this is a hackathon entry with prizes. Our team also runs Miner 64176 (the survey record), one of the
+specialists Gold Rush asks, so those calls are related-party; the app labels them.
+
 OathCast is a Telegraph hackathon project for time-locked, exact-hour weather
 forecasts and later calibration evidence. One authenticated Miner is deployed
 publicly on release `2026-08-30-hourly-v18`. The registered `GET /predict`
