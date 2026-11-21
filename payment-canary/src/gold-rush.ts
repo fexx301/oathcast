@@ -23,6 +23,19 @@ export interface Specialist {
   id: string;
   name: string;
   description: string;
+  prices?: boolean; // also answers "gold price in <year>"
+}
+
+// shortcut: 7310050 answers gold-price questions (NFT KING, 21 Nov) but its catalogue text doesn't say so yet; drop once it does.
+const PRICE_MINERS = new Set(["7310050"]);
+
+// The year to price: the latest closure or last-working year this site's specialists reported for the site itself.
+export function priceYear(rows: Record<string, unknown>[], site: Pick<Site, "site_no" | "name">): number | null {
+  const years = rows.filter((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner && !r.topic)
+    .flatMap((r) => { const c = (r.facts as Record<string, unknown> | null)?.closure; return Array.isArray(c) ? c : c ? [c] : []; })
+    .filter((c) => aboutSite(c, site.name)).map((c) => Number((c as { year?: unknown }).year))
+    .filter((y) => Number.isInteger(y) && y >= 1800 && y <= 2100);
+  return years.length ? Math.max(...years) : null;
 }
 
 export interface Site {
@@ -66,6 +79,7 @@ export function specialistsFrom(catalogue: unknown): Specialist[] {
   return (items as Record<string, unknown>[])
     .filter((m) => Array.isArray(m.supported_intents) && m.supported_intents.includes(INTENT) && m.activation_status === "active")
     .map((m) => ({ id: String(m.id), name: String(m.name ?? ""), description: String(m.description ?? "") }))
+    .map((m) => ({ ...m, prices: PRICE_MINERS.has(m.id) || /gold[ -]price/i.test(m.description) }))
     .filter((m) => /^\d+$/.test(m.id) && SPECIALIST.test(`${m.name} ${m.description}`) && !NOT_SPECIALIST.test(`${m.name} ${m.description}`))
     .filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i)
     .slice(0, MAX_SPECIALISTS);
@@ -92,6 +106,12 @@ const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v &&
 export function aboutSite(row: unknown, siteName = ""): boolean {
   const e = (row as { entity?: unknown } | null)?.entity;
   return !siteName || typeof e !== "string" || !e.trim() || e.toLowerCase().includes(siteName.toLowerCase());
+}
+
+// A price answer covers only the gold price; a site answer is checked by sentence and by its structured fields.
+function topicsOf(answer: string, facts: Record<string, unknown> | null, siteName: string, topic?: "price"): Record<string, boolean> {
+  if (topic === "price") return { "gold price": Boolean(facts && nonEmpty(facts.gold_price)) };
+  return { ...topicsCovered(answer, siteName), ...factTopics(facts, siteName) };
 }
 
 export function factTopics(facts: Record<string, unknown> | null, siteName = ""): Record<string, boolean> {
@@ -178,6 +198,8 @@ export class GoldRush {
     const specialists = await this.specialists();
     if (!specialists.length) return { status: 503, body: { error: "No specialist Miner for Queensland gold mines is registered right now." } };
     const steps = [...specialists.map((m) => ({ miner: m.id, miner_name: m.name, path: "direct" })),
+      // After the site answers, so the year comes from them.
+      ...specialists.filter((m) => m.prices).map((m) => ({ miner: m.id, miner_name: m.name, path: "direct", topic: "price" })),
       { miner: "ranked", miner_name: ROUTED.name, path: "ranked route" }];
     return { status: 200, body: { site, question: questionFor(site), steps } };
   }
@@ -189,6 +211,13 @@ export class GoldRush {
       const want = String((raw as { miner?: unknown })?.miner ?? "");
       const miner = want === "ranked" ? ROUTED : (await this.specialists()).find((m) => m.id === want);
       if (!miner) throw new InputError("miner must be a current specialist or \"ranked\".");
+      if ((raw as { topic?: unknown })?.topic === "price") {
+        if (!(miner as Specialist).prices) throw new InputError("That miner doesn't answer gold-price questions.");
+        const year = priceYear(this.ledger.rows, site);
+        if (year === null) return { status: 200, body: { kind: "skipped", topic: "price", miner_id: miner.id, miner_name: miner.name, path: "direct",
+          reason: "No closure or last-working year in this site's answers yet, so there's no year to price (nothing charged)." } };
+        return { status: 200, body: { ...(await this.askOne(site, miner, `Gold price in ${year}`, ip, "price")), path: "direct" } };
+      }
       const answer = await this.askOne(site, miner, questionFor(site), ip);
       return { status: 200, body: { ...answer, path: want === "ranked" ? "ranked route" : "direct" } };
     });
@@ -244,12 +273,12 @@ export class GoldRush {
     }
   }
 
-  private async askOne(site: Site, miner: Specialist, question: string, ip: string): Promise<Record<string, unknown>> {
-    const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id;
+  private async askOne(site: Site, miner: Specialist, question: string, ip: string, topic?: "price"): Promise<Record<string, unknown>> {
+    // A site's price answer is cached apart from its site answer (same miner, different question).
+    const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id && (r.topic ?? undefined) === topic;
     const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && mine(r));
     // A reused answer is re-checked with the same topic rule as a fresh one.
-    if (cached) return { ...cached, type: undefined, reused: true,
-      topics: { ...topicsCovered(String(cached.answer ?? ""), site.name), ...factTopics((cached.facts ?? null) as Record<string, unknown> | null, site.name) } };
+    if (cached) return { ...cached, type: undefined, reused: true, topics: topicsOf(String(cached.answer ?? ""), (cached.facts ?? null) as Record<string, unknown> | null, site.name, topic) };
     // An earlier payment for this site and miner with no settled outcome may have been charged: never pay for it twice.
     // shortcut: it stays blocked until the ledger row is reconciled by hand; automate if timeouts become common.
     const settled = new Set(this.ledger.rows.filter((r) => r.type === "outcome" && r.kind !== "unknown").map((r) => r.id));
@@ -262,7 +291,7 @@ export class GoldRush {
     if (hits.length >= this.limits.maxPerIpHour) return { kind: "skipped", miner_id: miner.id, miner_name: miner.name, reason: "Too many paid calls from you this hour." };
 
     const id = `gr-${now}-${Math.random().toString(36).slice(2, 8)}`;
-    const base = { id, site_no: site.site_no, site_name: site.name, asked_miner: miner.id, question };
+    const base = { id, site_no: site.site_no, site_name: site.name, asked_miner: miner.id, question, ...(topic ? { topic } : {}) };
     try {
       const outcome = await escrowAsk({
         node: NODE, signer: this.signer, minerId: miner.id || undefined, fetchFn: this.fetchFn, now: this.now,
@@ -292,7 +321,7 @@ export class GoldRush {
         ...base, kind: "served", miner_id: b.miner_id ?? miner.id, miner_name: b.miner_name ?? miner.name,
         answer, shaped_answer: raw?.answer ? String(result.answer ?? "") : null, brief: result.brief ?? null,
         sources: Array.isArray(raw?.sources ?? result.sources) ? ((raw?.sources ?? result.sources) as unknown[]).slice(0, 10) : [],
-        facts, topics: { ...topicsCovered(answer, site.name), ...factTopics(facts, site.name) },
+        facts, topics: topicsOf(answer, facts, site.name, topic),
         signal_hash: b.signal_hash ?? null, receipt: outcome.receipt,
       };
       this.ledger.append({ type: "outcome", at, ...row });

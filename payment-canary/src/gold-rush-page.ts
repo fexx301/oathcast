@@ -223,7 +223,7 @@ function focusSite(s) {
 
 function select(s) {
   current = null; // leaving a run stops its remaining asks
-  const n = specialists.length;
+  const n = specialists.length, np = specialists.filter((m) => m.prices).length;
   history.replaceState(null, "", "#site=" + s.site_no);
   if (ring) ring.remove();
   ring = L.circleMarker([s.lat, s.lon], { radius: (RADIUS[s.band || "very small"]) + 7, color: "oklch(94% 0.012 85)", weight: 2, fill: false, interactive: false }).addTo(map);
@@ -233,8 +233,9 @@ function select(s) {
     "<h2>" + esc(title(s.name)) + "</h2>" +
     '<p class="meta"><span>Survey site <b>' + s.site_no + "</b></span><span>Gold <b>" + esc(s.band || "unsized") + "</b></span><span>" +
     esc(title(s.sheet)) + " sheet</span><span>" + s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + "</span></p>" +
-    "<p>Ask " + n + " specialist" + (n === 1 ? "" : "s") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed.</p>" +
-    '<button class="go" id="go">Investigate · up to $' + ((n + 1) * 0.01).toFixed(2) + " test USDC</button>";
+    "<p>Ask " + n + " specialist" + (n === 1 ? "" : "s") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed" +
+    (np ? ", then the gold price in its last recorded year" : "") + ".</p>" +
+    '<button class="go" id="go">Investigate · up to $' + ((n + np + 1) * 0.01).toFixed(2) + " test USDC</button>";
   document.getElementById("go").onclick = () => investigate(s);
   document.getElementById("back").onclick = home;
 }
@@ -253,7 +254,7 @@ async function investigate(s) {
     run = current = { site: s, question: plan.question, answers: [], started: new Date().toISOString() };
     rep.innerHTML = '<h3>Investigation</h3><p class="q">“' + esc(plan.question) + '”</p><ol class="run" id="run">' +
       plan.steps.map((st, i) => '<li id="step-' + i + '" class="wait"><span class="st">○</span><span><b>' + esc(st.miner_name) +
-        '</b> <span class="tag">' + esc(st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
+        '</b> <span class="tag">' + esc(st.topic === "price" ? "gold price" : st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
       '<div id="summary"></div><div id="answers"></div>';
     for (let i = 0; i < plan.steps.length; i++) {
       if (current !== run) return; // the user moved on: don't pay for the rest of this run
@@ -261,7 +262,7 @@ async function investigate(s) {
       row.className = "busy"; row.querySelector(".st").textContent = "◌"; row.querySelector("small").textContent = "asking through Telegraph…";
       let a;
       try {
-        const res = await fetch(BASE + "api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ site_no: s.site_no, miner: st.miner }) });
+        const res = await fetch(BASE + "api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ site_no: s.site_no, miner: st.miner, topic: st.topic }) });
         a = await res.json();
         if (!res.ok) a = { kind: "refused", reason: a.error, miner_name: st.miner_name, path: st.path };
       } catch { a = { kind: "refused", reason: "The request failed.", miner_name: st.miner_name, path: st.path }; }
@@ -335,7 +336,22 @@ function renderReport(r) {
     for (const c of arr(f.closure)) add(c, "closure", [c.year, /MineHist/.test(String(c.source_ref || "")) ? "last recorded working year (survey)" : "",
       c.reason_class && c.reason_class !== "unknown" ? c.reason_class : c.reason_text ? "" : "reason not recorded", c.reason_text ? "“" + c.reason_text + "”" : ""].filter(Boolean).join(" · "), a, src(c));
     for (const o of arr(f.ownership)) add(o, "ownership", [o.owner, o.role, (o.period_from || "") + (o.period_to ? "–" + o.period_to : "")].filter(Boolean).join(" · "), a, src(o));
-    for (const g of arr(f.gold_price)) rows.push(["gold price", [g.month, g.usd_per_oz && "US$" + g.usd_per_oz + "/oz", g.aud_per_oz && "A$" + g.aud_per_oz + "/oz"].filter(Boolean).join(" · "), a.miner_name, src(g) || g.series || "", ""]);
+    // Monthly prices, summarised per series: the period, the US$ (and A$) range, and the basis (an official price isn't a market average).
+    const bySeries = {};
+    for (const g of arr(f.gold_price)) if (g.usd_per_oz != null && g.usd_per_oz !== "") (bySeries[(g.price_basis || "") + "|" + (g.source_ref || g.series || "")] ||= []).push(g);
+    for (const gs of Object.values(bySeries)) {
+      const months = gs.map((g) => String(g.month || "")).sort(), range = (xs, cur) => {
+        const v = xs.filter((x) => x != null && x !== "").map(Number).filter(isFinite);
+        if (!v.length) return "";
+        const lo = Math.min(...v), hi = Math.max(...v);
+        return cur + (lo === hi ? lo.toFixed(2) : lo.toFixed(2) + "–" + hi.toFixed(2)) + "/oz";
+      };
+      const basis = gs[0].price_basis === "official" ? "official US price, not a market average" : gs[0].price_basis === "market" ? "monthly market average" : gs[0].price_basis;
+      const notes = [...new Set(gs.map((g) => g.note).filter(Boolean))];
+      rows.push(["gold price", [months[0] === months[months.length - 1] ? months[0] : months[0] + " to " + months[months.length - 1],
+        range(gs.map((g) => g.usd_per_oz), "US$"), range(gs.map((g) => g.aud_per_oz), "A$"), basis, ...notes].filter(Boolean).join(" · "),
+        a.miner_name, src(gs[0]) || gs[0].series || "", ""]);
+    }
     // What the miner looked for and couldn't source, stated by the miner rather than left blank.
     const nf = arr(f.not_found).map((x) => typeof x === "string" ? x : JSON.stringify(x));
     if (nf.length) rows.push(["looked, not found", nf.join("; "), a.miner_name, "", ""]);
@@ -365,9 +381,10 @@ function renderReport(r) {
     '<p class="mute small">Known and missing count specialist answers only (the ranked-route answer is for contrast). Topics without structured facts come from a keyword check of sentences that name the mine; read the answers below.</p>';
   const card = (a) => {
     const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
-      '<span class="tag">' + esc(a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") +
+      '<span class="tag">' + esc(a.topic === "price" ? "gold price" : a.path) + "</span>" + (a.reused ? '<span class="tag">reused, no new charge</span>' : "") +
       (a.miner_id === "64176" ? '<span class="tag">run by the OathCast team</span>' : "") + "</div>" +
-      (a.question && a.question !== r.question ? '<p class="mute small">Asked earlier with different wording: “' + esc(a.question) + "”</p>" : "");
+      (a.topic === "price" ? '<p class="mute small">Asked: “' + esc(a.question || "") + "”</p>" :
+        a.question && a.question !== r.question ? '<p class="mute small">Asked earlier with different wording: “' + esc(a.question) + "”</p>" : "");
     if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
     const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
     return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + (src ? '<p class="small">' + src + "</p>" : "") + proof(a) + "</div>";
@@ -382,7 +399,7 @@ function download() {
   if (!r) return;
   const out = { app: "Gold Rush", url: location.origin + "/gold-rush#site=" + r.site.site_no, generated_at: new Date().toISOString(),
     network: "Ethereum Sepolia testnet · Telegraph escrow", site: r.site, question: r.question,
-    answers: r.answers.map((a) => ({ question: a.question ?? r.question, asked_at: a.at ?? null, path: a.path, kind: a.kind, miner_id: a.miner_id ?? null, miner_name: a.miner_name ?? null, reused: !!a.reused,
+    answers: r.answers.map((a) => ({ topic: a.topic ?? "site", question: a.question ?? r.question, asked_at: a.at ?? null, path: a.path, kind: a.kind, miner_id: a.miner_id ?? null, miner_name: a.miner_name ?? null, reused: !!a.reused,
       answer: a.answer ?? null, sources: a.sources ?? [], facts: a.facts ?? null, topics: a.topics ?? null, reason: a.reason ?? null,
       receipt: a.receipt ?? null, signal_hash: a.signal_hash ?? null })) };
   const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));

@@ -164,6 +164,49 @@ describe("review fixes (Astra, 2026-11-21)", () => {
   });
 });
 
+describe("gold price step", () => {
+  // A catalogue where 64176 says it answers gold prices; its site answer reports a 1917 closure for this site and a 1990 one elsewhere.
+  function priceWorld(closures: unknown[]) {
+    const w = world();
+    const asked: string[] = [];
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      if (url.includes("/api/miners")) return json(200, [{ ...CATALOGUE[0], description: "Queensland gold mines; also the gold price for a year" }]);
+      if (url.includes("/engine/v1/signal/")) return json(200, { payload: { response: { answer: "x", closure: closures, gold_price: [{ month: "1917-01", usd_per_oz: 20.67 }] } } });
+      if (init?.body) asked.push(JSON.parse(String(init.body)).params.question);
+      return w.fetchFn(url, init);
+    }) as unknown as typeof fetch;
+    return { w, asked, fetchFn };
+  }
+
+  it("prices the site's own last recorded year, after the site answer, cached apart from it", async () => {
+    const { w, asked, fetchFn } = priceWorld([{ year: 1917, entity: "Mount Leyshon" }, { year: 1990, entity: "Brilliant Extended" }]);
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, fetchFn, () => 1_800_000_000_000);
+    const plan = await app.plan({ site_no: 38940 });
+    expect((plan.body.steps as { miner: string; topic?: string }[]).map((s) => [s.miner, s.topic])).toEqual([["64176", undefined], ["64176", "price"], ["ranked", undefined]]);
+    const early = await app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip"); // no site answer yet: no year
+    expect(early.body.kind).toBe("skipped");
+    expect(w.paidCount()).toBe(0);
+    await app.ask({ site_no: 38940, miner: "64176" }, "ip");
+    const price = await app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip");
+    expect([price.body.kind, price.body.topic, price.body.question]).toEqual(["served", "price", "Gold price in 1917"]); // 1990 is another working
+    expect(price.body.topics).toEqual({ "gold price": true });
+    expect(asked.filter((q) => q === "Gold price in 1917").length).toBe(2); // 402, then paid
+    expect(w.paidCount()).toBe(2);
+    const again = await app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip");
+    expect(again.body.reused).toBe(true);
+    const site = await app.ask({ site_no: 38940, miner: "64176" }, "ip");
+    expect([site.body.reused, site.body.topic]).toEqual([true, undefined]);
+    expect(w.paidCount()).toBe(2);
+  });
+
+  it("refuses price questions to a miner that doesn't answer them", async () => {
+    const w = world();
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, w.fetchFn);
+    await expect(app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip")).rejects.toBeInstanceOf(InputError);
+    expect(w.paidCount()).toBe(0);
+  });
+});
+
 describe("delivery records", () => {
   it("checks only this app's receipts and reads recorded, pending and unknown from the node", async () => {
     const w = world();
