@@ -30,13 +30,20 @@ it. The report shows each answer with its source, cost and receipt, and which qu
    MINOCC record (CC BY 4.0). A larger circle is a larger gold class: very small (<0.5 t), small (0.5–5 t), medium
    (5–50 t), large (50–150 t) or giant (>150 t, Mount Morgan).
 2. Click a site. The panel shows its survey site number, map sheet, gold class and coordinates, and what an
-   investigation will cost (one $0.01 test-USDC call per specialist, plus one for comparison).
+   investigation will cost (one $0.01 test-USDC call per specialist, one per gold-price specialist, plus one for
+   comparison). Answers someone already paid for are reused at no charge.
 3. Click **Investigate**. The app asks each matching specialist (up to four) the same question (who owned it, how much gold it produced,
-   and when and why it closed) and also asks Telegraph's ranked route once, for comparison.
+   and when and why it closed). A specialist that also answers gold prices (today 7310050) is then asked for the gold
+   price in the site's last recorded year, taken from the answers it just got. Telegraph's ranked route is asked the
+   site question once, for comparison.
 4. Read the report:
    - each answer, its miner and sources, and its receipt (hash and epoch);
-   - any structured fields a specialist returned (production, closure, gold price, "looked, not found");
-   - a **"who answered what"** table with a row per question. "Nobody" marks a gap for the next Miner to fill.
+   - **Known / Missing / Check:** which questions the specialists answered, which nobody did, and any disagreements
+     (between a miner's own sources, or between miners on the same period);
+   - a **facts table:** every structured field a specialist returned (production, closure, ownership, gold price,
+     "looked, not found"), each with its miner and source. Facts the miner labels as another working (for Brilliant
+     Lode: Brilliant Deeps, Brilliant Extended) are listed apart and never counted for this site;
+   - each answer, its miner and sources, its receipt, and whether the node has published its delivery record yet.
 
 A site that was investigated before reuses the earlier paid answers at no charge.
 
@@ -139,11 +146,11 @@ possibly charged and is never resent. Our deployment runs it as its own containe
 
 ## Limits
 
-- **Coverage:** only one specialist is registered today (64176, the survey record). Ownership, reported production,
-  closure reasons and gold prices stay "nobody" until other Gold Rush Miners register (the first is targeted for
-  25 Nov).
-- **The "who answered what" table** is a keyword check of sentences that name the mine, plus any structured fields.
-  Read the answers.
+- **Coverage:** two specialists are registered: 64176 (the survey record, ours) and 7310050 (mine history and gold
+  prices, by NFT KING). Gold prices before March 1900 aren't covered, and before 1960 they're the official US price,
+  not a market average; the report says which.
+- **Known and Missing** come from structured fields where a miner returns them, otherwise from a keyword check of
+  sentences that name the mine. Read the answers.
 - **The ranked-route comparison** often goes to a general research Miner. On Mount Morgan it returned academic
   abstracts, which is the reason for the direct asks.
 - **Map positions** come from the survey record; its location accuracy is shown per site in 64176's answer.
