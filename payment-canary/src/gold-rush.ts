@@ -117,6 +117,7 @@ export class GoldRush {
   private ipHits = new Map<string, number[]>();
   private sitesCache: { at: number; sites: Site[] } | null = null;
   private specialistsCache: { at: number; list: Specialist[] } | null = null;
+  private deliveryCache = new Map<string, { at: number; status: string }>();
 
   constructor(
     readonly ledger: Ledger,
@@ -207,6 +208,27 @@ export class GoldRush {
     const covered = Object.fromEntries(Object.keys(TOPICS).map((t) => [t,
       answers.filter((a) => a.kind === "served" && (a.topics as Record<string, boolean>)?.[t]).map((a) => a.miner_name)]));
     return { status: 200, body: { site, question, answers, covered } };
+  }
+
+  // Has the node published the delivery record for one of our receipts? Only receipts in this app's ledger are checked.
+  // recorded (200) is kept for good; pending (no block for the epoch yet) and missing for 5 minutes; unknown not kept.
+  async delivery(raw: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+    const receipt = String(raw ?? "");
+    if (!/^0x[0-9a-f]{64}$/i.test(receipt)) throw new InputError("Give a receipt hash.");
+    const row = this.ledger.rows.find((r) => r.type === "outcome" && (r.receipt as { receipt_hash?: string } | undefined)?.receipt_hash?.toLowerCase() === receipt.toLowerCase());
+    const epoch = (row?.receipt as { epoch_id?: unknown } | undefined)?.epoch_id;
+    if (!row || !/^\d{1,9}$/.test(String(epoch))) return { status: 404, body: { error: "Not a receipt from this app." } };
+    const url = `${NODE}/v1/blocks/${epoch}/deliveries/${receipt}`;
+    const hit = this.deliveryCache.get(receipt);
+    if (hit && (hit.status === "recorded" || this.now() - hit.at < 300_000)) return { status: 200, body: { receipt, epoch, url, status: hit.status } };
+    let status = "unknown";
+    try {
+      const r = await this.fetchFn(url, { signal: AbortSignal.timeout(10_000) });
+      const text = r.status === 404 ? await r.text() : "";
+      status = r.ok ? "recorded" : r.status === 404 ? (/no block recorded/i.test(text) ? "pending" : "missing") : "unknown";
+    } catch { /* node unreachable: unknown */ }
+    if (status !== "unknown") this.deliveryCache.set(receipt, { at: this.now(), status });
+    return { status: 200, body: { receipt, epoch, url, status } };
   }
 
   // GET /engine/v1/signal/{hash} -> payload.response: the miner's raw answer, extra fields included. Free; best effort.
@@ -318,6 +340,10 @@ export function handler(app: GoldRush) {
       if (req.method === "GET" && path === "/gold-rush/api/sites") return send(res, 200, JSON.stringify({ source: "Geological Survey of Queensland, MINOCC historical workings (CC BY 4.0)", sites: await app.sites() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/specialists") return send(res, 200, JSON.stringify({ intent: INTENT, specialists: await app.specialists() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/ledger") return send(res, 200, JSON.stringify({ node: NODE, intent: INTENT, calls: app.ledger.public() }), jsonType);
+      if (req.method === "GET" && path === "/gold-rush/api/delivery") {
+        const out = await app.delivery(new URL(req.url ?? "/", "http://x").searchParams.get("receipt"));
+        return send(res, out.status, JSON.stringify(out.body), jsonType);
+      }
       if (req.method === "GET" && path === "/gold-rush/api/plan") {
         const out = await app.plan({ site_no: new URL(req.url ?? "/", "http://x").searchParams.get("site_no") });
         return send(res, out.status, JSON.stringify(out.body), jsonType);

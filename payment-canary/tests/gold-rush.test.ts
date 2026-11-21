@@ -164,6 +164,35 @@ describe("review fixes (Astra, 2026-11-21)", () => {
   });
 });
 
+describe("delivery records", () => {
+  it("checks only this app's receipts and reads recorded, pending and unknown from the node", async () => {
+    const w = world();
+    let reply: () => Response = () => json(200, {});
+    let nodeAsks = 0;
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      if (url.includes("/v1/blocks/")) { nodeAsks++; return reply(); }
+      return w.fetchFn(url, init);
+    }) as unknown as typeof fetch;
+    let t = 1_800_000_000_000;
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, fetchFn, () => t);
+    await app.ask({ site_no: 38940, miner: "64176" }, "ip"); // receipt 0x1 in the fake node: not a valid hash
+    app.ledger.append({ type: "outcome", at: new Date(t).toISOString(), id: "x", kind: "served", receipt: { receipt_hash: "0x" + "cd".repeat(32), epoch_id: 29 } });
+    await expect(app.delivery("nope")).rejects.toBeInstanceOf(InputError);
+    expect((await app.delivery("0x" + "ef".repeat(32))).status).toBe(404); // not ours: never sent to the node
+    expect(nodeAsks).toBe(0);
+    reply = () => new Response("no block recorded for this epoch", { status: 404 });
+    expect((await app.delivery("0x" + "cd".repeat(32))).body.status).toBe("pending");
+    t += 400_000; // pending is re-asked after 5 minutes
+    reply = () => json(500, {});
+    expect((await app.delivery("0x" + "cd".repeat(32))).body.status).toBe("unknown");
+    reply = () => json(200, { receipt_hash: "0x" + "cd".repeat(32) });
+    expect((await app.delivery("0x" + "cd".repeat(32))).body.status).toBe("recorded");
+    reply = () => json(500, {});
+    expect((await app.delivery("0x" + "cd".repeat(32))).body.status).toBe("recorded"); // kept for good
+    expect(nodeAsks).toBe(3);
+  });
+});
+
 describe("step-by-step investigation", () => {
   it("plans the specialists plus the ranked route, then asks one at a time", async () => {
     const w = world();

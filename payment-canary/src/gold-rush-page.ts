@@ -390,14 +390,32 @@ function download() {
   document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// The delivery record's state, asked of our server once per receipt (it checks the node); filled in when the answer lands.
+const DELIVERY = new Map();
+function delivery(rc) {
+  const href = NODE + "/v1/blocks/" + encodeURIComponent(rc.epoch_id) + "/deliveries/" + rc.receipt_hash;
+  const st = DELIVERY.get(rc.receipt_hash);
+  const a = (label) => '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + label + "</a>";
+  if (st === "recorded") return a("delivery record") + ' <span class="yes">✓ recorded</span>';
+  if (st === "pending") return "delivery record pending (epoch " + esc(rc.epoch_id) + " not yet recorded)";
+  if (st === "missing") return a("delivery record") + ' <span class="warn">not in epoch ' + esc(rc.epoch_id) + "’s record</span>";
+  if (st === undefined) {
+    DELIVERY.set(rc.receipt_hash, "checking");
+    fetch(BASE + "api/delivery?receipt=" + rc.receipt_hash).then((r) => r.json()).then((d) => {
+      DELIVERY.set(rc.receipt_hash, d.status || "unknown");
+      if (current) renderReport(current);
+    }).catch(() => DELIVERY.set(rc.receipt_hash, "unknown"));
+  }
+  return a("delivery record") + (st === "checking" ? " · checking…" : "");
+}
+
 // Request, miner, amount, network and clickable proof for one paid answer.
 const NODE = "https://devnode.telegraphprotocol.com";
 function proof(a) {
   const rc = a.receipt || {};
   const amt = rc.amount_uusdc ? "$" + (Number(rc.amount_uusdc) / 1e6).toFixed(2) + " test USDC" : "amount not in receipt";
   const links = [];
-  if (rc.receipt_hash && rc.epoch_id != null && /^0x[0-9a-f]{64}$/i.test(rc.receipt_hash))
-    links.push('<a href="' + NODE + "/v1/blocks/" + encodeURIComponent(rc.epoch_id) + "/deliveries/" + rc.receipt_hash + '" target="_blank" rel="noopener">delivery record</a> (published once epoch ' + esc(rc.epoch_id) + " is recorded)");
+  if (rc.receipt_hash && rc.epoch_id != null && /^0x[0-9a-f]{64}$/i.test(rc.receipt_hash)) links.push(delivery(rc));
   if (a.signal_hash && /^0x[0-9a-f]{64}$/i.test(a.signal_hash))
     links.push('<a href="' + NODE + "/engine/v1/signal/" + a.signal_hash + '" target="_blank" rel="noopener">signal record</a>');
   return '<p class="mono">' + esc(amt) + " · Ethereum Sepolia testnet · escrow · receipt " + esc(rc.receipt_hash || "—") +
