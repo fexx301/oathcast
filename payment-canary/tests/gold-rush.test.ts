@@ -65,6 +65,7 @@ describe("gold rush", () => {
   it("asks a clean question and drops 'near' when the sheet is the mine's own name", () => {
     expect(questionFor({ name: "MOUNT MORGAN", sheet: "MOUNT MORGAN" })).toMatch(/^Tell me about the Mount Morgan gold mine, Queensland:/);
     expect(questionFor({ name: "MOUNT LEYSHON", sheet: "CHARTERS TOWERS" })).toMatch(/Mount Leyshon gold mine near Charters Towers,/);
+    expect(questionFor({ name: "MOUNT MORGAN", sheet: "MOUNT MORGAN", site_no: 494270 })).toMatch(/Mount Morgan gold mine \(site 494270\), Queensland:/);
   });
 
   it("keeps the question within the intent's 256 bytes", () => {
@@ -117,6 +118,7 @@ describe("specialist facts", () => {
     const f = structured(raw);
     expect(Object.keys(f ?? {})).toEqual(["production", "closure", "not_found"]);
     expect(factTopics(f)).toEqual({ production: true, closure: true });
+    expect(factTopics(structured({ ownership: [{ owner: "Mount Morgan Gold Mining Co" }], closure: [{ year: 1990 }] }))).toEqual({ ownership: true, closure: true });
     expect(structured({ answer: "x" })).toBeNull();
   });
 });

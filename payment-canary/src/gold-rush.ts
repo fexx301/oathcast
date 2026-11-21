@@ -75,26 +75,29 @@ export function titled(s: string): string {
 }
 
 // Structured fields a specialist may return beside answer/sources (agreed with the NFT KING team, 2026-11-20).
-export const FACT_KEYS = ["site_no", "production", "closure", "gold_price", "not_found"] as const;
+export const FACT_KEYS = ["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found"] as const;
 
 export function structured(raw: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!raw) return null;
-  const out = Object.fromEntries(FACT_KEYS.filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
-  // shortcut: drops oversized fact blocks (> 8 KB) rather than truncating them; revisit if real miners send more
-  return Object.keys(out).length && JSON.stringify(out).length <= 8192 ? out : null;
+  const out: Record<string, unknown> = Object.fromEntries(FACT_KEYS.filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
+  // Keep the ledger row bounded: the long narrative fields go first, the facts stay.
+  for (const k of ["years_worked", "references"]) if (JSON.stringify(out).length > 24_576) delete out[k];
+  return Object.keys(out).length && JSON.stringify(out).length <= 24_576 ? out : null;
 }
 
 const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : Boolean(v && typeof v === "object" && Object.keys(v).length));
 
 export function factTopics(facts: Record<string, unknown> | null): Record<string, boolean> {
   if (!facts) return {};
-  return Object.fromEntries(Object.entries({ production: "production", closure: "closure", "gold price": "gold_price" })
+  return Object.fromEntries(Object.entries({ ownership: "ownership", production: "production", closure: "closure", "gold price": "gold_price" })
     .filter(([, k]) => nonEmpty(facts[k])).map(([t]) => [t, true]));
 }
 
-export function questionFor(site: Pick<Site, "name" | "sheet">): string {
+export function questionFor(site: Pick<Site, "name" | "sheet"> & { site_no?: number }): string {
   const near = site.sheet && site.sheet.toUpperCase() !== site.name.toUpperCase() ? ` near ${titled(site.sheet)}` : "";
-  const q = `Tell me about the ${titled(site.name)} gold mine${near}, Queensland: who owned it, how much gold it produced, ` +
+  // The GSQ site number lets specialists match the exact record (same-name sites exist on different sheets).
+  const no = site.site_no ? ` (site ${site.site_no})` : "";
+  const q = `Tell me about the ${titled(site.name)} gold mine${no}${near}, Queensland: who owned it, how much gold it produced, ` +
     "and when and why it closed.";
   return q.length <= 256 ? q : q.slice(0, 256);
 }

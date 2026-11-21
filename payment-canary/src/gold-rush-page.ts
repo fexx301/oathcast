@@ -108,7 +108,8 @@ th { color: var(--faint); font-weight: 600; font-size: 13px; }
 .run .busy .st { color: var(--gold); } .run .done .st { color: var(--ok); } .run .fail .st { color: var(--bad); }
 .verdict { background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: var(--space-3) var(--space-4); margin: var(--space-3) 0; }
 .verdict p { margin: 4px 0; font-size: 14px; } .verdict span { font-weight: 800; margin-right: 6px; }
-.warn { color: var(--gold); } .facts tr.flag td { background: oklch(80% 0.14 82 / .06); }
+.warn { color: var(--gold); }
+.checks { margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: var(--mute); } .checks li { margin: 4px 0; } .facts tr.flag td { background: oklch(80% 0.14 82 / .06); }
 .facts small { color: var(--mute); }
 .ghost { background: none; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 14px; cursor: pointer; }
 .ghost:hover { border-color: var(--gold-deep); }
@@ -276,13 +277,17 @@ async function investigate(s) {
   finally { btn.disabled = false; btn.textContent = "Investigate again · reuses paid answers"; }
 }
 
+const arr = (v) => Array.isArray(v) ? v : v && typeof v === "object" ? [v] : [];
+const src = (x) => x.source_url || x.source_title || x.source_ref || "";
+
 // Survey size classes in tonnes of gold, for checking reported production against the record.
 const BAND_T = { "very small": [0, 0.5], small: [0.5, 5], medium: [5, 50], large: [50, 150], giant: [150, Infinity] };
 const OZ_PER_T = 32150.7466;
 function tonnes(p) {
   const n = Number(p.amount), u = String(p.unit || "").toLowerCase();
   if (!isFinite(n)) return null;
-  return u === "t" || u === "tonnes" ? n : u === "kg" ? n / 1000 : u === "oz" ? n / OZ_PER_T : u === "koz" ? n * 1e3 / OZ_PER_T : u === "moz" ? n * 1e6 / OZ_PER_T : null;
+  return u === "t" || u === "tonnes" ? n : u === "kg" ? n / 1000 : u === "g" ? n / 1e6 : (u === "oz" || u === "troy oz") ? n / OZ_PER_T :
+    u === "koz" ? n * 1e3 / OZ_PER_T : (u === "moz" || u === "moz troy") ? n * 1e6 / OZ_PER_T : null;
 }
 const fmtT = (t) => t >= 10 ? t.toFixed(0) + " t" : t >= 1 ? t.toFixed(1) + " t" : (t * 1000).toFixed(0) + " kg";
 
@@ -301,19 +306,26 @@ function renderReport() {
   for (const a of served) {
     const f = a.facts || {};
     for (const p of (Array.isArray(f.production) ? f.production : [])) {
+      if (String(p.commodity || "gold").toLowerCase() !== "gold") continue; // the report is about gold
       const t = tonnes(p), period = (p.period_from || "") + "–" + (p.period_to || "");
       prod.push({ t, a, period });
       const range = BAND_T[s.band];
       let flag = "";
       // The survey's class is the mine's lifetime total: a figure above it is suspect; a lifetime figure (no period) below it too.
-      if (t != null && range && (t > range[1] || (period === "–" && t < range[0]))) {
+      // Rows a miner marks as partial (scope other than a site total) are shown but not checked against the class.
+      const partial = p.scope && p.scope !== "site_total";
+      if (!partial && t != null && range && (t > range[1] || (period === "–" && t < range[0]))) {
         flag = t > range[1] ? "more than the survey's size class allows" : "below the survey's size class for a lifetime total";
         flags.push(a.miner_name + ": " + fmtT(t) + " reported vs " + s.band + " in the survey");
       }
-      rows.push(["production", [p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== "").join(" ") + (t != null ? " ≈ " + fmtT(t) : ""), a.miner_name, p.source_url || p.source_ref || "", flag]);
+      rows.push(["production", [p.qualifier, p.amount, p.unit, p.commodity, (p.period_from || "") + (p.period_to ? "–" + p.period_to : ""), p.basis].filter((x) => x !== undefined && x !== null && x !== "").join(" ") + (t != null ? " ≈ " + fmtT(t) : "") + (partial ? " · " + String(p.scope).replace(/_/g, " ") : ""), a.miner_name, src(p), flag]);
     }
-    if (f.closure && typeof f.closure === "object") rows.push(["closure", [f.closure.year, f.closure.reason_class, f.closure.reason_text ? "“" + f.closure.reason_text + "”" : ""].filter(Boolean).join(" · "), a.miner_name, f.closure.source_ref || "", ""]);
-    if (f.gold_price && typeof f.gold_price === "object") rows.push(["gold price", [f.gold_price.month, f.gold_price.usd_per_oz && "US$" + f.gold_price.usd_per_oz + "/oz", f.gold_price.aud_per_oz && "A$" + f.gold_price.aud_per_oz + "/oz"].filter(Boolean).join(" · "), a.miner_name, f.gold_price.source_url || f.gold_price.series || "", ""]);
+    for (const c of arr(f.closure)) rows.push(["closure", [c.year, c.reason_class, c.reason_text ? "“" + c.reason_text + "”" : ""].filter(Boolean).join(" · "), a.miner_name, src(c), ""]);
+    for (const o of arr(f.ownership)) rows.push(["ownership", [o.owner, o.role, (o.period_from || "") + (o.period_to ? "–" + o.period_to : "")].filter(Boolean).join(" · "), a.miner_name, src(o), ""]);
+    for (const g of arr(f.gold_price)) rows.push(["gold price", [g.month, g.usd_per_oz && "US$" + g.usd_per_oz + "/oz", g.aud_per_oz && "A$" + g.aud_per_oz + "/oz"].filter(Boolean).join(" · "), a.miner_name, src(g) || g.series || "", ""]);
+    // Conflicts the miner found between its own sources: shown as reported, credited to that miner.
+    for (const c of arr(f.conflicts)) if (/gold/i.test(String(c.field || "")) || !/copper|silver|lead|zinc/i.test(String(c.field || "")))
+      flags.push((c.field || "sources disagree") + ": " + arr(c.values).map((v) => v.value + (v.source_ref ? " (" + v.source_ref + (v.period ? ", " + v.period : "") + ")" : "")).join(" vs ") + " · reported by " + a.miner_name);
   }
   // Different miners, same period, values more than 10% apart: a real disagreement.
   const byPeriod = {};
@@ -328,7 +340,7 @@ function renderReport() {
   document.getElementById("summary").innerHTML =
     '<div class="verdict"><p><span class="yes">Known</span> ' + esc(known.join(" · ")) + "</p>" +
     '<p><span class="no">Missing</span> ' + (missing.length ? esc(missing.join(" · ")) : "nothing from the four questions") + "</p>" +
-    (flags.length ? '<p><span class="warn">Check</span> ' + esc(flags.join("; ")) + "</p>" : "") + "</div>" +
+    (flags.length ? '<p><span class="warn">Check</span></p><ul class="checks">' + flags.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul>" : "") + "</div>" +
     '<table class="facts"><tr><th>Fact</th><th>Value</th><th>From</th></tr>' + rows.map(([k, v, m, src, flag]) =>
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
       "</td><td>" + esc(m) + (src ? "<br><small>" + link(src) + "</small>" : "") + "</td></tr>").join("") + "</table>" +
