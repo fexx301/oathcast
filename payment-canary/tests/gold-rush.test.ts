@@ -232,6 +232,8 @@ describe("gold price step", () => {
     expect(f.checks).toBeUndefined();
     expect(f.tenure.slice(0, 2).map((t) => t.record_id)).toEqual(["EPM 100", "EPM 101"]);
     expect(f.tenure.length + f.omitted.tenure).toBe(30);
+    const dup = structured({ tenure: [row(1, "contains_site_point"), row(1, "contains_site_point"), row(2, "within_buffer")] }) as { tenure: unknown[] };
+    expect(dup.tenure.length).toBe(2); // one row per record_id
     expect(JSON.stringify(f).length).toBeLessThanOrEqual(24_576);
   });
 

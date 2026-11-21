@@ -110,6 +110,11 @@ export function structured(raw: Record<string, unknown> | null): Record<string, 
   const extra = Object.keys(raw).filter((k) => !NOT_FACTS.has(k) && !(FACT_KEYS as readonly string[]).includes(k) && /^[a-z][a-z0-9_]{0,40}$/.test(k)
     && raw[k] !== null && typeof raw[k] === "object");
   const out: Record<string, unknown> = Object.fromEntries([...FACT_KEYS, ...extra].filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
+  // A register can list the same record twice (e.g. one tenure in two layers): keep one row per record_id.
+  for (const [k, v] of Object.entries(out)) if (Array.isArray(v)) {
+    const seen = new Set<string>();
+    out[k] = v.filter((x) => { const id = (x as { record_id?: unknown } | null)?.record_id; if (typeof id !== "string" || !id) return true; if (seen.has(id)) return false; seen.add(id); return true; });
+  }
   // Keep the ledger row bounded: the long narrative and diagnostic fields go first, the facts stay.
   const LIMIT = 24_576, size = () => JSON.stringify(out).length;
   for (const k of ["years_worked", "references", "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage"]) if (size() > LIMIT) delete out[k];

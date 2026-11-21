@@ -299,7 +299,8 @@ const brief = (x) => {
   if (x && typeof x === "object" && x.real_usd_per_oz_in_latest_dollars != null) // gold price then vs today
     return x.closure_year + ": US$" + x.nominal_usd_per_oz + "/oz then, about US$" + x.real_usd_per_oz_in_latest_dollars + " in " + (x.cpi_latest_month || "today's") +
       " dollars; today US$" + x.today_usd_per_oz + " (" + x.today_vs_closure_real_ratio + "× in real terms)" + (x.label ? " · " + x.label : "");
-  const pick = x && typeof x === "object" ? PREFER.filter((k) => x[k] != null && x[k] !== "" && !(Array.isArray(x[k]) && !x[k].length)) : [];
+  const blank = (v) => v == null || v === "" || v === "None" || v === "null" || (Array.isArray(v) && !v.length);
+  const pick = x && typeof x === "object" ? PREFER.filter((k) => !blank(x[k])) : [];
   if (pick.length >= 2) return pick.map((k) => (k === "record_id" || k === "name" || k === "holders" || k === "relation" ? "" : k.replace(/_/g, " ") + " ") + show(k, x[k])).join(" · ") +
     (x.checked_at ? " · checked " + String(x.checked_at).slice(0, 10) : "");
   return briefAll(x);
@@ -378,7 +379,7 @@ function renderReport(r) {
     for (const [key, val] of Object.entries(f)) {
       if (HANDLED.has(key)) continue;
       const over = (x) => Number(x && x.relation === "contains_site_point");
-      const items = arr(val).slice().sort((p, q) => over(q) - over(p)), label = key === "gold_price_real" ? "gold price then vs today" : key.replace(/_/g, " ");
+      const ids = new Set(), items = arr(val).filter((x) => !x || !x.record_id || (!ids.has(x.record_id) && ids.add(x.record_id))).sort((p, q) => over(q) - over(p)), label = key === "gold_price_real" ? "gold price then vs today" : key.replace(/_/g, " ");
       const more = (items.length > 6 ? items.length - 6 : 0) + Number((f.omitted || {})[key] || 0);
       for (const x of items.slice(0, 6)) {
         if (!LAND.has(key)) add(x, label, brief(x), a, src(x));
