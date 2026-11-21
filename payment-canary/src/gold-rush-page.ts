@@ -288,7 +288,7 @@ const src = (x) => (x && typeof x === "object" && (x.source_url || x.query_url |
 const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", tenure: "tenure", native_title: "native title", land_status: "land status" };
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
 const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
-  "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by"]);
+  "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by", "dataset"]);
 const LAND = new Set(["tenure", "native_title", "land_status"]);
 const SKIP = new Set(["source_ref", "source_url", "source_title", "query_url", "entity", "checked_at", "note"]);
 // Register rows (tenure, native title, heritage...): the identifying fields only, in reading order.

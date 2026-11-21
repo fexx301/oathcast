@@ -111,7 +111,8 @@ export function structured(raw: Record<string, unknown> | null): Record<string, 
     && raw[k] !== null && typeof raw[k] === "object");
   const out: Record<string, unknown> = Object.fromEntries([...FACT_KEYS, ...extra].filter((k) => raw[k] !== undefined && raw[k] !== null).map((k) => [k, raw[k]]));
   // A register can list the same record twice (e.g. one tenure in two layers): keep one row per record_id.
-  for (const [k, v] of Object.entries(out)) if (Array.isArray(v)) {
+  // Register rows only (they say where they sit relative to the site); fact rows may share a record legitimately.
+  for (const [k, v] of Object.entries(out)) if (Array.isArray(v) && v.some((x) => (x as { relation?: unknown } | null)?.relation)) {
     const seen = new Set<string>();
     out[k] = v.filter((x) => { const id = (x as { record_id?: unknown } | null)?.record_id; if (typeof id !== "string" || !id) return true; if (seen.has(id)) return false; seen.add(id); return true; });
   }
@@ -245,7 +246,10 @@ export class GoldRush {
       const topic = (raw as { topic?: unknown })?.topic;
       if (topic !== undefined && topic !== null && topic !== "") {
         if (typeof topic !== "string" || !EXTRA_TOPICS[topic] || !(miner as Specialist).topics?.includes(topic)) throw new InputError("That miner doesn't answer that question.");
-        const year = priceYear(this.ledger.rows, site);
+        // Site answers stored before their rows fit the size cap are re-read from their signal records (free) for the year.
+        const siteRows = await Promise.all(this.ledger.rows.filter((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner && !r.topic)
+          .map(async (r) => (r.facts || !r.signal_hash ? r : { ...r, facts: structured(await this.rawResponse(r.signal_hash)) })));
+        const year = priceYear(siteRows, site);
         if (topic === "price" && year === null) return { status: 200, body: { kind: "skipped", topic, miner_id: miner.id, miner_name: miner.name, path: "direct",
           reason: "No closure or last-working year in this site's answers yet, so there's no year to price (nothing charged)." } };
         return { status: 200, body: { ...(await this.askOne(site, miner, EXTRA_TOPICS[topic].question(site, year ?? 0), ip, topic)), path: "direct" } };
