@@ -693,7 +693,9 @@ describe("payment canary", () => {
   });
 
   it("bounds total RPC verification and preserves settlement evidence on timeout", async () => {
-    vi.useFakeTimers();
+    // Fake only the verification timeout: newer Node 24 releases (24.22+) schedule internal work on other timer
+    // types, and faking those makes vi.waitFor loop until vitest aborts (CI failed this way from 21 Nov).
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
       const target = buildTarget(options(true));
       const challenge = challengeFor(target.requestUrl);
