@@ -14,6 +14,14 @@ Two apps in this repo run live on Telegraph's testnet escrow (Ethereum Sepolia),
 - **Field-day review**: did a past day's spray or harvest window hold? Asks Telegraph for the recorded weather and
   says why. Live: <https://oathcastcourt.duckdns.org/field-day> · tutorial: [docs/field-day.md](docs/field-day.md).
 
+- **Our Miners** (registered on Telegraph's Sepolia Diamond; walkthrough in
+  [docs/telegraph-s2-miner-tutorial.md](docs/telegraph-s2-miner-tutorial.md)):
+  - 64173 `oathcast-weather` · `WEATHER_FORECAST_GENERAL`;
+  - 64174 `oathcast-forecast-verify` · `WEATHER_FORECAST_VERIFY_GENERAL` (the miner Field-day's ranked calls reached);
+  - 64175 `oathcast-sanctions` · `SANCTIONS_SCREENING_MATCH_GENERAL` (official OFAC, UN and EU lists, rebuilt daily);
+  - 64176 `oathcast-qld-gold` · `RESEARCH_QUERY_GENERAL` (the Geological Survey of Queensland record; a Gold Rush
+    specialist).
+
 Disclosure: this is a hackathon entry with prizes. Our team also runs Miner 64176 (the survey record), one of the
 specialists Gold Rush asks, so those calls are related-party; the app labels them.
 
