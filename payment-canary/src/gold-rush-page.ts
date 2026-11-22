@@ -90,8 +90,11 @@ h3 { font-size: 15px; margin: var(--space-5) 0 var(--space-2); color: var(--mute
   font-size: 15px; cursor: pointer; transition: transform .12s var(--ease-out), background .12s var(--ease-out); }
 .go:hover { background: oklch(84% 0.14 85); } .go:active { transform: translateY(1px); }
 .go:disabled { opacity: .6; cursor: progress; }
-.back { background: none; border: 0; color: var(--mute); font: inherit; font-size: 14px; padding: 0; margin-bottom: var(--space-3); cursor: pointer; }
-.back:hover { color: var(--ink); }
+/* Styled like the size chips so it reads as a control; min-height keeps a finger-sized target on phones. */
+.back { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; background: var(--raise); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 999px; font: inherit; font-size: 14px; padding: 6px 14px 6px 12px; margin-bottom: var(--space-3); cursor: pointer; }
+.back:hover { border-color: var(--gold-deep); }
+.back:active { transform: translateY(1px); }
 .card { border: 1px solid var(--line); border-radius: 10px; padding: var(--space-4); margin: var(--space-3) 0; background: oklch(19% 0.013 75); }
 .card .who { font-weight: 700; } .card p { margin: var(--space-2) 0; overflow-wrap: anywhere; }
 .tag { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; margin-left: 6px; color: var(--mute); font-weight: 500; }
