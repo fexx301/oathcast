@@ -237,7 +237,7 @@ function select(s) {
     '<p class="meta"><span>Survey site <b>' + s.site_no + "</b></span><span>Gold <b>" + esc(s.band || "unsized") + "</b></span><span>" +
     esc(title(s.sheet)) + " sheet</span><span>" + s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + "</span></p>" +
     "<p>Ask " + n + " specialist" + (n === 1 ? "" : "s") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed" +
-    (np ? ", then " + [...new Set(extra.map((t) => TOPIC_LABEL[t] || t))].join(", ") : "") + ".</p>" +
+    (np ? ", plus " + extraPhrase(extra) : "") + ".</p>" +
     '<button class="go" id="go">Investigate · up to $' + ((n + np + 1) * 0.01).toFixed(2) + " test USDC</button>";
   if (CROSS[s.site_no]) document.getElementById("go").insertAdjacentHTML("afterend", '<p class="small">Cross-check: <a href="' + esc(CROSS[s.site_no]) +
     '" target="_blank" rel="noopener">Takar’s dossier for this mine</a> (another team’s checks, not part of this report)</p>');
@@ -290,6 +290,14 @@ async function investigate(s) {
 
 const arr = (v) => Array.isArray(v) ? v : v && typeof v === "object" ? [v] : [];
 const src = (x) => (x && typeof x === "object" && (x.source_url || x.query_url || x.source_title || x.source_ref)) || "";
+// The panel's plain-English summary of a specialist's extra questions, e.g. "the gold price then and now and who holds the land today".
+function extraPhrase(topics) {
+  const t = new Set(topics), parts = [];
+  if (t.has("price") || t.has("price_real")) parts.push(t.has("price") && t.has("price_real") ? "the gold price then and now" : t.has("price") ? "the gold price at the time" : "the gold price then vs now");
+  if (t.has("land") || t.has("tenure") || t.has("native_title") || t.has("land_status")) parts.push("who holds the land today");
+  for (const x of t) if (!["price", "price_real", "land", "tenure", "native_title", "land_status"].includes(x)) parts.push(TOPIC_LABEL[x] || x);
+  return parts.join(" and ");
+}
 const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", land: "land and rights", tenure: "tenure", native_title: "native title", land_status: "land status" };
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
 const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
