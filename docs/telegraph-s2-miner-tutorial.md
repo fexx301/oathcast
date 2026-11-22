@@ -252,6 +252,36 @@ client in about 160 lines is
 [escrow.ts](https://github.com/fexx301/oathcast/blob/2495caa/payment-canary/src/escrow.ts)
 (pinned to the new Diamond; it refuses to pay any other address).
 
+## A second example: a sanctions-screening Miner
+
+The same steps serve a different Intent. My second miner, **OathCast Sanctions
+Screen (64175)**, answers `SANCTIONS_SCREENING_MATCH_GENERAL`: is this person,
+company, vessel or wallet on a sanctions list?
+
+- **Source:** the official OFAC SDN and non-SDN, UN Security Council and EU
+  consolidated lists, rebuilt every day at 06:15 UTC. Names are matched on primary
+  names and aliases after accents, punctuation and legal-form words are removed;
+  wallets match exactly. The match threshold (0.84) was set by a rule fixed in
+  advance.
+- **Endpoint:** keyless (`auth: none` in the YAML), so Step 6 doesn't apply.
+  Try it:
+  ```bash
+  curl -s 'https://ngrgakvwtxioa2kkdllvhn5pza0fxqcb.lambda-url.eu-north-1.on.aws/screen?name=Lazarus%20Group'
+  # "matched": true, "LAZARUS GROUP" on OFAC SDN, score 1.00, plus each list's publication date
+  curl -s 'https://ngrgakvwtxioa2kkdllvhn5pza0fxqcb.lambda-url.eu-north-1.on.aws/screen?name=Tesla,%20Inc.'
+  # "matched": false, "No match … Checked: OFAC SDN (published …); …"
+  ```
+- **YAML:** [oathcast-sanctions-s2.yaml](https://raw.githubusercontent.com/fexx301/oathcast/8cd6e0a50b355237d27b20eb0e03a4e231bbfbb4/miners/candidates/oathcast-sanctions-s2.yaml),
+  pinned to a commit. Its `intent_mapping` maps the Intent's fields (`name`,
+  `matched`, `matches`, `lists`, `match_score`) and adds a one-sentence `summary`
+  and a `confidence` for the node's signal mapping.
+- **Tested by someone else:** another builder checked it against GLEIF company
+  records (6 names, 6 right). They found two real flaws, a similar-but-different
+  bank scoring too high and a no-match that didn't name its closest listing. Both
+  were fixed the same day, and they confirmed the fixes in public.
+- **Limits:** UK lists aren't covered. The lists are a daily snapshot. A name
+  match is an alert that needs identity review, and no match is not a clearance.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -276,11 +306,16 @@ client in about 160 lines is
   run, the daily high was within ±2 °C on 81.5% of the 92 covered days. The
   average error was 1.35 °C. The weakest region was Asia-Pacific at 65%.
   [Method and numbers](https://github.com/fexx301/oathcast-telegraph-s2/tree/main/wfv-miner-quality-v1).
-- **Ranking:** this Intent has no dedicated scorer registered yet. The node
-  gives it a generic fallback score, and Telegraph's explorer shows the Intent
-  as unranked. So I can show routed, paid requests, but not an official rank.
-- **Routing share:** all 10 of my app's calls reached this miner. I do not know
-  why the share was that high, and it may not stay that way.
+- **Ranking:** since the network reset (16–17 Nov 2026), WEATHER_FORECAST_VERIFY
+  has a canonical scorer from another team (reg 120). Under it, this miner scored
+  0.5 on 2026-11-19, the same as the rest of the Intent's top five, so it was a tie,
+  not a lead. On 2026-11-22 the node showed 0 for it and for most of the Intent;
+  Telegraph says that's a ranking rollover issue it is fixing.
+  Before the reset, my own adapter (reg 408) was the Intent's first canonical
+  scorer for about a day, which I disclose because it ranked my own miner.
+- **Routing share:** 14 of my app's 16 paid calls (to 2026-11-17) reached this
+  miner; the other 2 went to other miners. I do not know why the share was that
+  high, and it may not stay that way.
 
 ## Try it, and tell me what breaks
 
