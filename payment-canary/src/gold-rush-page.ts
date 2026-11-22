@@ -287,7 +287,7 @@ async function investigate(s) {
 
 const arr = (v) => Array.isArray(v) ? v : v && typeof v === "object" ? [v] : [];
 const src = (x) => (x && typeof x === "object" && (x.source_url || x.query_url || x.source_title || x.source_ref)) || "";
-const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", tenure: "tenure", native_title: "native title", land_status: "land status" };
+const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", land: "land and rights", tenure: "tenure", native_title: "native title", land_status: "land status" };
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
 const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
   "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by", "dataset"]);
