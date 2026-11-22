@@ -164,7 +164,7 @@ footer strong { color: var(--mute); }
   (2 test USDC into the Telegraph Diamond, 20 Nov 2026).</p>
   <p>Map data: Geological Survey of Queensland, MINOCC historical workings, CC BY 4.0, State of Queensland. Base map ©
   OpenStreetMap contributors. Every paid call: <a href="/gold-rush/api/ledger">public ledger</a> ·
-  <a href="https://github.com/fexx301/oathcast/blob/s2-gold-rush/docs/gold-rush.md" target="_blank" rel="noopener">how it works</a>.</p>
+  <a href="https://github.com/fexx301/oathcast/blob/main/docs/gold-rush.md" target="_blank" rel="noopener">how it works</a>.</p>
 </footer>
 <script>
 const BASE = "/gold-rush/";

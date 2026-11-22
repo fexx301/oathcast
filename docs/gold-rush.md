@@ -56,7 +56,7 @@ A site that was investigated before reuses the earlier paid answers at no charge
 
 ```sh
 B=https://oathcastcourt.duckdns.org/gold-rush/api
-curl -s $B/specialists   # the Miners the app asks (today: 64176)
+curl -s $B/specialists   # the Miners the app asks (today: 64176 and 7310050)
 curl -s $B/sites | head -c 300
 curl -s $B/ledger        # every paid call: question, miner, outcome, receipt
 ```
@@ -85,7 +85,7 @@ curl -s $B/ledger        # every paid call: question, miner, outcome, receipt
 
 1. Register a Miner on `RESEARCH_QUERY_GENERAL` whose description says what it covers, e.g. "Queensland gold
    mines: reported production…". See the
-   [miner tutorial](https://github.com/fexx301/oathcast/blob/s2-field-day/docs/telegraph-s2-miner-tutorial.md).
+   [miner tutorial](https://github.com/fexx301/oathcast/blob/main/docs/telegraph-s2-miner-tutorial.md).
 2. Put the key facts in `answer`, so anyone reading only the reshaped answer gets them.
 3. Optionally, return these structured fields as top-level keys next to `answer` and `sources`. The app shows them
    as rows, and they count toward "who answered what". These were agreed with another Gold Rush builder.
@@ -108,7 +108,7 @@ You need Node 22 or later, a Sepolia wallet for the app (its key stays on your s
 escrow.
 
 ```sh
-git clone -b s2-gold-rush https://github.com/fexx301/oathcast && cd oathcast/payment-canary
+git clone https://github.com/fexx301/oathcast && cd oathcast/payment-canary
 npm ci
 npx vitest run tests/gold-rush.test.ts        # offline; no network, no money
 ```
@@ -148,13 +148,14 @@ possibly charged and is never resent. Our deployment runs it as its own containe
 - **Per answer:** $0.01 test USDC from the app's escrow; no gas per call.
 - **Funding:** one deposit transaction (a fraction of a cent of Sepolia ETH).
 - **Hosting:** a second small process on our existing server (about 100 MB of memory).
-- **Registering a specialist Miner:** a 1 test-USDC bond for its first intent on the current Diamond, returned when
-  you deregister.
+- **Registering a specialist Miner:** a bond in test USDC for its first intent on the current Diamond (read the amount
+  with `minerBondParams()`; our 64176 posted 1.2), returned when you deregister.
 
 ## Limits
 
-- **Coverage:** two specialists are registered: 64176 (the survey record, ours) and 7310050 (mine history and gold
-  prices, by NFT KING). Gold prices before March 1900 aren't covered, and before 1960 they're the official US price,
+- **Coverage:** two specialists are registered: 64176 (the survey record, ours) and 7310050 (mine history, gold
+  prices, and land and rights, by NFT KING). The app finds a specialist's extra questions from its catalogue text;
+  7310050's description doesn't list them yet, so for now the app recognises them from a short built-in list. Gold prices before March 1900 aren't covered, and before 1960 they're the official US price,
   not a market average; the report says which.
 - **Known and Missing** come from structured fields where a miner returns them, otherwise from a keyword check of
   sentences that name the mine. Read the answers.

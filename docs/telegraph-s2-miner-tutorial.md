@@ -307,12 +307,15 @@ company, vessel or wallet on a sanctions list?
   average error was 1.35 °C. The weakest region was Asia-Pacific at 65%.
   [Method and numbers](https://github.com/fexx301/oathcast-telegraph-s2/tree/main/wfv-miner-quality-v1).
 - **Ranking:** since the network reset (16–17 Nov 2026), WEATHER_FORECAST_VERIFY
-  has a canonical scorer from another team (reg 120). Under it, this miner scores
-  0.5, the same as the rest of the Intent's top five, so it is a tie, not a lead.
+  has a canonical scorer from another team (reg 120). Under it, this miner scored
+  0.5 on 2026-11-19, the same as the rest of the Intent's top five, so it was a tie,
+  not a lead. On 2026-11-22 the node showed 0 for it and for most of the Intent;
+  Telegraph says that's a ranking rollover issue it is fixing.
   Before the reset, my own adapter (reg 408) was the Intent's first canonical
   scorer for about a day, which I disclose because it ranked my own miner.
-- **Routing share:** all 10 of my app's calls reached this miner. I do not know
-  why the share was that high, and it may not stay that way.
+- **Routing share:** 14 of my app's 16 paid calls (to 2026-11-17) reached this
+  miner; the other 2 went to other miners. I do not know why the share was that
+  high, and it may not stay that way.
 
 ## Try it, and tell me what breaks
 
