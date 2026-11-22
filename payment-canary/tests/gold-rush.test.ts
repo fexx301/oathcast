@@ -186,7 +186,7 @@ describe("gold price step", () => {
     const early = await app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip"); // no site answer yet: no year
     expect(early.body.kind).toBe("skipped");
     expect(w.paidCount()).toBe(0);
-    await expect(app.ask({ site_no: 38940, miner: "64176", topic: "tenure" }, "ip")).rejects.toBeInstanceOf(InputError); // not one of its topics
+    await expect(app.ask({ site_no: 38940, miner: "64176", topic: "land" }, "ip")).rejects.toBeInstanceOf(InputError); // not one of its topics
     await app.ask({ site_no: 38940, miner: "64176" }, "ip");
     const price = await app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip");
     expect([price.body.kind, price.body.topic, price.body.question]).toEqual(["served", "price", "Gold price in 1917"]); // 1990 is another working
@@ -216,10 +216,10 @@ describe("gold price step", () => {
     const app = new GoldRush(new Ledger(null), account, { maxCalls: 20, maxPerDay: 20, maxPerIpHour: 20 }, fetchFn, () => 1_800_000_000_000);
     const plan = await app.plan({ site_no: 38940 });
     expect((plan.body.steps as { miner: string; topic?: string }[]).filter((s) => s.miner === "7310050").map((s) => s.topic))
-      .toEqual([undefined, "price", "price_real", "tenure", "native_title", "land_status"]);
-    const t = await app.ask({ site_no: 38940, miner: "7310050", topic: "tenure" }, "ip");
-    expect(asked).toContain("Who holds the tenure at Mount Leyshon (site 38940)?");
-    expect(t.body.topics).toEqual({ tenure: true });
+      .toEqual([undefined, "price", "price_real", "land"]);
+    const t = await app.ask({ site_no: 38940, miner: "7310050", topic: "land" }, "ip");
+    expect(asked).toContain("Land and rights at Mount Leyshon (site 38940)");
+    expect(t.body.topics).toEqual({ "land and rights": true });
     expect(Object.keys(t.body.facts as object)).toEqual(["tenure", "events"]); // a new field (events) is kept too
   });
 

@@ -30,16 +30,16 @@ export interface Specialist {
 type SiteRef = Pick<Site, "site_no" | "name">;
 const named = (s: SiteRef) => `${titled(s.name)} (site ${s.site_no})`;
 // Extra questions a specialist may answer, each returning its own top-level rows (agreed with NFT KING, 21 Nov).
-export const EXTRA_TOPICS: Record<string, { label: string; rows: string; re: RegExp; question: (s: SiteRef, year: number) => string }> = {
-  price: { label: "gold price", rows: "gold_price", re: /gold[ -]price/i, question: (_s, year) => `Gold price in ${year}` },
-  price_real: { label: "gold price then vs today", rows: "gold_price_real", re: /(closure|then) vs today|inflation-adjusted/i,
+export const EXTRA_TOPICS: Record<string, { label: string; rows: string[]; re: RegExp; question: (s: SiteRef, year: number) => string }> = {
+  price: { label: "gold price", rows: ["gold_price"], re: /gold[ -]price/i, question: (_s, year) => `Gold price in ${year}` },
+  price_real: { label: "gold price then vs today", rows: ["gold_price_real"], re: /(closure|then) vs today|inflation-adjusted/i,
     question: (s) => `Gold price at closure vs today for ${named(s)}` },
-  tenure: { label: "tenure", rows: "tenure", re: /current (mining )?tenure|tenure holder/i, question: (s) => `Who holds the tenure at ${named(s)}?` },
-  native_title: { label: "native title", rows: "native_title", re: /native title/i, question: (s) => `Native title at ${named(s)}` },
-  land_status: { label: "land status", rows: "land_status", re: /land status|protected area/i, question: (s) => `Land status of ${named(s)}` },
+  // One question returns all three layers (NFT KING, 22 Nov): tenure[], native_title[], land_status[].
+  land: { label: "land and rights", rows: ["tenure", "native_title", "land_status"], re: /native title|land and rights/i,
+    question: (s) => `Land and rights at ${named(s)}` },
 };
-// shortcut: 7310050 answers all of these (NFT KING, 21 Nov) but its catalogue text doesn't say so yet; drop once it does.
-const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "tenure", "native_title", "land_status"] };
+// shortcut: 7310050 answers all of these (NFT KING, 21-22 Nov) but its catalogue text doesn't say so yet; drop once it does.
+const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "land"] };
 
 // The year to price: the latest closure or last-working year this site's specialists reported for the site itself.
 export function priceYear(rows: Record<string, unknown>[], site: SiteRef): number | null {
@@ -143,7 +143,7 @@ export function aboutSite(row: unknown, siteName = ""): boolean {
 // An extra-topic answer covers only its own rows; a site answer is checked by sentence and by its structured fields.
 function topicsOf(answer: string, facts: Record<string, unknown> | null, siteName: string, topic?: string): Record<string, boolean> {
   const t = topic ? EXTRA_TOPICS[topic] : undefined;
-  if (t) return { [t.label]: Boolean(facts && nonEmpty(facts[t.rows])) };
+  if (t) return { [t.label]: Boolean(facts && t.rows.some((k) => nonEmpty(facts[k]))) };
   return { ...topicsCovered(answer, siteName), ...factTopics(facts, siteName) };
 }
 
@@ -473,7 +473,7 @@ export function main(): void {
   delete process.env.OATHCAST_S2_ESCROW_PRIVATE_KEY;
   const ledger = new Ledger(process.env.GOLD_RUSH_LEDGER ?? "/data/gold-rush-ledger.jsonl");
   const app = new GoldRush(ledger, account, {
-    // A full report is up to 8 calls (site, gold price, land and rights, ranked): about 20 new sites in all, 7 a day.
+    // A full report is up to 6 calls (two site answers, gold price, then vs today, land and rights, ranked): ~30 new sites, 10 a day.
     maxCalls: envInt("GOLD_RUSH_MAX_CALLS", 180),
     maxPerDay: envInt("GOLD_RUSH_MAX_PER_DAY", 60),
     maxPerIpHour: envInt("GOLD_RUSH_MAX_PER_IP_HOUR", 20),
