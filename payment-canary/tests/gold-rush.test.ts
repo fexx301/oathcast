@@ -239,11 +239,14 @@ describe("gold price step", () => {
     const app = new GoldRush(new Ledger(null), account, { maxCalls: 20, maxPerDay: 20, maxPerIpHour: 20 }, fetchFn, () => 1_800_000_000_000);
     const plan = await app.plan({ site_no: 38940 });
     expect((plan.body.steps as { miner: string; topic?: string }[]).filter((s) => s.miner === "7310050").map((s) => s.topic))
-      .toEqual([undefined, "price", "price_real", "land"]);
+      .toEqual([undefined, "price", "price_real", "land", "remain"]);
     const t = await app.ask({ site_no: 38940, miner: "7310050", topic: "land" }, "ip");
     expect(asked).toContain("Land and rights at Mount Leyshon (site 38940)");
     expect(t.body.topics).toEqual({ "land and rights": true });
     expect(Object.keys(t.body.facts as object)).toEqual(["tenure", "events"]); // a new field (events) is kept too
+    const r = await app.ask({ site_no: 38940, miner: "7310050", topic: "remain" }, "ip");
+    expect(asked).toContain("What might remain at Mount Leyshon (site 38940)");
+    expect(r.body.topics).toEqual({ "what might remain today": false }); // this fake answer has none of the four layers
   });
 
   it("trims an oversized answer: diagnostics first, then rows over the site point kept ahead of nearby ones", async () => {
@@ -310,7 +313,7 @@ describe("who controls it today", () => {
     }) as unknown as typeof fetch;
     const app = new GoldRush(new Ledger(null), account, { maxCalls: 20, maxPerDay: 20, maxPerIpHour: 20 }, fetchFn, () => 1_800_000_000_000);
     const steps = (await app.plan({ site_no: 38940 })).body.steps as { miner: string; topic?: string }[];
-    expect(steps.map((s) => s.topic ?? s.miner).slice(-4)).toEqual(["land", "controller", "screen", "ranked"]);
+    expect(steps.map((s) => s.topic ?? s.miner).slice(-5)).toEqual(["land", "remain", "controller", "screen", "ranked"]);
 
     const early = await app.ask({ site_no: 38940, miner: "731005", topic: "controller" }, "ip");
     expect(early.body.kind).toBe("skipped"); // no land answer yet: nobody to look up, nothing paid

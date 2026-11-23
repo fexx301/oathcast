@@ -37,9 +37,12 @@ export const EXTRA_TOPICS: Record<string, { label: string; rows: string[]; re: R
   // One question returns all three layers (NFT KING, 22 Nov): tenure[], native_title[], land_status[].
   land: { label: "land and rights", rows: ["tenure", "native_title", "land_status"], re: /native title|land and rights/i,
     question: (s) => `Land and rights at ${named(s)}` },
+  // One question returns all four layers (NFT KING, 23 Nov): exploration[], resources[], access[], environment[].
+  remain: { label: "what might remain today", rows: ["exploration", "resources", "access", "environment"], re: /what might remain/i,
+    question: (s) => `What might remain at ${named(s)}` },
 };
 // shortcut: 7310050 answers all of these (NFT KING, 21-22 Nov) but its catalogue text doesn't say so yet; drop once it does.
-const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "land"] };
+const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "land", "remain"] };
 
 // "Who controls it today" (offered by Sadiq, Counterproof, 23 Nov): the tenure holder over the site -> its registered identity
 // (731005, GLEIF) -> a sanctions screen of that entity (731002). Another team's miners, asked directly by ID on their own intents

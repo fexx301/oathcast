@@ -301,14 +301,36 @@ function extraPhrase(topics) {
   const t = new Set(topics), parts = [];
   if (t.has("price") || t.has("price_real")) parts.push(t.has("price") && t.has("price_real") ? "the gold price then and now" : t.has("price") ? "the gold price at the time" : "the gold price then vs now");
   if (t.has("land") || t.has("tenure") || t.has("native_title") || t.has("land_status")) parts.push("who holds the land today and the company behind it");
-  for (const x of t) if (!["price", "price_real", "land", "tenure", "native_title", "land_status"].includes(x)) parts.push(TOPIC_LABEL[x] || x);
+  if (t.has("remain")) parts.push("what might remain");
+  for (const x of t) if (!["price", "price_real", "land", "tenure", "native_title", "land_status", "remain"].includes(x)) parts.push(TOPIC_LABEL[x] || x);
   return parts.join(" and ");
 }
 const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", land: "land and rights", tenure: "tenure", native_title: "native title", land_status: "land status",
-  controller: "who controls it today", screen: "controller sanctions screen" };
+  controller: "who controls it today", screen: "controller sanctions screen", remain: "what might remain today" };
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
 const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
-  "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by", "dataset"]);
+  "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by", "dataset",
+  "caveats", "labels", "calls"]);
+// What might remain today (NFT KING's four layers): records near the site, kept in their own table with their own caveat.
+const REMAIN = new Set(["exploration", "resources", "access", "environment"]);
+const km = (x) => x.distance_km != null ? x.distance_km + " km" : x.distance_m != null ? x.distance_m + " m" : "";
+function remainBrief(x) {
+  if (!x || typeof x !== "object") return String(x);
+  const j = (...xs) => xs.filter((v) => v !== null && v !== undefined && v !== "").join(" · ");
+  const t = x.record_type;
+  if (t === "borehole") return j("borehole " + (x.name || x.record_id), x.operator, x.total_depth_m != null ? x.total_depth_m + " m deep" : "", x.year, km(x) ? km(x) + " away" : "");
+  if (t === "company_report") return j("company report CR " + x.cr_number, String(x.title || "").slice(0, 140), x.year);
+  if (t === "modern_resource") return j(x.zone || x.deposit_name, x.commodity, "reported " + (x.reporting_date || "?"), x.classification_method,
+    (x.categories || []).map((c) => c.category + " " + c.tonnage_as_published + " " + c.tonnage_unit + (c.grade != null ? " at " + c.grade + " " + c.grade_unit : "")).join("; "),
+    x.published_source, "a published estimate, not gold left");
+  if (t && t.indexOf("nearest_") === 0) return j(t.replace("nearest_", "nearest ").replace(/_/g, " "), x.name, x.national_route, x.surface, x.capacity_kv ? x.capacity_kv + " kV" : "",
+    x.population ? "population " + x.population : "", km(x) + " straight line");
+  if (t === "environmental_authority") return j("environmental authority " + x.permit_ref_no, x.permit_type, x.status, x.holder, x.activity, show("relation", x.relation));
+  if (t === "abandoned_mine_tailings") return j("abandoned-mine tailings " + x.record_id, x.ftr_sub, x.ftr_rehab ? "rehabilitation " + x.ftr_rehab : "", show("relation", x.relation));
+  if (t === "abandoned_mine_program_site") return j("abandoned-mines program site " + x.record_id, x.mine_name, x.class, x.status, show("relation", x.relation));
+  if (x.count != null) return j(x.count + " " + (x.record_id || x.layer || ""), x.layer);
+  return brief(x);
+}
 const LAND = new Set(["tenure", "native_title", "land_status", "controller_identity", "controller_screen"]);
 const SKIP = new Set(["source_ref", "source_url", "source_title", "query_url", "entity", "checked_at", "note"]);
 // Register rows (tenure, native title, heritage...): the identifying fields only, in reading order.
@@ -353,7 +375,7 @@ function renderReport(r) {
   const who = Object.fromEntries(TOP.map((t) => [t, served.filter((a) => (a.topics || {})[t]).map((a) => a.miner_name)]));
   const known = ["location and size class (survey record)"].concat(TOP.filter((t) => who[t].length), gp ? ["gold price"] : []);
   const missing = TOP.filter((t) => !who[t].length);
-  const rows = [], near = [], land = [], flags = [];
+  const rows = [], near = [], land = [], flags = [], remain = [];
   const add = (x, k, v, a, from, flag) => here(x) ? rows.push([k, v, a.miner_name, from, flag || ""]) : near.push([k, x.entity + ": " + v, a.miner_name, from, ""]);
   rows.push(["size class", (s.band || "unsized") + (BAND_T[s.band] ? " (" + (BAND_T[s.band][1] === Infinity ? "over " + BAND_T[s.band][0] : BAND_T[s.band][0] + "–" + BAND_T[s.band][1]) + " t of gold)" : ""), "GSQ MINOCC record", ""]);
   const prod = [];
@@ -402,11 +424,12 @@ function renderReport(r) {
       const ids = new Set(), items = arr(val).filter((x) => !x || !x.record_id || (!ids.has(x.record_id) && ids.add(x.record_id))).sort((p, q) => over(q) - over(p)), label = key === "gold_price_real" ? "gold price then vs today" : key.replace(/_/g, " ");
       const more = (items.length > 6 ? items.length - 6 : 0) + Number((f.omitted || {})[key] || 0);
       for (const x of items.slice(0, 6)) {
-        if (!LAND.has(key)) add(x, label, brief(x), a, src(x));
+        if (REMAIN.has(key)) remain.push([label, remainBrief(x), a.miner_name, src(x), ""]);
+        else if (!LAND.has(key)) add(x, label, brief(x), a, src(x));
         else if (here(x)) land.push([label, brief(x), a.miner_name, src(x), ""]);
         else near.push([label, x.entity + ": " + brief(x), a.miner_name, src(x), ""]);
       }
-      if (more) (LAND.has(key) ? land : rows).push([label, "+" + more + " more nearby (full list in the miner's signal record)", a.miner_name, "", ""]);
+      if (more) (REMAIN.has(key) ? remain : LAND.has(key) ? land : rows).push([label, "+" + more + " more nearby (full list in the miner's signal record)", a.miner_name, "", ""]);
     }
     // What the miner looked for and couldn't source, stated by the miner rather than left blank.
     const nf = arr(f.not_found).map((x) => typeof x === "string" ? x : JSON.stringify(x));
@@ -428,7 +451,8 @@ function renderReport(r) {
   const link = (u) => /^https?:/.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">source</a>' : esc(u);
   if (land.length) known.push("land and rights today");
   if (land.some((r) => r[0] === "controller identity")) known.push("who controls it today");
-  r.view = { known, missing, flags, rows, near, land, gp };
+  if (remain.length) known.push("what might remain today (records)");
+  r.view = { known, missing, flags, rows, near, land, gp, remain };
   const tr = ([k, v, m, src, flag]) => k === "#near" ?
       '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
@@ -442,6 +466,8 @@ function renderReport(r) {
     (land.length ? "<h3>Land and rights today</h3>" +
       '<p class="mute small">From public registers, as of each row’s check date. An expiry date or a gap in tenure doesn’t mean the ground is available; that needs legal confirmation.</p>' +
       '<table class="facts"><tr><th>Register</th><th>Record</th><th>From</th></tr>' + land.map(tr).join("") + "</table>" : "") +
+    (remain.length ? "<h3>What might remain today</h3>" + '<p class="mute small">' + REMAIN_CAVEAT + "</p>" +
+      '<table class="facts"><tr><th>Kind</th><th>Record</th><th>From</th></tr>' + remain.map(tr).join("") + "</table>" : "") +
     '<p class="mute small">Known and missing count specialist answers only (the ranked-route answer is for contrast). Topics without structured facts come from a keyword check of sentences that name the mine; read the answers below.</p>';
   const card = (a) => {
     const head = '<div class="who">' + esc(a.miner_name || "—") + (a.miner_id ? " · " + esc(a.miner_id) : "") +
@@ -476,6 +502,9 @@ function save(text, type, name) {
   document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const REMAIN_CAVEAT = "Records of what has been drilled, reported, mapped or registered near the site, as the miner returned them. " +
+  "Not an estimate of gold remaining and not a judgement of whether anything is economic; that needs a geologist. Modern resources are " +
+  "companies’ published estimates (JORC, as reported), kept apart from historical production. Environmental records are not a statement of contamination.";
 const byYear = (xs) => xs.slice().sort((p, q) => (p.year ?? 9999) - (q.year ?? 9999));
 // Takar's events and people, as Takar's: quoted register sentences with their record and Takar's own status.
 function renderEvents(r) {
@@ -529,6 +558,8 @@ function evidence(r) {
     "## Land and rights today, and who controls it", "",
     "From public registers, as of each row's check date. An expiry date or a gap in tenure doesn't mean the ground is available; that needs legal confirmation.", "",
     table(["Register", "Record", "From", "Source"], v.land.map((x) => [x[0], x[1], x[2], x[3]])), "",
+    "## What might remain today (records near the site)", "", REMAIN_CAVEAT, "",
+    table(["Kind", "Record", "From", "Source"], (v.remain || []).map((x) => [x[0], x[1], x[2], x[3]])), "",
     "## Events and people (Queensland Heritage Register, via Takar)", "",
     e ? "By Takar (Bangdrop), another team; each event is signed in Takar's file (" + e.source_url + "). Status is Takar's own check." : "_No Takar register file for this mine._", "",
     e ? table(["Year", "Type", "Quoted sentence", "Record", "Takar's status"], evs.map((x) => [x.year ?? "", x.types.join(", "), x.quote, (x.entry ? x.entry + ", " : "") + x.record_id + (x.url ? " " + x.url : ""), x.status])) : "",
