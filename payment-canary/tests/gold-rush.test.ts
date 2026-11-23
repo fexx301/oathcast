@@ -281,7 +281,7 @@ describe("who controls it today", () => {
     expect(siteHolder(null)).toBeNull();
   });
 
-  it("asks 731005 for the holder's registered entity, then 731002 to screen that entity, each on its own intent, only after a land answer", async () => {
+  it("asks 731005 for the holder's registered entity, then 731002 to screen that entity, each on its own intent with its canonical params, only after a land answer", async () => {
     const bodies: { url: string; body: { intent: string; params: Record<string, unknown> } }[] = [];
     let n = 0;
     const SIG: Record<string, unknown> = {};
@@ -308,13 +308,13 @@ describe("who controls it today", () => {
 
     await app.ask({ site_no: 38940, miner: "7310050", topic: "land" }, "ip");
     const who = await app.ask({ site_no: 38940, miner: "731005", topic: "controller" }, "ip");
-    expect(bodies[1]).toMatchObject({ url: expect.stringMatching(/\/ask\/731005$/), body: { intent: "B2B_IDENTITY_ENRICHMENT_GENERAL", params: { name: "CITIGOLD CORPORATION LIMITED" } } });
+    expect(bodies[1]).toMatchObject({ url: expect.stringMatching(/\/ask\/731005$/), body: { intent: "B2B_IDENTITY_ENRICHMENT_GENERAL", params: { company: "CITIGOLD CORPORATION LIMITED" } } });
     expect(who.body.topics).toEqual({ "who controls it today": true });
     expect((who.body.facts as { controller_identity: Record<string, unknown>[] }).controller_identity[0])
       .toMatchObject({ record_id: "LEI 529900C4YHWJ2XJ8A350", status: "ACTIVE", jurisdiction: "AU", source_url: "https://search.gleif.org/#/record/529900C4YHWJ2XJ8A350" });
 
     const screen = await app.ask({ site_no: 38940, miner: "731002", topic: "screen" }, "ip");
-    expect(bodies[2].body).toEqual({ intent: "SANCTIONS_SCREENING_MATCH_GENERAL", params: { name: "CITIGOLD CORPORATION LIMITED", type: "entity" } });
+    expect(bodies[2].body).toEqual({ intent: "SANCTIONS_SCREENING_MATCH_GENERAL", params: { name: "CITIGOLD CORPORATION LIMITED" } }); // the intent's canonical params only
     expect((screen.body.facts as { controller_screen: Record<string, unknown>[] }).controller_screen[0]).toMatchObject({ status: "CLEAR", lists: "US 2026-11-09, UK 2026-11-10 (official lists as published; not ownership or adverse media)" });
 
     const again = await app.ask({ site_no: 38940, miner: "731005", topic: "controller" }, "ip");

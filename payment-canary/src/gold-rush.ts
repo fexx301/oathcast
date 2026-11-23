@@ -42,7 +42,8 @@ export const EXTRA_TOPICS: Record<string, { label: string; rows: string[]; re: R
 const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "land"] };
 
 // "Who controls it today" (offered by Sadiq, Counterproof, 23 Nov): the tenure holder over the site -> its registered identity
-// (731005, GLEIF) -> a sanctions screen of that entity (731002). Another team's miners, asked directly by ID on their own intents,
+// (731005, GLEIF) -> a sanctions screen of that entity (731002). Another team's miners, asked directly by ID on their own intents
+// with each intent's canonical params,
 // only after a land answer names a holder.
 export const CONTROLLER: Record<string, { id: string; name: string; intent: string; label: string; rows: string }> = {
   controller: { id: "731005", name: "Counterproof B2B Identity Enrichment", intent: "B2B_IDENTITY_ENRICHMENT_GENERAL", label: "who controls it today", rows: "controller_identity" },
@@ -390,7 +391,8 @@ export class GoldRush {
     if (!name) return { kind: "skipped", topic, miner_id: c.id, miner_name: c.name,
       reason: "No tenure holder over the site point in this site's land answer yet, so there's nobody to look up (nothing charged)." };
     const miner = { id: c.id, name: c.name, description: "" };
-    const call = { intent: c.intent, params: topic === "screen" ? { name, type: "entity" } : { name } };
+    // Each intent's canonical params (node /engine/v1/intents): identity takes {company}, the screen takes {name} only.
+    const call = { intent: c.intent, params: topic === "screen" ? { name } : { company: name } };
     return this.askOne(site, miner, topic === "screen" ? `Sanctions screen of ${name}` : `Registered identity of ${name}`, ip, topic, call);
   }
 
@@ -441,7 +443,7 @@ export class GoldRush {
       // The node reshapes (and may reword) the answer; the miner's own response is kept under its signal hash.
       const raw = await this.rawResponse(b.signal_hash);
       const answer = String(raw?.answer ?? result.answer ?? "");
-      const parsed = topic && CONTROLLER[topic] ? controllerFacts(topic, raw, String(call?.params.name ?? "")) : structured(raw);
+      const parsed = topic && CONTROLLER[topic] ? controllerFacts(topic, raw, String(call?.params.name ?? call?.params.company ?? "")) : structured(raw);
       // Structured fields for a different survey site number are dropped rather than credited to this one.
       const facts = parsed && parsed.site_no != null && Number(parsed.site_no) !== site.site_no ? null : parsed;
       const row = {
