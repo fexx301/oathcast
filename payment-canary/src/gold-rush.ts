@@ -41,6 +41,44 @@ export const EXTRA_TOPICS: Record<string, { label: string; rows: string[]; re: R
 // shortcut: 7310050 answers all of these (NFT KING, 21-22 Nov) but its catalogue text doesn't say so yet; drop once it does.
 const KNOWN_TOPICS: Record<string, string[]> = { "7310050": ["price", "price_real", "land"] };
 
+// "Who controls it today" (offered by Sadiq, Counterproof, 23 Nov): the tenure holder over the site -> its registered identity
+// (731005, GLEIF) -> a sanctions screen of that entity (731002). Another team's miners, asked directly by ID on their own intents,
+// only after a land answer names a holder.
+export const CONTROLLER: Record<string, { id: string; name: string; intent: string; label: string; rows: string }> = {
+  controller: { id: "731005", name: "Counterproof B2B Identity Enrichment", intent: "B2B_IDENTITY_ENRICHMENT_GENERAL", label: "who controls it today", rows: "controller_identity" },
+  screen: { id: "731002", name: "Counterproof Sanctions Screener", intent: "SANCTIONS_SCREENING_MATCH_GENERAL", label: "controller sanctions screen", rows: "controller_screen" },
+};
+
+// The holder named on the tenure over the site point, from the site's land answer (mining leases first).
+// shortcut: one holder per site; ask for each if sites with different holders on the same point turn up.
+export function siteHolder(landFacts: Record<string, unknown> | null): string | null {
+  const rows = (Array.isArray(landFacts?.tenure) ? landFacts.tenure : []) as Record<string, unknown>[];
+  const over = rows.filter((r) => r?.relation === "contains_site_point")
+    .sort((a, b) => Number(/mining lease/i.test(String(b.layer))) - Number(/mining lease/i.test(String(a.layer))));
+  for (const r of over) {
+    const h = (Array.isArray(r.holders) ? r.holders : [r.holder]).find((x) => typeof x === "string" && x.trim());
+    if (typeof h === "string") return h.trim().slice(0, 160);
+  }
+  return null;
+}
+
+// The two Counterproof answers as report rows beside the tenure rows; nothing from them counts toward the mine's history.
+export function controllerFacts(topic: string, raw: Record<string, unknown> | null, name: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  if (topic === "controller") {
+    if (raw.found === false || !raw.legal_name) return { not_found: [`no registered entity found for the tenure holder ${name}`] };
+    const lei = typeof raw.lei === "string" && /^[A-Z0-9]{20}$/.test(raw.lei) ? raw.lei : null;
+    return { controller_identity: [{ record_id: lei ? `LEI ${lei}` : null, name: raw.legal_name, jurisdiction: raw.jurisdiction ?? null, status: raw.status ?? null,
+      headquarters: raw.headquarters ?? null, relation: `registered entity of the tenure holder over the site point (${name})`,
+      source_url: lei ? `https://search.gleif.org/#/record/${lei}` : null, source_title: String(raw.source ?? "") }] };
+  }
+  const lists = (Array.isArray(raw.lists) ? raw.lists : []) as Record<string, unknown>[];
+  return { controller_screen: [{ name: raw.name ?? name, status: raw.label ?? null,
+    lists: (lists.map((l) => `${l.regime} ${String(l.published_at ?? "").slice(0, 10)}`).join(", ") || "not stated") +
+      " (official lists as published; not ownership or adverse media)",
+    checked_at: raw.screened_at ?? null }] };
+}
+
 // The year to price: the latest closure or last-working year this site's specialists reported for the site itself.
 export function priceYear(rows: Record<string, unknown>[], site: SiteRef): number | null {
   const years = rows.filter((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.asked_miner && !r.topic)
@@ -144,6 +182,8 @@ export function aboutSite(row: unknown, siteName = ""): boolean {
 function topicsOf(answer: string, facts: Record<string, unknown> | null, siteName: string, topic?: string): Record<string, boolean> {
   const t = topic ? EXTRA_TOPICS[topic] : undefined;
   if (t) return { [t.label]: Boolean(facts && t.rows.some((k) => nonEmpty(facts[k]))) };
+  const c = topic ? CONTROLLER[topic] : undefined;
+  if (c) return { [c.label]: Boolean(facts && nonEmpty(facts[c.rows])) };
   return { ...topicsCovered(answer, siteName), ...factTopics(facts, siteName) };
 }
 
@@ -239,6 +279,9 @@ export class GoldRush {
     const steps = [...specialists.map((m) => ({ miner: m.id, miner_name: m.name, path: "direct" })),
       // After the site answers, so the gold-price year comes from them.
       ...specialists.flatMap((m) => (m.topics ?? []).map((t) => ({ miner: m.id, miner_name: m.name, path: "direct", topic: t, label: EXTRA_TOPICS[t].label }))),
+      // After the land answer, which names the holder.
+      ...(specialists.some((m) => m.topics?.includes("land"))
+        ? Object.entries(CONTROLLER).map(([t, c]) => ({ miner: c.id, miner_name: c.name, path: "direct", topic: t, label: c.label })) : []),
       { miner: "ranked", miner_name: ROUTED.name, path: "ranked route" }];
     return { status: 200, body: { site, question: questionFor(site), steps } };
   }
@@ -248,6 +291,8 @@ export class GoldRush {
     const run = this.queue.then(async () => {
       const site = await this.siteFor(raw);
       const want = String((raw as { miner?: unknown })?.miner ?? "");
+      const ctl = Object.entries(CONTROLLER).find(([, c]) => c.id === want);
+      if (ctl) return { status: 200, body: { ...(await this.askController(site, ctl[0], (raw as { topic?: unknown })?.topic, ip)), path: "direct" } };
       const miner = want === "ranked" ? ROUTED : (await this.specialists()).find((m) => m.id === want);
       if (!miner) throw new InputError("miner must be a current specialist or \"ranked\".");
       const topic = (raw as { topic?: unknown })?.topic;
@@ -332,7 +377,25 @@ export class GoldRush {
     }
   }
 
-  private async askOne(site: Site, miner: Specialist, question: string, ip: string, topic?: string): Promise<Record<string, unknown>> {
+  // Who controls the ground today: only after this site's land answer names a holder; the screen uses the identity's legal name.
+  private async askController(site: Site, topic: string, asked: unknown, ip: string): Promise<Record<string, unknown>> {
+    const c = CONTROLLER[topic];
+    if (asked !== topic) throw new InputError("That miner doesn't answer that question.");
+    const served = (t: string, id?: string) => this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.topic === t && (!id || r.asked_miner === id));
+    const land = served("land");
+    const landFacts = land ? ((land.facts ?? (land.signal_hash ? structured(await this.rawResponse(land.signal_hash)) : null)) as Record<string, unknown> | null) : null;
+    const holder = siteHolder(landFacts);
+    const legal = topic === "screen" ? ((served("controller", CONTROLLER.controller.id)?.facts as Record<string, unknown> | null)?.controller_identity as { name?: unknown }[] | undefined)?.[0]?.name : null;
+    const name = typeof legal === "string" && legal ? legal : holder;
+    if (!name) return { kind: "skipped", topic, miner_id: c.id, miner_name: c.name,
+      reason: "No tenure holder over the site point in this site's land answer yet, so there's nobody to look up (nothing charged)." };
+    const miner = { id: c.id, name: c.name, description: "" };
+    const call = { intent: c.intent, params: topic === "screen" ? { name, type: "entity" } : { name } };
+    return this.askOne(site, miner, topic === "screen" ? `Sanctions screen of ${name}` : `Registered identity of ${name}`, ip, topic, call);
+  }
+
+  private async askOne(site: Site, miner: Specialist, question: string, ip: string, topic?: string,
+    call?: { intent: string; params: Record<string, unknown> }): Promise<Record<string, unknown>> {
     // A site's price answer is cached apart from its site answer (same miner, different question).
     const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id && (r.topic ?? undefined) === topic;
     const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && mine(r));
@@ -340,7 +403,7 @@ export class GoldRush {
     if (cached) {
       let facts = (cached.facts ?? null) as Record<string, unknown> | null;
       // Stored before its rows fit the size cap: re-read them from the miner's signal record (free, not charged again).
-      if (!facts && cached.signal_hash) facts = structured(await this.rawResponse(cached.signal_hash));
+      if (!facts && cached.signal_hash) { const r = await this.rawResponse(cached.signal_hash); facts = topic && CONTROLLER[topic] ? controllerFacts(topic, r, "") : structured(r); }
       return { ...cached, facts, type: undefined, reused: true, topics: topicsOf(String(cached.answer ?? ""), facts, site.name, topic) };
     }
     // An earlier payment for this site and miner with no settled outcome may have been charged: never pay for it twice.
@@ -359,7 +422,7 @@ export class GoldRush {
     try {
       const outcome = await escrowAsk({
         node: NODE, signer: this.signer, minerId: miner.id || undefined, fetchFn: this.fetchFn, now: this.now,
-        body: { intent: INTENT, params: { question } },
+        body: call ?? { intent: INTENT, params: { question } },
         beforePay: (a) => {
           hits.push(now);
           this.ipHits.set(ip, hits);
@@ -378,7 +441,7 @@ export class GoldRush {
       // The node reshapes (and may reword) the answer; the miner's own response is kept under its signal hash.
       const raw = await this.rawResponse(b.signal_hash);
       const answer = String(raw?.answer ?? result.answer ?? "");
-      const parsed = structured(raw);
+      const parsed = topic && CONTROLLER[topic] ? controllerFacts(topic, raw, String(call?.params.name ?? "")) : structured(raw);
       // Structured fields for a different survey site number are dropped rather than credited to this one.
       const facts = parsed && parsed.site_no != null && Number(parsed.site_no) !== site.site_no ? null : parsed;
       const row = {
