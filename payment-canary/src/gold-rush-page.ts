@@ -236,9 +236,10 @@ function select(s) {
     "<h2>" + esc(title(s.name)) + "</h2>" +
     '<p class="meta"><span>Survey site <b>' + s.site_no + "</b></span><span>Gold <b>" + esc(s.band || "unsized") + "</b></span><span>" +
     esc(title(s.sheet)) + " sheet</span><span>" + s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + "</span></p>" +
-    "<p>Ask " + n + " specialist" + (n === 1 ? "" : "s") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed" +
+    // The specialist list can fail to load; then don't claim a count or a price, the server's plan decides who is asked.
+    "<p>Ask " + (n ? n + " specialist" + (n === 1 ? "" : "s") : "the matching specialists") + " and Telegraph's ranked route: who owned it, how much gold it produced, and when and why it closed" +
     (np ? ", plus " + extraPhrase(extra) : "") + ".</p>" +
-    '<button class="go" id="go">Investigate · up to $' + ((n + np + 1) * 0.01).toFixed(2) + " test USDC</button>";
+    '<button class="go" id="go">Investigate' + (n ? " · up to $" + ((n + np + 1) * 0.01).toFixed(2) + " test USDC" : "") + "</button>";
   if (CROSS[s.site_no]) document.getElementById("go").insertAdjacentHTML("afterend", '<p class="small">Cross-check: <a href="' + esc(CROSS[s.site_no]) +
     '" target="_blank" rel="noopener">Takar’s dossier for this mine</a> (another team’s checks, not part of this report)</p>');
   document.getElementById("go").onclick = () => investigate(s);

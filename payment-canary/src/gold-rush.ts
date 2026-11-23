@@ -204,11 +204,16 @@ export class GoldRush {
   }
 
   async specialists(): Promise<Specialist[]> {
-    if (this.specialistsCache && this.now() - this.specialistsCache.at < 600_000) return this.specialistsCache.list;
-    const r = await this.fetchFn(`${NODE}/api/miners?intent=${INTENT}`, { signal: AbortSignal.timeout(30_000) });
-    const list = specialistsFrom(await r.json());
-    this.specialistsCache = { at: this.now(), list };
-    return list;
+    const last = this.specialistsCache;
+    if (last && this.now() - last.at < 600_000) return last.list;
+    try {
+      const r = await this.fetchFn(`${NODE}/api/miners?intent=${INTENT}`, { signal: AbortSignal.timeout(30_000) });
+      const list = r.ok ? specialistsFrom(await r.json()) : [];
+      if (list.length) { this.specialistsCache = { at: this.now(), list }; return list; }
+    } catch { /* node unreachable: fall back below */ }
+    // A node error or a momentarily empty catalogue (e.g. mid-rollover) mustn't stick for 10 minutes as "0 specialists":
+    // cache only a non-empty list, and keep serving the last good one for up to an hour.
+    return last && this.now() - last.at < 3_600_000 ? last.list : [];
   }
 
   // Paid calls run one at a time so the caps can't be raced.
