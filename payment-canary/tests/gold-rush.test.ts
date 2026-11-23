@@ -164,6 +164,27 @@ describe("review fixes (Astra, 2026-11-21)", () => {
   });
 });
 
+describe("specialist list", () => {
+  it("never caches an empty or failed catalogue, and keeps the last good list through a node hiccup", async () => {
+    let t = 1_800_000_000_000, mode: "ok" | "empty" | "error" | "down" = "empty";
+    const fetchFn = (async (url: string) => {
+      if (mode === "down") throw new Error("unreachable");
+      if (mode === "error") return json(502, { error: "bad gateway" });
+      return json(200, mode === "ok" ? CATALOGUE : []);
+    }) as unknown as typeof fetch;
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, fetchFn, () => t);
+    expect(await app.specialists()).toEqual([]); // empty at first: nothing to fall back on
+    mode = "ok";
+    expect((await app.specialists()).map((m) => m.id)).toEqual(["64176"]); // the empty answer wasn't cached
+    for (const m of ["empty", "error", "down"] as const) {
+      mode = m; t += 700_000; // past the 10-minute cache
+      expect((await app.specialists()).map((x) => x.id)).toEqual(["64176"]);
+    }
+    t += 3_600_000; // the last good list is over an hour old
+    expect(await app.specialists()).toEqual([]);
+  });
+});
+
 describe("gold price step", () => {
   // A catalogue where 64176 says it answers gold prices; its site answer reports a 1917 closure for this site and a 1990 one elsewhere.
   function priceWorld(closures: unknown[]) {
