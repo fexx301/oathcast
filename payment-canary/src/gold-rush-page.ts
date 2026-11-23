@@ -226,7 +226,7 @@ function focusSite(s) {
 
 function select(s) {
   current = null; // leaving a run stops its remaining asks
-  const n = specialists.length, extra = specialists.flatMap((m) => m.topics || []), np = extra.length;
+  const n = specialists.length, extra = specialists.flatMap((m) => m.topics || []), np = extra.length + (extra.includes("land") ? 2 : 0); // + identity and screen of the holder
   history.replaceState(null, "", "#site=" + s.site_no);
   if (ring) ring.remove();
   ring = L.circleMarker([s.lat, s.lon], { radius: (RADIUS[s.band || "very small"]) + 7, color: "oklch(94% 0.012 85)", weight: 2, fill: false, interactive: false }).addTo(map);
@@ -295,18 +295,19 @@ const src = (x) => (x && typeof x === "object" && (x.source_url || x.query_url |
 function extraPhrase(topics) {
   const t = new Set(topics), parts = [];
   if (t.has("price") || t.has("price_real")) parts.push(t.has("price") && t.has("price_real") ? "the gold price then and now" : t.has("price") ? "the gold price at the time" : "the gold price then vs now");
-  if (t.has("land") || t.has("tenure") || t.has("native_title") || t.has("land_status")) parts.push("who holds the land today");
+  if (t.has("land") || t.has("tenure") || t.has("native_title") || t.has("land_status")) parts.push("who holds the land today and the company behind it");
   for (const x of t) if (!["price", "price_real", "land", "tenure", "native_title", "land_status"].includes(x)) parts.push(TOPIC_LABEL[x] || x);
   return parts.join(" and ");
 }
-const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", land: "land and rights", tenure: "tenure", native_title: "native title", land_status: "land status" };
+const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today", land: "land and rights", tenure: "tenure", native_title: "native title", land_status: "land status",
+  controller: "who controls it today", screen: "controller sanctions screen" };
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
 const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
   "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by", "dataset"]);
-const LAND = new Set(["tenure", "native_title", "land_status"]);
+const LAND = new Set(["tenure", "native_title", "land_status", "controller_identity", "controller_screen"]);
 const SKIP = new Set(["source_ref", "source_url", "source_title", "query_url", "entity", "checked_at", "note"]);
 // Register rows (tenure, native title, heritage...): the identifying fields only, in reading order.
-const PREFER = ["record_id", "name", "holders", "holder", "outcome", "register_status", "status", "sub_status", "grant_date", "expiry_date", "determination_date", "entry_date", "relation"];
+const PREFER = ["record_id", "name", "holders", "holder", "outcome", "register_status", "status", "sub_status", "jurisdiction", "headquarters", "lists", "grant_date", "expiry_date", "determination_date", "entry_date", "relation"];
 const show = (k, v) => k === "relation" ? (v === "contains_site_point" ? "over the site point" : v === "within_buffer" ? "within 2 km" : String(v)) :
   Array.isArray(v) ? v.join(", ") : String(v);
 const brief = (x) => {
@@ -421,6 +422,7 @@ function renderReport(r) {
   }
   const link = (u) => /^https?:/.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">source</a>' : esc(u);
   if (land.length) known.push("land and rights today");
+  if (land.some((r) => r[0] === "controller identity")) known.push("who controls it today");
   const tr = ([k, v, m, src, flag]) => k === "#near" ?
       '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +

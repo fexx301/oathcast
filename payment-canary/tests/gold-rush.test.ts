@@ -3,7 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
-import { GoldRush, keyWord, questionFor, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
+import { GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -263,6 +263,63 @@ describe("gold price step", () => {
     const app = new GoldRush(new Ledger(null), account, { maxCalls: 10, maxPerDay: 10, maxPerIpHour: 10 }, w.fetchFn);
     await expect(app.ask({ site_no: 38940, miner: "64176", topic: "price" }, "ip")).rejects.toBeInstanceOf(InputError);
     expect(w.paidCount()).toBe(0);
+  });
+});
+
+describe("who controls it today", () => {
+  const NFT = { id: "7310050", name: "Gold Rush Queensland Mine History", description: "Queensland gold mines history", supported_intents: ["RESEARCH_QUERY_GENERAL"], activation_status: "active" };
+  const LAND = { answer: "land", tenure: [
+    { layer: "Exploration permit for mineral (EPM)", holders: ["CITIGOLD CORPORATION LIMITED"], relation: "contains_site_point" },
+    { layer: "Mining lease (ML)", holders: ["OTHER MINING PTY LTD"], relation: "within_buffer" },
+    { layer: "Mining lease (ML)", holders: ["CITIGOLD CORPORATION LIMITED "], relation: "contains_site_point" }] };
+  const IDENTITY = { found: true, legal_name: "CITIGOLD CORPORATION LIMITED", lei: "529900C4YHWJ2XJ8A350", jurisdiction: "AU", status: "ACTIVE", headquarters: "Fortitude Valley, AU", source: "the Global LEI Index" };
+  const SCREEN = { label: "CLEAR", name: "CITIGOLD CORPORATION LIMITED", screened_at: "2026-11-23T10:37:09Z", lists: [{ regime: "US", published_at: "2026-11-09T19:36:18Z" }, { regime: "UK", published_at: "2026-11-10" }] };
+
+  it("takes the holder over the site point, mining leases first", () => {
+    expect(siteHolder(LAND)).toBe("CITIGOLD CORPORATION LIMITED");
+    expect(siteHolder({ tenure: [{ holders: ["NEARBY LTD"], relation: "within_buffer" }] })).toBeNull();
+    expect(siteHolder(null)).toBeNull();
+  });
+
+  it("asks 731005 for the holder's registered entity, then 731002 to screen that entity, each on its own intent, only after a land answer", async () => {
+    const bodies: { url: string; body: { intent: string; params: Record<string, unknown> } }[] = [];
+    let n = 0;
+    const SIG: Record<string, unknown> = {};
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      if (url.includes("arcgis")) return json(200, GSQ_ROWS);
+      if (url.includes("/api/miners")) return json(200, [...CATALOGUE, NFT]);
+      if (url.includes("/engine/v1/signal/")) return json(200, { payload: { response: SIG[url.split("/").pop()!] } });
+      if (!(init?.headers as Record<string, string>)?.["X-PAYMENT"]) return json(402, CHALLENGE);
+      const body = JSON.parse(String(init!.body));
+      bodies.push({ url, body });
+      const id = url.split("/").pop()!, hash = "0x" + (++n).toString(16).padStart(64, "0");
+      SIG[hash] = id === "731005" ? IDENTITY : id === "731002" ? SCREEN : body.params.question?.startsWith("Land") ? LAND : { answer: "x" };
+      const receipt = Buffer.from(JSON.stringify({ receipt_hash: `0x${n}`, epoch_id: 44, miner: id })).toString("base64");
+      return json(200, { signal_hash: hash, miner_id: id, miner_name: id, result: { answer: "ok" } }, { "X-PAYMENT-RESPONSE": receipt });
+    }) as unknown as typeof fetch;
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 20, maxPerDay: 20, maxPerIpHour: 20 }, fetchFn, () => 1_800_000_000_000);
+    const steps = (await app.plan({ site_no: 38940 })).body.steps as { miner: string; topic?: string }[];
+    expect(steps.map((s) => s.topic ?? s.miner).slice(-4)).toEqual(["land", "controller", "screen", "ranked"]);
+
+    const early = await app.ask({ site_no: 38940, miner: "731005", topic: "controller" }, "ip");
+    expect(early.body.kind).toBe("skipped"); // no land answer yet: nobody to look up, nothing paid
+    expect(bodies).toHaveLength(0);
+    await expect(app.ask({ site_no: 38940, miner: "731005", topic: "screen" }, "ip")).rejects.toBeInstanceOf(InputError);
+
+    await app.ask({ site_no: 38940, miner: "7310050", topic: "land" }, "ip");
+    const who = await app.ask({ site_no: 38940, miner: "731005", topic: "controller" }, "ip");
+    expect(bodies[1]).toMatchObject({ url: expect.stringMatching(/\/ask\/731005$/), body: { intent: "B2B_IDENTITY_ENRICHMENT_GENERAL", params: { name: "CITIGOLD CORPORATION LIMITED" } } });
+    expect(who.body.topics).toEqual({ "who controls it today": true });
+    expect((who.body.facts as { controller_identity: Record<string, unknown>[] }).controller_identity[0])
+      .toMatchObject({ record_id: "LEI 529900C4YHWJ2XJ8A350", status: "ACTIVE", jurisdiction: "AU", source_url: "https://search.gleif.org/#/record/529900C4YHWJ2XJ8A350" });
+
+    const screen = await app.ask({ site_no: 38940, miner: "731002", topic: "screen" }, "ip");
+    expect(bodies[2].body).toEqual({ intent: "SANCTIONS_SCREENING_MATCH_GENERAL", params: { name: "CITIGOLD CORPORATION LIMITED", type: "entity" } });
+    expect((screen.body.facts as { controller_screen: Record<string, unknown>[] }).controller_screen[0]).toMatchObject({ status: "CLEAR", lists: "US 2026-11-09, UK 2026-11-10 (official lists as published; not ownership or adverse media)" });
+
+    const again = await app.ask({ site_no: 38940, miner: "731005", topic: "controller" }, "ip");
+    expect(again.body.reused).toBe(true); // reused, not paid twice
+    expect(bodies).toHaveLength(3);
   });
 });
 
