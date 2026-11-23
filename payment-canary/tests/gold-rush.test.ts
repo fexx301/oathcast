@@ -3,7 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
-import { GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
+import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -274,6 +274,15 @@ describe("who controls it today", () => {
     { layer: "Mining lease (ML)", holders: ["CITIGOLD CORPORATION LIMITED "], relation: "contains_site_point" }] };
   const IDENTITY = { found: true, legal_name: "CITIGOLD CORPORATION LIMITED", lei: "529900C4YHWJ2XJ8A350", jurisdiction: "AU", status: "ACTIVE", headquarters: "Fortitude Valley, AU", source: "the Global LEI Index" };
   const SCREEN = { label: "CLEAR", name: "CITIGOLD CORPORATION LIMITED", screened_at: "2026-11-23T10:37:09Z", lists: [{ regime: "US", published_at: "2026-11-09T19:36:18Z" }, { regime: "UK", published_at: "2026-11-10" }] };
+
+  it("reads the screen's list dates in the shape Telegraph delivers and in the miner's own shape", () => {
+    const viaNode = { label: "CLEAR", name: "X", list_versions: { EU: "2026-10-23", UK: "2026-11-10", UN: "2026-11-12", US: "2026-11-09" },
+      lists: ["US OFAC SDN and non-SDN Consolidated lists (published 2026-11-09)"] };
+    const lists = (raw: Record<string, unknown>) => ((controllerFacts("screen", raw, "X") as { controller_screen: { lists: string }[] }).controller_screen[0].lists);
+    expect(lists(viaNode)).toMatch(/^US 2026-11-09, UN 2026-11-12, EU 2026-10-23, UK 2026-11-10 \(/);
+    expect(lists({ label: "CLEAR", lists: ["UK Sanctions List (published 2026-11-10)"] })).toMatch(/^UK Sanctions List \(published 2026-11-10\) \(/);
+    expect(lists(SCREEN)).toMatch(/^US 2026-11-09, UK 2026-11-10 \(/);
+  });
 
   it("takes the holder over the site point, mining leases first", () => {
     expect(siteHolder(LAND)).toBe("CITIGOLD CORPORATION LIMITED");

@@ -73,9 +73,13 @@ export function controllerFacts(topic: string, raw: Record<string, unknown> | nu
       headquarters: raw.headquarters ?? null, relation: `registered entity of the tenure holder over the site point (${name})`,
       source_url: lei ? `https://search.gleif.org/#/record/${lei}` : null, source_title: String(raw.source ?? "") }] };
   }
-  const lists = (Array.isArray(raw.lists) ? raw.lists : []) as Record<string, unknown>[];
+  // Through Telegraph the screen sends list_versions {US: date, ...} and lists as strings; its own endpoint sends list objects.
+  const order = ["US", "UN", "EU", "UK"], rank = (k: string) => (order.indexOf(k) + 5) % 5;
+  const lv = raw.list_versions && typeof raw.list_versions === "object" ? Object.entries(raw.list_versions as Record<string, unknown>) : [];
+  const lists = lv.length ? lv.sort(([a], [b]) => rank(a) - rank(b)).map(([k, v]) => `${k} ${String(v).slice(0, 10)}`)
+    : (Array.isArray(raw.lists) ? raw.lists : []).map((l) => typeof l === "string" ? l : `${(l as Record<string, unknown>)?.regime} ${String((l as Record<string, unknown>)?.published_at ?? "").slice(0, 10)}`);
   return { controller_screen: [{ name: raw.name ?? name, status: raw.label ?? null,
-    lists: (lists.map((l) => `${l.regime} ${String(l.published_at ?? "").slice(0, 10)}`).join(", ") || "not stated") +
+    lists: (lists.join(", ") || "not stated") +
       " (official lists as published; not ownership or adverse media)",
     checked_at: raw.screened_at ?? null }] };
 }
@@ -405,7 +409,9 @@ export class GoldRush {
     if (cached) {
       let facts = (cached.facts ?? null) as Record<string, unknown> | null;
       // Stored before its rows fit the size cap: re-read them from the miner's signal record (free, not charged again).
-      if (!facts && cached.signal_hash) { const r = await this.rawResponse(cached.signal_hash); facts = topic && CONTROLLER[topic] ? controllerFacts(topic, r, "") : structured(r); }
+      // Controller rows are always rebuilt from the signal record (free), so a row-format fix reaches answers already paid for.
+      const ctl = Boolean(topic && CONTROLLER[topic]);
+      if (cached.signal_hash && (!facts || ctl)) { const r = await this.rawResponse(cached.signal_hash); facts = ctl ? controllerFacts(topic!, r, "") ?? facts : structured(r); }
       return { ...cached, facts, type: undefined, reused: true, topics: topicsOf(String(cached.answer ?? ""), facts, site.name, topic) };
     }
     // An earlier payment for this site and miner with no settled outcome may have been charged: never pay for it twice.
