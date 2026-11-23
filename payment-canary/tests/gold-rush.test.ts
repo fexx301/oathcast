@@ -3,7 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
-import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, topicsCovered } from "../src/gold-rush.js";
+import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, takarEvents, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -345,6 +345,43 @@ describe("cross-checks", () => {
     expect(await app.crossChecks()).toEqual({ "494270": "https://takar-telegraph.vercel.app/goldrush.html#mount-morgan" });
     up = false; t += 4_000_000;
     expect(Object.keys(await app.crossChecks())).toEqual(["494270"]);
+  });
+});
+
+describe("Takar events and people", () => {
+  const FILE = { title: "Mount Leyshon: events", gaps: ["No accident is recorded."], people: ["A. Person"], capsules: [
+    { finding: { year: 1928, types: ["restart"], people: ["Boyd"], quote: "  Work restarted\n in 1928. ", status: "recorded (one register entry)",
+      source: { register: "Queensland Heritage Register", record_id: "600751", entry: "Mount Morgan Mine", url: "https://apps.des.qld.gov.au/heritage-register/detail/?id=600751" } },
+      attestation: { signature: "sig" } },
+    { finding: { year: "not a year", types: "fire", quote: "x".repeat(900), source: { url: "javascript:alert(1)" } } },
+    { finding: { year: 1900, quote: "" } }] };
+
+  it("keeps only safe, bounded fields from another team's file", () => {
+    const out = takarEvents(FILE, 38940, "https://takar.test/events.json") as { events: Record<string, unknown>[]; gaps: string[] };
+    expect(out.events).toHaveLength(2); // the one with no quote is dropped
+    expect(out.events[0]).toMatchObject({ year: 1928, types: ["restart"], quote: "Work restarted in 1928.", record_id: "600751", signed: true,
+      url: "https://apps.des.qld.gov.au/heritage-register/detail/?id=600751" });
+    expect(out.events[1]).toMatchObject({ year: null, types: [], url: null, signed: false });
+    expect((out.events[1].quote as string).length).toBe(600);
+    expect(out.gaps).toEqual(["No accident is recorded."]);
+    expect(takarEvents("garbage", 1, "u")).toMatchObject({ available: true, events: [], gaps: [] });
+  });
+
+  it("finds the file by Takar's dossier slug and keeps the last good copy when a refresh fails", async () => {
+    let t = 1_800_000_000_000, down = false;
+    const fetchFn = (async (url: string) => {
+      if (url.includes("arcgis")) return json(200, GSQ_ROWS);
+      if (url.endsWith("/dossiers/index.json")) return json(200, [{ site_no: 38940, slug: "mount-leyshon" }]);
+      if (down) throw new Error("unreachable");
+      if (url.endsWith("/receipts/events-mount-leyshon.json")) return json(200, FILE);
+      return json(404, {});
+    }) as unknown as typeof fetch;
+    const app = new GoldRush(new Ledger(null), account, { maxCalls: 1, maxPerDay: 1, maxPerIpHour: 1 }, fetchFn, () => t);
+    const first = await app.events({ site_no: 38940 });
+    expect(first.body).toMatchObject({ available: true, source_url: "https://takar-telegraph.vercel.app/receipts/events-mount-leyshon.json" });
+    down = true; t += 3_700_000;
+    expect((await app.events({ site_no: 38940 })).body).toEqual(first.body);
+    await expect(app.events({ site_no: "x" })).rejects.toBeInstanceOf(InputError);
   });
 });
 
