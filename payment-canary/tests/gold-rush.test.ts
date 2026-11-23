@@ -1,8 +1,10 @@
+import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
 
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
+import { PAGE } from "../src/gold-rush-page.js";
 import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, takarEvents, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
@@ -345,6 +347,15 @@ describe("cross-checks", () => {
     expect(await app.crossChecks()).toEqual({ "494270": "https://takar-telegraph.vercel.app/goldrush.html#mount-morgan" });
     up = false; t += 4_000_000;
     expect(Object.keys(await app.crossChecks())).toEqual(["494270"]);
+  });
+});
+
+describe("page", () => {
+  // The page script sits inside a template string: a single backslash there (\n, \s) breaks it in the browser.
+  it("serves inline scripts that compile", () => {
+    const scripts = [...PAGE.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const s of scripts) expect(() => new vm.Script(s)).not.toThrow();
   });
 });
 

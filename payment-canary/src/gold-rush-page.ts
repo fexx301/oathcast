@@ -261,7 +261,10 @@ async function investigate(s) {
     rep.innerHTML = '<h3>Investigation</h3><p class="q">“' + esc(plan.question) + '”</p><ol class="run" id="run">' +
       plan.steps.map((st, i) => '<li id="step-' + i + '" class="wait"><span class="st">○</span><span><b>' + esc(st.miner_name) +
         '</b> <span class="tag">' + esc(st.label || st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
-      '<div id="summary"></div><div id="answers"></div>';
+      '<div id="summary"></div><div id="events"></div><div id="answers"></div>';
+    // Takar's events and people (another team, free): fetched alongside the paid asks, rendered when it lands.
+    const mine = run;
+    fetch(BASE + "api/events?site_no=" + s.site_no).then((x) => x.json()).then((e) => { if (current === mine) { mine.events = e; renderEvents(mine); } }).catch(() => {});
     for (let i = 0; i < plan.steps.length; i++) {
       if (current !== run) return; // the user moved on: don't pay for the rest of this run
       const st = plan.steps[i], row = document.getElementById("step-" + i);
@@ -283,8 +286,10 @@ async function investigate(s) {
         : (a.reason || a.kind) + (a.kind === "paid_refusal" || a.kind === "refused" ? " · not charged" : "");
       renderReport(run);
     }
-    document.getElementById("answers").insertAdjacentHTML("afterend", '<p><button class="ghost" id="dl">Download report (JSON)</button></p>');
+    document.getElementById("answers").insertAdjacentHTML("afterend", '<p><button class="ghost" id="md">Download evidence report (Markdown)</button> ' +
+      '<button class="ghost" id="dl">Download report (JSON)</button></p>');
     document.getElementById("dl").onclick = download;
+    document.getElementById("md").onclick = () => save(evidence(run), "text/markdown", "gold-rush-" + s.site_no + "-evidence.md");
   } catch { if (current === run) rep.innerHTML = '<p class="no">The request failed. Try again.</p>'; }
   finally { btn.disabled = false; btn.textContent = "Investigate again · reuses paid answers"; }
 }
@@ -423,6 +428,7 @@ function renderReport(r) {
   const link = (u) => /^https?:/.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">source</a>' : esc(u);
   if (land.length) known.push("land and rights today");
   if (land.some((r) => r[0] === "controller identity")) known.push("who controls it today");
+  r.view = { known, missing, flags, rows, near, land, gp };
   const tr = ([k, v, m, src, flag]) => k === "#near" ?
       '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
@@ -459,10 +465,79 @@ function download() {
     network: "Ethereum Sepolia testnet · Telegraph escrow", site: r.site, question: r.question,
     answers: r.answers.map((a) => ({ topic: a.topic ?? "site", question: a.question ?? r.question, asked_at: a.at ?? null, path: a.path, kind: a.kind, miner_id: a.miner_id ?? null, miner_name: a.miner_name ?? null, reused: !!a.reused,
       answer: a.answer ?? null, sources: a.sources ?? [], facts: a.facts ?? null, topics: a.topics ?? null, reason: a.reason ?? null,
-      receipt: a.receipt ?? null, signal_hash: a.signal_hash ?? null })) };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
-  const el = document.createElement("a"); el.href = url; el.download = "gold-rush-" + r.site.site_no + ".json";
+      receipt: a.receipt ?? null, signal_hash: a.signal_hash ?? null })),
+    events_by_takar: r.events && r.events.available ? r.events : null };
+  save(JSON.stringify(out, null, 2), "application/json", "gold-rush-" + r.site.site_no + ".json");
+}
+
+function save(text, type, name) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const el = document.createElement("a"); el.href = url; el.download = name;
   document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const byYear = (xs) => xs.slice().sort((p, q) => (p.year ?? 9999) - (q.year ?? 9999));
+// Takar's events and people, as Takar's: quoted register sentences with their record and Takar's own status.
+function renderEvents(r) {
+  const e = r.events, el = document.getElementById("events");
+  if (!el || !e || !e.available) return;
+  const evs = byYear(e.events || []), shown = evs.slice(0, 12);
+  const rec = (x) => (x.entry ? esc(x.entry) + " · " : "") + (x.url ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">record ' + esc(x.record_id) + "</a>" : "record " + esc(x.record_id));
+  el.innerHTML = "<h3>Events and people · Queensland Heritage Register, via Takar</h3>" +
+    '<p class="mute small">By Takar (Bangdrop), another team: register sentences quoted word for word, each with its record and Takar’s own status ' +
+    "(checked against two event miners). Shown as Takar’s, not merged into the facts above. " +
+    (e.source_url ? '<a href="' + esc(e.source_url) + '" target="_blank" rel="noopener">Takar’s signed file</a>' : "") + "</p>" +
+    (shown.length ? '<table class="facts"><tr><th>Year</th><th>Event</th><th>Takar’s status</th></tr>' + shown.map((x) =>
+      "<tr><td>" + esc(x.year ?? "–") + "</td><td>" + esc((x.types || []).join(", ")) + ": “" + esc(x.quote) + "”<br><small>" + rec(x) + "</small></td><td>" + esc(x.status) + "</td></tr>").join("") + "</table>" : "") +
+    (evs.length > shown.length ? '<p class="mute small">+' + (evs.length - shown.length) + " more in Takar’s file and in the evidence report.</p>" : "") +
+    ((e.people || []).length ? '<p class="small">People named in the register: ' + esc(e.people.join(", ")) + "</p>" : "") +
+    ((e.gaps || []).length ? '<p><span class="no">Not established</span></p><ul class="checks">' + e.gaps.map((g) => "<li>" + esc(g) + "</li>").join("") + "</ul>" : "");
+}
+
+// The evidence report: what's established, disputed, not established and worth investigating, built by fixed rules from what
+// this page shows (no model wording), with every source, record and receipt.
+function evidence(r) {
+  const v = r.view || { known: [], missing: [], flags: [], rows: [], near: [], land: [], gp: false };
+  const cell = (x) => String(x ?? "").replace(/\\|/g, "\\\\|").replace(/\\s+/g, " ").trim();
+  const table = (head, rows) => rows.length ? ["| " + head.join(" | ") + " |", "|" + head.map(() => "---").join("|") + "|", ...rows.map((x) => "| " + x.map(cell).join(" | ") + " |")].join("\\n") : "_None._";
+  const e = r.events && r.events.available ? r.events : null, evs = e ? byYear(e.events || []) : [];
+  const site = r.site, url = location.origin + "/gold-rush#site=" + site.site_no;
+  const notFound = v.rows.filter((x) => x[0] === "looked, not found");
+  const facts = v.rows.filter((x) => x[0] !== "looked, not found");
+  const worth = [
+    ...v.flags.map((f) => "Check: " + f),
+    ...evs.filter((x) => /disputed|contradicted/i.test(x.status)).map((x) => "Event " + (x.year ?? "") + " (" + x.types.join(", ") + "): Takar’s miners disagree; read record " + x.record_id + "."),
+    ...v.land.filter((x) => /renewal lodged/i.test(x[1])).map((x) => "Tenure renewal pending: " + x[1] + ". Confirm the current status with the register."),
+    ...v.missing.map((t) => "No specialist answered " + t + "."),
+  ];
+  const label = (a) => a.path === "ranked route" ? "ranked route (contrast)" : a.topic ? (TOPIC_LABEL[a.topic] || a.topic) : "site question";
+  const receipts = r.answers.map((a) => [label(a), (a.miner_name || "") + (a.miner_id ? " · " + a.miner_id : ""), a.kind === "served" ? (a.reused ? "reused (paid earlier)" : "paid $0.01") : (a.reason || a.kind),
+    (a.receipt || {}).receipt_hash || "", (a.receipt || {}).epoch_id ?? "", a.signal_hash || ""]);
+  return [
+    "# Gold Rush evidence report: " + title(site.name) + " (GSQ site " + site.site_no + ")", "",
+    "Generated " + new Date().toISOString() + " from " + url + ". Every answer was bought from a Telegraph miner through this app's escrow on Ethereum Sepolia (testnet); receipts are listed at the end. " +
+      "This report restates what the miners and registers returned, by fixed rules. It is not legal or investment advice.", "",
+    "Question asked: \u201c" + r.question + "\u201d", "",
+    "## Established", "", "Known: " + v.known.join(" · ") + ".", "",
+    table(["Fact", "Value", "From", "Source", "Note"], facts.map((x) => [x[0], x[1], x[2], x[3], x[4]])), "",
+    "## Disputed or to check", "", v.flags.length ? v.flags.map((f) => "- " + f).join("\\n") : "_No disagreement between sources was found._",
+    evs.some((x) => /disputed|contradicted/i.test(x.status)) ? "\\n" + evs.filter((x) => /disputed|contradicted/i.test(x.status)).map((x) => "- Event " + (x.year ?? "") + ": " + x.status + " (record " + x.record_id + ")").join("\\n") : "", "",
+    "## Not established", "",
+    [...v.missing.map((t) => "- " + t + ": no specialist answered."), ...(v.gp ? [] : ["- The gold price at the time: no gold-price miner answered."]),
+      ...notFound.map((x) => "- " + x[1] + " (" + x[2] + ")"), ...(e ? e.gaps.map((g) => "- " + g + " (Takar)") : ["- Events and people: no register file from Takar for this mine."])].join("\\n") || "_Nothing listed._", "",
+    "## Worth investigating further", "", worth.length ? worth.map((w) => "- " + w).join("\\n") : "_Nothing flagged by the rules above._", "",
+    "## Land and rights today, and who controls it", "",
+    "From public registers, as of each row's check date. An expiry date or a gap in tenure doesn't mean the ground is available; that needs legal confirmation.", "",
+    table(["Register", "Record", "From", "Source"], v.land.map((x) => [x[0], x[1], x[2], x[3]])), "",
+    "## Events and people (Queensland Heritage Register, via Takar)", "",
+    e ? "By Takar (Bangdrop), another team; each event is signed in Takar's file (" + e.source_url + "). Status is Takar's own check." : "_No Takar register file for this mine._", "",
+    e ? table(["Year", "Type", "Quoted sentence", "Record", "Takar's status"], evs.map((x) => [x.year ?? "", x.types.join(", "), x.quote, (x.entry ? x.entry + ", " : "") + x.record_id + (x.url ? " " + x.url : ""), x.status])) : "",
+    e && e.people.length ? "\\nPeople named in the register: " + e.people.join(", ") + "." : "", "",
+    "## Other workings named in the sources (not this site, not counted)", "", table(["Fact", "Value", "From"], v.near.map((x) => [x[0], x[1], x[2]])), "",
+    "## Answers and receipts", "",
+    table(["Step", "Miner", "Charge", "Receipt", "Epoch", "Signal record"], receipts), "",
+    "Delivery records: " + NODE + "/v1/blocks/<epoch>/deliveries/<receipt>. Signal records: " + NODE + "/engine/v1/signal/<signal record>.", "",
+  ].join("\\n");
 }
 
 // The delivery record's state, asked of our server once per receipt (it checks the node); filled in when the answer lands.
