@@ -140,6 +140,24 @@ export function specialistsFrom(catalogue: unknown): Specialist[] {
     .slice(0, MAX_SPECIALISTS);
 }
 
+// Another team's file is untrusted: keep only short strings, https links, known shapes; at most 80 events.
+export function takarEvents(raw: unknown, siteNo: number, url: string): Record<string, unknown> {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+  const https = (v: unknown) => (typeof v === "string" && /^https:\/\/[^\s"'<>]{1,300}$/.test(v) ? v : null);
+  const list = (v: unknown, n: number, len: number) => (Array.isArray(v) ? v : []).map((x) => str(x, len)).filter(Boolean).slice(0, n);
+  const events = (Array.isArray(o.capsules) ? o.capsules : []).slice(0, 80).map((c) => {
+    const f = ((c as { finding?: unknown })?.finding ?? {}) as Record<string, unknown>;
+    const src = (f.source ?? {}) as Record<string, unknown>;
+    const year = Number(f.year);
+    return { year: Number.isInteger(year) && year > 1700 && year < 2100 ? year : null, types: list(f.types, 6, 30), people: list(f.people, 8, 60),
+      quote: str(f.quote, 600), status: str(f.status, 80), record_id: str(src.record_id, 20), entry: str(src.entry, 120), url: https(src.url),
+      register: str(src.register, 60), signed: Boolean((c as { attestation?: { signature?: unknown } })?.attestation?.signature) };
+  }).filter((e) => e.quote);
+  return { site_no: siteNo, available: true, by: "Takar (Bangdrop), another team", source_url: url, title: str(o.title, 160), method: str(o.method, 600),
+    generated_at: str(o.generated_at, 40), gaps: list(o.gaps, 10, 300), people: list(o.people, 30, 60), events };
+}
+
 export function titled(s: string): string {
   return s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
@@ -217,6 +235,7 @@ export class GoldRush {
   private specialistsCache: { at: number; list: Specialist[] } | null = null;
   private deliveryCache = new Map<string, { at: number; status: string }>();
   private crossCache: { at: number; map: Record<string, string> } | null = null;
+  private eventsCache = new Map<string, { at: number; body: Record<string, unknown> }>();
 
   constructor(
     readonly ledger: Ledger,
@@ -346,6 +365,27 @@ export class GoldRush {
     } catch { /* keep the last good list */ }
     this.crossCache = { at: this.now(), map };
     return map;
+  }
+
+  // Takar's events and people for a mine (Bangdrop, 23 Nov): Queensland Heritage Register sentences quoted with record IDs,
+  // typed, signed per event, with Takar's own status. Shown as Takar's and never merged into this report's facts.
+  // Free (no Telegraph call). Refreshed hourly; a failed fetch keeps the last good copy.
+  async events(raw: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+    const site = await this.siteFor(raw);
+    const slug = ((await this.crossChecks())[String(site.site_no)] ?? "").split("#")[1];
+    if (!slug) return { status: 200, body: { site_no: site.site_no, available: false } };
+    const hit = this.eventsCache.get(slug);
+    if (hit && this.now() - hit.at < 3_600_000) return { status: 200, body: hit.body };
+    const url = `${TAKAR}/receipts/events-${slug}.json`;
+    try {
+      const r = await this.fetchFn(url, { signal: AbortSignal.timeout(10_000) });
+      if (!r.ok) throw new Error(String(r.status));
+      const body = takarEvents((await r.json()) as unknown, site.site_no, url);
+      this.eventsCache.set(slug, { at: this.now(), body });
+      return { status: 200, body };
+    } catch {
+      return { status: 200, body: hit?.body ?? { site_no: site.site_no, available: false } };
+    }
   }
 
   // Has the node published the delivery record for one of our receipts? Only receipts in this app's ledger are checked.
@@ -503,6 +543,10 @@ export function handler(app: GoldRush) {
       if (req.method === "GET" && (path === "/gold-rush" || path === "/gold-rush/")) return send(res, 200, PAGE, "text/html; charset=utf-8");
       if (req.method === "GET" && path === "/gold-rush/api/sites") return send(res, 200, JSON.stringify({ source: "Geological Survey of Queensland, MINOCC historical workings (CC BY 4.0)", sites: await app.sites() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/crosschecks") return send(res, 200, JSON.stringify({ by: "Takar (Bangdrop), another team", sites: await app.crossChecks() }), jsonType);
+      if (req.method === "GET" && path === "/gold-rush/api/events") {
+        const r = await app.events({ site_no: new URL(req.url ?? "/", "http://x").searchParams.get("site_no") });
+        return send(res, r.status, JSON.stringify(r.body), jsonType);
+      }
       if (req.method === "GET" && path === "/gold-rush/api/specialists") return send(res, 200, JSON.stringify({ intent: INTENT, specialists: await app.specialists() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/ledger") return send(res, 200, JSON.stringify({ node: NODE, intent: INTENT, calls: app.ledger.public() }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/delivery") {
