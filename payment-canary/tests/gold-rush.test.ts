@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
 import { PAGE } from "../src/gold-rush-page.js";
-import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, takarEvents, topicsCovered } from "../src/gold-rush.js";
+import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, takarChecks, takarEvents, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -379,6 +379,16 @@ describe("Takar events and people", () => {
     expect((out.events[1].quote as string).length).toBe(600);
     expect(out.gaps).toEqual(["No accident is recorded."]);
     expect(takarEvents("garbage", 1, "u")).toMatchObject({ available: true, events: [], gaps: [] });
+  });
+
+  it("carries Takar's checks but never Praman's figures", () => {
+    const ck = takarChecks({ dossier: { open_questions: ["why it stopped in 1990: no source quotes a reason"], receipts_tie: { checked: 7, in_paid_answer: 3 },
+      land_check: { tenure: { ours: 24, theirs: 26, both: 20, only_ours: ["ML 5649"] } }, control: [{ company: "Heritage Minerals Pty Ltd", verdict: "agree", active: true }],
+      cross_check: { claim: "6.6M oz", tonnes: 205.3, note: "matches none of the recorded totals" } } }, "https://takar.test/d.json");
+    expect(ck).toMatchObject({ receipts_tie: { checked: 7, in_paid_answer: 3 }, tenure_vs_7310050: { both: 20, takar: 24, miner: 26, only_takar: ["ML 5649"] },
+      control: [{ company: "Heritage Minerals Pty Ltd", verdict: "agree", active: true }], praman_note: "matches none of the recorded totals" });
+    expect(JSON.stringify(ck)).not.toMatch(/6\.6M|205\.3/);
+    expect(takarChecks(null, "u")).toMatchObject({ open_questions: [], control: [], praman_note: null });
   });
 
   it("finds the file by Takar's dossier slug and keeps the last good copy when a refresh fails", async () => {
