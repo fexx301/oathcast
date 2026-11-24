@@ -155,7 +155,10 @@ footer strong { color: var(--mute); }
   <p><strong>How it pays.</strong> Each answer is one $0.01 test-USDC call from this app's Telegraph escrow on Ethereum
   Sepolia (testnet). A repeat question to the same Miner reuses the earlier paid answer at no charge. Specialists are
   the Miners whose catalogue entry for RESEARCH_QUERY_GENERAL names gold, mining, geology or Queensland; they're asked
-  directly. <strong>Disclosure:</strong> this app is run by the OathCast team, which also runs Miner 64176, one of the
+  directly. Who controls the ground today comes from Counterproof's identity and sanctions Miners
+  (B2B_IDENTITY_ENRICHMENT_GENERAL, SANCTIONS_SCREENING_MATCH_GENERAL), asked directly for companies only. Events, people
+  and independent checks are Takar's signed files (another Season II team), read free from its site and labelled as
+  Takar's; they aren't bought through Telegraph. <strong>Disclosure:</strong> this app is run by the OathCast team, which also runs Miner 64176, one of the
   specialists, so those calls are related-party.</p>
   <p><strong>Proof.</strong> The escrow rail has no blockchain transaction per answer: each call is charged to the app's
   escrow and settled at the epoch close. Its proof is the receipt and the node's delivery record (linked on each
@@ -241,7 +244,7 @@ function select(s) {
     (np ? ", plus " + extraPhrase(extra) : "") + ".</p>" +
     '<button class="go" id="go">Investigate' + (n ? " · up to $" + ((n + np + 1) * 0.01).toFixed(2) + " test USDC" : "") + "</button>";
   if (CROSS[s.site_no]) document.getElementById("go").insertAdjacentHTML("afterend", '<p class="small">Cross-check: <a href="' + esc(CROSS[s.site_no]) +
-    '" target="_blank" rel="noopener">Takar’s dossier for this mine</a> (another team’s checks, not part of this report)</p>');
+    '" target="_blank" rel="noopener">Takar’s dossier for this mine</a> (another team; its checks are shown in the report, labelled as Takar’s)</p>');
   document.getElementById("go").onclick = () => investigate(s);
   document.getElementById("back").onclick = home;
 }
@@ -264,7 +267,7 @@ async function investigate(s) {
       '<div id="questions"></div><div id="summary"></div><div id="events"></div><div id="answers"></div>';
     // Takar's events and people (another team, free): fetched alongside the paid asks, rendered when it lands.
     const mine = run;
-    fetch(BASE + "api/events?site_no=" + s.site_no).then((x) => x.json()).then((e) => { if (current === mine) { mine.events = e; renderEvents(mine); } }).catch(() => {});
+    const eventsLoaded = fetch(BASE + "api/events?site_no=" + s.site_no).then((x) => x.json()).then((e) => { if (current === mine) { mine.events = e; renderEvents(mine); } }).catch(() => {});
     for (let i = 0; i < plan.steps.length; i++) {
       if (current !== run) return; // the user moved on: don't pay for the rest of this run
       const st = plan.steps[i], row = document.getElementById("step-" + i);
@@ -286,6 +289,8 @@ async function investigate(s) {
         : (a.reason || a.kind) + (a.kind === "paid_refusal" || a.kind === "refused" ? " · not charged" : "");
       renderReport(run);
     }
+    await Promise.race([eventsLoaded, new Promise((ok) => setTimeout(ok, 8000))]); // so a download includes Takar's files
+    if (current !== run) return;
     document.getElementById("answers").insertAdjacentHTML("afterend", '<p><button class="ghost" id="md">Download evidence report (Markdown)</button> ' +
       '<button class="ghost" id="dl">Download report (JSON)</button></p>');
     document.getElementById("dl").onclick = download;
@@ -310,7 +315,7 @@ const TOPIC_LABEL = { price: "gold price", price_real: "gold price then vs today
 // Fields this report lays out itself; any other rows a miner returns are shown generically. Land and rights get their own table.
 const HANDLED = new Set(["site_no", "production", "closure", "ownership", "years_worked", "references", "conflicts", "gold_price", "not_found", "omitted",
   "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "period", "cpi", "closure_year_used", "matched_by", "dataset",
-  "caveats", "labels", "calls"]);
+  "caveats", "labels", "calls", "notes"]);
 // What might remain today (NFT KING's four layers): records near the site, kept in their own table with their own caveat.
 const REMAIN = new Set(["exploration", "resources", "access", "environment"]);
 const km = (x) => x.distance_km != null ? x.distance_km + " km" : x.distance_m != null ? x.distance_m + " m" : "";
@@ -555,7 +560,7 @@ function questionsOf(r) {
   const why = [...closures.map((x) => x[1] + " (" + x[2] + ")"), ...ev(["closure"]).slice(0, 4).map(q), ...oq(/stopped|closure/i)];
   const since = [
     ...v.rows.filter((x) => x[0] === "ownership" && lastClose && yrs(x[1]).some((y) => y >= lastClose)).map((x) => "Owner: " + x[1] + " (" + x[2] + ")"),
-    ...ev(["restart", "ownership"]).filter((x) => x.year && x.year >= lastClose).slice(0, 4).map(q),
+    ...ev(["restart", "ownership"]).filter((x) => lastClose && x.year && x.year >= lastClose).slice(0, 4).map(q),
     ...v.land.filter((x) => x[0] === "tenure" && /over the site point/.test(x[1])).slice(0, 3).map((x) => "Tenure today: " + x[1]),
     ...v.land.filter((x) => x[0] === "controller identity").map((x) => "Controller today: " + x[1]),
     ...v.land.filter((x) => x[0] === "controller screen").map((x) => "Sanctions screen: " + x[1]),
@@ -606,7 +611,8 @@ function evidence(r) {
     (a.receipt || {}).receipt_hash || "", (a.receipt || {}).epoch_id ?? "", a.signal_hash || ""]);
   return [
     "# Gold Rush evidence report: " + title(site.name) + " (GSQ site " + site.site_no + ")", "",
-    "Generated " + new Date().toISOString() + " from " + url + ". Every answer was bought from a Telegraph miner through this app's escrow on Ethereum Sepolia (testnet); receipts are listed at the end. " +
+    "Generated " + new Date().toISOString() + " from " + url + ". Every miner answer was bought through this app's Telegraph escrow on Ethereum Sepolia (testnet); receipts are listed at the end. " +
+      "Takar's events and checks are another team's signed files, read free and labelled as Takar's. " +
       "This report restates what the miners and registers returned, by fixed rules. It is not legal or investment advice.", "",
     "Question asked: \u201c" + r.question + "\u201d", "",
     "## The four questions", "", "Answered by fixed rules from the rows below; nothing is assumed about remaining gold or economic viability.", "",

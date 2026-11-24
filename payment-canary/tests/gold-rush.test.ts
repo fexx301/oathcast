@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
 import { PAGE } from "../src/gold-rush-page.js";
-import { controllerFacts, GoldRush, keyWord, questionFor, isCompany, siteHolder, specialistsFrom, takarChecks, takarEvents, topicsCovered } from "../src/gold-rush.js";
+import { controllerFacts, GoldRush, intentOf, keyWord, structured, questionFor, isCompany, siteHolder, specialistsFrom, takarChecks, takarEvents, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -359,6 +359,29 @@ describe("cross-checks", () => {
     expect(await app.crossChecks()).toEqual({ "494270": "https://takar-telegraph.vercel.app/goldrush.html#mount-morgan" });
     up = false; t += 4_000_000;
     expect(Object.keys(await app.crossChecks())).toEqual(["494270"]);
+  });
+});
+
+describe("review fixes (Neon, 2026-11-24)", () => {
+  it("trims a large answer without losing a whole record type, and drops diagnostics first", () => {
+    const bore = (i: number) => ({ record_type: "borehole", record_id: "BH" + i, relation: "within_buffer", note: "x".repeat(900) });
+    const out = structured({ answer: "a", caveats: { exploration: "y".repeat(5000) }, labels: { a: "z".repeat(3000) },
+      exploration: [...Array.from({ length: 30 }, (_, i) => bore(i)), { record_type: "company_report", record_id: "CR 1", relation: "linked_by_minocc" }],
+      environment: [{ record_type: "abandoned_mine_tailings", record_id: "MF1", relation: "within_buffer" }] })!;
+    expect(out.caveats).toBeUndefined();
+    expect(out.labels).toBeUndefined();
+    const kinds = (out.exploration as { record_type: string }[]).map((x) => x.record_type);
+    expect(kinds).toContain("company_report");
+    expect(kinds).toContain("borehole");
+    expect((out.omitted as Record<string, number>).exploration).toBeGreaterThan(0);
+  });
+
+  it("names the holder on a reused controller row and labels each ledger row with its intent", () => {
+    expect((controllerFacts("controller", { legal_name: "X LTD", lei: "529900C4YHWJ2XJ8A350" }, "") as { controller_identity: { relation: string }[] })
+      .controller_identity[0].relation).toBe("registered entity of the tenure holder over the site point");
+    expect(intentOf("731005")).toBe("B2B_IDENTITY_ENRICHMENT_GENERAL");
+    expect(intentOf("731002")).toBe("SANCTIONS_SCREENING_MATCH_GENERAL");
+    expect(intentOf("64176")).toBe("RESEARCH_QUERY_GENERAL");
   });
 });
 
