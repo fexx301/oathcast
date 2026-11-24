@@ -53,14 +53,23 @@ export const CONTROLLER: Record<string, { id: string; name: string; intent: stri
   screen: { id: "731002", name: "Counterproof Sanctions Screener", intent: "SANCTIONS_SCREENING_MATCH_GENERAL", label: "controller sanctions screen", rows: "controller_screen" },
 };
 
-// The holder named on the tenure over the site point, from the site's land answer (mining leases first).
+// Only a company is looked up: a private person's name is never sent to an identity lookup or a sanctions screen
+// (Takar found a "Surname, Given" holder pulling an unrelated charity's LEI, 24 Nov).
+const COMPANY = /\b(pty|ltd|limited|inc|incorporated|corp|corporation|company|co|n\.?l|plc|llc|trust|holdings?|group|resources|mining|minerals?|gold|exploration|metals)\b/i;
+export function isCompany(name: string): boolean {
+  if (/\b(pty|ltd|limited)\b/i.test(name)) return true;
+  const person = /^[^,]+,\s*[A-Za-z][A-Za-z .'-]*$/.test(name.trim()); // "Surname, Given Names" as the register writes people
+  return COMPANY.test(name) && !person;
+}
+
+// The company holding the tenure over the site point, from the site's land answer (mining leases first).
 // shortcut: one holder per site; ask for each if sites with different holders on the same point turn up.
 export function siteHolder(landFacts: Record<string, unknown> | null): string | null {
   const rows = (Array.isArray(landFacts?.tenure) ? landFacts.tenure : []) as Record<string, unknown>[];
   const over = rows.filter((r) => r?.relation === "contains_site_point")
     .sort((a, b) => Number(/mining lease/i.test(String(b.layer))) - Number(/mining lease/i.test(String(a.layer))));
   for (const r of over) {
-    const h = (Array.isArray(r.holders) ? r.holders : [r.holder]).find((x) => typeof x === "string" && x.trim());
+    const h = (Array.isArray(r.holders) ? r.holders : [r.holder]).find((x) => typeof x === "string" && x.trim() && isCompany(x));
     if (typeof h === "string") return h.trim().slice(0, 160);
   }
   return null;
@@ -463,7 +472,7 @@ export class GoldRush {
     const legal = topic === "screen" ? ((served("controller", CONTROLLER.controller.id)?.facts as Record<string, unknown> | null)?.controller_identity as { name?: unknown }[] | undefined)?.[0]?.name : null;
     const name = typeof legal === "string" && legal ? legal : holder;
     if (!name) return { kind: "skipped", topic, miner_id: c.id, miner_name: c.name,
-      reason: "No tenure holder over the site point in this site's land answer yet, so there's nobody to look up (nothing charged)." };
+      reason: "No company holds tenure over the site point in this site's land answer, so there's nobody to look up; private individuals are never looked up (nothing charged)." };
     const miner = { id: c.id, name: c.name, description: "" };
     // Each intent's canonical params (node /engine/v1/intents): identity takes {company}, the screen takes {name} only.
     const call = { intent: c.intent, params: topic === "screen" ? { name } : { company: name } };
