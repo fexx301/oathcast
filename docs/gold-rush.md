@@ -30,14 +30,22 @@ it. The report shows each answer with its source, cost and receipt, and which qu
    MINOCC record (CC BY 4.0). A larger circle is a larger gold class: very small (<0.5 t), small (0.5–5 t), medium
    (5–50 t), large (50–150 t) or giant (>150 t, Mount Morgan).
 2. Click a site. The panel shows its survey site number, map sheet, gold class and coordinates, and what an
-   investigation will cost (one $0.01 test-USDC call per specialist, one per gold-price specialist, plus one for
-   comparison). Answers someone already paid for are reused at no charge.
+   investigation will cost (one $0.01 test-USDC call per step, up to $0.09 for a new site). Answers someone already
+   paid for are reused at no charge.
 3. Click **Investigate**. The app asks each matching specialist (up to four) the same question (who owned it, how much gold it produced,
    and when and why it closed). A specialist that answers more (today 7310050) is then asked its extra questions:
    the gold price in the site's last recorded year (taken from the answers it just got), the gold price then vs today,
-   and who holds the tenure, native title and land status at the site. Telegraph's ranked route is asked the
-   site question once, for comparison.
+   land and rights (tenure, native title, land status) and **what might remain** (exploration, modern resources,
+   access, environment). Then **who controls it today**: the company holding tenure over the site goes to
+   Counterproof's identity Miner 731005 (`B2B_IDENTITY_ENRICHMENT_GENERAL`) and its registered name to the sanctions
+   Miner 731002 (`SANCTIONS_SCREENING_MATCH_GENERAL`). A private individual on the register is never looked up.
+   Telegraph's ranked route is asked the site question once, for comparison. Nine paid steps in all.
+   Separately, the app reads **Takar's** signed files for the mine (another Season II team): Heritage Register events
+   and people, and Takar's independent checks. They're free, not bought through Telegraph, and labelled as Takar's.
 4. Read the report:
+   - **the four questions** at the top: why it closed, what has changed since, what the evidence establishes today,
+     and what deserves further investigation, answered by fixed rules from the rows below ("not established" when
+     nothing qualifies; nothing assumed about remaining gold or economic viability);
    - each answer, its miner and sources, and its receipt (hash and epoch);
    - **Known / Missing / Check:** which questions the specialists answered, which nobody did, and any disagreements
      (between a miner's own sources, or between miners on the same period);
@@ -46,17 +54,27 @@ it. The report shows each answer with its source, cost and receipt, and which qu
      Lode: Brilliant Deeps, Brilliant Extended) are listed apart and never counted for this site;
    - **land and rights today:** tenure, native title and land status rows, each with its register, record ID and check
      date. An expiry date or a gap in tenure doesn't mean the ground is available; that needs legal confirmation;
-   - any other structured rows a miner returns (for example events or people) appear in the facts table with their
-     source, with no change to the app;
+   - **who controls it today:** the registered company (legal name, LEI with a GLEIF link, jurisdiction, status) and
+     its sanctions screen (each list's publication date and the screen's scope);
+   - **what might remain today:** boreholes and company reports near the site, modern JORC resources as published
+     (never "gold left"), the nearest town, road and power line, and environmental records (not a statement of
+     contamination);
+   - **events and people** (Takar, Queensland Heritage Register): quoted sentences with record IDs and Takar's status,
+     and **Takar's independent checks**;
+   - any other structured rows a miner returns appear in the facts table with their source, with no change to the app;
    - each answer, its miner and sources, its receipt, and whether the node has published its delivery record yet.
 
-A site that was investigated before reuses the earlier paid answers at no charge.
+A site that was investigated before reuses the earlier paid answers at no charge. **Download evidence report**
+saves the whole investigation as Markdown: the four questions, what's established, disputed, not established and
+worth investigating, land and control, what might remain, events, Takar's checks, and every answer's receipt, epoch
+and signal record. **Download report (JSON)** saves the raw answers.
 
 **The same data from the command line:**
 
 ```sh
 B=https://oathcastcourt.duckdns.org/gold-rush/api
-curl -s $B/specialists   # the Miners the app asks (today: 64176 and 7310050)
+curl -s $B/specialists   # the site-question Miners (today: 64176 and 7310050); 731005 and 731002 are asked by ID
+curl -s "$B/events?site_no=494270" | head -c 300   # Takar's events and checks for Mount Morgan (free)
 curl -s $B/sites | head -c 300
 curl -s $B/ledger        # every paid call: question, miner, outcome, receipt
 ```
@@ -138,7 +156,9 @@ OATHCAST_S2_ESCROW_PRIVATE_KEY=0x… OATHCAST_S2_ESCROW_ADDRESS=$APP GOLD_RUSH_L
 - `GOLD_RUSH_MAX_PER_DAY` 60;
 - `GOLD_RUSH_MAX_PER_IP_HOUR` 20.
 
-A full report on a new site is up to 6 paid calls (two site answers; the gold price, the price then vs today, and land and rights, which is one question for all three layers; one ranked-route answer).
+A full report on a new site is up to 9 paid calls: two site answers; the gold price, the price then vs today, land
+and rights (one question for all three layers) and what might remain (one question for all four); the controller's
+identity and its sanctions screen (companies only); one ranked-route answer.
 
 Paid calls run one at a time. An attempt row is written before each paid request leaves, so a crash counts as
 possibly charged and is never resent. Our deployment runs it as its own container behind Caddy at `/gold-rush`.
@@ -153,9 +173,12 @@ possibly charged and is never resent. Our deployment runs it as its own containe
 
 ## Limits
 
-- **Coverage:** two specialists are registered: 64176 (the survey record, ours) and 7310050 (mine history, gold
-  prices, and land and rights, by NFT KING). The app finds a specialist's extra questions from its catalogue text;
-  7310050's description doesn't list them yet, so for now the app recognises them from a short built-in list. Gold prices before March 1900 aren't covered, and before 1960 they're the official US price,
+- **Coverage:** four Miners from three teams: 64176 (the survey record, ours), 7310050 (history, prices, land and
+  rights, what might remain; NFT KING), 731005 and 731002 (identity and sanctions; Counterproof). The app finds a
+  specialist's extra questions from its catalogue text; 7310050's doesn't list them yet, so the app recognises them
+  from a short built-in list (`KNOWN_TOPICS`). The controller Miners and the Takar file reader are written in.
+- **Not covered by anyone yet:** historical assays, detailed geological reports, tailings volumes, the economics of
+  reopening. Gold prices before March 1900 aren't covered, and before 1960 they're the official US price,
   not a market average; the report says which.
 - **Known and Missing** come from structured fields where a miner returns them, otherwise from a keyword check of
   sentences that name the mine. Read the answers.

@@ -7,8 +7,10 @@
 Two apps in this repo run live on Telegraph's testnet escrow (Ethereum Sepolia), each with a beginner tutorial:
 
 - **Gold Rush** (Apps entry): investigate Queensland's historical gold mines. Pick one of 8,132 sites from the
-  Geological Survey's map; the app asks the specialist Miners directly (history, production, closure, gold price
-  then and now, land and rights today), shows each fact with its source and receipt, and flags disagreements.
+  Geological Survey's map; one investigation buys answers from four Miners run by three teams on three Intents
+  (history, production, closure, gold prices, land and rights, what might remain, and who controls the ground today),
+  adds Takar's Heritage Register events and checks, answers four questions (why it closed, what's changed, what the
+  evidence establishes, what to investigate), and downloads as an evidence report with every source and receipt.
   Live: <https://oathcastcourt.duckdns.org/gold-rush> · tutorial: [docs/gold-rush.md](docs/gold-rush.md) · code:
   `payment-canary/src/gold-rush.ts`, `gold-rush-page.ts`.
 - **Field-day review**: did a past day's spray or harvest window hold? Asks Telegraph for the recorded weather and
