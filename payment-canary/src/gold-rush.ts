@@ -82,7 +82,7 @@ export function controllerFacts(topic: string, raw: Record<string, unknown> | nu
     if (raw.found === false || !raw.legal_name) return { not_found: [`no registered entity found for the tenure holder ${name}`] };
     const lei = typeof raw.lei === "string" && /^[A-Z0-9]{20}$/.test(raw.lei) ? raw.lei : null;
     return { controller_identity: [{ record_id: lei ? `LEI ${lei}` : null, name: raw.legal_name, jurisdiction: raw.jurisdiction ?? null, status: raw.status ?? null,
-      headquarters: raw.headquarters ?? null, relation: `registered entity of the tenure holder over the site point (${name})`,
+      headquarters: raw.headquarters ?? null, relation: "registered entity of the tenure holder over the site point" + (name ? ` (${name})` : ""),
       source_url: lei ? `https://search.gleif.org/#/record/${lei}` : null, source_title: String(raw.source ?? "") }] };
   }
   // Through Telegraph the screen sends list_versions {US: date, ...} and lists as strings; its own endpoint sends list objects.
@@ -191,6 +191,17 @@ export function takarChecks(raw: unknown, url: string): Record<string, unknown> 
   };
 }
 
+// The newest row that matches (the ledger only appends): a re-asked topic wins over its older answer.
+function newest<T>(rows: T[], f: (r: T) => boolean): T | undefined {
+  for (let i = rows.length - 1; i >= 0; i--) if (f(rows[i])) return rows[i];
+  return undefined;
+}
+
+// Rows logged before each row carried its intent: the controller miners' own intents, else the research intent.
+export function intentOf(miner: unknown): string {
+  return Object.values(CONTROLLER).find((c) => c.id === miner)?.intent ?? INTENT;
+}
+
 export function titled(s: string): string {
   return s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
@@ -213,13 +224,20 @@ export function structured(raw: Record<string, unknown> | null): Record<string, 
   }
   // Keep the ledger row bounded: the long narrative and diagnostic fields go first, the facts stay.
   const LIMIT = 24_576, size = () => JSON.stringify(out).length;
-  for (const k of ["years_worked", "references", "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage"]) if (size() > LIMIT) delete out[k];
+  for (const k of ["years_worked", "references", "checks", "licences", "buffer", "gsq_record", "categories", "series_coverage", "caveats", "labels", "calls"])
+    if (size() > LIMIT) delete out[k];
   // Still too big (e.g. 30 tenures within 2 km): keep rows over the site point first, then fewer nearby ones, and say how many were left out.
   const before = Object.fromEntries(Object.entries(out).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).length]));
   const over = (x: unknown) => Number((x as { relation?: unknown } | null)?.relation === "contains_site_point");
+  // Rows over the site point first, and at least one of each record_type (e.g. company reports beside boreholes).
+  const pick = (v: unknown[], keep: number) => {
+    const sorted = [...v].sort((a, b) => over(b) - over(a)), kinds = new Set<unknown>(), first: unknown[] = [];
+    for (const x of sorted) { const t = (x as { record_type?: unknown } | null)?.record_type; if (t !== undefined && !kinds.has(t)) { kinds.add(t); first.push(x); } }
+    return [...first, ...sorted.filter((x) => !first.includes(x))].slice(0, Math.max(keep, first.length));
+  };
   for (const keep of [12, 6, 3]) {
     if (size() <= LIMIT) break;
-    for (const [k, v] of Object.entries(out)) if (Array.isArray(v) && v.length > keep) out[k] = [...v].sort((a, b) => over(b) - over(a)).slice(0, keep);
+    for (const [k, v] of Object.entries(out)) if (Array.isArray(v) && v.length > keep) out[k] = pick(v, keep);
   }
   const omitted = Object.fromEntries(Object.entries(before).map(([k, n]) => [k, n - (out[k] as unknown[]).length]).filter(([, d]) => (d as number) > 0));
   if (Object.keys(omitted).length) out.omitted = omitted;
@@ -465,7 +483,7 @@ export class GoldRush {
   private async askController(site: Site, topic: string, asked: unknown, ip: string): Promise<Record<string, unknown>> {
     const c = CONTROLLER[topic];
     if (asked !== topic) throw new InputError("That miner doesn't answer that question.");
-    const served = (t: string, id?: string) => this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.topic === t && (!id || r.asked_miner === id));
+    const served = (t: string, id?: string) => newest(this.ledger.rows, (r) => r.type === "outcome" && r.kind === "served" && r.site_no === site.site_no && r.topic === t && (!id || r.asked_miner === id));
     const land = served("land");
     const landFacts = land ? ((land.facts ?? (land.signal_hash ? structured(await this.rawResponse(land.signal_hash)) : null)) as Record<string, unknown> | null) : null;
     const holder = siteHolder(landFacts);
@@ -483,14 +501,15 @@ export class GoldRush {
     call?: { intent: string; params: Record<string, unknown> }): Promise<Record<string, unknown>> {
     // A site's price answer is cached apart from its site answer (same miner, different question).
     const mine = (r: Record<string, unknown>) => r.site_no === site.site_no && r.asked_miner === miner.id && (r.topic ?? undefined) === topic;
-    const cached = this.ledger.rows.find((r) => r.type === "outcome" && r.kind === "served" && mine(r));
+    const cached = newest(this.ledger.rows, (r) => r.type === "outcome" && r.kind === "served" && mine(r));
     // A reused answer is re-checked with the same topic rule as a fresh one.
     if (cached) {
       let facts = (cached.facts ?? null) as Record<string, unknown> | null;
       // Stored before its rows fit the size cap: re-read them from the miner's signal record (free, not charged again).
       // Controller rows are always rebuilt from the signal record (free), so a row-format fix reaches answers already paid for.
       const ctl = Boolean(topic && CONTROLLER[topic]);
-      if (cached.signal_hash && (!facts || ctl)) { const r = await this.rawResponse(cached.signal_hash); facts = ctl ? controllerFacts(topic!, r, "") ?? facts : structured(r); }
+      const asked = String(cached.question ?? "").replace(/^(Registered identity|Sanctions screen) of /, "");
+      if (cached.signal_hash && (!facts || ctl)) { const r = await this.rawResponse(cached.signal_hash); facts = ctl ? controllerFacts(topic!, r, asked) ?? facts : structured(r); }
       return { ...cached, facts, type: undefined, reused: true, topics: topicsOf(String(cached.answer ?? ""), facts, site.name, topic) };
     }
     // An earlier payment for this site and miner with no settled outcome may have been charged: never pay for it twice.
@@ -505,7 +524,7 @@ export class GoldRush {
     if (hits.length >= this.limits.maxPerIpHour) return { kind: "skipped", miner_id: miner.id, miner_name: miner.name, reason: "Too many paid calls from you this hour." };
 
     const id = `gr-${now}-${Math.random().toString(36).slice(2, 8)}`;
-    const base = { id, site_no: site.site_no, site_name: site.name, asked_miner: miner.id, question, ...(topic ? { topic } : {}) };
+    const base = { id, site_no: site.site_no, site_name: site.name, asked_miner: miner.id, intent: call?.intent ?? INTENT, question, ...(topic ? { topic } : {}) };
     try {
       const outcome = await escrowAsk({
         node: NODE, signer: this.signer, minerId: miner.id || undefined, fetchFn: this.fetchFn, now: this.now,
@@ -587,7 +606,8 @@ export function handler(app: GoldRush) {
         return send(res, r.status, JSON.stringify(r.body), jsonType);
       }
       if (req.method === "GET" && path === "/gold-rush/api/specialists") return send(res, 200, JSON.stringify({ intent: INTENT, specialists: await app.specialists() }), jsonType);
-      if (req.method === "GET" && path === "/gold-rush/api/ledger") return send(res, 200, JSON.stringify({ node: NODE, intent: INTENT, calls: app.ledger.public() }), jsonType);
+      if (req.method === "GET" && path === "/gold-rush/api/ledger") return send(res, 200, JSON.stringify({ node: NODE,
+        intents: [INTENT, ...Object.values(CONTROLLER).map((c) => c.intent)], calls: app.ledger.public().map((r) => ({ ...r, intent: r.intent ?? intentOf(r.asked_miner) })) }), jsonType);
       if (req.method === "GET" && path === "/gold-rush/api/delivery") {
         const out = await app.delivery(new URL(req.url ?? "/", "http://x").searchParams.get("receipt"));
         return send(res, out.status, JSON.stringify(out.body), jsonType);
@@ -600,12 +620,6 @@ export function handler(app: GoldRush) {
         if (!String(req.headers["content-type"] ?? "").startsWith(jsonType)) return send(res, 415, JSON.stringify({ error: "Send JSON." }), jsonType);
         const ip = String(req.headers["x-real-ip"] ?? req.socket.remoteAddress ?? "unknown");
         const out = await app.ask(await readBody(req), ip);
-        return send(res, out.status, JSON.stringify(out.body), jsonType);
-      }
-      if (req.method === "POST" && path === "/gold-rush/api/investigate") {
-        if (!String(req.headers["content-type"] ?? "").startsWith(jsonType)) return send(res, 415, JSON.stringify({ error: "Send JSON." }), jsonType);
-        const ip = String(req.headers["x-real-ip"] ?? req.socket.remoteAddress ?? "unknown");
-        const out = await app.investigate(await readBody(req), ip);
         return send(res, out.status, JSON.stringify(out.body), jsonType);
       }
       return send(res, 404, JSON.stringify({ error: "not found" }), jsonType);
