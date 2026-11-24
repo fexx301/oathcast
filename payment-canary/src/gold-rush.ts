@@ -161,6 +161,27 @@ export function takarEvents(raw: unknown, siteNo: number, url: string): Record<s
     generated_at: str(o.generated_at, 40), gaps: list(o.gaps, 10, 300), people: list(o.people, 30, 60), events };
 }
 
+// Takar's checks, bounded like its events. Praman's figures are never carried (they mix scopes): only Takar's note on them.
+export function takarChecks(raw: unknown, url: string): Record<string, unknown> {
+  const d = (((raw && typeof raw === "object" ? raw : {}) as { dossier?: unknown }).dossier ?? {}) as Record<string, unknown>;
+  const str = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+  const int = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < 100_000 ? (v as number) : null);
+  const tie = (d.receipts_tie ?? {}) as Record<string, unknown>;
+  const ten = ((d.land_check ?? {}) as { tenure?: Record<string, unknown> }).tenure ?? {};
+  const cross = (d.cross_check ?? {}) as Record<string, unknown>;
+  return {
+    source_url: url,
+    open_questions: (Array.isArray(d.open_questions) ? d.open_questions : []).map((q) => str(q, 400)).filter(Boolean).slice(0, 12),
+    receipts_tie: { checked: int(tie.checked), in_paid_answer: int(tie.in_paid_answer) },
+    tenure_vs_7310050: { both: int(ten.both), takar: int(ten.ours), miner: int(ten.theirs), only_takar: (Array.isArray(ten.only_ours) ? ten.only_ours : []).map((x) => str(x, 40)).slice(0, 10) },
+    control: (Array.isArray(d.control) ? d.control : []).slice(0, 6).map((c) => {
+      const o = (c ?? {}) as Record<string, unknown>;
+      return { company: str(o.company, 120), verdict: str(o.verdict, 30), active: typeof o.active === "boolean" ? o.active : null, why: str(o.why, 120) };
+    }).filter((c) => c.company),
+    praman_note: str(cross.note, 200) || null,
+  };
+}
+
 export function titled(s: string): string {
   return s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
@@ -384,6 +405,12 @@ export class GoldRush {
       const r = await this.fetchFn(url, { signal: AbortSignal.timeout(10_000) });
       if (!r.ok) throw new Error(String(r.status));
       const body = takarEvents((await r.json()) as unknown, site.site_no, url);
+      // Takar's independent checks from its signed dossier for the same mine (best effort: the events stand without them).
+      const durl = `${TAKAR}/receipts/dossier-${slug}.json`;
+      try {
+        const d = await this.fetchFn(durl, { signal: AbortSignal.timeout(10_000) });
+        if (d.ok) body.checks = takarChecks((await d.json()) as unknown, durl);
+      } catch { /* no checks this time */ }
       this.eventsCache.set(slug, { at: this.now(), body });
       return { status: 200, body };
     } catch {

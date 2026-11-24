@@ -261,7 +261,7 @@ async function investigate(s) {
     rep.innerHTML = '<h3>Investigation</h3><p class="q">“' + esc(plan.question) + '”</p><ol class="run" id="run">' +
       plan.steps.map((st, i) => '<li id="step-' + i + '" class="wait"><span class="st">○</span><span><b>' + esc(st.miner_name) +
         '</b> <span class="tag">' + esc(st.label || st.path) + '</span><br><small>waiting</small></span></li>').join("") + "</ol>" +
-      '<div id="summary"></div><div id="events"></div><div id="answers"></div>';
+      '<div id="questions"></div><div id="summary"></div><div id="events"></div><div id="answers"></div>';
     // Takar's events and people (another team, free): fetched alongside the paid asks, rendered when it lands.
     const mine = run;
     fetch(BASE + "api/events?site_no=" + s.site_no).then((x) => x.json()).then((e) => { if (current === mine) { mine.events = e; renderEvents(mine); } }).catch(() => {});
@@ -453,6 +453,7 @@ function renderReport(r) {
   if (land.some((r) => r[0] === "controller identity")) known.push("who controls it today");
   if (remain.length) known.push("what might remain today (records)");
   r.view = { known, missing, flags, rows, near, land, gp, remain };
+  setTimeout(() => renderQuestions(r), 0); // after the summary below is in place
   const tr = ([k, v, m, src, flag]) => k === "#near" ?
       '<tr><th colspan="3">Other workings named in the sources · not this site, not counted</th></tr>' :
       "<tr" + (flag ? ' class="flag"' : "") + "><td>" + esc(k) + "</td><td>" + esc(v) + (flag ? '<br><small class="warn">⚠ ' + esc(flag) + "</small>" : "") +
@@ -520,7 +521,68 @@ function renderEvents(r) {
       "<tr><td>" + esc(x.year ?? "–") + "</td><td>" + esc((x.types || []).join(", ")) + ": “" + esc(x.quote) + "”<br><small>" + rec(x) + "</small></td><td>" + esc(x.status) + "</td></tr>").join("") + "</table>" : "") +
     (evs.length > shown.length ? '<p class="mute small">+' + (evs.length - shown.length) + " more in Takar’s file and in the evidence report.</p>" : "") +
     ((e.people || []).length ? '<p class="small">People named in the register: ' + esc(e.people.join(", ")) + "</p>" : "") +
-    ((e.gaps || []).length ? '<p><span class="no">Not established</span></p><ul class="checks">' + e.gaps.map((g) => "<li>" + esc(g) + "</li>").join("") + "</ul>" : "");
+    ((e.gaps || []).length ? '<p><span class="no">Not established</span></p><ul class="checks">' + e.gaps.map((g) => "<li>" + esc(g) + "</li>").join("") + "</ul>" : "") +
+    (e.checks ? "<h3>Independent checks · Takar</h3>" + '<p class="mute small">From Takar’s signed dossier for this mine (another team), shown as Takar’s. ' +
+      '<a href="' + esc(e.checks.source_url) + '" target="_blank" rel="noopener">Takar’s dossier</a></p><ul class="checks">' +
+      checkLines(e.checks).map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul>" : "");
+  renderQuestions(r);
+}
+
+// Takar's checks as plain lines. Praman's own figures are never shown (they mix scopes): only Takar's note on them.
+function checkLines(ck) {
+  const t = ck.receipts_tie || {}, n = ck.tenure_vs_7310050 || {};
+  return [
+    ...(t.checked != null ? ["Takar tied " + t.in_paid_answer + " of " + t.checked + " production figures to the paid answers."] : []),
+    ...(n.both != null ? ["Tenure compared with 7310050’s land answer: " + n.both + " in both reads (" + n.takar + " in Takar’s, " + n.miner + " in 7310050’s)" +
+      ((n.only_takar || []).length ? "; only in Takar’s: " + n.only_takar.join(", ") : "") + "."] : []),
+    ...(ck.control || []).map((c) => "Controller check by Takar (other identity miners): " + c.company + ": " + c.verdict + (c.active === true ? ", active" : "") + (c.why ? " (" + c.why + ")" : "") + "."),
+    ...(ck.praman_note ? ["Praman Desk (another team), as Takar compared it: " + ck.praman_note + ". Praman’s own figures are not used in this report (they mix scopes)."] : []),
+    ...(ck.open_questions || []).map((q) => "Open question (Takar): " + q),
+  ];
+}
+
+// The four questions, answered by fixed rules from the rows this report shows: no model wording, nothing assumed
+// about remaining gold or economic viability. An empty answer says so.
+function questionsOf(r) {
+  const v = r.view || { rows: [], land: [], remain: [], flags: [], missing: [] };
+  const e = r.events && r.events.available ? r.events : null, evs = e ? byYear(e.events || []) : [], ck = e && e.checks;
+  const yrs = (t) => (String(t).match(/[0-9]{4}/g) || []).map(Number).filter((y) => y > 1800 && y < 2100);
+  const closures = v.rows.filter((x) => x[0] === "closure");
+  const lastClose = Math.max(0, ...closures.flatMap((x) => yrs(x[1])));
+  const ev = (types) => evs.filter((x) => (x.types || []).some((t) => types.includes(t)));
+  const q = (x) => (x.year ?? "") + ": “" + String(x.quote).slice(0, 220) + (String(x.quote).length > 220 ? "…" : "") + "” (Heritage Register " + x.record_id + ", via Takar)";
+  const oq = (re) => ck ? (ck.open_questions || []).filter((s) => re.test(s)).map((s) => s + " (Takar)") : [];
+  const why = [...closures.map((x) => x[1] + " (" + x[2] + ")"), ...ev(["closure"]).slice(0, 4).map(q), ...oq(/stopped|closure/i)];
+  const since = [
+    ...v.rows.filter((x) => x[0] === "ownership" && lastClose && yrs(x[1]).some((y) => y >= lastClose)).map((x) => "Owner: " + x[1] + " (" + x[2] + ")"),
+    ...ev(["restart", "ownership"]).filter((x) => x.year && x.year >= lastClose).slice(0, 4).map(q),
+    ...v.land.filter((x) => x[0] === "tenure" && /over the site point/.test(x[1])).slice(0, 3).map((x) => "Tenure today: " + x[1]),
+    ...v.land.filter((x) => x[0] === "controller identity").map((x) => "Controller today: " + x[1]),
+    ...v.land.filter((x) => x[0] === "controller screen").map((x) => "Sanctions screen: " + x[1]),
+    ...v.remain.filter((x) => x[0] === "environment" && /over the site point/.test(x[1])).slice(0, 3).map((x) => "Environment: " + x[1]),
+  ];
+  const today = [
+    ...v.rows.filter((x) => x[0] === "size class" || x[0] === "production").slice(0, 6).map((x) => x[0] + ": " + x[1] + " (" + x[2] + ")"),
+    ...v.remain.filter((x) => x[0] === "resources" || x[0] === "exploration").map((x) => x[0] + " (record, not gold left): " + x[1]),
+  ];
+  const next = [...v.flags.map((f) => "Check: " + f), ...(ck ? (ck.open_questions || []).map((s) => s + " (Takar)") : []),
+    ...v.land.filter((x) => /renewal lodged/i.test(x[1])).map((x) => "Tenure renewal pending: " + x[1]), ...v.missing.map((t) => "No specialist answered " + t + ".")];
+  const or = (xs, msg) => xs.length ? [...new Set(xs)] : [msg];
+  return [
+    ["Why did it close?", or(why, "Not established: no source here gives a closure year or reason.")],
+    ["What has changed since?", or(since, "Not established from these sources.")],
+    ["What does the evidence establish today?", or(today, "Only the survey record.")],
+    ["What deserves further investigation?", or(next, "Nothing flagged by these rules.")],
+  ];
+}
+
+function renderQuestions(r) {
+  const el = document.getElementById("questions");
+  if (!el || !r.view || current !== r) return;
+  el.innerHTML = '<div class="verdict"><p><b>The four questions</b> <span class="mute small">answered by fixed rules from the rows below; ' +
+    "nothing is assumed about remaining gold or economic viability</span></p>" +
+    questionsOf(r).map(([h, xs]) => "<p><b>" + esc(h) + '</b></p><ul class="checks">' + xs.slice(0, 5).map((x) => "<li>" + esc(x) + "</li>").join("") +
+      (xs.length > 5 ? "<li>+" + (xs.length - 5) + " more in the evidence report</li>" : "") + "</ul>").join("") + "</div>";
 }
 
 // The evidence report: what's established, disputed, not established and worth investigating, built by fixed rules from what
@@ -547,6 +609,8 @@ function evidence(r) {
     "Generated " + new Date().toISOString() + " from " + url + ". Every answer was bought from a Telegraph miner through this app's escrow on Ethereum Sepolia (testnet); receipts are listed at the end. " +
       "This report restates what the miners and registers returned, by fixed rules. It is not legal or investment advice.", "",
     "Question asked: \u201c" + r.question + "\u201d", "",
+    "## The four questions", "", "Answered by fixed rules from the rows below; nothing is assumed about remaining gold or economic viability.", "",
+    questionsOf(r).map(([h, xs]) => "### " + h + "\\n\\n" + xs.map((x) => "- " + x).join("\\n")).join("\\n\\n"), "",
     "## Established", "", "Known: " + v.known.join(" · ") + ".", "",
     table(["Fact", "Value", "From", "Source", "Note"], facts.map((x) => [x[0], x[1], x[2], x[3], x[4]])), "",
     "## Disputed or to check", "", v.flags.length ? v.flags.map((f) => "- " + f).join("\\n") : "_No disagreement between sources was found._",
@@ -564,6 +628,8 @@ function evidence(r) {
     e ? "By Takar (Bangdrop), another team; each event is signed in Takar's file (" + e.source_url + "). Status is Takar's own check." : "_No Takar register file for this mine._", "",
     e ? table(["Year", "Type", "Quoted sentence", "Record", "Takar's status"], evs.map((x) => [x.year ?? "", x.types.join(", "), x.quote, (x.entry ? x.entry + ", " : "") + x.record_id + (x.url ? " " + x.url : ""), x.status])) : "",
     e && e.people.length ? "\\nPeople named in the register: " + e.people.join(", ") + "." : "", "",
+    "## Independent checks (Takar)", "",
+    e && e.checks ? "From Takar's signed dossier (" + e.checks.source_url + "), shown as Takar's.\\n\\n" + checkLines(e.checks).map((x) => "- " + x).join("\\n") : "_No Takar dossier checks for this mine._", "",
     "## Other workings named in the sources (not this site, not counted)", "", table(["Fact", "Value", "From"], v.near.map((x) => [x[0], x[1], x[2]])), "",
     "## Answers and receipts", "",
     table(["Step", "Miner", "Charge", "Receipt", "Epoch", "Signal record"], receipts), "",
