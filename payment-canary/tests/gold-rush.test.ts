@@ -5,7 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { DIAMOND } from "../src/escrow.js";
 import { InputError, Ledger } from "../src/field-day.js";
 import { PAGE } from "../src/gold-rush-page.js";
-import { controllerFacts, GoldRush, keyWord, questionFor, siteHolder, specialistsFrom, takarChecks, takarEvents, topicsCovered } from "../src/gold-rush.js";
+import { controllerFacts, GoldRush, keyWord, questionFor, isCompany, siteHolder, specialistsFrom, takarChecks, takarEvents, topicsCovered } from "../src/gold-rush.js";
 
 // Throwaway key from the viem/anvil test set; never funded.
 const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
@@ -287,6 +287,15 @@ describe("who controls it today", () => {
     expect(lists(viaNode)).toMatch(/^US 2026-11-09, UN 2026-11-12, EU 2026-10-23, UK 2026-11-10 \(/);
     expect(lists({ label: "CLEAR", lists: ["UK Sanctions List (published 2026-11-10)"] })).toMatch(/^UK Sanctions List \(published 2026-11-10\) \(/);
     expect(lists(SCREEN)).toMatch(/^US 2026-11-09, UK 2026-11-10 \(/);
+  });
+
+  it("never looks up a private individual", () => {
+    for (const c of ["CITIGOLD CORPORATION LIMITED", "HERITAGE MINERALS PTY LTD", "CLG Properties Pty Ltd", "Gold Copper Exploration Ltd", "Ravenswood Gold Pty Ltd", "Smith Mining NL"])
+      expect(isCompany(c)).toBe(true);
+    for (const p of ["Beamond, Adrian Peter", "WALLACE, Brian Richard", "Bell", "John Smith"]) expect(isCompany(p)).toBe(false);
+    expect(siteHolder({ tenure: [{ layer: "Mining lease (ML)", holders: ["Beamond, Adrian Peter"], relation: "contains_site_point" },
+      { layer: "Exploration permit (EPM)", holders: ["CLG Properties Pty Ltd"], relation: "contains_site_point" }] })).toBe("CLG Properties Pty Ltd");
+    expect(siteHolder({ tenure: [{ holders: ["Beamond, Adrian Peter"], relation: "contains_site_point" }] })).toBeNull();
   });
 
   it("takes the holder over the site point, mining leases first", () => {
