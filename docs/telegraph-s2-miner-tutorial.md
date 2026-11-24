@@ -243,8 +243,8 @@ The network was reset around 16–17 Nov, and delivery records from before then
 now return 404, including the ones this app collected on 11–12 Nov. Keep your own
 copy of each record if you need it later.
 
-As of 2026-11-12 00:49 UTC the app had made 10 paid calls over two days, and the
-router sent all 10 to this miner.
+By 2026-11-20 the app had made 16 paid calls (15 on 11–12 Nov, before the reset, and
+one on 20 Nov, after it), and the router sent 14 of them to this miner.
 
 To pay for requests from your own code, the escrow method is the simplest: one
 deposit, then one signature per call and no per-call transaction. A working
@@ -313,7 +313,7 @@ company, vessel or wallet on a sanctions list?
   Telegraph says that's a ranking rollover issue it is fixing.
   Before the reset, my own adapter (reg 408) was the Intent's first canonical
   scorer for about a day, which I disclose because it ranked my own miner.
-- **Routing share:** 14 of my app's 16 paid calls (to 2026-11-17) reached this
+- **Routing share:** 14 of my app's 16 paid calls (to 2026-11-20) reached this
   miner; the other 2 went to other miners. I do not know why the share was that
   high, and it may not stay that way.
 
