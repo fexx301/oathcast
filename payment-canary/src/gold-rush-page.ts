@@ -482,7 +482,13 @@ function renderReport(r) {
       (a.topic ? '<p class="mute small">Asked: “' + esc(a.question || "") + "”</p>" :
         a.question && a.question !== r.question ? '<p class="mute small">Asked earlier with different wording: “' + esc(a.question) + "”</p>" : "");
     if (a.kind !== "served") return '<div class="card">' + head + '<p class="no small">' + esc(a.reason || a.kind) + "</p></div>";
-    const src = (a.sources || []).map((x) => /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x)).join("<br>");
+    // A source can be a URL, plain text, or an object (some Miners send {title, url}); never print "[object Object]".
+    const one = (x) => {
+      if (x && typeof x === "object") { const u = x.url || x.source_url || x.link || "", t = x.title || x.name || x.source || u; x = u && /^https?:/.test(u) ? { u, t: String(t) } : String(t || ""); }
+      if (x && typeof x === "object") return '<a href="' + esc(x.u) + '" rel="noopener" target="_blank">' + esc(x.t.slice(0, 90)) + "</a>";
+      return /^https?:/.test(x) ? '<a href="' + esc(x) + '" rel="noopener" target="_blank">' + esc(x.slice(0, 70)) + "</a>" : esc(x);
+    };
+    const src = (a.sources || []).map(one).filter(Boolean).join("<br>");
     return '<div class="card">' + head + "<p>" + esc(a.answer) + "</p>" + (src ? '<p class="small">' + src + "</p>" : "") + proof(a) + "</div>";
   };
   const spec = r.answers.filter((a) => a.path === "direct"), ranked = r.answers.filter((a) => a.path === "ranked route");
