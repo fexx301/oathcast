@@ -48,7 +48,7 @@ function fakeTelegraph(answers: Record<string, ReturnType<typeof day>>, ranked =
       if (minerId && fails > 0) { fails--; throw new Error("Telegraph's paid ask returned 500"); }
       beforePay();
       const hash = HASH(miner === "64174" ? "a" : "b");
-      sources.set(hash, { payload: { response: { result: answers[miner] } } });
+      sources.set(hash, { signal: { subnet_id: Number(miner) }, payload: { subnet_id: Number(miner), response: answers[miner] }, result: { id: "r", status: "success" } });
       return { miner_id: miner, result: answers[miner], signal_hash: hash, payment_tx: SIG(900 + asks.length) };
     },
     signal: async (hash) => sources.get(hash) ?? null,
@@ -214,11 +214,18 @@ describe("audit", () => {
 
   it("fails a reading that doesn't match Telegraph's record, and says so when the node is down", async () => {
     const { a, c, t } = await settled({ "64174": day(0), "731004": day(0) });
-    t.sources.set(HASH("b"), { payload: { response: { result: day(7) } } });
+    t.sources.set(HASH("b"), { signal: { subnet_id: 731004 }, payload: { response: day(7) } });
     t.sources.delete(HASH("a"));
     const checks = (await a.audit(c.sent[1].sig)).body.checks as { name: string; ok: boolean | null }[];
     expect(checks.find((x) => x.name.includes("731004"))?.ok).toBe(false);
     expect(checks.find((x) => x.name.includes("64174"))?.ok).toBeNull();
+  });
+
+  it("fails a record from a different miner than the memo names", async () => {
+    const { a, c, t } = await settled({ "64174": day(0), "731004": day(0) });
+    t.sources.set(HASH("b"), { signal: { subnet_id: 99 }, payload: { response: day(0) } });
+    const checks = (await a.audit(c.sent[1].sig)).body.checks as { name: string; ok: boolean | null }[];
+    expect(checks.find((x) => x.name.includes("731004"))?.ok).toBe(false);
   });
 
   it("rejects bad input and foreign transactions", async () => {

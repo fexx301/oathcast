@@ -209,11 +209,18 @@ export function solanaTelegraph(signer: KeyPairSigner, fetchFn: typeof fetch = f
   };
 }
 
-/** A signal record's result, wherever the node puts it (payload.response.result or result). */
+const pick = (o: unknown, ...path: string[]) => path.reduce<unknown>((x, k) => (x && typeof x === "object" ? (x as Record<string, unknown>)[k] : undefined), o);
+
+/** A signal record's answer: the miner's raw response is payload.response (its fields at the top, or under result). */
 export function signalResult(record: Record<string, unknown> | null): Record<string, unknown> | undefined {
-  const pick = (o: unknown, ...path: string[]) => path.reduce<unknown>((x, k) => (x && typeof x === "object" ? (x as Record<string, unknown>)[k] : undefined), o);
-  const r = pick(record, "payload", "response", "result") ?? pick(record, "response", "result") ?? pick(record, "result");
+  const r = pick(record, "payload", "response", "result") ?? pick(record, "payload", "response");
   return r && typeof r === "object" ? (r as Record<string, unknown>) : undefined;
+}
+
+/** The miner that answered, as the node recorded it (signal.subnet_id). */
+export function signalMiner(record: Record<string, unknown> | null): string | undefined {
+  const m = pick(record, "signal", "subnet_id") ?? pick(record, "payload", "subnet_id");
+  return m === undefined ? undefined : String(m);
 }
 
 // ---------- Solana devnet ----------
@@ -429,7 +436,8 @@ export class FieldDaySettle {
       const theirs = reading(memo.op, r);
       checks.push(rec === null
         ? { name: `Telegraph record for ${miner}`, ok: null, detail: `${hash}: the node didn't answer; try again later` }
-        : { name: `Telegraph record for ${miner}`, ok: theirs === value && r?.date === memo.date, detail: `${hash}: reading ${theirs ?? "none"} on ${String(r?.date)}; the memo says ${value ?? "none"} on ${memo.date}` });
+        : { name: `Telegraph record for ${miner}`, ok: theirs === value && r?.date === memo.date && signalMiner(rec) === miner,
+            detail: `${hash}: miner ${signalMiner(rec) ?? "?"}, reading ${theirs ?? "none"} on ${String(r?.date)}; the memo says ${miner}, ${value ?? "none"} on ${memo.date}` });
     }
     return { status: 200, body: { signature, memo, checks } };
   }
