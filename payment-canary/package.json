@@ -14,10 +14,12 @@
     "wallet:create": "tsx src/create-wallet.ts",
     "check": "npm run build && npm test",
     "field-day": "tsx src/field-day.ts",
-    "gold-rush": "tsx src/gold-rush.ts"
+    "gold-rush": "tsx src/gold-rush.ts",
+    "field-day-solana": "tsx src/field-day-solana.ts"
   },
   "dependencies": {
     "@scure/base": "1.2.6",
+    "@solana-program/token": "0.9.0",
     "@solana/kit": "5.5.1",
     "@x402/fetch": "2.11.0",
     "@x402/svm": "2.11.0",
