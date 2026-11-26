@@ -47,7 +47,7 @@ function fakeTelegraph(answers: Record<string, ReturnType<typeof day>>, ranked =
       asks.push(minerId ? `direct:${minerId}` : "ranked");
       if (minerId && fails > 0) { fails--; throw new Error("Telegraph's paid ask returned 500"); }
       beforePay();
-      const hash = HASH(miner === "64174" ? "a" : "b");
+      const hash = HASH(({ "64174": "a", "731004": "b", "77031": "c" } as Record<string, string>)[miner]);
       sources.set(hash, { signal: { subnet_id: Number(miner) }, payload: { subnet_id: Number(miner), response: answers[miner] }, result: { id: "r", status: "success" } });
       return { miner_id: miner, result: answers[miner], signal_hash: hash, payment_tx: SIG(900 + asks.length) };
     },
@@ -121,12 +121,12 @@ describe("inputs and memos", () => {
 describe("lifecycle", () => {
   it("books, verifies twice and releases to the contractor; a repeat pays nothing", async () => {
     const { chain, sent } = fakeChain();
-    const { tg, asks } = fakeTelegraph({ "64174": day(0), "731004": day(0) });
+    const { tg, asks } = fakeTelegraph({ "64174": day(0), "731004": day(0), "77031": day(0) });
     const a = app(chain, tg);
     const out = await a.review(RAW, "1.1.1.1");
     expect(out.status).toBe(200);
     expect(out.body).toMatchObject({ state: "release", decision: "RELEASE" });
-    expect(asks).toEqual(["ranked", "direct:731004"]);
+    expect(asks).toEqual(["ranked", "direct:77031"]);
     expect(sent.map((s) => [s.kind, s.to ?? null, s.fee ?? null])).toEqual([["deposit", null, 20_000n], ["pay", CONTRACTOR, 20_000n]]);
     expect(parseMemo(sent[0].memo)?.step).toBe("BOOKED");
 
@@ -138,25 +138,33 @@ describe("lifecycle", () => {
 
   it("refunds the buyer when both say the window failed, and holds on disagreement", async () => {
     const r = fakeChain();
-    await app(r.chain, fakeTelegraph({ "64174": day(6), "731004": day(4.5) }).tg).review(RAW, "1.1.1.1");
+    await app(r.chain, fakeTelegraph({ "64174": day(6), "77031": day(4.5) }).tg).review(RAW, "1.1.1.1");
     expect(r.sent[1]).toMatchObject({ kind: "pay", to: OPERATOR, fee: 20_000n });
 
     const h = fakeChain();
-    const out = await app(h.chain, fakeTelegraph({ "64174": day(0), "731004": day(2) }).tg).review(RAW, "1.1.1.1");
+    const out = await app(h.chain, fakeTelegraph({ "64174": day(0), "77031": day(2) }).tg).review(RAW, "1.1.1.1");
     expect(out.body.decision).toBe("HOLD");
     expect(h.sent.map((s) => s.kind)).toEqual(["deposit", "note"]);
   });
 
   it("cross-checks with a different miner from the one the ranked route chose", async () => {
     const { chain } = fakeChain();
-    const { tg, asks } = fakeTelegraph({ "731004": day(0), "64174": day(0) }, "731004");
+    const { tg, asks } = fakeTelegraph({ "731004": day(0), "64174": day(0), "77031": day(0) }, "77031");
     await app(chain, tg).review(RAW, "1.1.1.1");
-    expect(asks).toEqual(["ranked", "direct:64174"]);
+    expect(asks).toEqual(["ranked", "direct:731004"]);
+  });
+
+  it("falls back to the next cross-check verifier when one fails", async () => {
+    const { chain } = fakeChain();
+    const { tg, asks } = fakeTelegraph({ "64174": day(0), "731004": day(0), "77031": day(0) }, "64174", 1);
+    const out = await app(chain, tg).review(RAW, "1.1.1.1");
+    expect(out.body.decision).toBe("RELEASE");
+    expect(asks).toEqual(["ranked", "direct:77031", "direct:731004"]);
   });
 
   it("resumes a failed job without a second deposit or a second ranked payment", async () => {
     const { chain, sent } = fakeChain();
-    const { tg, asks } = fakeTelegraph({ "64174": day(0), "731004": day(0) }, "64174", 1);
+    const { tg, asks } = fakeTelegraph({ "64174": day(0), "731004": day(0), "77031": day(0) }, "64174", 2);
     const a = app(chain, tg);
     const first = await a.review(RAW, "1.1.1.1");
     expect(first.status).toBe(502);
@@ -170,7 +178,7 @@ describe("lifecycle", () => {
   it("refuses a job whose deposit never confirmed", async () => {
     const { chain, sent } = fakeChain();
     chain.deposit = async () => { throw new Error("blockhash expired"); };
-    const a = app(chain, fakeTelegraph({ "64174": day(0), "731004": day(0) }).tg);
+    const a = app(chain, fakeTelegraph({ "64174": day(0), "731004": day(0), "77031": day(0) }).tg);
     expect((await a.review(RAW, "1.1.1.1")).status).toBe(502);
     // A failed deposit leaves an attempt with no booking: the next try must not send money again.
     const again = await a.review(RAW, "1.1.1.1");
@@ -180,7 +188,7 @@ describe("lifecycle", () => {
 
   it("caps jobs per IP per hour", async () => {
     const { chain } = fakeChain();
-    const a = app(chain, fakeTelegraph({ "64174": day(0), "731004": day(0) }).tg);
+    const a = app(chain, fakeTelegraph({ "64174": day(0), "731004": day(0), "77031": day(0) }).tg);
     for (const fee of ["0.01", "0.02", "0.03"]) expect((await a.review({ ...RAW, fee }, "9.9.9.9")).status).toBe(200);
     expect((await a.review({ ...RAW, fee: "0.04" }, "9.9.9.9")).status).toBe(429);
   });
@@ -195,8 +203,15 @@ describe("audit", () => {
     return { a, c, t, out };
   }
 
+  it("reads numeric strings in signal records", async () => {
+    const { a, c, t } = await settled({ "64174": day(0), "731004": day(0), "77031": day(0.12) });
+    t.sources.set(HASH("c"), { signal: { subnet_id: 77031 }, payload: { response: { date: "2026-11-20", precipitation_mm: "0.12" } } });
+    const checks = (await a.audit(c.sent[1].sig)).body.checks as { name: string; ok: boolean | null }[];
+    expect(checks.find((x) => x.name.includes("77031"))?.ok).toBe(true);
+  });
+
   it("passes a genuine release and a genuine deposit", async () => {
-    const { a, c } = await settled({ "64174": day(0), "731004": day(0) });
+    const { a, c } = await settled({ "64174": day(0), "731004": day(0), "77031": day(0) });
     const rel = await a.audit(c.sent[1].sig);
     expect(rel.body.checks).toHaveLength(5);
     expect((rel.body.checks as { ok: boolean }[]).every((x) => x.ok === true)).toBe(true);
@@ -205,7 +220,7 @@ describe("audit", () => {
   });
 
   it("fails a memo whose decision doesn't follow from its readings", async () => {
-    const { a, c } = await settled({ "64174": day(0), "731004": day(2) }); // a HOLD
+    const { a, c } = await settled({ "64174": day(0), "77031": day(2) }); // a HOLD
     const memo = JSON.parse(c.sent[1].memo);
     c.sent[1].memo = JSON.stringify({ ...memo, step: "RELEASE" });
     const out = await a.audit(c.sent[1].sig);
@@ -213,23 +228,23 @@ describe("audit", () => {
   });
 
   it("fails a reading that doesn't match Telegraph's record, and says so when the node is down", async () => {
-    const { a, c, t } = await settled({ "64174": day(0), "731004": day(0) });
-    t.sources.set(HASH("b"), { signal: { subnet_id: 731004 }, payload: { response: day(7) } });
+    const { a, c, t } = await settled({ "64174": day(0), "731004": day(0), "77031": day(0) });
+    t.sources.set(HASH("c"), { signal: { subnet_id: 77031 }, payload: { response: { ...day(7), precipitation_mm: "7" } } });
     t.sources.delete(HASH("a"));
     const checks = (await a.audit(c.sent[1].sig)).body.checks as { name: string; ok: boolean | null }[];
-    expect(checks.find((x) => x.name.includes("731004"))?.ok).toBe(false);
+    expect(checks.find((x) => x.name.includes("77031"))?.ok).toBe(false);
     expect(checks.find((x) => x.name.includes("64174"))?.ok).toBeNull();
   });
 
   it("fails a record from a different miner than the memo names", async () => {
-    const { a, c, t } = await settled({ "64174": day(0), "731004": day(0) });
-    t.sources.set(HASH("b"), { signal: { subnet_id: 99 }, payload: { response: day(0) } });
+    const { a, c, t } = await settled({ "64174": day(0), "731004": day(0), "77031": day(0) });
+    t.sources.set(HASH("c"), { signal: { subnet_id: 99 }, payload: { response: day(0) } });
     const checks = (await a.audit(c.sent[1].sig)).body.checks as { name: string; ok: boolean | null }[];
-    expect(checks.find((x) => x.name.includes("731004"))?.ok).toBe(false);
+    expect(checks.find((x) => x.name.includes("77031"))?.ok).toBe(false);
   });
 
   it("rejects bad input and foreign transactions", async () => {
-    const { a } = await settled({ "64174": day(0), "731004": day(0) });
+    const { a } = await settled({ "64174": day(0), "731004": day(0), "77031": day(0) });
     expect((await a.audit("nope")).status).toBe(400);
     expect((await a.audit(SIG(77))).status).toBe(404);
   });

@@ -40,9 +40,10 @@ export const APP = "oathcast-field-day";
 export const MAX_ASK_UNITS = 10_000n; // $0.01 (6-decimal USDC): refuse any dearer Telegraph offer
 export const MIN_FEE_UNITS = 10_000n; // job fees between 0.01 and 0.05 devnet USDC
 export const MAX_FEE_UNITS = 50_000n;
-// Cross-check verifiers, in order: the first one that isn't the miner the ranked route chose.
-// 731004 is Counterproof's (another team); 64174 is ours, used only when the ranked route picked 731004.
-export const CROSS_CHECK = ["731004", "64174"];
+// Cross-check verifiers, tried in order (skipping the miner the ranked route chose) until one answers.
+// 77031 (SecondSky) reads NASA POWER: satellite and MERRA-2 data, independent of the ERA5 archive that 64174 and
+// 731004 both read (they agreed to the decimal on every test day). 731004 is Counterproof's; 64174 is ours, last.
+export const CROSS_CHECK = ["77031", "731004", "64174"];
 const DAY_MS = 86_400_000;
 
 export type Decision = "RELEASE" | "REFUND" | "HOLD";
@@ -99,10 +100,12 @@ export function validateJob(raw: unknown, now: number): Job {
   return { ...input, contractor, fee_units: parseFee(r.fee) };
 }
 
-/** The one number the rule reads: the day's low for frost work, else the day's precipitation. */
+/** The one number the rule reads: the day's low for frost work, else the day's precipitation.
+ *  Signal records can store numbers as strings ("0.12"), so plain numeric strings count too. */
 export function reading(op: Operation, result: Record<string, unknown> | undefined): number | null {
   const v = result?.[op === "frost" ? "temp_min_c" : "precipitation_mm"];
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
+  const n = typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v.trim()) ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
 
 /** Code decides: only two agreeing sources move money; anything else stays in escrow. */
@@ -375,15 +378,23 @@ export class FieldDaySettle {
         sources.push({ role: "ranked", ...s });
         this.ledger.append({ type: "outcome", id, at: at(), kind: "source", role: "ranked", ...s });
       }
-      if (!sources.some((s) => s.role === "cross-check")) {
-        const ranked = sources.find((s) => s.role === "ranked")!;
-        const miner = CROSS_CHECK.find((m) => m !== ranked.miner_id)!;
-        const s = await this.telegraph.ask(job, miner, () => this.ledger.append({ type: "attempt", id, at: at(), step: "ask-cross-check", miner_id: miner }));
-        sources.push({ role: "cross-check", ...s });
-        this.ledger.append({ type: "outcome", id, at: at(), kind: "source", role: "cross-check", ...s });
-      }
     } catch (error) {
       return fail("verify", error);
+    }
+    if (!sources.some((s) => s.role === "cross-check")) {
+      const ranked = sources.find((s) => s.role === "ranked")!;
+      const errors: string[] = [];
+      for (const miner of CROSS_CHECK.filter((m) => m !== ranked.miner_id)) {
+        try {
+          const s = await this.telegraph.ask(job, miner, () => this.ledger.append({ type: "attempt", id, at: at(), step: "ask-cross-check", miner_id: miner }));
+          sources.push({ role: "cross-check", ...s });
+          this.ledger.append({ type: "outcome", id, at: at(), kind: "source", role: "cross-check", ...s });
+          break;
+        } catch (error) {
+          errors.push(`${miner}: ${(error as Error).message}`);
+        }
+      }
+      if (!sources.some((s) => s.role === "cross-check")) return fail("verify", new Error(`no cross-check verifier answered (${errors.join("; ")})`));
     }
 
     // 3. Settle by rule, with the evidence in the memo.
