@@ -129,7 +129,7 @@ async function audit(sig) {
     const d = await r.json();
     if (!r.ok) { out.innerHTML = '<p class="err">' + esc(d.error) + "</p>"; return; }
     const m = d.memo;
-    out.innerHTML = '<p class="note" style="margin-top:12px">' + tx(d.signature, "Transaction") + ": job <code>" + esc(m.job) + "</code>, " + esc(m.step) + ", " + esc(OPS[m.op]) + " at " + esc(m.loc) + " on " + esc(m.date) + ". <button type=\"button\" data-job=\"" + esc(m.job) + "\" style=\"padding:2px 8px;font-size:0.8rem\">show the job</button></p>" +
+    out.innerHTML = '<p class="note" style="margin-top:12px">' + tx(d.signature, "Transaction") + ": job <code>" + esc(m.job) + "</code>, " + esc(m.step) + ", " + esc(OPS[m.op]) + " at " + esc(m.loc) + " on " + esc(m.date) + '. <button type="button" data-job="' + esc(m.job) + '" style="padding:2px 8px;font-size:0.8rem">show the job</button></p>' +
       '<ul class="checks">' + d.checks.map((c) => '<li><span class="' + (c.ok === true ? "y" : c.ok === false ? "n" : "q") + '">' + (c.ok === true ? "✓" : c.ok === false ? "✗" : "?") + "</span> <b>" + esc(c.name) + "</b>: " + esc(c.detail) + "</li>").join("") + "</ul>";
   } catch (e) { out.innerHTML = '<p class="err">The audit failed to load.</p>'; }
 }
