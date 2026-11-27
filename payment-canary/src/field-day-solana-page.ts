@@ -54,8 +54,9 @@ code { font-family:ui-monospace, monospace; font-size:0.85em; overflow-wrap:anyw
 <div class="rules">
   <div><b>Release</b>Both verifiers agree the window held: the fee goes to the contractor.</div>
   <div><b>Refund</b>Both agree it failed (rain of 1 mm or more; a low at or below 0 °C for frost work): the fee goes back to the buyer.</div>
-  <div><b>Hold</b>They disagree, or one has no reading: the fee stays in escrow for a person to resolve.</div>
+  <div><b>Hold</b>They disagree, or one has no reading: the fee stays in escrow until a person resolves it, and the resolution is recorded on-chain with its reason.</div>
 </div>
+<p class="note" style="margin:-12px 0 20px">The ranked route picks the first verifier (today that is our own miner 64174, which reads the ERA5 archive). The cross-check is SecondSky's 77031, which reads NASA POWER (satellite and MERRA-2 data), so the two can genuinely disagree; Counterproof's 731004 is the fallback. Limits: Solana devnet only; the escrow is a custodial agent wallet run by this app, not an on-chain program; the demo buyer is the app's operator wallet.</p>
 <form id="f">
   <label>Field job
     <select name="operation">
@@ -104,16 +105,17 @@ function steps(j) {
     '<li class="' + (j.deposit_tx ? "done" : "") + '"><b>1. Booked</b>' + esc(OPS[j.operation]) + " at " + esc(j.location) + " on " + esc(j.date) + ", " + usdc(j.fee_units) + " into escrow." +
       (j.deposit_tx ? "<dl><dt>Deposit</dt><dd>" + tx(j.deposit_tx, j.deposit_tx) + auditLink(j.deposit_tx) + "</dd></dl>" : "") + "</li>" +
     '<li class="' + (src.length === 2 ? "done" : "") + '"><b>2. Verified twice through Telegraph</b>Each reading bought with an x402 payment on Solana.<dl>' + src.map(one).join("") + "</dl></li>" +
-    settled + "</ol>";
+    settled + (j.resolution ? '<li class="' + (j.resolution.to === "contractor" ? "RELEASE" : "REFUND") + '"><b class="d">4. Resolved by hand: ' + (j.resolution.to === "contractor" ? "paid to the contractor" : "refunded to the buyer") + "</b>" + esc(j.resolution.why) + "<dl><dt>Transaction</dt><dd>" + tx(j.resolution.tx, j.resolution.tx) + auditLink(j.resolution.tx) + "</dd></dl></li>" : "") + "</ol>";
 }
 
 async function load() {
   try {
     const d = await (await fetch(BASE + "/api/jobs")).json();
+    JOBS = d.jobs;
     document.getElementById("info").innerHTML = "Escrow agent <code>" + esc(d.escrow_agent) + "</code> · operator (pays Telegraph and fees; the demo buyer) <code>" + esc(d.operator) + "</code> · cross-check verifiers " + esc((d.cross_check || []).join(", ")) + " · <a href=\\"" + BASE + "/api/ledger\\">full ledger (JSON)</a>";
     const rows = d.jobs.map((j) => "<tr><td><code>" + esc(j.id) + "</code><br>" + esc(OPS[j.operation]) + ", " + usdc(j.fee_units) + "</td><td>" + esc(j.location) + "<br>" + esc(j.date) + "</td><td>" +
       (j.sources || []).map((s) => esc(s.miner_id) + ": " + esc(reading(j.operation, s.result))).join("<br>") + "</td><td>" + esc(j.decision || j.state) + "</td><td>" +
-      [j.deposit_tx && tx(j.deposit_tx, "deposit"), j.settle_tx && tx(j.settle_tx, "settlement") + auditLink(j.settle_tx)].filter(Boolean).join("<br>") + "</td></tr>");
+      [j.deposit_tx && tx(j.deposit_tx, "deposit"), j.settle_tx && tx(j.settle_tx, "settlement") + auditLink(j.settle_tx), j.resolution && tx(j.resolution.tx, "resolution") + auditLink(j.resolution.tx)].filter(Boolean).join("<br>") + "</td></tr>");
     document.getElementById("jobs").innerHTML = rows.join("") || '<tr><td colspan="5">No jobs yet.</td></tr>';
   } catch (e) { document.getElementById("jobs").innerHTML = '<tr><td colspan="5" class="err">Could not load the jobs.</td></tr>'; }
 }
@@ -127,12 +129,14 @@ async function audit(sig) {
     const d = await r.json();
     if (!r.ok) { out.innerHTML = '<p class="err">' + esc(d.error) + "</p>"; return; }
     const m = d.memo;
-    out.innerHTML = '<p class="note" style="margin-top:12px">' + tx(d.signature, "Transaction") + ": job <code>" + esc(m.job) + "</code>, " + esc(m.step) + ", " + esc(OPS[m.op]) + " at " + esc(m.loc) + " on " + esc(m.date) + ".</p>" +
+    out.innerHTML = '<p class="note" style="margin-top:12px">' + tx(d.signature, "Transaction") + ": job <code>" + esc(m.job) + "</code>, " + esc(m.step) + ", " + esc(OPS[m.op]) + " at " + esc(m.loc) + " on " + esc(m.date) + ". <button type=\"button\" data-job=\"" + esc(m.job) + "\" style=\"padding:2px 8px;font-size:0.8rem\">show the job</button></p>" +
       '<ul class="checks">' + d.checks.map((c) => '<li><span class="' + (c.ok === true ? "y" : c.ok === false ? "n" : "q") + '">' + (c.ok === true ? "✓" : c.ok === false ? "✗" : "?") + "</span> <b>" + esc(c.name) + "</b>: " + esc(c.detail) + "</li>").join("") + "</ul>";
   } catch (e) { out.innerHTML = '<p class="err">The audit failed to load.</p>'; }
 }
 
 document.getElementById("go").addEventListener("click", () => { const s = document.getElementById("sig").value.trim(); if (s) audit(s); });
+let JOBS = [];
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-job]"); if (b) { const j = JOBS.find((x) => x.id === b.dataset.job); if (j) { document.getElementById("out").innerHTML = steps(j); document.getElementById("out").scrollIntoView({ behavior: "smooth" }); } } });
 document.addEventListener("click", (e) => { const a = e.target.closest("[data-audit]"); if (a) { e.preventDefault(); audit(a.dataset.audit); document.getElementById("audit").scrollIntoView({ behavior: "smooth" }); } });
 
 const f = document.getElementById("f");

@@ -250,6 +250,29 @@ describe("audit", () => {
   });
 });
 
+describe("resolution", () => {
+  it("settles a HOLD once, by hand, and the audit checks it against the HOLD", async () => {
+    const c = fakeChain();
+    const a = app(c.chain, fakeTelegraph({ "64174": day(3.7), "77031": day(0.62) }).tg);
+    const held = await a.review(RAW, "1.1.1.1");
+    expect(held.body.decision).toBe("HOLD");
+    await expect(a.resolve(String(held.body.id), "contractor", "ok")).rejects.toThrow(/reason/);
+    const out = await a.resolve(String(held.body.id), "contractor", "Contractor's photos show the field was sprayed.");
+    expect(out.resolution).toMatchObject({ to: "contractor" });
+    expect(c.sent.at(-1)).toMatchObject({ kind: "pay", to: CONTRACTOR, fee: 20_000n });
+    await expect(a.resolve(String(held.body.id), "buyer", "second try")).rejects.toThrow(/already/);
+    const checks = (await a.audit(c.sent.at(-1)!.sig)).body.checks as { ok: boolean | null }[];
+    expect(checks.map((x) => x.ok)).toEqual([true, true, true]);
+  });
+
+  it("refuses to resolve a job that isn't on hold", async () => {
+    const c = fakeChain();
+    const a = app(c.chain, fakeTelegraph({ "64174": day(0), "731004": day(0), "77031": day(0) }).tg);
+    const done = await a.review(RAW, "1.1.1.1");
+    await expect(a.resolve(String(done.body.id), "buyer", "change of mind")).rejects.toThrow(/not on hold/);
+  });
+});
+
 describe("page", () => {
   it("serves inline scripts that compile", () => {
     const scripts = [...PAGE.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);

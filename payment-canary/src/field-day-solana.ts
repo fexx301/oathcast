@@ -47,7 +47,7 @@ export const CROSS_CHECK = ["77031", "731004", "64174"];
 const DAY_MS = 86_400_000;
 
 export type Decision = "RELEASE" | "REFUND" | "HOLD";
-export type Step = "BOOKED" | Decision;
+export type Step = "BOOKED" | Decision | "RESOLVED";
 
 export interface Job extends ReviewInput {
   contractor: string;
@@ -73,6 +73,7 @@ export interface Memo {
   date: string;
   fee: string; // units of 6-decimal USDC
   src?: [string, number | null, string][]; // [miner, reading, signal hash]
+  res?: { to: "contractor" | "buyer"; why: string; hold: string }; // RESOLVED only: who got the fee, why, the HOLD tx
 }
 
 // ---------- pure rules ----------
@@ -126,9 +127,10 @@ export function decideFromReadings(op: Operation, readings: (number | null)[]): 
   return decide(op, a, b).decision;
 }
 
-export function memoFor(id: string, step: Step, job: Job, sources?: Source[]): string {
+export function memoFor(id: string, step: Step, job: Job, sources?: Source[], res?: Memo["res"]): string {
   const m: Memo = { v: 1, app: APP, job: id, step, op: job.operation, loc: job.location, date: job.date, fee: job.fee_units.toString() };
   if (sources) m.src = sources.map((s) => [s.miner_id, reading(job.operation, s.result), s.signal_hash]);
+  if (res) m.res = res;
   const text = JSON.stringify(m);
   if (Buffer.byteLength(text) > 560) throw new Error("memo too long");
   return text;
@@ -137,7 +139,8 @@ export function memoFor(id: string, step: Step, job: Job, sources?: Source[]): s
 export function parseMemo(text: string): Memo | null {
   try {
     const m = JSON.parse(text) as Memo;
-    if (m.v !== 1 || m.app !== APP || typeof m.job !== "string" || !["BOOKED", "RELEASE", "REFUND", "HOLD"].includes(m.step)) return null;
+    if (m.v !== 1 || m.app !== APP || typeof m.job !== "string" || !["BOOKED", "RELEASE", "REFUND", "HOLD", "RESOLVED"].includes(m.step)) return null;
+    if (m.step === "RESOLVED" && !(m.res && ["contractor", "buyer"].includes(m.res.to) && typeof m.res.hold === "string")) return null;
     if (!(m.op in OPERATIONS) || !/^\d+$/.test(m.fee)) return null;
     return m;
   } catch {
@@ -325,6 +328,7 @@ export class FieldDaySettle {
       if (r.type === "outcome" && r.kind === "source") (out.sources as unknown[]).push({ role: r.role, miner_id: r.miner_id, result: r.result, signal_hash: r.signal_hash, payment_tx: r.payment_tx });
       if (r.type === "outcome" && r.kind === "failed") Object.assign(out, { error: r.reason });
       if (r.type === "outcome" && r.kind === "settled") Object.assign(out, { state: String(r.decision).toLowerCase(), decision: r.decision, text: r.text, settle_tx: r.tx, error: undefined });
+      if (r.type === "outcome" && r.kind === "resolved") Object.assign(out, { state: `resolved: ${r.to === "contractor" ? "paid to the contractor" : "refunded to the buyer"}`, resolution: { to: r.to, why: r.why, tx: r.tx } });
     }
     return out;
   }
@@ -413,6 +417,25 @@ export class FieldDaySettle {
     return { status: 200, body: this.job(id)! };
   }
 
+  /** A person settles a HOLD: the fee goes to the contractor or back to the buyer, with the reason on the record.
+   *  Operator-only (run from the command line on the host); the memo links the HOLD so the audit can check it. */
+  async resolve(id: string, to: "contractor" | "buyer", why: string): Promise<Record<string, unknown>> {
+    const j = this.job(id);
+    if (!j) throw new Error(`no job ${id}`);
+    if (j.decision !== "HOLD") throw new Error(`${id} is not on hold (${String(j.state)})`);
+    if (j.resolution || this.ledger.rows.some((r) => r.id === id && r.type === "attempt" && r.step === "resolve")) {
+      throw new Error(`${id} already has a resolution attempt; check the ledger and the chain`);
+    }
+    const reason = why.trim().replace(/\s+/g, " ");
+    if (reason.length < 5 || reason.length > 140) throw new Error("give a reason of 5 to 140 characters");
+    const job = { operation: j.operation, location: j.location, date: j.date, contractor: j.contractor, fee_units: BigInt(String(j.fee_units)) } as Job;
+    const memo = memoFor(id, "RESOLVED", job, undefined, { to, why: reason, hold: String(j.settle_tx) });
+    this.ledger.append({ type: "attempt", id, at: new Date(this.now()).toISOString(), step: "resolve", to });
+    const tx = await this.chain.pay(to === "contractor" ? job.contractor : this.chain.operator, job.fee_units, memo);
+    this.ledger.append({ type: "outcome", id, at: new Date(this.now()).toISOString(), kind: "resolved", to, why: reason, tx, memo });
+    return this.job(id)!;
+  }
+
   /** Audits a settlement from its transaction alone: the chain, the memo, and Telegraph's records. */
   async audit(signature: string): Promise<{ status: number; body: Record<string, unknown> }> {
     if (!/^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(signature)) return { status: 400, body: { error: "Give a Solana transaction signature." } };
@@ -425,6 +448,18 @@ export class FieldDaySettle {
     const usdc = (n: bigint) => `${Number(n) / 1e6} USDC`;
     const moved = (owner: string) => tx.moves.find((m) => m.owner === owner)?.delta ?? 0n;
     const agent = this.chain.agent;
+    if (memo.step === "RESOLVED") {
+      const res = memo.res!;
+      const hold = await this.chain.tx(res.hold);
+      const holdMemo = hold?.memos.map(parseMemo).find(Boolean) ?? null;
+      checks.push({ name: "It resolves a recorded HOLD for the same job", ok: holdMemo?.step === "HOLD" && holdMemo.job === memo.job && hold?.moves.length === 0,
+        detail: holdMemo ? `${res.hold.slice(0, 12)}… is a ${holdMemo.step} for ${holdMemo.job}` : `${res.hold.slice(0, 12)}… has no Field-day memo` });
+      const to = tx.moves.find((m) => m.delta > 0n);
+      const toOk = res.to === "buyer" ? to?.owner === this.chain.operator : Boolean(to) && to!.owner !== this.chain.operator;
+      checks.push({ name: `Fee paid from escrow to the ${res.to}`, ok: moved(agent) === -fee && to?.delta === fee && toOk,
+        detail: `escrow ${usdc(moved(agent))}; ${to ? `${to.owner} +${usdc(to.delta)}` : "no recipient"}. Reason given: ${res.why}` });
+      return { status: 200, body: { signature, memo, checks } };
+    }
     if (memo.step === "BOOKED") {
       checks.push({ name: "Fee deposited into escrow", ok: moved(agent) === fee, detail: `escrow agent ${agent} received ${usdc(moved(agent))}; the memo says ${usdc(fee)}` });
       return { status: 200, body: { signature, memo, checks } };
@@ -524,7 +559,7 @@ function envInt(name: string, fallback: number): number {
   return v;
 }
 
-export async function main(): Promise<void> {
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   const operator = await signerFrom("SOLANA_PRIVATE_KEY");
   const agent = await signerFrom("FIELD_DAY_AGENT_KEY");
   if (operator.address === agent.address) throw new Error("the escrow agent must be a different wallet from the operator");
@@ -534,6 +569,12 @@ export async function main(): Promise<void> {
     maxPerDay: envInt("FIELD_DAY_SOLANA_MAX_PER_DAY", 15),
     maxPerIpHour: envInt("FIELD_DAY_SOLANA_MAX_PER_IP_HOUR", 4),
   });
+  // npm run field-day-solana -- resolve <job id> contractor|buyer "<reason>": settle a HOLD by hand.
+  if (argv[0] === "resolve") {
+    if (argv[2] !== "contractor" && argv[2] !== "buyer") throw new Error('usage: resolve <job id> contractor|buyer "<reason>"');
+    console.log(json(await app.resolve(argv[1] ?? "", argv[2], argv.slice(3).join(" "))));
+    return;
+  }
   const info = { network: SOLANA_DEVNET_NETWORK, usdc: SOLANA_DEVNET_USDC, node: NODE, intent: INTENT, operator: operator.address, escrow_agent: agent.address, cross_check: CROSS_CHECK };
   const port = envInt("FIELD_DAY_SOLANA_PORT", 8793);
   const host = process.env.FIELD_DAY_SOLANA_HOST ?? "127.0.0.1";
