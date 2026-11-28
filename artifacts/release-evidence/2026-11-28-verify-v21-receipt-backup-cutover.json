@@ -1,0 +1,15 @@
+{
+  "backup": {
+    "backup_row_count": 1299,
+    "bytes": 14684160,
+    "integrity_check": "ok",
+    "path": "/backups/receipts-cutover-v21.sqlite3",
+    "restore_check": true,
+    "sha256": "c0761595766cbb58488c2bb9507f84fbe450a7c78298da03b48269eaa3d223fb",
+    "source_open_mode": "ro",
+    "source_row_count": 1299
+  },
+  "database": "/data/oathcast/receipts.sqlite3",
+  "source_integrity_check": "ok",
+  "verified_at": "2026-11-28T07:14:30.477202Z"
+}

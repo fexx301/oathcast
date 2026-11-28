@@ -1,0 +1,83 @@
+{
+ "schema_version": 1,
+ "recorded_at": "2026-11-28T07:14:44Z",
+ "release_id": "2026-11-28-verify-v21",
+ "source_sha256": "0c538fdaff4bcc46f3b692c4b9f7924807635c24cc8a142db34d527407cd5e37",
+ "source_verification": {
+  "build_root": "/home/ec2-user/oathcast/releases/2026-11-28-verify-v21/source-clean",
+  "source_tar_sha256": "0ec36253775ad77e23bfb08b9a7e68a83ec4dc393091f053c4555479a20ac51a",
+  "file_count": 82,
+  "expected_source_sha256": "0c538fdaff4bcc46f3b692c4b9f7924807635c24cc8a142db34d527407cd5e37",
+  "host_recomputed_source_sha256": "0c538fdaff4bcc46f3b692c4b9f7924807635c24cc8a142db34d527407cd5e37",
+  "per_file_mismatches": 0,
+  "manifest_path": "artifacts/release-evidence/2026-11-28-verify-v21-manifest.json",
+  "manifest_file_sha256": "d1b9e2f9940c5ec2e2714aa04f29eab4bac4936de6dcf2462c1a777b749d7e5f",
+  "git_commit": "a244f79 (branch s2-verify-forecast)",
+  "verified": true
+ },
+ "image": {
+  "name": "oathcast:2026-11-28-verify-v21",
+  "image_id": "sha256:50d09b34edeb318c17cda42b0165b7c6795e23c18c51be719b1bd189b5c0624c",
+  "image_digest": "sha256:50d09b34edeb318c17cda42b0165b7c6795e23c18c51be719b1bd189b5c0624c",
+  "build_method": "not rebuilt: a container from oathcast:2026-11-07-verify-v20 with the four files that differ from v20's source copied in (src/oathcast/verify.py, service.py, decision_ui.py, miners/candidates/oathcast-sanctions-s2.yaml), committed with the release ID and source SHA-256 as ENV and labels; a docker build froze this host on 24 Nov",
+  "image_vs_clean_tree": "78 files under src/, miners/, scripts/ and pyproject.toml compared inside the image with the uploaded clean tree: 0 mismatches, 0 extra files",
+  "base_image_reference": "docker.io/library/python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217",
+  "labels": {
+   "org.opencontainers.image.title": "OathCast Miner",
+   "org.opencontainers.image.version": "2026-11-28-verify-v21",
+   "org.opencontainers.image.revision": "0c538fdaff4bcc46f3b692c4b9f7924807635c24cc8a142db34d527407cd5e37"
+  }
+ },
+ "runtime": {
+  "public_base_url": "https://oathcastcourt.duckdns.org",
+  "container": "oathcast",
+  "status": "running",
+  "port_binding": "127.0.0.1:8080:8080",
+  "receipt_mount": "/home/ec2-user/oathcast/data:/data/oathcast",
+  "restart_policy": "unless-stopped",
+  "user": "1000:1000",
+  "env_names": [
+   "OATHCAST_MINER_API_KEY",
+   "OATHCAST_MINER_API_KEYS",
+   "OATHCAST_ENABLE_TEMPERATURE_WINDOW",
+   "OATHCAST_REQUIRE_AUTH",
+   "OATHCAST_IMAGE_DIGEST",
+   "OATHCAST_ENABLE_VERIFY"
+  ],
+  "credentials": "unchanged from the live v20 container; runtime.env is v20's with only OATHCAST_IMAGE_DIGEST replaced (same keys, never printed)",
+  "verify_enabled": true,
+  "rollback_container": "oathcast-v19-rollback-20261107",
+  "candidate_container": "oathcast-v20-candidate-20261107 (stopped before cutover)",
+  "cutover_started": "2026-11-07T07:29:17Z",
+  "cutover_healthy": "2026-11-07T07:30:00Z",
+  "rollback": "docker rm -f oathcast && docker rename oathcast-v20-rollback-20261128 oathcast && docker start oathcast"
+ },
+ "verification": {
+  "candidate": "127.0.0.1:8081 on a copy of the receipts: smoke 12/12, verify checks 8/8",
+  "public": "https://oathcastcourt.duckdns.org: smoke 12/12, verify checks 8/8",
+  "cutover": "07:14:31Z to 07:14:44Z"
+ },
+ "database": {
+  "backup_before_candidate": "integrity ok",
+  "backup_at_cutover": "integrity ok"
+ },
+ "evidence": {
+  "manifest": "artifacts/release-evidence/2026-11-28-verify-v21-manifest.json",
+  "candidate_smoke": "artifacts/release-evidence/2026-11-28-verify-v21-candidate-smoke.json",
+  "candidate_verify": "artifacts/release-evidence/2026-11-28-verify-v21-candidate-verify.json",
+  "public_smoke": "artifacts/release-evidence/2026-11-28-verify-v21-public-smoke.json",
+  "public_verify": "artifacts/release-evidence/2026-11-28-verify-v21-public-verify.json",
+  "receipt_backup": "artifacts/release-evidence/2026-11-28-verify-v21-receipt-backup.json",
+  "receipt_backup_cutover": "artifacts/release-evidence/2026-11-28-verify-v21-receipt-backup-cutover.json"
+ },
+ "evidence_capture_sha256": {
+  "manifest": "d1b9e2f9940c5ec2e2714aa04f29eab4bac4936de6dcf2462c1a777b749d7e5f",
+  "candidate_smoke": "d97c9cc9091cdff92b4673a28d2f0282c058a5bca99d1f0b9ea194ea74611d48",
+  "candidate_verify": "90924182a86eeab8e79b2aeb7abcc5d549b74ba79570f46eddbb1ebd3e4be8b7",
+  "public_smoke": "369cd02600fda44d17eb8e61d68567b0c82c5cff6ff20e58daec4048fe04fd8a",
+  "public_verify": "bc448c16821ad588bef8eeadd494d07aef60e8d2235d614074fe13aa24b2fe9d",
+  "receipt_backup": "fda7486e330e52b0ee6a2a6f7280cc6ba605f6c5038df6810088c3849e7944af",
+  "receipt_backup_cutover": "d8d5af4a19b858c7e7982aeb78bf3acc10dadb070d0bd52d96c98a0f9e77bb4f"
+ },
+ "scope": "WEATHER_FORECAST_VERIFY_GENERAL answers today and up to 15 days ahead from the Open-Meteo forecast, labelled; past days unchanged."
+}
