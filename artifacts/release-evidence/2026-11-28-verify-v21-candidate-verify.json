@@ -1,0 +1,77 @@
+{
+ "base_url": "http://127.0.0.1:8081",
+ "today_utc": "2026-11-28",
+ "ok": true,
+ "checks": [
+  {
+   "name": "past_day_recorded_200",
+   "ok": true,
+   "status": 200,
+   "body": {
+    "condition": "overcast",
+    "content": "Open-Meteo's historical weather model data estimates a high of 19.8°C, a low of 12.3°C and 0 mm of precipitation for London, United Kingdom on 20 September 2026 (overcast).",
+    "date": "2026-09-20",
+    "location": "London, United Kingdom",
+    "precipitation_mm": 0.0,
+    "temp_max_c": 19.8,
+    "temp_min_c": 12.3,
+    "verdict": "no_forecast_supplied"
+   }
+  },
+  {
+   "name": "past_day_replay_identical",
+   "ok": true,
+   "status": 200
+  },
+  {
+   "name": "coming_day_forecast_200_labelled",
+   "ok": true,
+   "status": 200,
+   "body": {
+    "condition": "fog",
+    "content": "Open-Meteo's weather forecast estimates a high of 11.3°C, a low of 2.9°C and 0 mm of precipitation for Lleida, Spain on 29 November 2026 (fog). This is a forecast: the day has not been recorded yet.",
+    "date": "2026-11-29",
+    "location": "Lleida, Spain",
+    "precipitation_mm": 0.0,
+    "temp_max_c": 11.3,
+    "temp_min_c": 2.9,
+    "verdict": "forecast_not_yet_recorded"
+   }
+  },
+  {
+   "name": "coming_day_replay_identical",
+   "ok": true,
+   "status": 200
+  },
+  {
+   "name": "no_date_is_today_forecast_200",
+   "ok": true,
+   "status": 200,
+   "body": {
+    "condition": "slight rain",
+    "content": "Open-Meteo's weather forecast estimates a high of 10°C, a low of 7.1°C and 10 mm of precipitation for Cork, Ireland on 28 November 2026 (slight rain). This is a forecast: the day has not been recorded yet.",
+    "date": "2026-11-28",
+    "location": "Cork, Ireland",
+    "precipitation_mm": 10.0,
+    "temp_max_c": 10.0,
+    "temp_min_c": 7.1,
+    "verdict": "forecast_not_yet_recorded"
+   }
+  },
+  {
+   "name": "claim_on_coming_day_422_retry",
+   "ok": true,
+   "status": 422
+  },
+  {
+   "name": "unknown_param_400_code",
+   "ok": true,
+   "status": 400
+  },
+  {
+   "name": "no_auth_401",
+   "ok": true,
+   "status": 401
+  }
+ ]
+}

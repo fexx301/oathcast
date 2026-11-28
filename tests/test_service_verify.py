@@ -215,6 +215,51 @@ class VerifyRouteTests(unittest.TestCase):
         archive = [u for u in upstream.urls if "archive-api" in u][0]
         self.assertIn("daily=temperature_2m_max%2Ctemperature_2m_min%2Cprecipitation_sum%2Cweather_code", archive)
 
+    def test_a_coming_day_is_answered_from_the_forecast_and_labelled(self):
+        upstream = FakeUpstream(daily_value=2.5)
+        with RunningForecastServer(make_service(upstream)) as address:
+            status, body, _ = get(address, {"location": "Lisbon", "date": "2026-09-30"})
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            body,
+            {
+                "content": "Open-Meteo's weather forecast estimates a high of 2.5°C, a low of 2.5°C and 2.5 mm of "
+                "precipitation for Lisbon, Portugal on 30 September 2026 (slight rain). "
+                "This is a forecast: the day has not been recorded yet.",
+                "location": "Lisbon, Portugal",
+                "date": "2026-09-30",
+                "temp_max_c": 2.5,
+                "temp_min_c": 2.5,
+                "precipitation_mm": 2.5,
+                "condition": "slight rain",
+                "verdict": "forecast_not_yet_recorded",
+            },
+        )
+        self.assertEqual(upstream.count("archive-api"), 0)
+        self.assertEqual(upstream.count("api.open-meteo"), 1)
+
+    def test_today_is_answered_even_before_it_ends_at_the_place(self):
+        # 12:00 UTC: today is unfinished everywhere; the archive path would refuse it, the forecast answers it.
+        with RunningForecastServer(make_service(FakeUpstream())) as address:
+            status, body, _ = get(address, {"location": "Lisbon"})
+        self.assertEqual((status, body["date"], body["verdict"]), (200, "2026-09-28", "forecast_not_yet_recorded"))
+
+    def test_a_forecast_receipt_names_the_forecast_and_is_never_replayed_as_the_record(self):
+        upstream = FakeUpstream(daily_value=2.5)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SqliteReceiptStore(Path(tmp) / "receipts.sqlite3")
+            with RunningForecastServer(make_service(upstream, receipt_store=store)) as address:
+                _, early, _ = get(address, {"location": "Lisbon", "date": "2026-09-29"})
+                get(address, {"location": "Lisbon", "date": "2026-09-29"})  # same day: replayed
+            self.assertEqual(upstream.count("api.open-meteo"), 1)
+            later_upstream = FakeUpstream(daily_value=7.0)
+            later = make_service(later_upstream, receipt_store=store, now=FIXED_NOW + timedelta(days=3))
+            with RunningForecastServer(later) as address:
+                status, recorded, _ = get(address, {"location": "Lisbon", "date": "2026-09-29"})
+        self.assertEqual(early["verdict"], "forecast_not_yet_recorded")
+        self.assertEqual((status, recorded["verdict"], recorded["precipitation_mm"]), (200, "no_forecast_supplied", 7.0))
+        self.assertEqual(later_upstream.count("archive-api"), 1)
+
     def test_recorded_day_refuses_a_missing_value(self):
         upstream = FakeUpstream(daily_value=None)
         with RunningForecastServer(make_service(upstream)) as address:

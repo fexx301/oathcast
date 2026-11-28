@@ -400,7 +400,41 @@ DuckDNS currently maps
 now installed and runs from a root-only token file every five minutes because
 the public IPv4 is ephemeral.
 
-## Release 2026-11-07 - WFV recorded-day answer (CURRENT)
+## Release 2026-11-28 - WFV answers today and coming days from the forecast (CURRENT)
+
+Release v21 stops refusing the scorer's questions about today, coming days and no day. A plain
+place-and-day question about today or up to 15 days ahead (a place with no day means today) gets
+the same four fields from Open-Meteo's forecast API, with "This is a forecast: the day has not
+been recorded yet." in `content`, `verdict: forecast_not_yet_recorded`, and the forecast named as
+the source in the receipt. The answer is its own question, tied to the day it was issued, so it is
+never replayed as the record once the day has passed. Past days, claims, and the archive path are
+unchanged; claims on unfinished days are still refused (422, `window_not_finished`). Why: over
+25-28 Nov the Miner refused 13 of 72 requests (`date_required` 6, `window_not_finished` 4,
+`place_not_found` 4) while forecast miners led the Intent. Source: commit `a244f79` on
+`s2-verify-forecast`.
+
+- Release ID: `2026-11-28-verify-v21`
+- Source SHA-256: `0c538fdaff4bcc46f3b692c4b9f7924807635c24cc8a142db34d527407cd5e37` (82 files),
+  recomputed on the host from the uploaded tar (`0ec36253…0ac51a`).
+- Image: `sha256:50d09b34edeb318c17cda42b0165b7c6795e23c18c51be719b1bd189b5c0624c`. **Not rebuilt:**
+  a container from the v20 image with the four files that differ from v20's source copied in
+  (`verify.py`, `service.py`, `decision_ui.py`, the sanctions candidate YAML), committed with the
+  release ID and source SHA-256 as ENV and labels. A `docker build` froze this 912 MB host on 24
+  Nov. Inside the image, 78 files under `src/`, `miners/`, `scripts/` and `pyproject.toml` match the
+  clean tree: 0 mismatches, 0 extra files.
+- Runtime env: v20's `runtime.env` with only `OATHCAST_IMAGE_DIGEST` replaced (same keys, never
+  printed), in `releases/2026-11-28-verify-v21/runtime.env` (mode 600).
+- Backups before the candidate and at cutover: integrity `ok` both times.
+- Candidate (`127.0.0.1:8081`, on a copy of the receipts): smoke 12/12 and the v21 verify checks
+  8/8 (past day recorded and replayed; coming day forecast, labelled and replayed; no day is today;
+  a claim on a coming day 422 with Retry-After; unknown parameter 400; no auth 401). Production
+  then passed both over public HTTPS. Cutover: 07:14:31Z to 07:14:44Z.
+- Temporary SSH rules (one /32 each) were revoked after each step.
+- Evidence: `artifacts/release-evidence/2026-11-28-verify-v21-*`; the public canary now pins it.
+- Rollback: `docker rm -f oathcast && docker rename oathcast-v20-rollback-20261128 oathcast && docker start oathcast`.
+  v20 refuses today and coming days; it replays every other receipt.
+
+## Release 2026-11-07 - WFV recorded-day answer (HISTORICAL; SUPERSEDED BY V21)
 
 Release v20 answers WEATHER_FORECAST_VERIFY_GENERAL's current request (only
 `location` and a past `date`) with the recorded day: `temp_max_c`,
