@@ -24,6 +24,15 @@ from urllib.parse import urlencode
 
 
 ARCHIVE_ENDPOINT = "https://archive-api.open-meteo.com/v1/archive"
+FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
+# A place-and-day question about today or a coming day is answered from the forecast, labelled as such:
+# the record does not exist yet. The forecast API covers today plus 15 days.
+MAX_FORECAST_DAYS_AHEAD = 15
+FORECAST_SOURCE: dict[str, str] = {
+    "provider": "Open-Meteo Forecast API",
+    "datasets": "best match of national and global weather models",
+    "kind": "a forecast for a grid cell: the day has not been recorded yet",
+}
 GEOCODING_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search"
 # What the archive values are, stated as Open-Meteo documents them. Default
 # "best match" combines IFS HRES, ERA5 and ERA5-Land (open-meteo.com/en/docs/historical-weather-api).
@@ -217,6 +226,12 @@ class VerifyRequest:
     # The Intent's own request: a place and one past day, no variable or claim.
     # Answered with the whole recorded day (high, low, precipitation, condition).
     recorded_day: bool = False
+    # Set when the day is today or later: answered from the forecast issued on this date, never as a record.
+    forecast_issued_on: date | None = None
+
+    @property
+    def upcoming(self) -> bool:
+        return self.forecast_issued_on is not None
 
     @property
     def days(self) -> int:
@@ -454,24 +469,19 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
     if not location:
         raise VerifyError("a location (place name or 'lat,lon') is required", code="location_required")
 
+    no_date = False
     if params.get("start") or params.get("date"):
         start = _parse_date_param(params.get("start") or params["date"], today)
         end = _parse_date_param(params["end"], today) if params.get("end") else start
     else:
         dates = _parse_date_text(text, today)
-        if not dates:
-            raise VerifyError("a past date or window (YYYY-MM-DD) is required", code="date_required")
-        start, end = dates[0], dates[-1]
+        if dates:
+            start, end = dates[0], dates[-1]
+        else:  # a place with no day: answered for today, from the forecast, if nothing else needs a past day
+            start = end = today
+            no_date = True
     if end < start:
         start, end = end, start
-    if end >= today:
-        raise VerifyError(
-            "the window has not finished yet; verification needs a past date",
-            code="window_not_finished",
-            status=422,
-            # Until the day after the window ends; the archive may need longer.
-            retry_after=((end - today).days + 1) * DAY_SECONDS,
-        )
     if (end - start).days + 1 > MAX_WINDOW_DAYS:
         raise VerifyError(f"the window may cover at most {MAX_WINDOW_DAYS} days", code="window_too_long")
 
@@ -508,6 +518,23 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
         except ValueError as exc:
             raise VerifyError("tolerance must be a number", code="invalid_number") from exc
 
+    # A day that has not finished can't verify a claim (that would compare one forecast with another),
+    # but a plain question about one day, today or up to 15 days ahead, gets that day's forecast, labelled.
+    forecast_issued_on: date | None = None
+    if end >= today:
+        if forecast_value is None and start == end and (end - today).days <= MAX_FORECAST_DAYS_AHEAD:
+            recorded_day, forecast_issued_on = True, today
+        elif no_date:
+            raise VerifyError("a past date or window (YYYY-MM-DD) is required", code="date_required")
+        else:
+            raise VerifyError(
+                "the window has not finished yet; verification needs a past date",
+                code="window_not_finished",
+                status=422,
+                # Until the day after the window ends; the archive may need longer.
+                retry_after=((end - today).days + 1) * DAY_SECONDS,
+            )
+
     return VerifyRequest(
         location=location,
         start=start,
@@ -518,6 +545,7 @@ def parse_verify_request(params: dict[str, str], *, today: date) -> VerifyReques
         tolerance=tolerance,
         question=question,
         recorded_day=recorded_day,
+        forecast_issued_on=forecast_issued_on,
     )
 
 
@@ -563,6 +591,20 @@ def parse_geocoding(payload: dict[str, Any], location: str) -> Place:
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise VerifyError("the geocoding result was malformed", code="upstream_malformed", status=502) from exc
+
+
+def forecast_url(place: Place, request: VerifyRequest) -> str:
+    """The forecast for one coming day, with the same daily fields as a recorded day."""
+
+    params = {
+        "latitude": f"{place.latitude:.4f}",
+        "longitude": f"{place.longitude:.4f}",
+        "start_date": request.start.isoformat(),
+        "end_date": request.end.isoformat(),
+        "daily": ",".join(RECORDED_DAY_FIELDS),
+        "timezone": "auto",
+    }
+    return f"{FORECAST_ENDPOINT}?{urlencode(params)}"
 
 
 def archive_url(place: Place, request: VerifyRequest) -> str:
@@ -692,6 +734,16 @@ def render_recorded_day(observation: Observation, fields: dict[str, Any]) -> str
         f"Open-Meteo's historical weather model data estimates a high of {_number(fields['temp_max_c'])}°C, "
         f"a low of {_number(fields['temp_min_c'])}°C and {_number(fields['precipitation_mm'])} mm of precipitation "
         f"for {observation.place.label} {_window(observation)}{condition}."
+    )
+
+
+def render_forecast_day(observation: Observation, fields: dict[str, Any]) -> str:
+    condition = f" ({fields['condition']})" if fields.get("condition") else ""
+    return (
+        f"Open-Meteo's weather forecast estimates a high of {_number(fields['temp_max_c'])}°C, "
+        f"a low of {_number(fields['temp_min_c'])}°C and {_number(fields['precipitation_mm'])} mm of precipitation "
+        f"for {observation.place.label} {_window(observation)}{condition}. "
+        "This is a forecast: the day has not been recorded yet."
     )
 
 

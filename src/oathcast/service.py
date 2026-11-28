@@ -67,7 +67,9 @@ from oathcast.verify import (
     Place,
     VerifyError,
     VerifyRequest,
+    FORECAST_SOURCE,
     archive_url,
+    forecast_url,
     coordinates_from_location,
     geocoding_url,
     parse_archive,
@@ -75,6 +77,7 @@ from oathcast.verify import (
     parse_verify_request,
     recorded_day_fields,
     render_answer,
+    render_forecast_day,
     render_recorded_day,
     verify,
 )
@@ -555,6 +558,10 @@ def _verify_question(request: VerifyRequest, place: Place) -> dict[str, Any]:
     }
     if request.recorded_day:  # only when set, so earlier questions keep their event ids
         question["recorded_day"] = True
+    if request.forecast_issued_on is not None:
+        # A forecast answer is its own question, tied to the day it was issued: it is replayed only that day,
+        # and never stands in for the record once the day has passed.
+        question["forecast_issued_on"] = request.forecast_issued_on.isoformat()
     digest = hashlib.sha256(
         json.dumps(question, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -1229,10 +1236,16 @@ class ForecastService:
                     receipt_sha256=stored.get("receipt_sha256"),
                 )
 
-        raw_payload = self._fetch_verify_json(archive_url(place, request))
+        upcoming = request.upcoming
+        raw_payload = self._fetch_verify_json(forecast_url(place, request) if upcoming else archive_url(place, request))
         retrieved_at = self.clock().astimezone(UTC)
-        result = verify(request, parse_archive(raw_payload, place, request, now=retrieved_at))
+        # The finished-day check guards the archive; a forecast answer is labelled instead.
+        result = verify(request, parse_archive(raw_payload, place, request, now=None if upcoming else retrieved_at))
         detail = result.to_dict()
+        details = result.details()
+        if upcoming:
+            detail["source"] = details["source"] = dict(FORECAST_SOURCE)
+            details["kind"] = "forecast"
         # Kept small on purpose, as with the S1 forecast response: which part
         # of the response the scorer reads is unpublished, and both the claimed
         # value in the text and structured details in the body measured as
@@ -1246,12 +1259,13 @@ class ForecastService:
         }
         if request.recorded_day:
             day = recorded_day_fields(raw_payload)
+            render = render_forecast_day if upcoming else render_recorded_day
             public = {
-                "content": render_recorded_day(result.observation, day),
+                "content": render(result.observation, day),
                 "location": result.observation.place.label,
                 "date": request.start.isoformat(),
                 **day,
-                "verdict": detail["verdict"],
+                "verdict": "forecast_not_yet_recorded" if upcoming else detail["verdict"],
             }
             detail["recorded_day"] = day
         if self.receipt_store is None:
@@ -1266,7 +1280,7 @@ class ForecastService:
             "retrieved_at": format_timestamp(retrieved_at),
             "raw_payload": raw_payload,
             "verification": detail,
-            "details": result.details(),
+            "details": details,
             "public_response": public,
         }
         receipt["receipt_sha256"] = receipt_digest(receipt)

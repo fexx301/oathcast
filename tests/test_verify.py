@@ -98,15 +98,40 @@ class ParseRequestTests(unittest.TestCase):
         )
         self.assertEqual((request.start, request.end, request.days), (date(2026, 9, 10), date(2026, 9, 12), 3))
 
-    def test_refuses_unfinished_window(self):
-        with self.assertRaises(VerifyError):
-            parse_verify_request({"location": "Lisbon", "date": "2026-09-28", "variable": "precipitation"}, today=TODAY)
+    def test_unfinished_window_with_a_claim_is_refused(self):
+        # Checking a claim against a day that hasn't finished would compare one forecast with another.
+        for params in (
+            {"location": "Lisbon", "date": "2026-09-28", "variable": "precipitation", "forecast_value": "3"},
+            {"location": "Lisbon", "start": "2026-09-28", "end": "2026-09-29", "variable": "precipitation"},
+            {"location": "Lisbon", "date": "2026-10-14"},  # 16 days ahead: beyond the forecast's range
+        ):
+            with self.subTest(params=params), self.assertRaises(VerifyError) as caught:
+                parse_verify_request(params, today=TODAY)
+            self.assertEqual(caught.exception.code, "window_not_finished")
+
+    def test_a_plain_question_about_today_or_a_coming_day_is_a_forecast(self):
+        for params in (
+            {"location": "Lisbon", "date": "2026-09-28"},
+            {"location": "Lisbon", "date": "2026-10-13"},  # 15 days ahead, the forecast's last day
+            {"location": "Lisbon", "date": "2026-09-29", "variable": "precipitation"},
+            {"location": "Lisbon", "question": "Will it rain in Lisbon on 2026-09-30?"},
+            {"location": "Lisbon"},  # no day: today
+        ):
+            with self.subTest(params=params):
+                request = parse_verify_request(params, today=TODAY)
+                self.assertTrue(request.recorded_day and request.upcoming)
+                self.assertEqual(request.forecast_issued_on, TODAY)
+        self.assertEqual(parse_verify_request({"location": "Lisbon"}, today=TODAY).start, TODAY)
+        past = parse_verify_request({"location": "Lisbon", "date": "2026-09-27"}, today=TODAY)
+        self.assertFalse(past.upcoming)
 
     def test_requires_location_and_date(self):
         with self.assertRaises(VerifyError):
             parse_verify_request({"date": "2026-09-01", "variable": "precipitation"}, today=TODAY)
-        with self.assertRaises(VerifyError):
-            parse_verify_request({"location": "Lisbon", "variable": "precipitation"}, today=TODAY)
+        # With no day, a claim still needs a past date to be checked against.
+        with self.assertRaises(VerifyError) as caught:
+            parse_verify_request({"location": "Lisbon", "variable": "precipitation", "forecast_value": "3"}, today=TODAY)
+        self.assertEqual(caught.exception.code, "date_required")
 
     def test_place_and_one_day_alone_is_a_recorded_day(self):
         request = parse_verify_request({"location": "Lisbon", "date": "2026-09-15"}, today=TODAY)
