@@ -17,7 +17,7 @@ description: >-
   punctuation and legal-form words are removed; wallets match exactly. A name
   match is an alert that needs identity review, and no match is not a clearance.
   UK lists are not covered.
-base_url: https://ngrgakvwtxioa2kkdllvhn5pza0fxqcb.lambda-url.eu-north-1.on.aws
+base_url: https://ezgc5cniaxnabra4i6uu7b2yie0eiiti.lambda-url.eu-north-1.on.aws
 auth:
   type: none
 rate_limit_per_sec: 2
